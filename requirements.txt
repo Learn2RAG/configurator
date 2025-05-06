@@ -1,0 +1,9 @@
+bs4
+colorlog
+grandalf
+langchain-community
+langchain-core
+langchain-huggingface
+langchain-ollama
+langgraph
+simsimd
