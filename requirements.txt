@@ -6,4 +6,5 @@ langchain-core
 langchain-huggingface
 langchain-ollama
 langgraph
+pypdf
 simsimd

@@ -1,6 +1,14 @@
+import asyncio
+
 import bs4
 
-from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.document_loaders import PyPDFLoader, WebBaseLoader
+
+
+def pdf_loader(paths):
+    loader = PyPDFLoader(paths)
+    docs = asyncio.run(loader.aload())
+    return docs
 
 
 def web_loader(urls):
