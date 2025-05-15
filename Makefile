@@ -1,5 +1,5 @@
 .PHONY: install test clean
-INSTALL_CHECK = .venv/lib/python3.*/site-packages/easy-install.pth
+INSTALL_CHECK = .venv/lib/python3.*/site-packages
 
 install: $(INSTALL_CHECK)
 
