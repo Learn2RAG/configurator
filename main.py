@@ -12,7 +12,7 @@ from langgraph.graph import START, StateGraph
 from typing_extensions import List, TypedDict
 
 from components import llm, prompt, vector_store
-from loaders import web_loader
+import loaders
 
 
 # Define state for application
@@ -22,13 +22,19 @@ class State(TypedDict):
     answer: AnswerWithSources
 
 
+class StateUpdate(TypedDict, total=False):
+    question: str
+    context: List[Document]
+    answer: AnswerWithSources
+
+
 # Define application steps
-def retrieve(state: State):
+def retrieve(state: State) -> StateUpdate:
     retrieved_docs = vector_store.similarity_search(state["question"])
     return {"context": retrieved_docs}
 
 
-def generate(state: State):
+def generate(state: State) -> StateUpdate:
     docs_content = "\n\n".join(doc.page_content for doc in state["context"])
     messages = prompt.invoke({
         'question': state['question'],
@@ -36,14 +42,16 @@ def generate(state: State):
     })
     structured_llm = llm.with_structured_output(AnswerWithSources)
     response = structured_llm.invoke(messages)
-    return {'answer': response}
+    return {'answer': response}  # type: ignore[typeddict-item]  # FIXME
 
 
-def main():
-    docs = web_loader([
+def main() -> None:
+    docs = []
+    docs += loaders.web_loader([
         'https://learn2rag.de/',
         'https://hobbit-project.github.io/',
     ])
+    docs += loaders.pdf_loader('tests/data/pdf/HOBBIT.pdf')
     logging.debug('Documents loaded: %i', len(docs))
 
     text_splitter = RecursiveCharacterTextSplitter(
@@ -62,7 +70,7 @@ def main():
     graph = graph_builder.compile()
     print(graph.get_graph().draw_ascii(), file=sys.stderr)
 
-    def rag_query(question):
+    def rag_query(question: str) -> None:
         logging.info('Question: %s', question)
         response = graph.invoke({'question': question})
         logging.info('Answer: %s', response['answer'])

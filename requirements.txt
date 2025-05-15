@@ -6,5 +6,7 @@ langchain-core
 langchain-huggingface
 langchain-ollama
 langgraph
+mypy
 pypdf
 simsimd
+types-PyYAML
