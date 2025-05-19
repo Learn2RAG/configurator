@@ -1,3 +1,14 @@
 * Learn2RAG basic implementation
 ** Requirements
+*** Python
 *** Access to Ollama instance
+** Install
+#+BEGIN_SRC sh
+make
+#+END_SRC
+
+In ./components.py, set the base url and authorization token for your Ollama instance.
+** Run
+#+BEGIN_SRC sh
+./main.py
+#+END_SRC
