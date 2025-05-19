@@ -14,5 +14,10 @@ llm = ChatOllama(
     model='llama3.3:70b',
     temperature=0,
     base_url='',
-    client_kwargs={'headers': {'Authorization': 'Bearer X'}},
+    client_kwargs={
+        'headers': {
+            'Authorization': 'Bearer TOKEN',
+        },
+        # 'proxy': 'socks5://HOST:PORT',
+    },
 )

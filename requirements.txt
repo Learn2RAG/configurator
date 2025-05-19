@@ -1,6 +1,7 @@
 bs4
 colorlog
 grandalf
+httpx[socks]
 langchain-community
 langchain-core
 langchain-huggingface
