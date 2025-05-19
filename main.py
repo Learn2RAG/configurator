@@ -52,6 +52,7 @@ def main() -> None:
         'https://hobbit-project.github.io/',
     ])
     docs += loaders.pdf_loader('tests/data/pdf/HOBBIT.pdf')
+    docs += loaders.wikibooks_loader('tests/data/wikibooks/pages-articles.xml.bz2', limit=20)
     logging.debug('Documents loaded: %i', len(docs))
 
     text_splitter = RecursiveCharacterTextSplitter(
@@ -84,6 +85,7 @@ def main() -> None:
     rag_query('Was ist IGUANA')
     rag_query('Was ist das Ziel von Projekt learn2rag')
     rag_query('Wer ist an learn2rag beteiligt')
+    rag_query('Warum 1 keine Primzahl ist')
 
 
 if __name__ == '__main__':

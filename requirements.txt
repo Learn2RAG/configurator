@@ -7,6 +7,8 @@ langchain-core
 langchain-huggingface
 langchain-ollama
 langgraph
+lxml
+lxml-stubs
 mypy
 pypdf
 simsimd
