@@ -77,14 +77,18 @@ def main() -> None:
         logging.info('Answer: %s', response['answer'].answer)
         logging.info('Sources: %s', response['answer'].sources)
 
+    # no corresponding sources
     rag_query('Wie viele Hasen gibt es in Paderborn')
     rag_query('Wie viele Hasen gibt es in Deutschland')
     rag_query('Wie viele Hasen gibt es auf der Welt')
     rag_query('Wie viele verschiedene Arten von Hasen gibt es')
+    # PDF
     rag_query('Was ist HOBBIT')
     rag_query('Was ist IGUANA')
+    # web
     rag_query('Was ist das Ziel von Projekt learn2rag')
     rag_query('Wer ist an learn2rag beteiligt')
+    # Wikibooks
     rag_query('Warum 1 keine Primzahl ist')
 
 
