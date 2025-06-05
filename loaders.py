@@ -19,6 +19,8 @@ def pdf_loader(file_path: str) -> list[Document]:
 
 def web_loader(web_path: Sequence[str]) -> list[Document]:
     bs4_strainer = SoupStrainer(class_=[
+        'SP-Content__main',
+        'section sectionZ sectionArticle',
         'page__content',
         'post-content',
     ])

@@ -48,6 +48,8 @@ def generate(state: State) -> StateUpdate:
 def main() -> None:
     docs = []
     docs += loaders.web_loader([
+        'https://www.paderborn.de/tourismus-kultur/sehenswuerdigkeiten/Hasenfenster_Sehensw.php',
+        'https://www1.wdr.de/nachrichten/mehr-feldhasen-nrw-100.html',
         'https://learn2rag.de/',
         'https://hobbit-project.github.io/',
     ])
@@ -77,11 +79,11 @@ def main() -> None:
         logging.info('Answer: %s', response['answer'].answer)
         logging.info('Sources: %s', response['answer'].sources)
 
+    # web
+    rag_query('Wie viele Hasen auf dem Fenster zu sehen sind')
+    rag_query('Warum gibt es in NRW so viele Hasen')
     # no corresponding sources
-    rag_query('Wie viele Hasen gibt es in Paderborn')
-    rag_query('Wie viele Hasen gibt es in Deutschland')
-    rag_query('Wie viele Hasen gibt es auf der Welt')
-    rag_query('Wie viele verschiedene Arten von Hasen gibt es')
+    rag_query('Wie viele Hasen leben auf der Welt')
     # PDF
     rag_query('Was ist HOBBIT')
     rag_query('Was ist IGUANA')
