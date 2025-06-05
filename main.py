@@ -55,6 +55,8 @@ def main() -> None:
     ])
     docs += loaders.pdf_loader('tests/data/pdf/HOBBIT.pdf')
     docs += loaders.wikibooks_loader('tests/data/wikibooks/pages-articles.xml.bz2', limit=20)
+    for doc in docs:
+        assert len(doc.page_content) != 0, doc
     logging.debug('Documents loaded: %i', len(docs))
 
     text_splitter = RecursiveCharacterTextSplitter(
