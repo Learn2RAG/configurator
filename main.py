@@ -1,5 +1,7 @@
 #!.venv/bin/python3
 # https://python.langchain.com/docs/tutorials/rag/
+from typing import Any
+import argparse
 import logging
 import logging.config
 import sys
@@ -10,6 +12,10 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.graph import START, StateGraph
 from typing_extensions import List, TypedDict
+import cliff
+import cliff.app
+import cliff.command
+import cliff.commandmanager
 
 from components import llm, prompt, vector_store
 import loaders
@@ -45,20 +51,25 @@ def generate(state: State) -> StateUpdate:
     return {'answer': response}  # type: ignore[typeddict-item]  # FIXME
 
 
-def main() -> None:
-    docs = []
-    docs += loaders.web_loader([
+docs: list[Document] = []
+graph = None
+
+
+def load() -> None:
+    docs.extend(loaders.web_loader([
         'https://www.paderborn.de/tourismus-kultur/sehenswuerdigkeiten/Hasenfenster_Sehensw.php',
         'https://www1.wdr.de/nachrichten/mehr-feldhasen-nrw-100.html',
         'https://learn2rag.de/',
         'https://hobbit-project.github.io/',
-    ])
-    docs += loaders.pdf_loader('tests/data/pdf/HOBBIT.pdf')
-    docs += loaders.wikibooks_loader('tests/data/wikibooks/pages-articles.xml.bz2', limit=20)
+    ]))
+    docs.extend(loaders.pdf_loader('tests/data/pdf/HOBBIT.pdf'))
+    docs.extend(loaders.wikibooks_loader('tests/data/wikibooks/pages-articles.xml.bz2', limit=2))
     for doc in docs:
         assert len(doc.page_content) != 0, doc
     logging.debug('Documents loaded: %i', len(docs))
 
+
+def index() -> None:
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
@@ -70,32 +81,82 @@ def main() -> None:
     vector_store.add_documents(documents=all_splits)
     logging.debug('Indexing done')
 
+
+def build() -> None:
+    global graph
     graph_builder = StateGraph(State).add_sequence([retrieve, generate])
     graph_builder.add_edge(START, 'retrieve')
     graph = graph_builder.compile()
     print(graph.get_graph().draw_ascii(), file=sys.stderr)
 
-    def rag_query(question: str) -> None:
-        logging.info('Question: %s', question)
-        response = graph.invoke({'question': question})
-        logging.info('Answer: %s', response['answer'].answer)
-        logging.info('Sources: %s', response['answer'].sources)
 
-    # web
-    rag_query('Wie viele Hasen auf dem Fenster zu sehen sind')
-    rag_query('Warum gibt es in NRW so viele Hasen')
-    # no corresponding sources
-    rag_query('Wie viele Hasen leben auf der Welt')
-    # PDF
-    rag_query('Was ist HOBBIT')
-    rag_query('Was ist IGUANA')
-    # web
-    rag_query('Was ist das Ziel von Projekt learn2rag')
-    rag_query('Wer ist an learn2rag beteiligt')
-    # Wikibooks
-    rag_query('Warum 1 keine Primzahl ist')
+def query(query: str) -> None:
+    assert graph is not None
+    logging.info('Question: %s', query)
+    response = graph.invoke({'question': query})
+    logging.info('Answer: %s', response['answer'].answer)
+    logging.info('Sources: %s', response['answer'].sources)
+
+
+class Load(cliff.command.Command):
+    def take_action(self, parsed_args: argparse.Namespace) -> Any:
+        load()
+
+
+class Index(cliff.command.Command):
+    def take_action(self, parsed_args: argparse.Namespace) -> Any:
+        index()
+
+
+class Build(cliff.command.Command):
+    def take_action(self, parsed_args: argparse.Namespace) -> Any:
+        build()
+
+
+class Query(cliff.command.Command):
+    def get_parser(self, prog_name: str) -> cliff._argparse.ArgumentParser:
+        parser = super().get_parser(prog_name)
+        parser.add_argument('query', help='Input query text')
+        return parser
+
+    def take_action(self, parsed_args: argparse.Namespace) -> Any:
+        query(parsed_args.query)
+
+
+class Run(cliff.command.Command):
+    def take_action(self, parsed_args: argparse.Namespace) -> Any:
+        load()
+        index()
+        build()
+        # web
+        query('Wie viele Hasen auf dem Fenster zu sehen sind')
+        query('Warum gibt es in NRW so viele Hasen')
+        # no corresponding sources
+        query('Wie viele Hasen leben auf der Welt')
+        # PDF
+        query('Was ist HOBBIT')
+        query('Was ist IGUANA')
+        # web
+        query('Was ist das Ziel von Projekt learn2rag')
+        query('Wer ist an learn2rag beteiligt')
+        # Wikibooks
+        query('Warum 1 keine Primzahl ist')
+
+
+class App(cliff.app.App):
+    def __init__(self) -> None:
+        super().__init__(
+            description='Learn2RAG',
+            version='0.1',
+            command_manager=cliff.commandmanager.CommandManager('learn2rag'),
+            deferred_help=True,
+        )
+
+    def initialize_app(self, argv: list[str]) -> None:
+        for command in [Load, Index, Build, Query, Run]:
+            self.command_manager.add_command(command.__name__.lower(), command)  # type:ignore[type-abstract]
 
 
 if __name__ == '__main__':
     logging.config.dictConfig(yaml.safe_load(open('logging.yaml').read()))
-    main()
+    sys.exit(App().run(sys.argv[1:]))
