@@ -5,6 +5,7 @@
 **** Access to Ollama instance
 *** Optional
 **** Docker
+**** direnv
 ** Install
 #+BEGIN_SRC sh
   make
