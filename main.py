@@ -66,6 +66,7 @@ def load() -> None:
     ]))
     docs.extend(loaders.pdf_loader('tests/data/pdf/HOBBIT.pdf'))
     docs.extend(loaders.wikibooks_loader('tests/data/wikibooks/pages-articles.xml.bz2', limit=2))
+    docs.extend(loaders.html_loader('tests/data/html/AIAct.html'))
     for doc in docs:
         assert len(doc.page_content) != 0, doc
     logging.debug('Documents loaded: %i', len(docs))
@@ -116,6 +117,9 @@ def run_example_queries() -> None:
     query('Wer ist an learn2rag beteiligt')
     # Wikibooks
     query('Warum 1 keine Primzahl ist')
+    # AI Act
+    query('Was besagt das AI-Gesetz über Hasen?')
+    query('Was besagt das AI-Gesetz über Banken?')
 
 
 class Use(cliff.command.Command):

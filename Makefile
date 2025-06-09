@@ -3,7 +3,7 @@ INSTALL_CHECK = .venv/lib/python3.*/site-packages
 
 install: $(INSTALL_CHECK)
 
-test: $(INSTALL_CHECK) tests/data/wikibooks/pages-articles.xml.bz2
+test: $(INSTALL_CHECK) tests/data/wikibooks/pages-articles.xml.bz2 tests/data/html/AIAct.html
 	.venv/bin/mypy .
 	#.venv/bin/python3 -m unittest discover tests
 
@@ -13,6 +13,10 @@ $(INSTALL_CHECK): .venv
 tests/data/wikibooks/pages-articles.xml.bz2:
 	mkdir --parents $$(dirname $@)
 	wget --output-document $@ "https://files.dice-research.org/datasets/Wikibooks/20250501/dewikibooks-20250501-pages-articles.xml.bz2"
+
+tests/data/html/AIAct.html:
+	mkdir --parents $$(dirname $@)
+	wget --output-document $@ "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=OJ:L_202401689"
 
 .venv:
 	python3 -m venv .venv

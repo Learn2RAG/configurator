@@ -1,3 +1,4 @@
 /__pycache__/
 /.venv/
+/tests/data/html/
 /tests/data/wikibooks/
