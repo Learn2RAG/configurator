@@ -17,7 +17,7 @@ import cliff.app
 import cliff.command
 import cliff.commandmanager
 
-from components import llm, prompt, vector_store
+from components import embeddings, llm, prompt, InMemoryVectorStore, RedisVectorStore
 import loaders
 
 
@@ -36,6 +36,7 @@ class StateUpdate(TypedDict, total=False):
 
 # Define application steps
 def retrieve(state: State) -> StateUpdate:
+    assert vector_store is not None, 'vector_store should be defined'
     retrieved_docs = vector_store.similarity_search(state["question"])
     return {"context": retrieved_docs}
 
@@ -51,6 +52,7 @@ def generate(state: State) -> StateUpdate:
     return {'answer': response}  # type: ignore[typeddict-item]  # FIXME
 
 
+vector_store = None
 docs: list[Document] = []
 graph = None
 
@@ -70,6 +72,8 @@ def load() -> None:
 
 
 def index() -> None:
+    assert vector_store is not None, 'vector_store should be defined'
+
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
@@ -114,6 +118,21 @@ def run_example_queries() -> None:
     query('Warum 1 keine Primzahl ist')
 
 
+class Use(cliff.command.Command):
+    def get_parser(self, prog_name: str) -> cliff._argparse.ArgumentParser:
+        parser = super().get_parser(prog_name)
+        parser.add_argument('variable', help='Variable to configure')
+        parser.add_argument('constructor', help='Class name or function')
+        return parser
+
+    def take_action(self, parsed_args: argparse.Namespace) -> Any:
+        global vector_store
+        if parsed_args.variable == 'vector_store':
+            vector_store = globals()[parsed_args.constructor](embeddings)
+        else:
+            raise NotImplementedError
+
+
 class Load(cliff.command.Command):
     def take_action(self, parsed_args: argparse.Namespace) -> Any:
         load()
@@ -146,7 +165,9 @@ class Example(cliff.command.Command):
 
 class Run(cliff.command.Command):
     def take_action(self, parsed_args: argparse.Namespace) -> Any:
+        global vector_store
         load()
+        vector_store = InMemoryVectorStore(embeddings)
         index()
         build()
         run_example_queries()
@@ -162,7 +183,15 @@ class App(cliff.app.App):
         )
 
     def initialize_app(self, argv: list[str]) -> None:
-        for command in [Load, Index, Build, Query, Example, Run]:
+        for command in [
+                Use,
+                Load,
+                Index,
+                Build,
+                Query,
+                Example,
+                Run,
+        ]:
             self.command_manager.add_command(command.__name__.lower(), command)  # type:ignore[type-abstract]
 
 

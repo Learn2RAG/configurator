@@ -1,14 +1,31 @@
 * Learn2RAG basic implementation
 ** Requirements
-*** Python
-*** Access to Ollama instance
+*** Mandatory
+**** Python
+**** Access to Ollama instance
+*** Optional
+**** Docker
 ** Install
 #+BEGIN_SRC sh
-make
+  make
 #+END_SRC
 
 In ./components.py, set the base url and authorization token for your Ollama instance.
 ** Run
+*** Run an example with in-memory index store
 #+BEGIN_SRC sh
-./main.py
+  ./main.py <<< 'run_script scripts/example-inmemory-run'
+#+END_SRC
+*** Run an example with persistent vector store
+#+BEGIN_SRC sh
+  # Start the database
+  docker-compose up -d
+  # Index documents once
+  ./main.py <<< 'run_script scripts/example-redis-index'
+  # Run queries using the index
+  ./main.py <<< 'run_script scripts/example-redis-run'
+#+END_SRC
+*** Start interactive session
+#+BEGIN_SRC sh
+  ./main.py
 #+END_SRC

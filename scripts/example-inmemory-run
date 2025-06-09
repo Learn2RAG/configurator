@@ -1,0 +1,5 @@
+load
+use vector_store InMemoryVectorStore
+index
+build
+example
