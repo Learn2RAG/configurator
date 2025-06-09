@@ -2,7 +2,7 @@ import asyncio
 import bz2
 import itertools
 import logging
-from typing import Sequence
+from typing import Iterator, Sequence
 
 from bs4 import SoupStrainer  # type: ignore[attr-defined]
 from lxml import etree
@@ -37,13 +37,13 @@ def web_loader(web_path: Sequence[str]) -> list[Document]:
     return docs
 
 
-def cleanup_etree(elem):
+def cleanup_etree(elem: etree._Element) -> None:
     elem.clear()
     while elem.getprevious() is not None:
-        del elem.getparent()[0]
+        del elem.getparent()[0]  # type:ignore[union-attr]
 
 
-def read_wikibooks_dump(path: str):
+def read_wikibooks_dump(path: str) -> Iterator[tuple[str, str]]:
     total = 0
     skipped = 0
     file = bz2.open(path)
@@ -63,7 +63,7 @@ def read_wikibooks_dump(path: str):
     logging.debug('Pages skipped in %s: %d', path, skipped)
 
 
-def wikibooks_loader(path: str, limit: int = None) -> list[Document]:
+def wikibooks_loader(path: str, limit: int | None = None) -> list[Document]:
     docs: list[Document] = []
     for title, text in itertools.islice(read_wikibooks_dump(path), limit):
         docs.append(Document(page_content=text, metadata={
