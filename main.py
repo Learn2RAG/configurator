@@ -91,11 +91,27 @@ def build() -> None:
 
 
 def query(query: str) -> None:
-    assert graph is not None
+    assert graph is not None, 'graph should be defined'
     logging.info('Question: %s', query)
     response = graph.invoke({'question': query})
     logging.info('Answer: %s', response['answer'].answer)
     logging.info('Sources: %s', response['answer'].sources)
+
+
+def run_example_queries() -> None:
+    # web
+    query('Wie viele Hasen auf dem Fenster zu sehen sind')
+    query('Warum gibt es in NRW so viele Hasen')
+    # no corresponding sources
+    query('Wie viele Hasen leben auf der Welt')
+    # PDF
+    query('Was ist HOBBIT')
+    query('Was ist IGUANA')
+    # web
+    query('Was ist das Ziel von Projekt learn2rag')
+    query('Wer ist an learn2rag beteiligt')
+    # Wikibooks
+    query('Warum 1 keine Primzahl ist')
 
 
 class Load(cliff.command.Command):
@@ -123,24 +139,17 @@ class Query(cliff.command.Command):
         query(parsed_args.query)
 
 
+class Example(cliff.command.Command):
+    def take_action(self, parsed_args: argparse.Namespace) -> Any:
+        run_example_queries()
+
+
 class Run(cliff.command.Command):
     def take_action(self, parsed_args: argparse.Namespace) -> Any:
         load()
         index()
         build()
-        # web
-        query('Wie viele Hasen auf dem Fenster zu sehen sind')
-        query('Warum gibt es in NRW so viele Hasen')
-        # no corresponding sources
-        query('Wie viele Hasen leben auf der Welt')
-        # PDF
-        query('Was ist HOBBIT')
-        query('Was ist IGUANA')
-        # web
-        query('Was ist das Ziel von Projekt learn2rag')
-        query('Wer ist an learn2rag beteiligt')
-        # Wikibooks
-        query('Warum 1 keine Primzahl ist')
+        run_example_queries()
 
 
 class App(cliff.app.App):
@@ -153,7 +162,7 @@ class App(cliff.app.App):
         )
 
     def initialize_app(self, argv: list[str]) -> None:
-        for command in [Load, Index, Build, Query, Run]:
+        for command in [Load, Index, Build, Query, Example, Run]:
             self.command_manager.add_command(command.__name__.lower(), command)  # type:ignore[type-abstract]
 
 
