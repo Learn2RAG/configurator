@@ -1,6 +1,7 @@
 version: '3.3'
 services:
   redis:
-    image: redis/redis-stack:7.4.0-v5
+    # redis/redis-stack:7.4.0-v5
+    image: hub.cs.upb.de/dice-research/images/redis-stack:7.4.0-v5
     ports:
       - "6379:6379"
