@@ -1,3 +1,5 @@
+import os
+
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain import hub
@@ -11,7 +13,7 @@ class RedisVectorStore(langchain_redis.RedisVectorStore):
     def __init__(self, embeddings: langchain_core.embeddings.embeddings.Embeddings) -> None:
         super().__init__(embeddings, config=langchain_redis.RedisConfig(
             index_name='test',
-            redis_url='redis://localhost:6379',
+            redis_url=os.environ.get('REDIS_URL', 'redis://localhost:6379'),
             metadata_schema=[
                 {'name': 'category', 'type': 'tag'},
             ],
@@ -26,10 +28,10 @@ prompt = hub.pull('rlm/rag-prompt')
 llm = ChatOllama(
     model='llama3.3:70b',
     temperature=0,
-    base_url='',
+    base_url=os.environ.get('OLLAMA_URL'),
     client_kwargs={
         'headers': {
-            'Authorization': 'Bearer TOKEN',
+            'Authorization': os.environ.get('OLLAMA_AUTH'),
         },
         # 'proxy': 'socks5://HOST:PORT',
     },
