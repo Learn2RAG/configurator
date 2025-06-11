@@ -25,6 +25,14 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+  langgraph:
+    build: .
+    environment:
+      LANGCHAIN_API_KEY: 1
+      LANGCHAIN_TRACING_V2: "false"
+      OLLAMA_URL: ${OLLAMA_URL}
+      OLLAMA_AUTH: ${OLLAMA_AUTH}
+      REDIS_URL: redis://redis:6379
 volumes:
   open-webui-data:
   open-webui-pipelines:

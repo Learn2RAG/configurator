@@ -1,6 +1,7 @@
 bs4
 cliff
 colorlog
+fastapi==0.115.11
 grandalf
 httpx[socks]
 langchain-community
@@ -13,5 +14,7 @@ lxml
 lxml-stubs
 mypy
 pypdf
+sentence-transformers
 simsimd
 types-PyYAML
+uvicorn==0.34.0

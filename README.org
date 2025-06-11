@@ -6,6 +6,11 @@
 *** Optional
 **** Docker
 **** direnv
+*** Installing (some of) requirements
+#+BEGIN_SRC sh
+  apt install build-essential python3-venv docker.io docker-compose direnv
+  direnv hook bash >>~/.bashrc
+#+END_SRC
 ** Install
 #+BEGIN_SRC sh
   make
@@ -20,7 +25,7 @@ In ./components.py, set the base url and authorization token for your Ollama ins
 *** Run an example with persistent vector store
 #+BEGIN_SRC sh
   # Start the database
-  docker-compose up -d
+  docker-compose up -d redis
   # Index documents once
   ./main.py <<< 'run_script scripts/example-redis-index'
   # Run queries using the index
@@ -30,3 +35,17 @@ In ./components.py, set the base url and authorization token for your Ollama ins
 #+BEGIN_SRC sh
   ./main.py
 #+END_SRC
+*** Start web interface
+**** Initial setup
+#+BEGIN_SRC sh
+  # Index documents
+  ./main.py <<< 'run_script scripts/example-redis-index'
+  # Start all components
+  docker-compose up -d
+#+END_SRC
+
+Open [[http://localhost:3000/][Open WebUI]], set up a local admin account.
+
+In user menu, Settings, Admin Settings, Connections, OpenAI API, "+" set URL to ~http://open-webui-pipelines:9099~ (without the trailing slash) and API key to ~0p3n-w3bu!~.
+
+In user menu, Settings, Admin Settings, Pipelines set Api Uri to ~http://langgraph:9000/stream~.

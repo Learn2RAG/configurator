@@ -1,3 +1,4 @@
+/.env
 /.local.envrc
 /__pycache__/
 /.venv/
