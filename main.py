@@ -7,49 +7,16 @@ import logging.config
 import sys
 import yaml
 
-from langchain.chains.openai_functions.qa_with_structure import AnswerWithSources
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langgraph.graph import START, StateGraph
-from typing_extensions import List, TypedDict
 import cliff
 import cliff.app
 import cliff.command
 import cliff.commandmanager
 
 from components import embeddings, llm, prompt, InMemoryVectorStore, RedisVectorStore
+from pipeline import pipeline
 import loaders
-
-
-# Define state for application
-class State(TypedDict):
-    question: str
-    context: List[Document]
-    answer: AnswerWithSources
-
-
-class StateUpdate(TypedDict, total=False):
-    question: str
-    context: List[Document]
-    answer: AnswerWithSources
-
-
-# Define application steps
-def retrieve(state: State) -> StateUpdate:
-    assert vector_store is not None, 'vector_store should be defined'
-    retrieved_docs = vector_store.similarity_search(state["question"])
-    return {"context": retrieved_docs}
-
-
-def generate(state: State) -> StateUpdate:
-    docs_content = "\n\n".join(doc.page_content for doc in state["context"])
-    messages = prompt.invoke({
-        'question': state['question'],
-        'context': docs_content,
-    })
-    structured_llm = llm.with_structured_output(AnswerWithSources)
-    response = structured_llm.invoke(messages)
-    return {'answer': response}  # type: ignore[typeddict-item]  # FIXME
 
 
 vector_store = None
@@ -89,9 +56,12 @@ def index() -> None:
 
 def build() -> None:
     global graph
-    graph_builder = StateGraph(State).add_sequence([retrieve, generate])
-    graph_builder.add_edge(START, 'retrieve')
-    graph = graph_builder.compile()
+    assert vector_store is not None, 'vector_store should be defined'
+    graph = pipeline(
+        vector_store=vector_store,
+        llm=llm,
+        prompt=prompt,
+    )
     print(graph.get_graph().draw_ascii(), file=sys.stderr)
 
 
