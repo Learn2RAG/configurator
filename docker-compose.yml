@@ -5,3 +5,7 @@ services:
     image: hub.cs.upb.de/dice-research/images/redis-stack:7.4.0-v5
     ports:
       - "6379:6379"
+    volumes:
+      - redis-data:/data
+volumes:
+  redis-data:
