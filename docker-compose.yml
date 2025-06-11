@@ -1,5 +1,23 @@
 version: '3.3'
 services:
+  open-webui:
+    # ghcr.io/open-webui/open-webui:main
+    image: hub.cs.upb.de/dice-research/images/open-webui@sha256:a7368a98dcc4e439575d991b25770bfc73188da6e50020dad3911caffa8c48c7
+    environment:
+      OFFLINE_MODE: "True"
+    ports:
+      - "3000:8080"
+    volumes:
+      - open-webui-data:/app/backend/data
+  open-webui-pipelines:
+    # ghcr.io/open-webui/pipelines:main
+    image: hub.cs.upb.de/dice-research/images/open-webui-pipelines@sha256:53858fbba70f55171d21eff5820f202cac43babf4e627f01472105407982d49a
+    environment:
+      PIPELINES_URLS: "https://github.com/open-webui/pipelines/blob/48ddbec455de76fc43224daf3438537cd8fcde87/examples/pipelines/integrations/langgraph_pipeline/langgraph_stream_pipeline.py"
+    ports:
+      - "9099:9099"
+    volumes:
+      - open-webui-pipelines:/app/pipelines
   redis:
     # redis/redis-stack:7.4.0-v5
     image: hub.cs.upb.de/dice-research/images/redis-stack:7.4.0-v5
@@ -8,4 +26,6 @@ services:
     volumes:
       - redis-data:/data
 volumes:
+  open-webui-data:
+  open-webui-pipelines:
   redis-data:
