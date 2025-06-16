@@ -1,18 +1,19 @@
+import logging
 import os
 
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain import hub
 from langchain_ollama import ChatOllama
-import langchain_core.embeddings.embeddings
+from langchain_core.embeddings.embeddings import Embeddings
 import langchain_redis
 
 
 # https://python.langchain.com/api_reference/redis/vectorstores/langchain_redis.vectorstores.RedisVectorStore.html
 class RedisVectorStore(langchain_redis.RedisVectorStore):
-    def __init__(self, embeddings: langchain_core.embeddings.embeddings.Embeddings) -> None:
+    def __init__(self, embeddings: Embeddings, index_name: str) -> None:
         super().__init__(embeddings, config=langchain_redis.RedisConfig(
-            index_name='test',
+            index_name=index_name,
             redis_url=os.environ.get('REDIS_URL', 'redis://localhost:6379'),
             metadata_schema=[
                 {'name': 'category', 'type': 'tag'},
@@ -25,10 +26,12 @@ embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-b
 # Define prompt for question-answering
 prompt = hub.pull('rlm/rag-prompt')
 
+ollama_url = os.environ.get('OLLAMA_URL')
+logging.info('Using Ollama URL: %s', ollama_url)
 llm = ChatOllama(
     model='llama3.3:70b',
     temperature=0,
-    base_url=os.environ.get('OLLAMA_URL'),
+    base_url=ollama_url,
     client_kwargs={
         'headers': {
             'Authorization': os.environ.get('OLLAMA_AUTH'),

@@ -33,6 +33,7 @@ services:
       OLLAMA_URL: ${OLLAMA_URL}
       OLLAMA_AUTH: ${OLLAMA_AUTH}
       REDIS_URL: redis://redis:6379
+      REDIS_INDEX_NAME: ${REDIS_INDEX_NAME}
 volumes:
   open-webui-data:
   open-webui-pipelines:

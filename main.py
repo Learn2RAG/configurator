@@ -26,23 +26,22 @@ docs: list[Document] = []
 graph = None
 
 
-def load() -> None:
-    docs.extend(loaders.web_loader([
-        'https://www.paderborn.de/tourismus-kultur/sehenswuerdigkeiten/Hasenfenster_Sehensw.php',
-        'https://www1.wdr.de/nachrichten/mehr-feldhasen-nrw-100.html',
-        'https://learn2rag.de/',
-        'https://hobbit-project.github.io/',
-    ]))
-    docs.extend(loaders.pdf_loader('tests/data/pdf/HOBBIT.pdf'))
-    docs.extend(loaders.wikibooks_loader('tests/data/wikibooks/pages-articles.xml.bz2', limit=2))
-    docs.extend(loaders.html_loader('tests/data/html/AIAct.html'))
-    for doc in docs:
-        assert len(doc.page_content) != 0, doc
-    logging.debug('Documents loaded: %i', len(docs))
+def load(path: str) -> None:
+    logging.debug('Loading: %s', path)
+    if path.startswith('https://'):
+        loaded_docs = loaders.web_loader(path)
+    elif path.endswith('.html'):
+        loaded_docs = loaders.html_loader(path)
+    else:
+        raise ValueError('Unsupported path', path)
+    docs.extend(loaded_docs)
 
 
 def index() -> None:
     assert vector_store is not None, 'vector_store should be defined'
+
+    for doc in docs:
+        assert len(doc.page_content) != 0, doc
 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
@@ -82,19 +81,25 @@ class Use(cliff.command.Command):
         parser = super().get_parser(prog_name)
         parser.add_argument('variable', help='Variable to configure')
         parser.add_argument('constructor', help='Class name or function')
+        parser.add_argument('constructor_args', nargs='*', help='Arguments for the constructor')
         return parser
 
-    def take_action(self, parsed_args: argparse.Namespace) -> Any:
+    def take_action(self, args: argparse.Namespace) -> Any:
         global vector_store
-        if parsed_args.variable == 'vector_store':
-            vector_store = globals()[parsed_args.constructor](embeddings)
+        if args.variable == 'vector_store':
+            vector_store = globals()[args.constructor](*([embeddings] + args.constructor_args))
         else:
             raise NotImplementedError
 
 
 class Load(cliff.command.Command):
-    def take_action(self, parsed_args: argparse.Namespace) -> Any:
-        load()
+    def get_parser(self, prog_name: str) -> cliff._argparse.ArgumentParser:
+        parser = super().get_parser(prog_name)
+        parser.add_argument('path', type=str, help='Path to index')
+        return parser
+
+    def take_action(self, args: argparse.Namespace) -> Any:
+        load(args.path)
 
 
 class Index(cliff.command.Command):

@@ -40,7 +40,7 @@ def generate_custom_stream(type: Literal["think","normal"], content: str):
     return custom_stream_writer({type:content})
 
 
-vector_store = RedisVectorStore(embeddings)
+vector_store = RedisVectorStore(embeddings, os.environ.get('REDIS_INDEX_NAME'))
 
 graph = pipeline(
     vector_store=vector_store,

@@ -15,8 +15,11 @@
 #+BEGIN_SRC sh
   make
 #+END_SRC
-
-In ./components.py, set the base url and authorization token for your Ollama instance.
+Configure options in ~./.local.envrc~:
+#+BEGIN_SRC sh
+export OLLAMA_URL="..."
+export OLLAMA_AUTH="Bearer ..."
+#+END_SRC
 ** Run
 *** Run an example with in-memory index store
 #+BEGIN_SRC sh
@@ -27,19 +30,33 @@ In ./components.py, set the base url and authorization token for your Ollama ins
   # Start the database
   docker-compose up -d redis
   # Index documents once
-  ./main.py <<< '@scripts/example-redis-index'
+  ./main.py <<< '@scripts/index-aiact'
   # Run queries using the index
-  ./main.py <<< '@scripts/example-redis-run'
+  ./main.py <<< '@scripts/query-aiact'
+  ./main.py <<< '@scripts/query-aifaq'
 #+END_SRC
-*** Start interactive session
+*** Start and interactive session
 #+BEGIN_SRC sh
   ./main.py
+#+END_SRC
+#+BEGIN_SRC
+  use vector_store RedisVectorStore aiact
+  build
+  query '"Was ist KI-Gesetz?"'
 #+END_SRC
 *** Start web interface
 **** Initial setup
 #+BEGIN_SRC sh
   # Index documents
-  ./main.py <<< '@scripts/example-redis-index'
+  ./main.py <<< '@scripts/index-aiact'
+#+END_SRC
+Configure options in ~./.env~:
+#+BEGIN_SRC sh
+  OLLAMA_URL="..."
+  OLLAMA_AUTH="Bearer ..."
+  REDIS_INDEX_NAME=aiact
+#+END_SRC
+#+BEGIN_SRC sh
   # Start all components
   docker-compose up -d
 #+END_SRC
