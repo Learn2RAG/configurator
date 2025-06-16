@@ -20,16 +20,16 @@ In ./components.py, set the base url and authorization token for your Ollama ins
 ** Run
 *** Run an example with in-memory index store
 #+BEGIN_SRC sh
-  ./main.py <<< 'run_script scripts/example-inmemory-run'
+  ./main.py <<< '@scripts/example-inmemory-run'
 #+END_SRC
 *** Run an example with persistent vector store
 #+BEGIN_SRC sh
   # Start the database
   docker-compose up -d redis
   # Index documents once
-  ./main.py <<< 'run_script scripts/example-redis-index'
+  ./main.py <<< '@scripts/example-redis-index'
   # Run queries using the index
-  ./main.py <<< 'run_script scripts/example-redis-run'
+  ./main.py <<< '@scripts/example-redis-run'
 #+END_SRC
 *** Start interactive session
 #+BEGIN_SRC sh
@@ -39,7 +39,7 @@ In ./components.py, set the base url and authorization token for your Ollama ins
 **** Initial setup
 #+BEGIN_SRC sh
   # Index documents
-  ./main.py <<< 'run_script scripts/example-redis-index'
+  ./main.py <<< '@scripts/example-redis-index'
   # Start all components
   docker-compose up -d
 #+END_SRC
