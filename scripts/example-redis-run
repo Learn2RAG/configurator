@@ -1,3 +1,5 @@
 use vector_store RedisVectorStore
 build
-example
+query --input-file tests/queries/hares.csv -f csv
+query --input-file tests/queries/dice.csv -f csv
+query --input-file tests/queries/wikibooks.csv -f csv

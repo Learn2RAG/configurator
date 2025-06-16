@@ -2,6 +2,7 @@
 # https://python.langchain.com/docs/tutorials/rag/
 from typing import Any
 import argparse
+import csv
 import logging
 import logging.config
 import sys
@@ -13,9 +14,10 @@ import cliff
 import cliff.app
 import cliff.command
 import cliff.commandmanager
+import cliff.lister
 
 from components import embeddings, llm, prompt, InMemoryVectorStore, RedisVectorStore
-from pipeline import pipeline
+import pipeline
 import loaders
 
 
@@ -57,7 +59,7 @@ def index() -> None:
 def build() -> None:
     global graph
     assert vector_store is not None, 'vector_store should be defined'
-    graph = pipeline(
+    graph = pipeline.pipeline(
         vector_store=vector_store,
         llm=llm,
         prompt=prompt,
@@ -65,31 +67,14 @@ def build() -> None:
     print(graph.get_graph().draw_ascii(), file=sys.stderr)
 
 
-def query(query: str) -> None:
+def query(query: str) -> pipeline.State:
     assert graph is not None, 'graph should be defined'
-    logging.info('Question: %s', query)
-    response = graph.invoke({'question': query})
-    logging.info('Answer: %s', response['answer'].answer)
-    logging.info('Sources: %s', response['answer'].sources)
+    return graph.invoke({'question': query})
 
 
-def run_example_queries() -> None:
-    # web
-    query('Wie viele Hasen auf dem Fenster zu sehen sind')
-    query('Warum gibt es in NRW so viele Hasen')
-    # no corresponding sources
-    query('Wie viele Hasen leben auf der Welt')
-    # PDF
-    query('Was ist HOBBIT')
-    query('Was ist IGUANA')
-    # web
-    query('Was ist das Ziel von Projekt learn2rag')
-    query('Wer ist an learn2rag beteiligt')
-    # Wikibooks
-    query('Warum 1 keine Primzahl ist')
-    # AI Act
-    query('Was besagt das AI-Gesetz über Hasen?')
-    query('Was besagt das AI-Gesetz über Banken?')
+def queries_from_file(input_path: str) -> list[pipeline.State]:
+    with open(input_path, newline='') as input_object:
+        return [query(row['query']) for row in csv.DictReader(input_object)]
 
 
 class Use(cliff.command.Command):
@@ -122,29 +107,22 @@ class Build(cliff.command.Command):
         build()
 
 
-class Query(cliff.command.Command):
+class Query(cliff.lister.Lister):
     def get_parser(self, prog_name: str) -> cliff._argparse.ArgumentParser:
         parser = super().get_parser(prog_name)
-        parser.add_argument('query', help='Input query text')
+        parser.add_argument('--input-file', type=str, help='Input csv file')
+        parser.add_argument('query', nargs='?', help='Input query text')
         return parser
 
-    def take_action(self, parsed_args: argparse.Namespace) -> Any:
-        query(parsed_args.query)
-
-
-class Example(cliff.command.Command):
-    def take_action(self, parsed_args: argparse.Namespace) -> Any:
-        run_example_queries()
-
-
-class Run(cliff.command.Command):
-    def take_action(self, parsed_args: argparse.Namespace) -> Any:
-        global vector_store
-        load()
-        vector_store = InMemoryVectorStore(embeddings)
-        index()
-        build()
-        run_example_queries()
+    def take_action(self, args: argparse.Namespace) -> Any:
+        if args.input_file is not None:
+            items = queries_from_file(args.input_file)
+        else:
+            items = [query(args.query)]
+        return (
+            ('query', 'response', 'sources'),
+            [(item['question'], item['answer'].answer, item['answer'].sources) for item in items],
+        )
 
 
 class App(cliff.app.App):
@@ -163,8 +141,6 @@ class App(cliff.app.App):
                 Index,
                 Build,
                 Query,
-                Example,
-                Run,
         ]:
             self.command_manager.add_command(command.__name__.lower(), command)  # type:ignore[type-abstract]
 
