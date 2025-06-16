@@ -2,5 +2,6 @@
 /.local.envrc
 /__pycache__/
 /.venv/
+/output/
 /tests/data/html/
 /tests/data/wikibooks/
