@@ -5,6 +5,7 @@ import argparse
 import csv
 import logging
 import logging.config
+import pathlib
 import sys
 import yaml
 
@@ -28,6 +29,7 @@ graph = None
 
 def load(path: str) -> None:
     logging.debug('Loading: %s', path)
+    loaded_docs = []
     if path.startswith('https://'):
         loaded_docs = loaders.web_loader(path)
     elif path.endswith('.html'):
@@ -35,7 +37,12 @@ def load(path: str) -> None:
     elif path.endswith('.pdf'):
         loaded_docs = loaders.pdf_loader(path)
     else:
-        raise ValueError('Unsupported path', path)
+        p = pathlib.Path(path)
+        if p.is_dir():
+            for f in p.iterdir():
+                load(str(f))
+        else:
+            raise ValueError('Unsupported path', path)
     docs.extend(loaded_docs)
 
 

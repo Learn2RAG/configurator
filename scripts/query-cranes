@@ -1,0 +1,7 @@
+use vector_store RedisVectorStore cranes
+build
+query '"How to remove fog from windows in Liebherr crane?"'
+query '"How to remove fog from windows in Hitachi crane?"'
+query '"Which crane should be used to build a house?"'
+query '"Which crane should be used to build a pet house?"'
+query '"What is the maximum weight a crane can lift?"'
