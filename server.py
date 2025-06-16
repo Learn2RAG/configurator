@@ -23,7 +23,7 @@ from langgraph.config import get_stream_writer
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 
-from components import embeddings, llm, prompt, RedisVectorStore
+from components import embeddings, llm, load_prompt, RedisVectorStore
 from pipeline import pipeline, State
 
 
@@ -40,12 +40,12 @@ def generate_custom_stream(type: Literal["think","normal"], content: str):
     return custom_stream_writer({type:content})
 
 
-vector_store = RedisVectorStore(embeddings, os.environ.get('REDIS_INDEX_NAME'))
+vector_store = RedisVectorStore(embeddings, os.environ['REDIS_INDEX_NAME'])
 
 graph = pipeline(
     vector_store=vector_store,
     llm=llm,
-    prompt=prompt,
+    prompt=load_prompt(os.environ['PROMPT_FILE']),
 )
 
 
