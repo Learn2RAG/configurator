@@ -20,6 +20,7 @@ Configure options in ~./.local.envrc~:
 export OLLAMA_URL="..."
 export OLLAMA_AUTH="Bearer ..."
 #+END_SRC
+You might need to run ~direnv allow~ in the same directory.
 ** Run
 *** Run an example with in-memory index store
 #+BEGIN_SRC sh
