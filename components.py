@@ -3,9 +3,9 @@ import os
 
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain import hub
 from langchain_ollama import ChatOllama
 from langchain_core.embeddings.embeddings import Embeddings
+import langchain_core.prompts
 import langchain_redis
 
 
@@ -21,10 +21,9 @@ class RedisVectorStore(langchain_redis.RedisVectorStore):
         ))
 
 
-embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2')
+load_prompt = langchain_core.prompts.loading.load_prompt
 
-# Define prompt for question-answering
-prompt = hub.pull('rlm/rag-prompt')
+embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2')
 
 ollama_url = os.environ.get('OLLAMA_URL')
 logging.info('Using Ollama URL: %s', ollama_url)
@@ -43,7 +42,7 @@ llm = ChatOllama(
 __all__ = [
     'embeddings',
     'llm',
-    'prompt',
+    'load_prompt',
     'InMemoryVectorStore',
     'RedisVectorStore',
 ]

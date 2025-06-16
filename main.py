@@ -17,7 +17,7 @@ import cliff.command
 import cliff.commandmanager
 import cliff.lister
 
-from components import embeddings, llm, prompt, InMemoryVectorStore, RedisVectorStore
+from components import embeddings, llm, load_prompt, InMemoryVectorStore, RedisVectorStore
 import pipeline
 import loaders
 
@@ -25,6 +25,7 @@ import loaders
 vector_store = None
 docs: list[Document] = []
 graph = None
+prompt = None
 
 
 def load(path: str) -> None:
@@ -66,6 +67,7 @@ def index() -> None:
 
 def build() -> None:
     global graph
+    assert prompt is not None, 'prompt should be defined'
     assert vector_store is not None, 'vector_store should be defined'
     graph = pipeline.pipeline(
         vector_store=vector_store,
@@ -95,10 +97,10 @@ class Use(cliff.command.Command):
 
     def take_action(self, args: argparse.Namespace) -> Any:
         global vector_store
+        constructor_args = args.constructor_args
         if args.variable == 'vector_store':
-            vector_store = globals()[args.constructor](*([embeddings] + args.constructor_args))
-        else:
-            raise NotImplementedError
+            constructor_args.insert(0, embeddings)
+        globals()[args.variable] = globals()[args.constructor](*constructor_args)
 
 
 class Load(cliff.command.Command):

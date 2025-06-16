@@ -1,3 +1,4 @@
 use vector_store RedisVectorStore aiact
+use prompt load_prompt ./prompts/langsmithhub/rlm/rag-prompt.json
 build
 query --input-file tests/queries/aifaq.csv -f csv --output-file output/aifaq.csv
