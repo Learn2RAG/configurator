@@ -1,6 +1,9 @@
 use vector_store InMemoryVectorStore
 load https://www.paderborn.de/tourismus-kultur/sehenswuerdigkeiten/Hasenfenster_Sehensw.php
 load https://www1.wdr.de/nachrichten/mehr-feldhasen-nrw-100.html
+load https://learn2rag.de/
+load https://hobbit-project.github.io/
+load ./tests/data/pdf/HOBBIT.pdf
 index
 build
 query '"Warum gibt es in NRW so viele Hasen?"'

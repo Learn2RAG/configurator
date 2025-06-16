@@ -32,6 +32,8 @@ def load(path: str) -> None:
         loaded_docs = loaders.web_loader(path)
     elif path.endswith('.html'):
         loaded_docs = loaders.html_loader(path)
+    elif path.endswith('.pdf'):
+        loaded_docs = loaders.pdf_loader(path)
     else:
         raise ValueError('Unsupported path', path)
     docs.extend(loaded_docs)
