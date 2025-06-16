@@ -111,6 +111,7 @@ class Query(cliff.lister.Lister):
     def get_parser(self, prog_name: str) -> cliff._argparse.ArgumentParser:
         parser = super().get_parser(prog_name)
         parser.add_argument('--input-file', type=str, help='Input csv file')
+        parser.add_argument('--output-file', type=str, help='Output csv file')
         parser.add_argument('query', nargs='?', help='Input query text')
         return parser
 
@@ -119,10 +120,12 @@ class Query(cliff.lister.Lister):
             items = queries_from_file(args.input_file)
         else:
             items = [query(args.query)]
-        return (
-            ('query', 'response', 'sources'),
-            [(item['question'], item['answer'].answer, item['answer'].sources) for item in items],
-        )
+        output_fields = 'query', 'response', 'sources'
+        output_rows = [(item['question'], item['answer'].answer, item['answer'].sources) for item in items]
+        if args.output_file is not None:
+            with open(args.output_file, 'w', newline='') as output_object:
+                csv.writer(output_object).writerows([output_fields] + output_rows)
+        return (output_fields, output_rows)
 
 
 class App(cliff.app.App):
