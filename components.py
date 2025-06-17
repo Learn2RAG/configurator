@@ -27,6 +27,8 @@ embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-b
 
 ollama_url = os.environ.get('OLLAMA_URL')
 logging.info('Using Ollama URL: %s', ollama_url)
+ollama_proxy = os.environ.get('OLLAMA_PROXY')
+logging.info('Using proxy for Ollama: %s', ollama_proxy)
 llm = ChatOllama(
     model='llama3.3:70b',
     temperature=0,
@@ -36,6 +38,7 @@ llm = ChatOllama(
             'Authorization': os.environ.get('OLLAMA_AUTH'),
         },
         # 'proxy': 'socks5://HOST:PORT',
+        'proxy': ollama_proxy,
     },
 )
 

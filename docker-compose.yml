@@ -30,6 +30,7 @@ services:
     environment:
       LANGCHAIN_API_KEY: 1
       LANGCHAIN_TRACING_V2: "false"
+      OLLAMA_PROXY: ${OLLAMA_PROXY}
       OLLAMA_URL: ${OLLAMA_URL}
       OLLAMA_AUTH: ${OLLAMA_AUTH}
       REDIS_URL: redis://redis:6379
