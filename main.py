@@ -52,7 +52,8 @@ def index() -> None:
     assert vector_store is not None, 'vector_store should be defined'
 
     for doc in docs:
-        assert len(doc.page_content) != 0, doc
+        if len(doc.page_content) == 0:
+            logging.warning('Empty document: %s', doc.metadata['source'])
 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
