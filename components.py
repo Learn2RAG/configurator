@@ -27,7 +27,7 @@ embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-b
 
 ollama_url = os.environ.get('OLLAMA_URL')
 logging.info('Using Ollama URL: %s', ollama_url)
-ollama_proxy = os.environ.get('OLLAMA_PROXY')
+ollama_proxy = os.environ.get('OLLAMA_PROXY') or None
 logging.info('Using proxy for Ollama: %s', ollama_proxy)
 llm_client_headers = {}
 if ollama_auth := os.environ.get('OLLAMA_AUTH'):
