@@ -29,15 +29,15 @@ ollama_url = os.environ.get('OLLAMA_URL')
 logging.info('Using Ollama URL: %s', ollama_url)
 ollama_proxy = os.environ.get('OLLAMA_PROXY')
 logging.info('Using proxy for Ollama: %s', ollama_proxy)
+llm_client_headers = {}
+if ollama_auth := os.environ.get('OLLAMA_AUTH'):
+    llm_client_headers['Authorization'] = ollama_auth
 llm = ChatOllama(
     model='llama3.3:70b',
     temperature=0,
     base_url=ollama_url,
     client_kwargs={
-        'headers': {
-            'Authorization': os.environ.get('OLLAMA_AUTH'),
-        },
-        # 'proxy': 'socks5://HOST:PORT',
+        'headers': llm_client_headers,
         'proxy': ollama_proxy,
     },
 )
