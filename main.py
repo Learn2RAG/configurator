@@ -11,6 +11,7 @@ import yaml
 
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from tqdm import tqdm
 import cliff
 import cliff.app
 import cliff.command
@@ -84,7 +85,7 @@ def query(query: str) -> pipeline.State:
 
 def queries_from_file(input_path: str) -> list[pipeline.State]:
     with open(input_path, newline='') as input_object:
-        return [query(row['query']) for row in csv.DictReader(input_object)]
+        return [query(row['query']) for row in tqdm(csv.DictReader(input_object), desc=input_path)]
 
 
 class Use(cliff.command.Command):
