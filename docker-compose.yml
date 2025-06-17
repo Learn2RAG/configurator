@@ -4,7 +4,16 @@ services:
     # ghcr.io/open-webui/open-webui:main
     image: hub.cs.upb.de/dice-research/images/open-webui@sha256:a7368a98dcc4e439575d991b25770bfc73188da6e50020dad3911caffa8c48c7
     environment:
+      ENABLE_PERSISTENT_CONFIG: "False"
+      DEFAULT_PROMPT_SUGGESTIONS: '[{"title": ["KI-Gesetz", "Warum reguliert"], "content": "Warum muss die Verwendung künstlicher Intelligenz reguliert werden?"}]'
+      ENABLE_TITLE_GENERATION: "False"
       OFFLINE_MODE: "True"
+      USER_PERMISSIONS_CHAT_FILE_UPLOAD: "False"
+      USER_PERMISSIONS_CHAT_TEMPORARY_ENFORCED: "True"
+      USER_PERMISSIONS_FEATURES_CODE_INTERPRETER: "False"
+      USER_PERMISSIONS_FEATURES_IMAGE_GENERATION: "False"
+      USER_PERMISSIONS_FEATURES_WEB_SEARCH: "False"
+      WEBUI_NAME: "Learn2RAG"
     ports:
       - "3000:8080"
     volumes:
