@@ -1,17 +1,25 @@
 * Learn2RAG basic implementation
 ** Requirements
-*** Mandatory
-**** Python
-**** Access to Ollama instance
-*** Optional
-**** Docker
-**** direnv
-*** Installing (some of) requirements
+*** Python
+*** Ollama
+*** Docker
+*** direnv
+** Install
+*** Packages
 #+BEGIN_SRC sh
   apt install build-essential python3-venv docker.io docker-compose direnv
   direnv hook bash >>~/.bashrc
 #+END_SRC
-** Install
+*** Ollama
+#+BEGIN_SRC sh
+curl -L https://ollama.com/download/ollama-linux-amd64.tgz -o ollama-linux-amd64.tgz
+tar -xzvf ollama-linux-amd64.tgz
+bin/ollama serve
+#+END_SRC
+#+BEGIN_SRC sh
+curl http://localhost:11434/api/pull -d '{"model": "llama3.3:70b"}'
+#+END_SRC sh
+*** Learn2RAG
 #+BEGIN_SRC sh
   make
 #+END_SRC
