@@ -1,0 +1,14 @@
+use vector_store RedisVectorStore cars
+use prompt load_prompt ./prompts/langsmithhub/rlm/rag-prompt-llama3.json
+build
+query '"What type of oil to use for the engine?"'
+query '"Where can I find first aid kit?"'
+query '"Where I can find the fuses?"'
+query '"How to turn on cruise control?"'
+query '"How to configure the mirrors?"'
+query '"How to remove fog from the windows?"'
+query '"How to defrost the windows?"'
+query '"Where can I find the manual?"'
+query '"What to do if the tire is broken?"'
+query '"Is there a replacement tire in the car?"'
+query '"Where is the replacement tire?"'
