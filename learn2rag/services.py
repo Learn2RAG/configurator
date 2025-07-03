@@ -1,4 +1,5 @@
 import os
+import signal
 import subprocess
 
 import yaml
@@ -17,11 +18,11 @@ class Project():
                 service['command'],
                 cwd=service['working_dir'],
                 env=os.environ | service['environment'],
+                start_new_session=True,
             ))
 
     def stop(self):
         for process in self.processes:
-            # TODO needs killing all child processes
-            process.terminate()
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
             process.wait()
         self.processes = []
