@@ -17,3 +17,6 @@ services:
     command: ["bash", "-eu", "../open-webui-pipelines-start"]
     environment:
       PIPELINES_URLS: "https://github.com/open-webui/pipelines/blob/48ddbec455de76fc43224daf3438537cd8fcde87/examples/pipelines/integrations/langgraph_pipeline/langgraph_stream_pipeline.py"
+  redis:
+    working_dir: "services/redis"
+    command: ["bash", "-eu", "../start-redis"]

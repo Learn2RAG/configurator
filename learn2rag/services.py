@@ -17,7 +17,7 @@ class Project():
             self.processes.append(subprocess.Popen(
                 service['command'],
                 cwd=service['working_dir'],
-                env=os.environ | service['environment'],
+                env=os.environ | service.get('environment', {}),
                 start_new_session=True,
             ))
 
