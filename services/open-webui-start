@@ -1,0 +1,1 @@
+exec .venv/bin/open-webui serve

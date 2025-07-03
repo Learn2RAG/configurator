@@ -1,0 +1,6 @@
+[submodule "services/open-webui"]
+	path = services/open-webui
+	url = https://github.com/learn2rag/open-webui
+[submodule "services/open-webui-pipelines"]
+	path = services/open-webui-pipelines
+	url = https://github.com/learn2rag/open-webui-pipelines
