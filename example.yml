@@ -1,7 +1,7 @@
 services:
   open-webui:
     working_dir: "services/open-webui"
-    command: ["bash", "-eu", "../open-webui-start"]
+    command: ["bash", "-eu", "../start-open-webui"]
     environment:
       ENABLE_PERSISTENT_CONFIG: "False"
       ENABLE_TITLE_GENERATION: "False"
@@ -14,7 +14,7 @@ services:
       WEBUI_NAME: "Learn2RAG"
   openwebui-pipelines:
     working_dir: "services/open-webui-pipelines"
-    command: ["bash", "-eu", "../open-webui-pipelines-start"]
+    command: ["bash", "-eu", "../start-open-webui-pipelines"]
     environment:
       PIPELINES_URLS: "https://github.com/open-webui/pipelines/blob/48ddbec455de76fc43224daf3438537cd8fcde87/examples/pipelines/integrations/langgraph_pipeline/langgraph_stream_pipeline.py"
   redis:
