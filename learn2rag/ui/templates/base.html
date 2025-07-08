@@ -1,0 +1,36 @@
+<!doctype html>
+<title>{% block title %}{% endblock %} — Learn2RAG</title>
+<link href="{{ url_for('static', filename='bootstrap.css') }}" rel="stylesheet"/>
+<script src="{{ url_for('static', filename='bootstrap.bundle.js') }}"></script>
+
+<nav class="navbar navbar-expand-lg bg-body-tertiary">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">Learn2RAG</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="/pipelines">Pipelines</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/models">Models</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/sources">Sources</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<section class="container">
+  <header>
+    {% block header %}{% endblock %}
+  </header>
+  {% for message in get_flashed_messages() %}
+    <div class="flash">{{ message }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</section>
