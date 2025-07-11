@@ -1,1 +1,16 @@
-~.venv/bin/flask --app learn2rag.ui run --host 0.0.0.0~
+* Clone and install
+#+begin_src sh
+  git clone --recursive ...
+  cd ...
+  ./install
+#+end_src
+
+* Running services
+#+begin_src sh
+  .venv/bin/python3 example.yml
+#+end_src
+
+* UI
+#+begin_src sh
+  .venv/bin/flask --app learn2rag.ui run --host 0.0.0.0
+#+end_src
