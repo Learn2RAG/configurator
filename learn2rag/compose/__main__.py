@@ -10,7 +10,11 @@ parser.add_argument('--project-file')
 args = parser.parse_args()
 if args.command == 'create':
     assert args.project_file is not None
-    Project.create(args.project_file, args.name)
+    proj = Project.create(args.project_file, args.name)
+    if proj is not None:
+        print(proj)
+    else:
+        print('Failed')
 elif args.command == 'start':
     Project.get(args.name).start()
 elif args.command == 'stop':
