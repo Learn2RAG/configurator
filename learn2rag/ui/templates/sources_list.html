@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Models{% endblock %}</h1>
+  <h1>{% block title %}Sources{% endblock %}</h1>
 {% endblock %}
 
 {% block content %}
 <p class="d-inline-flex gap-1">
   <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
-    Add new model
+    Add new data source
   </button>
 </p>
 <div class="collapse" id="collapseCreate">
@@ -17,7 +17,7 @@
       <div class="accordion-item">
         <h2 class="accordion-header">
           <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateConnect" aria-expanded="true" aria-controls="collapseCreateConnect">
-            Connect a model
+            Local file or directory
           </button>
         </h2>
         <div id="collapseCreateConnect" class="accordion-collapse collapse show" data-bs-parent="#accordionCreate">
@@ -28,16 +28,8 @@
                 <input class="form-control" name="label">
               </div>
               <div class="mb-3">
-                <label for="url" class="form-label">URL</label>
-                <input class="form-control" name="url">
-              </div>
-              <div class="mb-3">
-                <label for="token" class="form-label">Token</label>
-                <input class="form-control" name="token">
-              </div>
-              <div class="mb-3">
-                <label for="model" class="form-label">Model</label>
-                <input class="form-control" name="model">
+                <label for="url" class="form-label">Path</label>
+                <input class="form-control" name="path">
               </div>
               <button type="submit" class="btn btn-primary">Add</button>
             </form>
@@ -47,7 +39,7 @@
       <div class="accordion-item">
         <h2 class="accordion-header">
           <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateDownload" aria-expanded="false" aria-controls="collapseCreateDownload">
-            Download a model
+            Other data sources
           </button>
         </h2>
         <div id="collapseCreateDownload" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
@@ -66,22 +58,18 @@
     <tr>
       <th scope="col">#</th>
       <th scope="col">Label</th>
-      <th scope="col">URL</th>
-      <th scope="col">Token</th>
-      <th scope="col">Model</th>
+      <th scope="col">Path</th>
       <th scope="col"></th>
     </tr>
   </thead>
   <tbody>
-    {% for name, model in models.items() %}
+    {% for name, item in sources.items() %}
     <tr>
       <th scope="row">{{ name }}</th>
-      <td>{{ model.label }}</td>
-      <td>{{ model.url }}</td>
-      <td>{{ model.token }}</td>
-      <td>{{ model.model }}</td>
+      <td>{{ item.label }}</td>
+      <td>{{ item.path }}</td>
       <td>
-        <form method="POST" action="{{ url_for('model_action', model=name) }}">
+        <form method="POST" action="{{ url_for('source_action', source=name) }}">
           <div class="btn-group" role="group">
             <button type="submit" class="btn btn-danger" name="action" value="delete">Remove</button>
           </div>

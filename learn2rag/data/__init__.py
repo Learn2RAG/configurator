@@ -17,5 +17,12 @@ def get_entries(root, category):
     return {str(item.stem): yaml.safe_load(item.open()) for item in (Path(root) / 'data' / category).glob('*.yml')}
 
 
+def get_entry(root, category, name):
+    for item in (Path(root) / 'data' / category).glob('*.yml'):
+        if item.stem == name:
+            return yaml.safe_load(item.open())
+    raise FileNotFoundError
+
+
 def delete_entry(root, category, name):
     (Path(root) / 'data' / category / (name + '.yml')).unlink()

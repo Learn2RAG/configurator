@@ -5,36 +5,6 @@
 {% endblock %}
 
 {% block content %}
-<table class="table">
-  <thead>
-    <tr>
-      <th scope="col">#</th>
-      <th scope="col">Label</th>
-      <th scope="col">Storage path</th>
-      <th scope="col">Sprachmodell</th>
-      <th scope="col"></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for name, pipeline in pipelines.items() %}
-    <tr>
-      <th scope="row">{{ name }}</th>
-      <td>{{ pipeline.label }}</td>
-      <td>{{ pipeline.storage_path }}</td>
-      <td>{{ pipeline.language_model }}</td>
-      <td>
-        <form method="POST" action="{{ url_for('pipeline_action', pipeline=name) }}">
-          <div class="btn-group" role="group">
-            <button type="submit" class="btn btn-primary" name="action" value="build">Build</button>
-            <button type="submit" class="btn btn-danger" name="action" value="delete">Remove</button>
-          </div>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-
 <p class="d-inline-flex gap-1">
   <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
     Add new pipeline
@@ -53,17 +23,62 @@
         <input class="form-control" name="storage_path">
       </div>
       <div class="mb-3">
-        <label for="token" class="form-label">Sprachmodell</label>
+        <label for="language_model" class="form-label">Sprachmodell</label>
         <select class="form-select" name="language_model">
-          <option selected>Open this select menu</option>
           {% for name, language_model in language_models.items() %}
           <option value="{{ name }}">{{ language_model.label }} ({{ language_model.model }})</option>
           {% endfor %}
         </select>
       </div>
-      <button type="submit" class="btn btn-primary">Submit</button>
+      <div class="mb-3">
+        <label for="sources" class="form-label">Sources</label>
+        <select class="form-select" multiple="multiple" name="sources">
+          {% for name, source in sources.items() %}
+          <option value="{{ name }}" selected="selected">{{ source.label }} ({{ source.path }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Add</button>
     </form>
 
   </div>
 </div>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Label</th>
+      <th scope="col">Storage path</th>
+      <th scope="col">Sprachmodell</th>
+      <th scope="col">Sources</th>
+      <th scope="col"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for name, pipeline in pipelines.items() %}
+    <tr>
+      <th scope="row">{{ name }}</th>
+      <td>{{ pipeline.label }}</td>
+      <td>{{ pipeline.storage_path }}</td>
+      <td>
+        <span class="badge text-bg-secondary">{{ language_models[pipeline.language_model].label }}</span>
+      </td>
+      <td>
+        {% for source in pipeline.sources %}
+        <span class="badge text-bg-secondary">{{ sources[source].label }}</span>
+        {% endfor %}
+      </td>
+      <td>
+        <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
+          <div class="btn-group" role="group">
+            <button type="submit" class="btn btn-primary" name="action" value="build">Build</button>
+            <button type="submit" class="btn btn-danger" name="action" value="delete">Remove</button>
+          </div>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% endblock %}
