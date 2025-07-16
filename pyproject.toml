@@ -1,2 +1,28 @@
-[tool.mypy]
-strict = true
+[project]
+name = "basic-pipeline"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Carolin Walter",email = "carolin.walter@usu.com"}
+]
+readme = "README.md"
+requires-python = "3.13.5"
+dependencies = [
+    "langchain-community (>=0.3.27,<0.4.0)",
+    "langchain-core (>=0.3.68,<0.4.0)",
+    "langchain-huggingface (>=0.3.0,<0.4.0)",
+    "langchain-ollama (>=0.3.4,<0.4.0)",
+    "pyyaml (>=6.0.2,<7.0.0)",
+    "cliff (>=4.10.0,<5.0.0)",
+    "langgraph (>=0.5.2,<0.6.0)",
+    "langchain-redis (>=0.2.3,<0.3.0)",
+    "sentence-transformers (>=5.0.0,<6.0.0)",
+    "bs4 (>=0.0.2,<0.0.3)",
+    "lxml (>=6.0.0,<7.0.0)",
+    "colorlog (>=6.9.0,<7.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
