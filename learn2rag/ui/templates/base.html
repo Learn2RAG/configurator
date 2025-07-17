@@ -29,8 +29,12 @@
   <header>
     {% block header %}{% endblock %}
   </header>
-  {% for message in get_flashed_messages() %}
-    <div class="flash">{{ message }}</div>
+  {% for category, message in get_flashed_messages(with_categories=True) %}
+  {% if category == 'error' %}
+  <div class="alert alert-danger">{{ message }}</div>
+  {% else %}
+  <div class="alert alert-primary">{{ message }}</div>
+  {% endif %}
   {% endfor %}
   {% block content %}{% endblock %}
 </section>

@@ -59,7 +59,12 @@
     {% for name, pipeline in pipelines.items() %}
     <tr>
       <th scope="row">{{ name }}</th>
-      <td>{{ pipeline.label }}</td>
+      <td>
+        {{ pipeline.label }}
+        {% if projects[name] and projects[name].running %}
+        <span class="badge text-bg-success">running</span>
+        {% endif %}
+      </td>
       <td>{{ pipeline.storage_path }}</td>
       <td>
         <span class="badge text-bg-secondary">{{ language_models[pipeline.language_model].label }}</span>
@@ -71,9 +76,31 @@
       </td>
       <td>
         <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
-          <div class="btn-group" role="group">
-            <button type="submit" class="btn btn-primary" name="action" value="build">Build</button>
-            <button type="submit" class="btn btn-danger" name="action" value="delete">Remove</button>
+          <div class="dropdown">
+            <div class="btn-toolbar" role="toolbar">
+              <div class="btn-group" role="group">
+                <button class="btn btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                        {% if projects[name] and projects[name].running %} disabled="disabled" {% endif %}
+                        >
+                  Start
+                </button>
+                <ul class="dropdown-menu">
+                  {% for name, project in compose_templates.items() %}
+                  <li><button class="dropdown-item" type="submit" name="action" value="start:{{ name }}">{{ project.name }}</button></li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+            <div class="btn-group" role="group">
+              <button type="submit" class="btn btn-warning" name="action" value="stop"
+                      {% if not (projects[name] and projects[name].running) %} disabled="disabled" {% endif %}
+                      >
+                Stop
+              </button>
+              <button type="submit" class="btn btn-danger" name="action" value="delete">
+                Remove
+              </button>
+            </div>
           </div>
         </form>
       </td>

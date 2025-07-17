@@ -1,0 +1,5 @@
+name: import
+services:
+  main:
+    working_dir: "{{pipeline.storage_path}}"
+    command: ["bash", "-c", "ping -c 30 127.0.0.1; exit 1"]

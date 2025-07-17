@@ -27,7 +27,8 @@ def init_db(con):
         cur.execute(sql)
 
 
-con = sqlite3.connect('compose.db')
+# FIXME
+con = sqlite3.connect('compose.db', check_same_thread=False)
 init_db(con)
 
 
@@ -49,7 +50,6 @@ class Project():
     def get(name):
         cur = con.cursor()
         cur.row_factory = sqlite3.Row
-        cur.execute('BEGIN EXCLUSIVE')
         cur.execute('SELECT * FROM projects WHERE name = ?', (name,))
         project = None
         if row := cur.fetchone():
@@ -57,8 +57,22 @@ class Project():
             project.name = row['name']
             project.content = json.loads(row['content'])
             project.running = row['running']
-        con.commit()
+        cur.close()
         return project
+
+    def get_all():
+        cur = con.cursor()
+        cur.row_factory = sqlite3.Row
+        cur.execute('SELECT * FROM projects')
+        projects = {}
+        for row in cur.fetchall():
+            project = Project()
+            project.name = row['name']
+            project.content = json.loads(row['content'])
+            project.running = row['running']
+            projects[project.name] = project
+        cur.close()
+        return projects
 
     def remove(self):
         cur = con.cursor()

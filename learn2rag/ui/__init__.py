@@ -1,7 +1,11 @@
+from pathlib import Path
 import os
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, flash, redirect, render_template, request, url_for
+import jinja2
+import yaml
 
+from learn2rag.compose import Project
 import learn2rag.data
 
 
@@ -9,6 +13,7 @@ def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(
+        SECRET_KEY='dev',
     )
 
     if test_config is None:
@@ -23,6 +28,11 @@ def create_app(test_config=None):
         os.makedirs(app.instance_path)
     except OSError:
         pass
+
+    app.logger.debug('root_path: %s', app.root_path)
+    app.compose_template_path = Path(app.root_path) / app.template_folder / 'compose'
+    app.compose_templates = {str(item.stem): yaml.safe_load(item.open()) for item in app.compose_template_path.glob('*.yml')}
+    app.logger.debug('Loaded %i compose_templates: %s', len(app.compose_templates), list(app.compose_templates.keys()))
 
     @app.get('/')
     def start():
@@ -71,7 +81,8 @@ def create_app(test_config=None):
         pipelines = learn2rag.data.get_entries(app.instance_path, 'pipelines')
         language_models = learn2rag.data.get_entries(app.instance_path, 'models')
         sources = learn2rag.data.get_entries(app.instance_path, 'sources')
-        return render_template('pipelines_list.html', pipelines=pipelines, language_models=language_models, sources=sources)
+        projects = Project.get_all()
+        return render_template('pipelines_list.html', pipelines=pipelines, language_models=language_models, sources=sources, compose_templates=app.compose_templates, projects=projects)
 
     @app.post('/pipelines')
     def pipeline_create():
@@ -85,11 +96,36 @@ def create_app(test_config=None):
 
     @app.post('/pipelines/<name>')
     def pipeline_action(name):
+        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
         if request.form['action'] == 'delete':
             return 'Not implemented'
-        if request.form['action'] == 'build':
-            pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
-            return 'Not implemented'
+        if request.form['action'].startswith('start:'):
+            template_name = request.form['action'].split(':', 2)[1]
+            assert app.compose_templates[template_name]
+            template = jinja2.Template((app.compose_template_path / (template_name + '.yml')).read_text())
+            content = template.render(pipeline=pipeline)
+            storage_path = Path(pipeline['storage_path'])
+            storage_path.mkdir(parents=True, exist_ok=True)
+            project_file = storage_path / 'pipeline.yml'
+            project_file.write_text(content)
+            try:
+                project = Project.create(project_file, name)
+                assert project is not None, 'project should not be None'
+                project.start()
+                flash('Pipeline started')
+            except Exception as e:
+                app.logger.error('Could not start the pipeline: %s', e)
+                flash('Could not start the pipeline', 'error')
+        if request.form['action'] == 'stop':
+            project = Project.get(name)
+            try:
+                assert project is not None, 'project should not be None'
+                project.stop()
+                project.remove()
+                flash('Pipeline stopped')
+            except Exception as e:
+                app.logger.error('Could not stop the pipeline: %s', e)
+                flash('Could not stop the pipeline', 'error')
         return redirect(url_for('pipelines_list'))
 
     return app
