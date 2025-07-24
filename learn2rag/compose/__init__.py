@@ -1,11 +1,14 @@
 from pathlib import Path
 import json
+import logging
 import os
 import signal
 import sqlite3
 import subprocess
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 init_sql = ['''
 CREATE TABLE IF NOT EXISTS projects (
@@ -123,7 +126,7 @@ class Project():
             try:
                 os.killpg(os.getpgid(row['pid']), signal.SIGTERM)
             except ProcessLookupError:
-                print('Process does not exist: ', dict(row))
+                logger.debug('Process does not exist: %s', dict(row))
             # TODO wait for services to actually terminate
         cur.execute('DELETE FROM services WHERE project = :project', {'project': self.name})
         con.commit()
