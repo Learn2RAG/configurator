@@ -1,3 +1,4 @@
+from pathlib import Path
 import json
 import os
 import signal
@@ -92,6 +93,8 @@ class Project():
             raise AssertionError('Could not mark the project as running')
         self.services = []
         for name, service in self.content['services'].items():
+            if working_dir := service.get('working_dir'):
+                Path(working_dir).mkdir(parents=True, exist_ok=True)
             proc = subprocess.Popen(
                 service['command'],
                 cwd=service.get('working_dir'),
