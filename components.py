@@ -4,6 +4,7 @@ import os
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from langchain_core.embeddings.embeddings import Embeddings
 import langchain_core.prompts
 import langchain_redis
@@ -36,14 +37,22 @@ logging.info('Using proxy for Ollama: %s', ollama_proxy)
 llm_client_headers = {}
 if ollama_auth := os.environ.get('OLLAMA_AUTH'):
     llm_client_headers['Authorization'] = ollama_auth
-llm = ChatOllama(
-    model='llama3.3:70b',
+
+# llm = ChatOllama(
+#     model='gemma-3-27b-it',
+#     temperature=0,
+#     base_url=ollama_url,
+#     client_kwargs={
+#         'headers': llm_client_headers,
+#         'proxy': ollama_proxy,
+#     },
+# )
+
+llm = ChatOpenAI(
+    model='gemma-3-27b-it',
     temperature=0,
     base_url=ollama_url,
-    client_kwargs={
-        'headers': llm_client_headers,
-        'proxy': ollama_proxy,
-    },
+    api_key=ollama_auth,
 )
 
 __all__ = [
