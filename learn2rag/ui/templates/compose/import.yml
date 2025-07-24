@@ -1,5 +1,17 @@
 name: import
 services:
+  redis:
+    working_dir: "{{pipeline.storage_path}}"
+    command: ["{{learn2rag_path}}/services/redis/src/redis-server", "--include", "{{learn2rag_path}}/services/redis/redis.conf", "--loadmodule", "{{learn2rag_path}}/services/redis/modules/redisbloom/redisbloom.so", "--loadmodule", "{{learn2rag_path}}/services/redis/modules/redisearch/redisearch.so", "--loadmodule", "{{learn2rag_path}}/services/redis/modules/redistimeseries/redistimeseries.so"]
   main:
     working_dir: "{{pipeline.storage_path}}"
-    command: ["bash", "-c", "ping -c 30 127.0.0.1; exit 1"]
+    command: ["{{learn2rag_path}}/services/basic-pipeline/.venv/bin/python3", "{{learn2rag_path}}/services/basic-pipeline/importer.py"]
+    environment:
+      LANGCHAIN_API_KEY: "1"
+      LANGCHAIN_TRACING_V2: "false"
+      OLLAMA_URL: "{{language_model.url}}"
+      OLLAMA_AUTH: "{{language_model.token}}"
+      REDIS_URL: redis://localhost:6379
+      REDIS_INDEX_NAME: example
+      PROMPT_FILE: "{{learn2rag_path}}/services/basic-pipeline/prompts/langsmithhub/rlm/rag-prompt.json"
+      IMPORT_DIR: "{{learn2rag_path}}/example_import_dir"

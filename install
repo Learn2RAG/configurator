@@ -4,3 +4,4 @@ python3 -m venv .venv
 (cd services/open-webui && bash -eu ../install-open-webui)
 (cd services/open-webui-pipelines && bash -eu ../install-open-webui-pipelines)
 (cd services/basic-pipeline && bash -eu ../install-basic-pipeline)
+(cd services/redis && BUILD_TLS=yes BUILD_WITH_MODULES=yes INSTALL_RUST_TOOLCHAIN=yes DISABLE_WERRORS=yes make -j "$(nproc)" all)
