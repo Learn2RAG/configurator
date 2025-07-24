@@ -1,12 +1,18 @@
 from pathlib import Path
+import logging
 import os
 
 from flask import Flask, flash, redirect, render_template, request, url_for
+import flask.logging
 import jinja2
 import yaml
 
 from learn2rag.compose import Project
 import learn2rag.data
+
+
+logging.getLogger().addHandler(flask.logging.default_handler)
+logging.getLogger().setLevel(logging.DEBUG)
 
 
 def create_app(test_config=None):
@@ -29,6 +35,7 @@ def create_app(test_config=None):
     except OSError:
         pass
 
+    app.logger.debug('cwd: %s', os.getcwd())
     app.logger.debug('root_path: %s', app.root_path)
     app.compose_template_path = Path(app.root_path) / app.template_folder / 'compose'
     app.compose_templates = {str(item.stem): yaml.safe_load(item.open()) for item in app.compose_template_path.glob('*.yml')}
@@ -97,35 +104,45 @@ def create_app(test_config=None):
     @app.post('/pipelines/<name>')
     def pipeline_action(name):
         pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
-        if request.form['action'] == 'delete':
+        if pipeline is None:
+            flash('Pipeline not found', 'error')
+        elif request.form['action'] == 'delete':
             return 'Not implemented'
-        if request.form['action'].startswith('start:'):
+        elif request.form['action'].startswith('start:'):
+            app.logger.debug('Starting: %s', name)
             template_name = request.form['action'].split(':', 2)[1]
             assert app.compose_templates[template_name]
             template = jinja2.Template((app.compose_template_path / (template_name + '.yml')).read_text())
-            content = template.render(pipeline=pipeline)
-            storage_path = Path(pipeline['storage_path'])
+            language_model = learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model'])
+            content = template.render(learn2rag_path=Path('.').absolute(), pipeline=pipeline, language_model=language_model)
+            storage_path = Path(pipeline['storage_path']).absolute()
+            app.logger.debug('Storage path: %s', storage_path)
             storage_path.mkdir(parents=True, exist_ok=True)
             project_file = storage_path / 'pipeline.yml'
             project_file.write_text(content)
             try:
+                project = None
+                if project := Project.get(name):
+                    assert not project.running
+                    project.remove()
                 project = Project.create(project_file, name)
                 assert project is not None, 'project should not be None'
                 project.start()
                 flash('Pipeline started')
             except Exception as e:
                 app.logger.error('Could not start the pipeline: %s', e)
-                flash('Could not start the pipeline', 'error')
-        if request.form['action'] == 'stop':
+                flash(f'Could not start the pipeline: {e}', 'error')
+            if project and not project.running:
+                flash('Pipeline failed to start', 'error')
+        elif request.form['action'] == 'stop':
             project = Project.get(name)
             try:
                 assert project is not None, 'project should not be None'
                 project.stop()
-                project.remove()
                 flash('Pipeline stopped')
             except Exception as e:
                 app.logger.error('Could not stop the pipeline: %s', e)
-                flash('Could not stop the pipeline', 'error')
+                flash(f'Could not stop the pipeline: {e}', 'error')
         return redirect(url_for('pipelines_list'))
 
     return app
