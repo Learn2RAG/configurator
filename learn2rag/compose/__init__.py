@@ -6,9 +6,14 @@ import signal
 import sqlite3
 import subprocess
 
+import psutil
 import yaml
 
 logger = logging.getLogger(__name__)
+
+# FIXME
+# remove child processes immediately when they exit
+signal.signal(signal.SIGCHLD, signal.SIG_IGN)
 
 init_sql = ['''
 CREATE TABLE IF NOT EXISTS projects (
@@ -31,8 +36,21 @@ def init_db(con):
         cur.execute(sql)
 
 
-# FIXME
-con = sqlite3.connect('compose.db', check_same_thread=False)
+def process_running(pid):
+    try:
+        process = psutil.Process(pid)
+        os.kill(pid, 0)
+    except psutil.NoSuchProcess:
+        return False
+    else:
+        return process.is_running()
+
+
+con = sqlite3.connect(
+    os.environ.get('COMPOSE_DB', 'compose.db'),
+    # FIXME
+    check_same_thread=False,
+)
 init_db(con)
 
 
@@ -49,34 +67,45 @@ class Project():
             con.rollback()
             raise e
         con.commit()
-        return Project.get(name)
+        cur.close()
+        return Project.get(name, check=False)
 
-    def get(name):
+    def _from_row(row, *, check):
+        project = Project()
+        project.name = row['name']
+        project.content = json.loads(row['content'])
+        project.running = row['running']
+
+        if check and project.running:
+            project.check()
+
+        return project
+
+    def check(self):
+        cur = con.cursor()
+        cur.row_factory = sqlite3.Row
+        cur.execute('SELECT * FROM services WHERE project = :project', {'project': self.name})
+        rows = cur.fetchall()
+        cur.close()
+        if stopped := list(filter(lambda row: not process_running(row['pid']), rows)):
+            logger.info('Stopping project %s due to stopped services: %s', self.name, [row['name'] for row in stopped])
+            self.stop()
+
+    def get(name, *, check=True):
         cur = con.cursor()
         cur.row_factory = sqlite3.Row
         cur.execute('SELECT * FROM projects WHERE name = ?', (name,))
-        project = None
-        if row := cur.fetchone():
-            project = Project()
-            project.name = row['name']
-            project.content = json.loads(row['content'])
-            project.running = row['running']
+        row = cur.fetchone()
         cur.close()
-        return project
+        return Project._from_row(row, check=check) if row else None
 
-    def get_all():
+    def get_all(*, check=True):
         cur = con.cursor()
         cur.row_factory = sqlite3.Row
         cur.execute('SELECT * FROM projects')
-        projects = {}
-        for row in cur.fetchall():
-            project = Project()
-            project.name = row['name']
-            project.content = json.loads(row['content'])
-            project.running = row['running']
-            projects[project.name] = project
+        rows = cur.fetchall()
         cur.close()
-        return projects
+        return {project.name: project for project in map(lambda row: Project._from_row(row, check=check), rows)}
 
     def remove(self):
         cur = con.cursor()
@@ -86,6 +115,7 @@ class Project():
             con.rollback()
             raise AssertionError('Could not delete the project')
         con.commit()
+        cur.close()
 
     def start(self):
         cur = con.cursor()
@@ -98,20 +128,28 @@ class Project():
         for name, service in self.content['services'].items():
             if working_dir := service.get('working_dir'):
                 Path(working_dir).mkdir(parents=True, exist_ok=True)
-            proc = subprocess.Popen(
-                service['command'],
-                cwd=service.get('working_dir'),
-                env=os.environ | service.get('environment', {}),
-                start_new_session=True,
-            )
+            try:
+                proc = subprocess.Popen(
+                    service['command'],
+                    cwd=working_dir,
+                    env=os.environ | service.get('environment', {}),
+                    start_new_session=True,
+                )
+            except Exception as e:
+                # TODO stop already started processes
+                con.rollback()
+                raise e
             self.services.append(proc)
             cur.execute('INSERT INTO services (project, name, pid) VALUES (:project, :name, :pid)', {
                 'project': self.name,
                 'name': name,
                 'pid': proc.pid,
             })
+            del proc
             # what if insert failed?
         con.commit()
+        cur.close()
+        self.running = True
 
     def stop(self):
         cur = con.cursor()
@@ -130,3 +168,5 @@ class Project():
             # TODO wait for services to actually terminate
         cur.execute('DELETE FROM services WHERE project = :project', {'project': self.name})
         con.commit()
+        cur.close()
+        self.running = False
