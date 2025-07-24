@@ -7,6 +7,7 @@ from langchain_ollama import ChatOllama
 from langchain_core.embeddings.embeddings import Embeddings
 import langchain_core.prompts
 import langchain_redis
+import redis
 
 
 # https://python.langchain.com/api_reference/redis/vectorstores/langchain_redis.vectorstores.RedisVectorStore.html
@@ -14,7 +15,10 @@ class RedisVectorStore(langchain_redis.RedisVectorStore):
     def __init__(self, embeddings: Embeddings, index_name: str) -> None:
         super().__init__(embeddings, config=langchain_redis.RedisConfig(
             index_name=index_name,
-            redis_url=os.environ.get('REDIS_URL', 'redis://localhost:6379'),
+            redis_client=redis.from_url(
+                os.environ.get('REDIS_URL', 'redis://localhost:6379'),
+                retry=redis.retry.Retry(redis.backoff.ExponentialBackoff(), 10),
+            ),
             metadata_schema=[
                 {'name': 'category', 'type': 'tag'},
             ],
