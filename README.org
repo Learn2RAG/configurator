@@ -5,21 +5,27 @@
   ./install
 #+end_src
 
-* Running services
-Example project definition is in [[./example.yml]].
-#+begin_src sh
-  # Initialize
-  .venv/bin/python3 -m learn2rag.compose create --name example --project-file example.yml
-  # Start
-  .venv/bin/python3 -m learn2rag.compose start --name example
-  # Stop
-  .venv/bin/python3 -m learn2rag.compose stop --name example
-  # Can start again...
-  # Remove
-  .venv/bin/python3 -m learn2rag.compose remove --name example
-#+end_src
-
-* UI
+* Using the configurator
+** Start
 #+begin_src sh
   .venv/bin/flask --app learn2rag.ui run --host 0.0.0.0
 #+end_src
+
+** Usage
+*** Set up a language model
+Go to "Models", add a new model with an OpenAI-compatible API URL like ~https://example.com/api~ and a token like ~sk-mytoken~.
+
+*** Set up a pipeline
+Go to "Pipelines", add a new pipeline and select a storage path and your configured language model.
+
+*** Import documents
+Use "Start" → "import".
+Wait until the pipeline is done running.
+
+*** Run the pipeline and UI
+Use "Start" → "pipeline".
+The UI will be available at http://localhost:5001/ with default credentials ~user@learn2rag.de~ and ~learn2rag~.
+
+* See also
+- [[learn2rag/compose/README.org][compose]]
+- [[learn2rag/ui/README.org][ui]]

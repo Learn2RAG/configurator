@@ -1,0 +1,13 @@
+* Running services
+Example project definition is in [[../../example.yml]].
+#+begin_src sh
+  # Initialize
+  .venv/bin/python3 -m learn2rag.compose create --name example --project-file example.yml
+  # Start
+  .venv/bin/python3 -m learn2rag.compose start --name example
+  # Stop
+  .venv/bin/python3 -m learn2rag.compose stop --name example
+  # Can start again...
+  # Remove
+  .venv/bin/python3 -m learn2rag.compose remove --name example
+#+end_src
