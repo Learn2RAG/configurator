@@ -16,4 +16,4 @@ services:
       REDIS_URL: redis://localhost:6379
       REDIS_INDEX_NAME: example
       PROMPT_FILE: "{{learn2rag_path}}/services/basic-pipeline/prompts/langsmithhub/rlm/rag-prompt.json"
-      IMPORT_DIR: "{{learn2rag_path}}/example_import_dir"
+      IMPORT_DIRS: "{{sources | items | map(attribute=1) | map(attribute='path') | join('|')}}"

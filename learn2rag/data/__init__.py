@@ -13,7 +13,7 @@ def create_entry(root, category, data):
     return name
 
 
-def get_entries(root, category):
+def get_all(root, category):
     return {str(item.stem): yaml.safe_load(item.open()) for item in (Path(root) / 'data' / category).glob('*.yml')}
 
 
@@ -22,6 +22,10 @@ def get_entry(root, category, name):
         if item.stem == name:
             return yaml.safe_load(item.open())
     raise FileNotFoundError
+
+
+def get_entries(root, category, names):
+    return {name: get_entry(root, category, name) for name in names}
 
 
 def delete_entry(root, category, name):

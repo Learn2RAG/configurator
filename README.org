@@ -13,10 +13,13 @@
 
 ** Usage
 *** Set up a language model
-Go to "Models", add a new model with an OpenAI-compatible API URL like ~https://example.com/api~ and a token like ~sk-mytoken~.
+Go to "Models", add a new model with an OpenAI-compatible API URL like ~https://example.com/api~, a token like ~sk-mytoken~, and a model like ~gemma-3-27b-it~.
+
+*** Set up sources
+Go to "Sources", add your sources by specifying a path to the directory with the files to import.
 
 *** Set up a pipeline
-Go to "Pipelines", add a new pipeline and select a storage path and your configured language model.
+Go to "Pipelines", add a new pipeline and select a storage path for the pipeline data, your configured language model and sources.
 
 *** Import documents
 Use "Start" → "import".

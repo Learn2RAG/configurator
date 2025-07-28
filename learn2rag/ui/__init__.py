@@ -47,7 +47,7 @@ def create_app(test_config=None):
 
     @app.get('/models')
     def models_list():
-        models = learn2rag.data.get_entries(app.instance_path, 'models')
+        models = learn2rag.data.get_all(app.instance_path, 'models')
         return render_template('models_list.html', models=models)
 
     @app.post('/models')
@@ -68,7 +68,7 @@ def create_app(test_config=None):
 
     @app.get('/sources')
     def sources_list():
-        sources = learn2rag.data.get_entries(app.instance_path, 'sources')
+        sources = learn2rag.data.get_all(app.instance_path, 'sources')
         return render_template('sources_list.html', sources=sources)
 
     @app.post('/sources')
@@ -85,9 +85,9 @@ def create_app(test_config=None):
 
     @app.get('/pipelines')
     def pipelines_list():
-        pipelines = learn2rag.data.get_entries(app.instance_path, 'pipelines')
-        language_models = learn2rag.data.get_entries(app.instance_path, 'models')
-        sources = learn2rag.data.get_entries(app.instance_path, 'sources')
+        pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
+        language_models = learn2rag.data.get_all(app.instance_path, 'models')
+        sources = learn2rag.data.get_all(app.instance_path, 'sources')
         projects = Project.get_all()
         return render_template('pipelines_list.html', pipelines=pipelines, language_models=language_models, sources=sources, compose_templates=app.compose_templates, projects=projects)
 
@@ -114,7 +114,8 @@ def create_app(test_config=None):
             assert app.compose_templates[template_name]
             template = jinja2.Template((app.compose_template_path / (template_name + '.yml')).read_text())
             language_model = learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model'])
-            content = template.render(learn2rag_path=Path('.').absolute(), pipeline=pipeline, language_model=language_model)
+            sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
+            content = template.render(learn2rag_path=Path('.').absolute(), pipeline=pipeline, language_model=language_model, sources=sources)
             storage_path = Path(pipeline['storage_path']).absolute()
             app.logger.debug('Storage path: %s', storage_path)
             storage_path.mkdir(parents=True, exist_ok=True)
