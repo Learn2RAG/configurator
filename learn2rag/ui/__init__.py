@@ -1,6 +1,7 @@
 from pathlib import Path
 import logging
 import os
+import urllib
 
 from flask import Flask, flash, redirect, render_template, request, url_for
 import flask.logging
@@ -86,6 +87,12 @@ def create_app(test_config=None):
     @app.get('/pipelines')
     def pipelines_list():
         pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
+
+        # FIXME
+        for pipeline in pipelines.values():
+            url = urllib.parse.urlparse(request.base_url)
+            pipeline['ui_url'] = url.scheme + '://' + url.hostname + ':5001'
+
         language_models = learn2rag.data.get_all(app.instance_path, 'models')
         sources = learn2rag.data.get_all(app.instance_path, 'sources')
         projects = Project.get_all()
