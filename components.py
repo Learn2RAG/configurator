@@ -3,10 +3,10 @@ import os
 
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
 from langchain_core.embeddings.embeddings import Embeddings
 import langchain_core.prompts
+import langchain_ollama
+import langchain_openai
 import langchain_redis
 import redis
 
@@ -26,34 +26,40 @@ class RedisVectorStore(langchain_redis.RedisVectorStore):
         ))
 
 
+def ChatOllama(*, url, token, model, proxy):
+    return langchain_ollama.ChatOllama(
+        model=model,
+        temperature=0,
+        base_url=url,
+        client_kwargs={
+            'headers': {'Authorization': f'Bearer {token}'} if token else {},
+            'proxy': proxy,
+        },
+    )
+
+
+def ChatOpenAI(*, url, token, model, proxy):
+    return langchain_openai.ChatOpenAI(
+        model=model,
+        temperature=0,
+        base_url=url,
+        api_key=token,
+    )
+
+
 load_prompt = langchain_core.prompts.loading.load_prompt
 
 embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2')
 
-ollama_url = os.environ.get('OLLAMA_URL')
-logging.info('Using Ollama URL: %s', ollama_url)
-ollama_proxy = os.environ.get('OLLAMA_PROXY') or None
-logging.info('Using proxy for Ollama: %s', ollama_proxy)
-llm_client_headers = {}
-if ollama_auth := os.environ.get('OLLAMA_AUTH'):
-    llm_client_headers['Authorization'] = ollama_auth
+llm_kwargs = {
+    'url': os.environ['LLM_API_URL'],
+    'token': os.environ.get('LLM_API_TOKEN'),
+    'model': os.environ['LLM_API_MODEL'],
+    'proxy': os.environ.get('LLM_API_PROXY'),
+}
+logging.info('LLM args: %s', llm_kwargs)
 
-# llm = ChatOllama(
-#     model='gemma-3-27b-it',
-#     temperature=0,
-#     base_url=ollama_url,
-#     client_kwargs={
-#         'headers': llm_client_headers,
-#         'proxy': ollama_proxy,
-#     },
-# )
-
-llm = ChatOpenAI(
-    model='gemma-3-27b-it',
-    temperature=0,
-    base_url=ollama_url,
-    api_key=ollama_auth,
-)
+llm = globals()[os.environ.get('LLM_API_TYPE', 'ChatOllama')](**llm_kwargs)
 
 __all__ = [
     'embeddings',

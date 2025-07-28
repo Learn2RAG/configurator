@@ -39,9 +39,10 @@ services:
     environment:
       LANGCHAIN_API_KEY: 1
       LANGCHAIN_TRACING_V2: "false"
-      OLLAMA_PROXY: ${OLLAMA_PROXY}
-      OLLAMA_URL: ${OLLAMA_URL}
-      OLLAMA_AUTH: ${OLLAMA_AUTH}
+      LLM_API_PROXY: ${LLM_API_PROXY}
+      LLM_API_URL: ${LLM_API_URL}
+      LLM_API_TOKEN: ${LLM_API_TOKEN}
+      LLM_API_MODEL: ${LLM_API_MODEL}
       REDIS_URL: redis://redis:6379
       REDIS_INDEX_NAME: ${REDIS_INDEX_NAME}
       PROMPT_FILE: ./prompts/langsmithhub/rlm/rag-prompt.json
