@@ -16,11 +16,11 @@
     <div class="accordion" id="accordionCreate">
       <div class="accordion-item">
         <h2 class="accordion-header">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateConnect" aria-expanded="true" aria-controls="collapseCreateConnect">
-            Connect a model
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateConnect" aria-expanded="false" aria-controls="collapseCreateConnect">
+            Connect an external model
           </button>
         </h2>
-        <div id="collapseCreateConnect" class="accordion-collapse collapse show" data-bs-parent="#accordionCreate">
+        <div id="collapseCreateConnect" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
           <div class="accordion-body">
             <form method="POST">
               <div class="mb-3">
@@ -29,24 +29,24 @@
               </div>
               <div class="mb-3">
                 <label for="url" class="form-label">URL</label>
-                <input class="form-control" name="url">
+                <input class="form-control" name="url" placeholder="http://example.com/api">
               </div>
               <div class="mb-3">
                 <label for="token" class="form-label">Token</label>
-                <input class="form-control" name="token">
+                <input class="form-control" name="token" placeholder="sk-...">
               </div>
               <div class="mb-3">
                 <label for="model" class="form-label">Model</label>
-                <input class="form-control" name="model">
+                <input class="form-control" name="model" placeholder="gemma-3-27b-it">
               </div>
-              <button type="submit" class="btn btn-primary">Add</button>
+              <button type="submit" class="btn btn-primary">Save</button>
             </form>
           </div>
         </div>
       </div>
       <div class="accordion-item">
         <h2 class="accordion-header">
-          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateDownload" aria-expanded="false" aria-controls="collapseCreateDownload">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateDownload" aria-expanded="false" aria-controls="collapseCreateDownload">
             Download a model
           </button>
         </h2>

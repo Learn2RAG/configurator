@@ -16,35 +16,47 @@
     <div class="accordion" id="accordionCreate">
       <div class="accordion-item">
         <h2 class="accordion-header">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateConnect" aria-expanded="true" aria-controls="collapseCreateConnect">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateLocal" aria-expanded="false" aria-controls="collapseCreateLocal">
             Local file or directory
           </button>
         </h2>
-        <div id="collapseCreateConnect" class="accordion-collapse collapse show" data-bs-parent="#accordionCreate">
+        <div id="collapseCreateLocal" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
           <div class="accordion-body">
             <form method="POST">
+              <input type="hidden" name="type" value="local"/>
               <div class="mb-3">
                 <label for="label" class="form-label">Label</label>
                 <input class="form-control" name="label">
               </div>
               <div class="mb-3">
-                <label for="url" class="form-label">Path</label>
-                <input class="form-control" name="path">
+                <label for="url" class="form-label">Local filesystem path</label>
+                <input class="form-control" name="path" placeholder="/home/user/Documents">
               </div>
-              <button type="submit" class="btn btn-primary">Add</button>
+              <button type="submit" class="btn btn-primary">Save</button>
             </form>
           </div>
         </div>
       </div>
       <div class="accordion-item">
         <h2 class="accordion-header">
-          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateDownload" aria-expanded="false" aria-controls="collapseCreateDownload">
-            Other data sources
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateWeb" aria-expanded="false" aria-controls="collapseCreateWeb">
+            Web page
           </button>
         </h2>
-        <div id="collapseCreateDownload" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
+        <div id="collapseCreateWeb" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
           <div class="accordion-body">
-            <div class="alert alert-warning" role="alert">Not implemented</div>
+            <form method="POST">
+              <input type="hidden" name="type" value="web"/>
+              <div class="mb-3">
+                <label for="label" class="form-label">Label</label>
+                <input class="form-control" name="label">
+              </div>
+              <div class="mb-3">
+                <label for="url" class="form-label">URL</label>
+                <input class="form-control" name="path" placeholder="https://example.com/">
+              </div>
+              <button type="submit" class="btn btn-primary">Save</button>
+            </form>
           </div>
         </div>
       </div>
