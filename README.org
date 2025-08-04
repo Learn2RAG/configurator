@@ -1,3 +1,7 @@
+* Build requirements
+- ~golang-go~
+- ~nodejs~ 20
+
 * Clone and install
 #+begin_src sh
   git clone --recursive ...

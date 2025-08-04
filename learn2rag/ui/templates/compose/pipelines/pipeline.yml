@@ -41,7 +41,7 @@ services:
     environment:
       LANGCHAIN_API_KEY: "1"
       LANGCHAIN_TRACING_V2: "false"
-      LLM_API_TYPE: "ChatOpenAI"
+      LLM_API_TYPE: "{{language_model.api}}"
       LLM_API_URL: "{{language_model.url}}"
       LLM_API_TOKEN: "{{language_model.token}}"
       LLM_API_MODEL: "{{language_model.model}}"

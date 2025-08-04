@@ -1,0 +1,8 @@
+services:
+  ollama:
+    command: ["{{learn2rag_path}}/services/ollama/dist/ollama", "serve"]
+    environment:
+      OLLAMA_HOST: "http://127.0.0.1:11434"
+      OLLAMA_MODELS: "{{storage_path}}/ollama/models"
+      OLLAMA_NOHISTORY: "true"
+      OLLAMA_TMPDIR: "{{storage_path}}/ollama/tmp"

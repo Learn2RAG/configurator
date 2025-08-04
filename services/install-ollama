@@ -1,0 +1,5 @@
+. scripts/env.sh
+go build -o dist/ollama .
+cmake --preset CPU
+cmake --build --preset CPU --parallel
+cmake --install build --component CPU --strip
