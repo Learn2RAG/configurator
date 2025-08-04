@@ -1,0 +1,10 @@
+{
+  "chunk_size": 2000,
+  "chunk_overlap": 200,
+  "embedding_model": "sentence-transformers/all-mpnet-base-v2",
+  "vector_size": {
+    "sentence-transformers/all-mpnet-base-v2": 768,
+    "BAAI/bge-m3": 1024
+  },
+  "top_k": 4
+}

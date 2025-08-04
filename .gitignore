@@ -6,3 +6,5 @@
 /tests/data/cranes/
 /tests/data/html/
 /tests/data/wikibooks/
+*.pdf
+.envrc

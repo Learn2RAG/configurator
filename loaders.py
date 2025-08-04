@@ -3,6 +3,7 @@ import bz2
 import itertools
 import logging
 from typing import Iterator, Sequence
+import os
 
 from bs4 import SoupStrainer  # type: ignore[attr-defined]
 from lxml import etree
@@ -20,6 +21,15 @@ def pdf_loader(file_path: str) -> list[Document]:
     loader = PyPDFLoader(file_path)
     docs = asyncio.run(loader.aload())
     return docs
+
+def sync_pdf_loader(file_path: str) -> list[Document]:
+    all_documents = []
+    for file in os.listdir(file_path)[:20]:
+        if file.endswith(".pdf"):
+            loader = PyPDFLoader(os.path.join(file_path, file), mode='single') # important: default of mode is page-vise!
+            docs = loader.load()
+            all_documents.extend(docs)
+    return all_documents
 
 
 def web_loader(web_path: Sequence[str]) -> list[Document]:

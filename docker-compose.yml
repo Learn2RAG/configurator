@@ -24,16 +24,25 @@ services:
     environment:
       PIPELINES_URLS: "https://github.com/open-webui/pipelines/blob/48ddbec455de76fc43224daf3438537cd8fcde87/examples/pipelines/integrations/langgraph_pipeline/langgraph_stream_pipeline.py"
     ports:
-      - "9099:9099"
+      - "9098:9098"
     volumes:
       - open-webui-pipelines:/app/pipelines
-  redis:
-    # redis/redis-stack:7.4.0-v5
-    image: hub.cs.upb.de/dice-research/images/redis-stack:7.4.0-v5
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: always
+    container_name: qdrant
     ports:
-      - "6379:6379"
+      - 6336:6336
+      - 6334:6334
+    expose:
+      - 6336
+      - 6334
+      - 6335
+    configs:
+      - source: qdrant_config
+        target: /qdrant/config/production.yaml
     volumes:
-      - redis-data:/data
+      - ./qdrant_data:/qdrant/storage
   langgraph:
     build: .
     environment:
@@ -49,3 +58,7 @@ volumes:
   open-webui-data:
   open-webui-pipelines:
   redis-data:
+configs:
+  qdrant_config:
+    content: |
+      log_level: INFO
