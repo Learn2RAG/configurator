@@ -11,8 +11,9 @@ import loaders
 def index(user_config, opt_config):
     # TODO: enable list of file paths in loader and adapt user_config
     # Load the documents from pdf
-    # TODO: load documents from JSON
     all_documents = loaders.sync_pdf_loader(user_config['file_path'])
+    # TODO: use ifdt loader to load pdf in json, then:
+    # all_documents = loaders.json_loader("loaded_documents.json")
 
     # Split documents into chunks
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=opt_config['chunk_size'], chunk_overlap=opt_config['chunk_overlap'])

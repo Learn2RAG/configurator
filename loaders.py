@@ -8,14 +8,17 @@ import os
 from bs4 import SoupStrainer  # type: ignore[attr-defined]
 from lxml import etree
 
-from langchain_community.document_loaders import BSHTMLLoader, PyPDFLoader, WebBaseLoader
+from langchain_community.document_loaders import BSHTMLLoader, PyPDFLoader, WebBaseLoader, JSONLoader
 from langchain_core.documents import Document
 
+
+def json_loader(file_path: str) -> list[Document]:
+    loader = JSONLoader(file_path,jq_schema=".[]",content_key="content",metadata_func=lambda record, meta: record.get("metadata", {}))
+    return loader.load()
 
 def html_loader(file_path: str) -> list[Document]:
     loader = BSHTMLLoader(file_path)
     return loader.load()
-
 
 def pdf_loader(file_path: str) -> list[Document]:
     loader = PyPDFLoader(file_path)
