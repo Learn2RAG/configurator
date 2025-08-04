@@ -1,4 +1,5 @@
 name: pipeline
+ui_url: "http://{{learn2rag_hostname}}:5001/"
 services:
   open-webui:
     working_dir: "{{pipeline.storage_path}}"

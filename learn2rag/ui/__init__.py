@@ -155,11 +155,6 @@ def create_app(test_config=None):
     def pipelines_list():
         pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
 
-        # FIXME
-        for pipeline in pipelines.values():
-            url = urllib.parse.urlparse(request.base_url)
-            pipeline['ui_url'] = url.scheme + '://' + url.hostname + ':5001'
-
         language_models = learn2rag.data.get_all(app.instance_path, 'models')
         sources = learn2rag.data.get_all(app.instance_path, 'sources')
         projects = Project.get_all()
@@ -183,7 +178,9 @@ def create_app(test_config=None):
         elif request.form['action'] == 'delete':
             return 'Not implemented'
         elif request.form['action'].startswith('start:'):
+            url = urllib.parse.urlparse(request.base_url)
             render_context = {
+                'learn2rag_hostname': url.hostname,
                 'pipeline': pipeline,
                 'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
                 'sources': learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources']),

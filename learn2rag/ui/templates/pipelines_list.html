@@ -93,9 +93,11 @@
             </div>
             {% if projects[name] and projects[name].running %}
             <div class="btn-group" role="group">
-              <a class="btn btn-primary" href="{{ pipeline.ui_url }}" role="button" target="_blank">
+              {% if 'ui_url' in projects[name].content %}
+              <a class="btn btn-primary" href="{{ projects[name].content['ui_url'] }}" role="button" target="_blank">
                 Open
               </a>
+              {% endif %}
               <button type="submit" class="btn btn-warning" name="action" value="stop">
                 Stop
               </button>
