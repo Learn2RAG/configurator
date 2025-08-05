@@ -32,7 +32,7 @@ services:
     restart: always
     container_name: qdrant
     ports:
-      - 6336:6336
+      - 6336:6333
       - 6334:6334
     expose:
       - 6336

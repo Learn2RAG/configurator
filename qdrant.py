@@ -4,8 +4,8 @@ from qdrant_client.http.models import Distance, VectorParams
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
 class Qdrant():
-    url_qdrant = "http://usdev001.usu.usu.grp:30333"
-    qdrant = QdrantClient(host="localhost", port=6333)
+    url_qdrant = "http://localhost:6336"
+    qdrant = QdrantClient(host="localhost", port=6336)
 
 
     def __init__(self, collection_name, encoder, vector_size):
