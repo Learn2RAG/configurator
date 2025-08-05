@@ -28,7 +28,7 @@ services:
     volumes:
       - open-webui-pipelines:/app/pipelines
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.14.1
     restart: always
     container_name: qdrant
     ports:
