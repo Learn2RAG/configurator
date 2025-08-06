@@ -42,5 +42,16 @@ docker compose up -d
 python data/get_repliqa_pdfs.py
 ```
 
+### Optional: get datasets
+```
+tests/data/wikibooks/pages-articles.xml.bz2:
+	mkdir --parents $$(dirname $@)
+	wget --output-document $@ "https://files.dice-research.org/datasets/Wikibooks/20250501/dewikibooks-20250501-pages-articles.xml.bz2"
+
+tests/data/html/AIAct.html:
+	mkdir --parents $$(dirname $@)
+	wget --output-document $@ "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=OJ:L_202401689"
+```
+
 
 

@@ -3,6 +3,7 @@ from langchain.prompts import PromptTemplate
 
 from llm import llm
 
+
 def generate(query, search_results) -> str:
     template = """Kontext:
     {context}
@@ -10,10 +11,7 @@ def generate(query, search_results) -> str:
     Beantworte die folgende Frage:
     {question}
     """
-    prompt = PromptTemplate(
-        input_variables=["context", "question"],
-        template=template
-    )
+    prompt = PromptTemplate(input_variables=["context", "question"], template=template)
 
     chain = LLMChain(llm=llm, prompt=prompt)
 
