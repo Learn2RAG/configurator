@@ -1,8 +1,23 @@
 name: import
+ports:
+  - redis
 services:
   redis:
     working_dir: "{{pipeline.storage_path}}"
-    command: ["{{learn2rag_path}}/services/redis/src/redis-server", "--include", "{{learn2rag_path}}/services/redis/redis.conf", "--loadmodule", "{{learn2rag_path}}/services/redis/modules/redisbloom/redisbloom.so", "--loadmodule", "{{learn2rag_path}}/services/redis/modules/redisearch/redisearch.so", "--loadmodule", "{{learn2rag_path}}/services/redis/modules/redistimeseries/redistimeseries.so"]
+    command:
+      - "{{learn2rag_path}}/services/redis/src/redis-server"
+      - "--include"
+      - "{{learn2rag_path}}/services/redis/redis.conf"
+      - "--loadmodule"
+      - "{{learn2rag_path}}/services/redis/modules/redisbloom/redisbloom.so"
+      - "--loadmodule"
+      - "{{learn2rag_path}}/services/redis/modules/redisearch/redisearch.so"
+      - "--loadmodule"
+      - "{{learn2rag_path}}/services/redis/modules/redistimeseries/redistimeseries.so"
+      - "--port"
+      - "{{ports.redis}}"
+      - "--pidfile"
+      - "redis.pid"
   main:
     working_dir: "{{pipeline.storage_path}}"
     command: ["{{learn2rag_path}}/services/basic-pipeline/.venv/bin/python3", "{{learn2rag_path}}/services/basic-pipeline/importer.py"]
@@ -13,7 +28,7 @@ services:
       LLM_API_URL: "{{language_model.url}}"
       LLM_API_TOKEN: "{{language_model.token}}"
       LLM_API_MODEL: "{{language_model.model}}"
-      REDIS_URL: redis://localhost:6379
-      REDIS_INDEX_NAME: example
+      REDIS_URL: "redis://localhost:{{ports.redis}}"
+      REDIS_INDEX_NAME: learn2rag
       PROMPT_FILE: "{{learn2rag_path}}/services/basic-pipeline/prompts/langsmithhub/rlm/rag-prompt.json"
       IMPORT_DIRS: "{{sources | items | map(attribute=1) | map(attribute='path') | join('|')}}"

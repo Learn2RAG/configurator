@@ -19,7 +19,7 @@ from typing import List, Union, Generator, Iterator
 
 class Pipeline:
     class Valves(BaseModel):
-        API_URL: str = Field(default="http://127.0.0.1:9000/stream", description="Langgraph API URL")
+        API_URL: str = Field(default=os.environ.get('PIPELINE_STREAM_URL', "http://127.0.0.1:9000/stream"), description="Langgraph API URL")
     
     def __init__(self):
         self.id = "LangGraph stream"

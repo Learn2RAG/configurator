@@ -2,6 +2,7 @@ from pathlib import Path
 import atexit
 import logging
 import os
+import socket
 import urllib
 
 from flask import Flask, flash, redirect, render_template, request, url_for
@@ -42,6 +43,20 @@ def stop_project(name):
     project = Project.get(name)
     assert project is not None, 'project should not be None'
     project.stop()
+
+
+def find_free_ports(n):
+    ports = []
+    sockets = []
+    for i in range(n):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('', 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sockets.append(s)
+        ports.append(s.getsockname()[1])
+    for s in sockets:
+        s.close()
+    return ports
 
 
 def create_app(test_config=None):
@@ -162,11 +177,13 @@ def create_app(test_config=None):
 
     @app.post('/pipelines')
     def pipeline_create():
+        ports = [int(port) for port in request.form.getlist("ports") if port]
         learn2rag.data.create_entry(app.instance_path, 'pipelines', {
             'label': request.form['label'],
             'storage_path': request.form['storage_path'],
             'language_model': request.form['language_model'],
             'sources': request.form.getlist('sources'),
+            'ports': ports,
         })
         return redirect(url_for('pipelines_list'))
 
@@ -190,6 +207,14 @@ def create_app(test_config=None):
             template_name = request.form['action'].split(':', 2)[1]
             assert app.pipeline_templates[template_name]
             template_file = app.pipelines_template_path / (template_name + '.yml')
+
+            with open(template_file) as f:
+                content = yaml.safe_load(f)
+            port_names = content.get('ports', [])
+            configured_ports = pipeline.get('ports', [])
+            ports = configured_ports + find_free_ports(len(port_names) - len(configured_ports))
+            render_context['ports'] = dict(zip(port_names, ports))
+
             storage_path = Path(pipeline['storage_path'])
 
             try:

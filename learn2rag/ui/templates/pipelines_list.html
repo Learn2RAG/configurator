@@ -38,6 +38,13 @@
           {% endfor %}
         </select>
       </div>
+      <div class="mb-3">
+        <label for="ports" class="form-label">Ports (optional)</label>
+        <input class="form-control" name="ports" type="number" min="1" max="65535">
+        <input class="form-control" name="ports" type="number" min="1" max="65535">
+        <input class="form-control" name="ports" type="number" min="1" max="65535">
+        <input class="form-control" name="ports" type="number" min="1" max="65535">
+      </div>
       <button type="submit" class="btn btn-primary">Save</button>
     </form>
 
@@ -52,6 +59,7 @@
       <th scope="col">Storage path</th>
       <th scope="col">Sprachmodell</th>
       <th scope="col">Sources</th>
+      <th scope="col">Ports</th>
       <th scope="col"></th>
     </tr>
   </thead>
@@ -72,6 +80,11 @@
       <td>
         {% for source in pipeline.sources %}
         <span class="badge text-bg-secondary">{{ sources[source].label }}</span>
+        {% endfor %}
+      </td>
+      <td>
+        {% for port in pipeline.ports %}
+        <span class="badge text-bg-secondary">{{ port }}</span>
         {% endfor %}
       </td>
       <td>

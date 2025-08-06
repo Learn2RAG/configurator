@@ -1,14 +1,19 @@
 name: pipeline
-ui_url: "http://{{learn2rag_hostname}}:5001/"
+ports:
+  - ui
+  - redis
+  - pipeline
+  - open_webui_pipelines
+ui_url: "http://{{learn2rag_hostname}}:{{ports.ui}}/"
 services:
   open-webui:
     working_dir: "{{pipeline.storage_path}}"
-    command: ["{{learn2rag_path}}/services/open-webui/.venv/bin/open-webui", "serve", "--host", "0.0.0.0", "--port", "5001"]
+    command: ["{{learn2rag_path}}/services/open-webui/.venv/bin/open-webui", "serve", "--host", "0.0.0.0", "--port", "{{ports.ui}}"]
     environment:
       DATA_DIR: "{{pipeline.storage_path}}/open-webui-data"
       DEFAULT_LOCALE: "de"
       ENABLE_OPENAI_API: "True"
-      OPENAI_API_BASE_URL: "http://localhost:9099"
+      OPENAI_API_BASE_URL: "http://localhost:{{ports.open_webui_pipelines}}"
       OPENAI_API_KEY: "0p3n-w3bu!"
       ENABLE_OLLAMA_API: "False"
       ENABLE_PERSISTENT_CONFIG: "False"
@@ -25,20 +30,35 @@ services:
     working_dir: "services/open-webui-pipelines"
     command: ["bash", "-eu", "{{learn2rag_path}}/services/start-open-webui-pipelines"]
     environment:
+      PIPELINE_STREAM_URL: "http://127.0.0.1:{{ports.pipeline}}/stream"
       PIPELINES_DIR: "{{learn2rag_path}}/open-webui-pipelines"
+      PORT: "{{ports.open_webui_pipelines}}"
   redis:
     working_dir: "{{pipeline.storage_path}}"
-    command: ["{{learn2rag_path}}/services/redis/src/redis-server", "--include", "{{learn2rag_path}}/services/redis/redis.conf", "--loadmodule", "{{learn2rag_path}}/services/redis/modules/redisbloom/redisbloom.so", "--loadmodule", "{{learn2rag_path}}/services/redis/modules/redisearch/redisearch.so", "--loadmodule", "{{learn2rag_path}}/services/redis/modules/redistimeseries/redistimeseries.so"]
+    command:
+      - "{{learn2rag_path}}/services/redis/src/redis-server"
+      - "--include"
+      - "{{learn2rag_path}}/services/redis/redis.conf"
+      - "--loadmodule"
+      - "{{learn2rag_path}}/services/redis/modules/redisbloom/redisbloom.so"
+      - "--loadmodule"
+      - "{{learn2rag_path}}/services/redis/modules/redisearch/redisearch.so"
+      - "--loadmodule"
+      - "{{learn2rag_path}}/services/redis/modules/redistimeseries/redistimeseries.so"
+      - "--port"
+      - "{{ports.redis}}"
+      - "--pidfile"
+      - "redis.pid"
   open-webui-setup:
     working_dir: "{{pipeline.storage_path}}"
     command: ["bash", "-eu", "{{learn2rag_path}}/services/setup-open-webui"]
     environment:
-      WEBUI_URL: "http://localhost:5001/"
+      WEBUI_URL: "http://localhost:{{ports.ui}}/"
       ADMIN_USER_EMAIL: "user@learn2rag.de"
       ADMIN_USER_PASSWORD: "learn2rag"
   main:
     working_dir: "{{pipeline.storage_path}}"
-    command: ["{{learn2rag_path}}/services/basic-pipeline/.venv/bin/uvicorn", "--host", "0.0.0.0", "--port", "9000", "--app-dir", "{{learn2rag_path}}/services/basic-pipeline", "server:app"]
+    command: ["{{learn2rag_path}}/services/basic-pipeline/.venv/bin/uvicorn", "--host", "0.0.0.0", "--port", "{{ports.pipeline}}", "--app-dir", "{{learn2rag_path}}/services/basic-pipeline", "server:app"]
     environment:
       LANGCHAIN_API_KEY: "1"
       LANGCHAIN_TRACING_V2: "false"
@@ -46,6 +66,6 @@ services:
       LLM_API_URL: "{{language_model.url}}"
       LLM_API_TOKEN: "{{language_model.token}}"
       LLM_API_MODEL: "{{language_model.model}}"
-      REDIS_URL: "redis://localhost:6379"
-      REDIS_INDEX_NAME: example
+      REDIS_URL: "redis://localhost:{{ports.redis}}"
+      REDIS_INDEX_NAME: learn2rag
       PROMPT_FILE: "{{learn2rag_path}}/services/basic-pipeline/prompts/langsmithhub/rlm/rag-prompt.json"
