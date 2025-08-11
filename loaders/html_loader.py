@@ -6,7 +6,7 @@ This module handles loading documents from HTML sources.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.2
+Version: 0.0.3
 Creation Date: July 28, 2025
 """
 
@@ -14,7 +14,7 @@ import hashlib
 from bs4 import BeautifulSoup
 from datetime import datetime
 from globals import stop_loading
-from langchain.document_loaders import UnstructuredHTMLLoader
+from langchain_community.document_loaders import UnstructuredHTMLLoader
 from langchain_core.documents import Document
 import logging
 import os
@@ -101,5 +101,15 @@ def load_html_content(url, depth=0, visited=None) -> list[Document]:
         if os.path.exists(temp_file):
             os.remove(temp_file)
             logger.debug(f"Temporary file {temp_file} deleted.")
+
+        if documents:
+            meta_count = sum(len(doc.metadata.get("meta_properties", {})) for doc in documents)
+            logger.info(
+                f"Loaded {len(documents)} documents from '{url}'. "
+                f"Total meta tags: {meta_count}. "
+                f"Depth: {depth}."
+            )
+        else:
+            logger.warning(f"No documents found for URL: {url}")
 
     return documents

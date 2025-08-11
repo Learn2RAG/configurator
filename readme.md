@@ -1,9 +1,9 @@
 # Learn2RAG importer
 
-This application is an importer for data that is to be used within the lear2rag pipeline application
+This application is an importer for data that is to be used within the learn2rag pipeline application
 
 Author: IFDT, KM
-Version: 0.0.3
+Version: 0.0.4
 
 ## Installation
     
@@ -13,6 +13,11 @@ Version: 0.0.3
 sudo apt-get install libmagic1
 ```
 - install magic1.dll if you are using windows
+
+- install libmagic on MacOS (with Homebrew)
+```
+brew install libmagic
+```
 
 ## Configuration
 - change /config/config.json according to your needs. Add a entry for each loader that you want to configure (see examples)
@@ -138,3 +143,7 @@ where
   - added import of Webpages (HTMLReader)
 - v0.0.3
   - added content hash for HTMLReader and config examples
+- v0.0.4
+  - updated dependencies
+  - better ouput description for files loaded
+  - fixed error if only HTMLLoader is used

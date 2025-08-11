@@ -16,6 +16,7 @@ handlers:
     level: DEBUG
     formatter: colored
     filename: logs/app.log
+    encoding: utf-8
 loggers:
   Learn2RAGImporter:
     level: DEBUG

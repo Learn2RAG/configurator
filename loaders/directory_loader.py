@@ -5,7 +5,7 @@ Description:
 This module handles loading documents from directories.
 
 Author: Kyrill Meyer
-Version: 0.0.1
+Version: 0.0.2
 Institution: IFDT
 Creation Date: June 10, 2025
 """
@@ -39,7 +39,8 @@ def load_from_directory(path, recursive) -> list[Document]:
     if isinstance(recursive, str):
         recursive = recursive.lower() == "true"
 
-    loader = DirectoryLoader(path, show_progress=True, silent_errors=True, recursive=recursive, glob=["*.csv", "*.doc", "*.docx", "*.eml", "*.epub", "*.html", "*.json", "*.md", "*.odt", "*.pdf", "*.ppt", "*.pptx", "*.rst", "*.rtf", "*.txt", "*.tsv", "*.cls", "*.xlsx", "*.xml"])
+    text_loader_kwargs = {"autodetect_encoding": True, "detect_language_per_element": False}
+    loader = DirectoryLoader(path, show_progress=True, silent_errors=True, loader_kwargs=text_loader_kwargs, recursive=recursive, glob=["*.csv", "*.doc", "*.docx", "*.eml", "*.epub", "*.html", "*.json", "*.md", "*.odt", "*.pdf", "*.ppt", "*.pptx", "*.rst", "*.rtf", "*.txt", "*.tsv", "*.cls", "*.xlsx", "*.xml"])
    
     #loader = DirectoryLoader(path, show_progress=True, silent_errors=True, recursive=False)
     try:
@@ -64,9 +65,14 @@ def load_from_directory(path, recursive) -> list[Document]:
             doc.metadata["loader_type"] = "DirectoryLoader"
             documents.append(doc)
             logger.debug(f"Loaded file: {doc.metadata.get('source', 'Unknown')}")
+
     except Exception as e:
         logger.error(f"Error loading documents from directory: {e}")
-    if not documents:
+    if documents:
+        file_types = [doc.metadata.get("file_extension", "unknown") for doc in documents]
+        type_count = {ext: file_types.count(ext) for ext in set(file_types)}
+        logger.info(f"Loaded {len(documents)} documents from '{path}'. File types: {type_count}")
+    else:
         logger.warning(f"No documents found in directory: {path}")
         raise ValueError(f"No documents found in directory: {path}")
 

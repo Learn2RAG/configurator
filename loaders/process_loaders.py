@@ -6,7 +6,7 @@ This module processes configuration entries and delegates loading to specific lo
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.1
+Version: 0.0.2
 Creation Date: June 10, 2025
 """
 
@@ -66,11 +66,13 @@ def process_configuration_entries(config_entries):
                     logger.error("Missing 'path' for 'DirectoryLoader' in configuration entry.")
                     continue
                 documents = load_from_directory(path, recursive=recursive)
+                logger.info(f"Loaded {len(documents)} documents from {path} using {loader_type}.")
             elif loader_type == "CSVLoader":
                 if not path:
                     logger.error("Missing 'path' for 'CSVLoader' in configuration entry.")
                     continue
                 documents = load_from_csv(path)
+                logger.info(f"Loaded {len(documents)} documents from {path} using {loader_type}.")
             elif loader_type == "HTMLLoader":
                 url = entry.get("url")
                 depth = entry.get("depth", 0)
@@ -78,11 +80,11 @@ def process_configuration_entries(config_entries):
                     logger.error(f"Invalid configuration for HTMLLoader: {entry}")
                     continue
                 documents = load_html_content(url, depth=depth)
+                logger.info(f"Loaded {len(documents)} documents from {url} using {loader_type}.")
             else:
                 logger.error(f"Unknown loader type: {loader_type}")
                 continue
 
-            logger.info(f"Loaded {len(documents)} documents from {path} using {loader_type}.")
             all_documents.extend(documents)
         except Exception as e:
             logger.error(f"Error processing entry {entry}: {e}")
