@@ -1,8 +1,54 @@
 from fastapi import FastAPI, Body
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import json
 import search
 import generate
+from typing import Annotated, Literal
+from typing_extensions import TypedDict
+
+from langgraph.graph.message import add_messages
+from langgraph.config import get_stream_writer
+from langgraph.graph import StateGraph, START, END
+from langchain_core.messages import ToolMessage
+from rag_pipeline import pipeline
+
+
+
+class ChatState(TypedDict):
+    messages: Annotated[list, add_messages]
+
+'''
+Define Langgraph
+'''
+def generate_custom_stream(type: Literal["think","normal"], content: str):
+    content = "\n"+content+"\n"
+    custom_stream_writer = get_stream_writer()
+    return custom_stream_writer({type:content})
+
+
+graph = pipeline()
+
+
+def chatbot(state: ChatState):
+    print('chatbot state', state)
+
+    question = state['messages'][-1].content
+    results = search.search(question, user_config, opt_config)
+    sources = "\n".join(result.payload['path'] for result in results)
+    answer = generate.generate(question, results)
+    content = f"{answer}\n\n{sources}"
+
+
+    generate_custom_stream('normal', content)
+    return {'messages': [ToolMessage(content=content)]}
+
+
+graph_builder = StateGraph(ChatState)
+graph_builder.add_node("chatbot", chatbot)
+graph_builder.add_edge("chatbot", END)
+graph_builder.add_edge(START, "chatbot")
+chat_graph = graph_builder.compile()
 
 app = FastAPI()
 
@@ -26,8 +72,8 @@ async def simple_chatbot_response(input: QuestionInput) -> str:
     return full_response
 
 
-@app.post("/chat")
-async def chat(
+@app.post("/QandA")
+async def qanda(
     input: QuestionInput = Body(
         ...,
         example={
@@ -42,6 +88,68 @@ async def chat(
 @app.get("/test")
 async def test():
     return {"message": "Hello World"}
+
+
+@app.post("/stream")
+async def stream(inputs: ChatState):
+    async def event_stream():
+        try:
+            stream_start_msg = {
+                'choices':
+                    [
+                        {
+                            'delta': {},
+                            'finish_reason': None
+                        }
+                    ]
+                }
+
+            # Stream start
+            yield f"data: {json.dumps(stream_start_msg)}\n\n"
+
+            # Processing langgraph stream response with <think> block support
+            async for event in chat_graph.astream(input=inputs, stream_mode="custom"):
+                print(event)
+                normal_content = event.get("normal", None)
+
+                normal_msg = {
+                    'choices':
+                    [
+                        {
+                            'delta':
+                            {
+                                'content': normal_content,
+                            },
+                            'finish_reason': None
+                        }
+                    ]
+                }
+
+                yield f"data: {json.dumps(normal_msg)}\n\n"
+
+            # End of the stream
+            stream_end_msg = {
+                'choices': [
+                    {
+                        'delta': {},
+                        'finish_reason': 'stop'
+                    }
+                ]
+            }
+            yield f"data: {json.dumps(stream_end_msg)}\n\n"
+
+        except Exception as e:
+            print('Error', e)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
 
 
 if __name__ == "__main__":

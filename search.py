@@ -20,7 +20,18 @@ def search(query, user_config, opt_config) -> list:
         query_vector=("dense", query_embedding),
         limit=opt_config["top_k"],
     )
-    # results = qdrant.vector_store.similarity_search(query, opt_config["top_k"])
-
 
     return results
+
+
+def extract_context_content(search_results) -> str:
+    contents = []
+    for result in search_results:
+        if hasattr(result, "payload") and "content" in result.payload:
+            contents.append(result.payload["content"])
+    return "\n".join(contents)
+
+
+def context_content(query, user_config, opt_config) -> str:
+    results = search(query, user_config, opt_config)
+    return extract_context_content(results)
