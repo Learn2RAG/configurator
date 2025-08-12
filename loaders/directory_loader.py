@@ -40,7 +40,7 @@ def load_from_directory(path, recursive) -> list[Document]:
         recursive = recursive.lower() == "true"
 
     text_loader_kwargs = {"autodetect_encoding": True, "detect_language_per_element": False}
-    loader = DirectoryLoader(path, show_progress=True, silent_errors=True, loader_kwargs=text_loader_kwargs, recursive=recursive, glob=["*.csv", "*.doc", "*.docx", "*.eml", "*.epub", "*.html", "*.json", "*.md", "*.odt", "*.pdf", "*.ppt", "*.pptx", "*.rst", "*.rtf", "*.txt", "*.tsv", "*.cls", "*.xlsx", "*.xml"])
+    loader = DirectoryLoader(path, show_progress=True, loader_kwargs=text_loader_kwargs, recursive=recursive, glob=["*.csv", "*.doc", "*.docx", "*.eml", "*.epub", "*.html", "*.json", "*.md", "*.odt", "*.pdf", "*.ppt", "*.pptx", "*.rst", "*.rtf", "*.txt", "*.tsv", "*.cls", "*.xlsx", "*.xml"])
    
     #loader = DirectoryLoader(path, show_progress=True, silent_errors=True, recursive=False)
     try:
