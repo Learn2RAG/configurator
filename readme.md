@@ -8,9 +8,9 @@ Version: 0.0.4
 ## Installation
     
 - to better determine filetypes, make sure all requirements are met
-- install libmagic for linux if you are using linux
+- install dependencies
 ```
-sudo apt-get install libmagic1
+apt install libgl1 libmagic1
 ```
 - install magic1.dll if you are using windows
 
