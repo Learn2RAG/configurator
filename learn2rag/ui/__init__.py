@@ -224,7 +224,8 @@ def create_app(test_config=None):
                 else:
                     flash('Pipeline failed to start', 'error')
             except Exception as e:
-                app.logger.error('Could not start the pipeline: %s', e)
+                app.logger.exception(e)
+                app.logger.error('Could not start the pipeline')
                 flash(f'Could not start the pipeline: {e}', 'error')
 
             # "load" the corresponding Ollama model
@@ -233,7 +234,8 @@ def create_app(test_config=None):
                 stop_project(name)
                 flash('Pipeline stopped')
             except Exception as e:
-                app.logger.error('Could not stop the pipeline: %s', e)
+                app.logger.exception(e)
+                app.logger.error('Could not stop the pipeline')
                 flash(f'Could not stop the pipeline: {e}', 'error')
         return redirect(url_for('pipelines_list'))
 
