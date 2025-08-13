@@ -124,10 +124,25 @@ class Project():
         if cur.rowcount != 1:
             con.rollback()
             raise AssertionError('Could not mark the project as running')
+
+        # files
+        try:
+            for file in self.content.get('files', []):
+                file_path = Path(file['path'])
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_text(file['content'])
+        except Exception as e:
+            con.rollback()
+            raise e
+
+        # services
         self.services = []
         for name, service in self.content['services'].items():
+            # working_dir
             if working_dir := service.get('working_dir'):
                 Path(working_dir).mkdir(parents=True, exist_ok=True)
+
+            # command
             try:
                 proc = subprocess.Popen(
                     service['command'],
