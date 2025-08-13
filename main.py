@@ -9,6 +9,7 @@ Version: 0.0.1
 Creation Date: June 10, 2025
 """
 
+import argparse
 import json
 import os
 import logging
@@ -17,8 +18,14 @@ from utils.logging_setup import setup_logging
 from utils.config_loader import load_json_config, validate_config_entry
 from loaders.process_loaders import process_configuration_entries
 
+
+class ImporterArgumentParser(argparse.ArgumentParser):
+    def __init__(self):
+        super().__init__()
+        self.add_argument('--config', default=JSON_CONFIG_PATH)
+
 #main function to run the application
-def main():
+def main(args):
 
     # Display a small textual description about the app
     print("------------------------------------------------------------")
@@ -44,7 +51,7 @@ def main():
 
     # Load JSON configuration
     try:
-        config = load_json_config(JSON_CONFIG_PATH)
+        config = load_json_config(args.config)
         logger.info("Configuration loaded successfully, starting validation...")
 
         # Validate each entry in the configuration
@@ -74,7 +81,6 @@ def main():
     except Exception as e:
         logger.error(f"Error loading configuration: {e}")
 
-    
 
 if __name__ == "__main__":
-    main()
+    main(ImporterArgumentParser().parse_args())
