@@ -1,18 +1,19 @@
+import json
+from typing import Annotated, Literal
+
 from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import json
-import search
-import generate
-from typing import Annotated, Literal
 from typing_extensions import TypedDict
 
-from langgraph.graph.message import add_messages
 from langgraph.config import get_stream_writer
 from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
 from langchain_core.messages import ToolMessage
 from rag_pipeline import pipeline
 
+import generate
+import search
 
 
 class ChatState(TypedDict):
@@ -72,7 +73,7 @@ async def simple_chatbot_response(input: QuestionInput) -> str:
     return full_response
 
 
-@app.post("/QandA")
+@app.post("/qanda")
 async def qanda(
     input: QuestionInput = Body(
         ...,
