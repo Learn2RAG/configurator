@@ -24,7 +24,7 @@ if __name__ == "__main__":
     for result in results:
         print(f"ID: {result.id}, Path: {result.payload['path']}, Score: {result.score}")
 
-    answer = generate.generate(query, results)
+    answer = generate.generate(query, results, opt_config)
 
     print(query)
     print(answer)

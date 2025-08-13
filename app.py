@@ -1,3 +1,17 @@
+"""
+title: Langgraph stream integration
+author: bartonzzx
+author_url: https://github.com/bartonzzx
+description: Integrate langgraph with open webui pipeline
+required_open_webui_version: 0.4.3
+requirements: none
+version: 0.4.3
+licence: MIT
+"""
+
+# https://github.com/open-webui/pipelines/tree/48ddbec455de76fc43224daf3438537cd8fcde87/examples/pipelines/integrations/langgraph_pipeline
+
+
 import json
 from typing import Annotated, Literal
 
@@ -16,8 +30,40 @@ import generate
 import search
 
 
+with open("user_config.json", "r") as file:
+    user_config = json.load(file)
+
+with open("opt_config.json", "r") as file:
+    opt_config = json.load(file)
+
+
+class QuestionInput(BaseModel):
+    question: str
+
+
 class ChatState(TypedDict):
     messages: Annotated[list, add_messages]
+
+
+async def simple_chatbot_response(input: QuestionInput) -> str:
+    question = input.question
+    results = search.search(question, user_config, opt_config)
+    sources = "\n".join(result.payload['path'] for result in results)
+    answer = generate.generate(question, results, opt_config)
+    full_response = f"{answer}\n\n{sources}"
+    return full_response
+
+
+def streaming_chatbot(state: ChatState):
+    print('chatbot state', state)
+    question = state['messages'][-1].content
+    results = search.search(question, user_config, opt_config)
+    sources = "\n".join(result.payload['path'] for result in results)
+    answer = generate.generate(question, results, opt_config)
+    content = f"{answer}\n\n{sources}"
+    generate_custom_stream('normal', content)
+    return {'messages': [ToolMessage(content=content)]}
+
 
 '''
 Define Langgraph
@@ -30,48 +76,13 @@ def generate_custom_stream(type: Literal["think","normal"], content: str):
 
 graph = pipeline()
 
-
-def chatbot(state: ChatState):
-    print('chatbot state', state)
-
-    question = state['messages'][-1].content
-    results = search.search(question, user_config, opt_config)
-    sources = "\n".join(result.payload['path'] for result in results)
-    answer = generate.generate(question, results)
-    content = f"{answer}\n\n{sources}"
-
-
-    generate_custom_stream('normal', content)
-    return {'messages': [ToolMessage(content=content)]}
-
-
 graph_builder = StateGraph(ChatState)
-graph_builder.add_node("chatbot", chatbot)
+graph_builder.add_node("chatbot", streaming_chatbot)
 graph_builder.add_edge("chatbot", END)
 graph_builder.add_edge(START, "chatbot")
 chat_graph = graph_builder.compile()
 
 app = FastAPI()
-
-with open("user_config.json", "r") as file:
-    user_config = json.load(file)
-
-with open("opt_config.json", "r") as file:
-    opt_config = json.load(file)
-
-
-class QuestionInput(BaseModel):
-    question: str
-
-
-async def simple_chatbot_response(input: QuestionInput) -> str:
-    question = input.question
-    results = search.search(question, user_config, opt_config)
-    sources = "\n".join(result.payload['path'] for result in results)
-    answer = generate.generate(question, results)
-    full_response = f"{answer}\n\n{sources}"
-    return full_response
-
 
 @app.post("/qanda")
 async def qanda(
@@ -150,7 +161,6 @@ async def stream(inputs: ChatState):
             "Connection": "keep-alive",
         }
     )
-
 
 
 if __name__ == "__main__":

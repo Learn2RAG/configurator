@@ -7,6 +7,7 @@ from langgraph.graph import START, StateGraph
 import search
 import generate
 
+
 with open("user_config.json", "r") as file:
     user_config = json.load(file)
 
@@ -32,7 +33,7 @@ def retrieve(user_config, opt_config) -> Callable[[State], StateUpdate]:
 
 def respond() -> Callable[[State], StateUpdate]:
     return lambda state: {
-        "answer": generate.generate(state["question"], state.get("context", ""))
+        "answer": generate.generate(state["question"], state.get("context", ""), opt_config)
     }
 
 
