@@ -34,12 +34,11 @@ def main():
 
     # Check if the logging configuration file exists
     if not os.path.exists(LOGGING_CONFIG_PATH):
-       print(f"Error: Logging configuration file not found at {LOGGING_CONFIG_PATH}")
-       return
-    
-
-    # Set up logging configuration
-    setup_logging(LOGGING_CONFIG_PATH)
+        logging.basicConfig()
+        logging.error("Logging configuration file not found at %s", LOGGING_CONFIG_PATH)
+    else:
+        # Set up logging configuration
+        setup_logging(LOGGING_CONFIG_PATH)
     logger = logging.getLogger("Learn2RAGImporter")
     logger.info("Application started.")
 
