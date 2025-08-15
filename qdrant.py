@@ -1,9 +1,11 @@
+import os
+
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
 
 class Qdrant:
-    client = QdrantClient(host="localhost", port=6336)
+    client = QdrantClient(host="localhost", port=os.environ.get('QDRANT__SERVICE__HTTP_PORT', 6336))
 
     def __init__(self, collection_name, vector_size):
         self.collection_name = collection_name

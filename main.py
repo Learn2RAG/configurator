@@ -1,5 +1,6 @@
 import logging
 import logging.config
+import os
 import yaml
 import json
 
@@ -9,12 +10,15 @@ import generate
 
 
 if __name__ == "__main__":
-    logging.config.dictConfig(yaml.safe_load(open("logging.yaml").read()))
+    try:
+        logging.config.dictConfig(yaml.safe_load(open("logging.yaml").read()))
+    except FileNotFoundError:
+        logging.basicConfig()
 
-    with open("user_config.json", "r") as file:
+    with open(os.environ.get("PIPELINE_USER_CONFIG", "user_config.json"), "r") as file:
         user_config = json.load(file)
 
-    with open("opt_config.json", "r") as file:
+    with open(os.environ.get("PIPELINE_OPT_CONFIG", "opt_config.json"), "r") as file:
         opt_config = json.load(file)
 
     ingestion.index(user_config, opt_config)
