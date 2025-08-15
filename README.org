@@ -2,6 +2,22 @@
 - ~autoconf automake ca-certificates clang cmake dpkg-dev g++ gcc git golang-go libc6-dev libssl-dev make python3 python3-dev python3-pip python3-venv rsync unzip wget~
 - ~nodejs~ 20
 
+** qdrant
+*** Common
+#+begin_src
+protobuf-compiler
+#+end_src
+*** Debian 13
+#+begin_src
+rustup
+#+end_src
+*** Debian 12
+#+begin_src
+wget -O ~/.local/bin/rustup-init https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init
+chmod +x ~/.local/bin/rustup-init
+rustup-init
+#+end_src
+
 * Runtime requirements
 - ~libgl1 libmagic1~
 
