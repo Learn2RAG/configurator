@@ -2,8 +2,7 @@ import json
 from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any
-from typing_extensions import TypedDict
+from typing import List
 from concurrent.futures import ThreadPoolExecutor
 
 import generate
@@ -107,6 +106,7 @@ async def stream(
                 ]
             }
             yield f"data: {json.dumps(msg)}\n\n"
+            # await asyncio.sleep(0.1) # stream check
 
         msg = {
             "choices": [
