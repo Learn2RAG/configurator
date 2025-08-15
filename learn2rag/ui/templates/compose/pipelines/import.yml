@@ -18,6 +18,14 @@ files:
               {% endfor %}
           ]
       }
+
+  - path: "{{pipeline.storage_path}}/basic_user_config.json"
+    content: |
+      {
+          "collection_name": "learn2rag",
+          "llm": "{{language_model.model}}"
+      }
+
 services:
   qdrant:
     working_dir: "{{pipeline.storage_path}}"
@@ -34,7 +42,12 @@ services:
   main:
     working_dir: "{{pipeline.storage_path}}"
     command:
-      - "{{learn2rag_path}}/services/importer/.venv/bin/python3"
-      - "{{learn2rag_path}}/services/importer/main.py"
-      - "--config"
-      - "{{pipeline.storage_path}}/importer_config.json"
+      - "bash"
+      - "-eu"
+      - "{{learn2rag_path}}/services/start-import"
+    environment:
+      LEARN2RAG_PATH: "{{learn2rag_path}}"
+      STORAGE_PATH: "{{pipeline.storage_path}}"
+      QDRANT__SERVICE__HTTP_PORT: "{{ports.qdrant_http}}"
+      PIPELINE_USER_CONFIG: "{{pipeline.storage_path}}/basic_user_config.json"
+      PIPELINE_OPT_CONFIG: "{{learn2rag_path}}/services/basic-pipeline/opt_config.json"

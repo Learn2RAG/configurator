@@ -1,0 +1,2 @@
+"$LEARN2RAG_PATH"/services/importer/.venv/bin/python3 "$LEARN2RAG_PATH"/services/importer/main.py --config "$STORAGE_PATH"/importer_config.json
+"$LEARN2RAG_PATH"/services/basic-pipeline/.venv/bin/python3 "$LEARN2RAG_PATH"/services/basic-pipeline/main.py
