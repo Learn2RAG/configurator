@@ -23,8 +23,13 @@ class QuestionInput(BaseModel):
     question: str
 
 
-class ChatState(TypedDict):
-    messages: List[Dict[str, Any]]
+class Message(BaseModel):
+    role: str
+    content: str
+
+
+class ChatState(BaseModel):
+    messages: List[Message]
 
 
 async def simple_chatbot_response(input: QuestionInput) -> str:
@@ -34,6 +39,16 @@ async def simple_chatbot_response(input: QuestionInput) -> str:
     answer = generate.generate(question, results, opt_config)
     full_response = f"{answer}\n\n{sources}"
     return full_response
+
+
+example_messages = {
+    "messages": [
+        {
+            "role": "user",
+            "content": "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
+        }
+    ]
+}
 
 
 app = FastAPI()
@@ -57,9 +72,14 @@ async def test():
 
 
 @app.post("/stream")
-async def stream(inputs: ChatState):
+async def stream(
+    inputs: ChatState = Body(
+        ...,
+        example=example_messages
+    )
+):
     async def event_stream():
-        question = inputs["messages"][-1]["content"]
+        question = inputs.messages[-1].content
         results = search.search(question, user_config, opt_config)
         sources = "\n".join(result.payload['path'] for result in results)
 
