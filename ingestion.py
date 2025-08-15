@@ -46,9 +46,9 @@ def insert(qdrant: Qdrant, collection_name: str, sample: Dict):
 def index(user_config, opt_config):
     # TODO: enable list of file paths in loader and adapt user_config
     # Load the documents from pdf
-    all_documents = loaders.sync_pdf_loader(user_config["file_path"])
+    # all_documents = loaders.sync_pdf_loader(user_config["file_path"])
     # TODO: use ifdt loader to load pdf in json, then:
-    # all_documents = loaders.json_loader("loaded_documents.json")
+    all_documents = loaders.json_loader("loaded_documents.json")
 
     # Split documents into chunks
     text_splitter = RecursiveCharacterTextSplitter(
