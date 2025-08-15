@@ -10,3 +10,18 @@ def generate(query, search_results, opt_config) -> str:
     chain = prompt | llm
     answer = chain.invoke({"context": context, "question": query})
     return answer.content
+
+
+def generate_stream(question: str, search_results, opt_config):
+    context = "\n\n".join([result.payload['content'] for result in search_results])
+    prompt = opt_config["prompt"]
+
+    messages = [
+        ("system", prompt),
+        ("human", f"Context:\n{context}\n\nQuestion:\n{question}")
+    ]
+
+    for chunk in llm.stream(messages):
+        text_chunk = chunk.text()
+        if text_chunk:
+            yield text_chunk
