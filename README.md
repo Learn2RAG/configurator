@@ -3,7 +3,7 @@
 ## Requirements
 
 - Python 3.13.5
-- poetry
+- poetry (which version?)
 - direnv
 - Docker
 - Ollama
