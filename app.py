@@ -33,7 +33,7 @@ class ChatState(BaseModel):
 async def simple_chatbot_response(input: QuestionInput) -> str:
     question = input.question
     results = search.search(question, user_config, opt_config)
-    sources = "\n".join(result.payload['path'] for result in results)
+    sources = "\n".join(set(result.payload['path'] for result in results))
     answer = generate.generate(question, results, opt_config)
     full_response = f"{answer}\n\n{sources}"
     return full_response
@@ -75,7 +75,7 @@ async def stream(
     async def event_stream():
         question = inputs.messages[-1].content
         results = search.search(question, user_config, opt_config)
-        sources = "\n".join(result.payload['path'] for result in results)
+        sources = "\n".join(set(result.payload['path'] for result in results))
 
         executor = ThreadPoolExecutor()
         loop = asyncio.get_event_loop()

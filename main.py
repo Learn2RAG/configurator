@@ -25,6 +25,7 @@ if __name__ == "__main__":
 
     query = "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
     results = search.search(query, user_config, opt_config)
+    sources = "\n".join(set(result.payload['path'] for result in results))
     for result in results:
         print(f"ID: {result.id}, Path: {result.payload['path']}, Score: {result.score}")
 
@@ -32,3 +33,4 @@ if __name__ == "__main__":
 
     print(query)
     print(answer)
+    print(sources)
