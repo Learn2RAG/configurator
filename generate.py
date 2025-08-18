@@ -12,14 +12,13 @@ def generate(query, search_results, opt_config) -> str:
     return answer.content
 
 
-def generate_stream(question: str, search_results, opt_config):
-    context = "\n\n".join([result.payload['content'] for result in search_results])
-    system_message = opt_config["prompt"]
+def generate_stream(query, search_results, opt_config):
+    context = "\n\n".join([result.payload["content"] for result in search_results])
+    system_message = SystemMessagePromptTemplate.from_template(opt_config["prompt"])
+    user_message = HumanMessagePromptTemplate.from_template("{question}")
+    prompt = ChatPromptTemplate.from_messages([system_message, user_message])
 
-    messages = [
-        ("system", system_message),
-        ("human", f"Context:\n{context}\n\nQuestion:\n{question}")
-    ]
+    messages = prompt.format_messages(context=context, question=query)
 
     for chunk in llm.stream(messages):
         text_chunk = chunk.text()
