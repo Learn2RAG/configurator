@@ -9,7 +9,8 @@ from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
 import generate
-import search
+import search as search_points
+import ingestion
 
 
 with open(os.environ.get("PIPELINE_USER_CONFIG", "user_config.json"), "r") as file:
@@ -34,7 +35,7 @@ class ChatState(BaseModel):
 
 async def simple_chatbot_response(input: QuestionInput) -> str:
     question = input.question
-    results = search.search(question, user_config, opt_config)
+    results = search_points.search(question, user_config, opt_config)
     sources = "\n".join(set(result.payload['path'] for result in results))
     answer = generate.generate(question, results, opt_config)
     full_response = f"{answer}\n\n{sources}"
@@ -76,7 +77,7 @@ async def stream(
 ):
     async def event_stream():
         question = inputs.messages[-1].content
-        results = search.search(question, user_config, opt_config)
+        results = search_points.search(question, user_config, opt_config)
         sources = "\n".join(set(result.payload['path'] for result in results))
 
         executor = ThreadPoolExecutor()
@@ -119,6 +120,23 @@ async def stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )
+
+
+@app.post("/search")
+async def search(
+    input: QuestionInput = Body(
+        ...,
+        example={
+            "question": example_query
+        }
+    )
+):
+    return search_points.search(input.question, user_config, opt_config)
+
+
+@app.post("/ingest")
+async def ingest():
+    ingestion.index(user_config, opt_config)
 
 
 @app.get("/test")
