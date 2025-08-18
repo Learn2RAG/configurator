@@ -1,10 +1,18 @@
 name: pipeline
 ports:
   - ui
-  - redis
+  - qdrant_http
   - pipeline
   - open_webui_pipelines
 ui_url: "http://{{learn2rag_hostname}}:{{ports.ui}}/"
+files:
+  - path: "{{pipeline.storage_path}}/basic_user_config.json"
+    content: |
+      {
+          "collection_name": "learn2rag",
+          "llm": "{{language_model.model}}"
+      }
+
 services:
   open-webui:
     working_dir: "{{pipeline.storage_path}}"
@@ -33,22 +41,18 @@ services:
       PIPELINE_STREAM_URL: "http://127.0.0.1:{{ports.pipeline}}/stream"
       PIPELINES_DIR: "{{learn2rag_path}}/open-webui-pipelines"
       PORT: "{{ports.open_webui_pipelines}}"
-  redis:
+  qdrant:
     working_dir: "{{pipeline.storage_path}}"
     command:
-      - "{{learn2rag_path}}/services/redis/src/redis-server"
-      - "--include"
-      - "{{learn2rag_path}}/services/redis/redis.conf"
-      - "--loadmodule"
-      - "{{learn2rag_path}}/services/redis/modules/redisbloom/redisbloom.so"
-      - "--loadmodule"
-      - "{{learn2rag_path}}/services/redis/modules/redisearch/redisearch.so"
-      - "--loadmodule"
-      - "{{learn2rag_path}}/services/redis/modules/redistimeseries/redistimeseries.so"
-      - "--port"
-      - "{{ports.redis}}"
-      - "--pidfile"
-      - "redis.pid"
+      - "{{learn2rag_path}}/services/qdrant/target/release/qdrant"
+      - "--config-path"
+      - "{{learn2rag_path}}/qdrant/config.yml"
+    environment:
+      # https://qdrant.tech/documentation/guides/configuration/
+      QDRANT__LOG_LEVEL: "INFO"
+      QDRANT__SERVICE__HOST: "127.0.0.1"
+      QDRANT__SERVICE__HTTP_PORT: "{{ports.qdrant_http}}"
+      QDRANT__TELEMETRY_DISABLED: "true"
   open-webui-setup:
     working_dir: "{{pipeline.storage_path}}"
     command: ["bash", "-eu", "{{learn2rag_path}}/services/setup-open-webui"]
@@ -58,14 +62,22 @@ services:
       ADMIN_USER_PASSWORD: "learn2rag"
   main:
     working_dir: "{{pipeline.storage_path}}"
-    command: ["{{learn2rag_path}}/services/basic-pipeline/.venv/bin/uvicorn", "--host", "0.0.0.0", "--port", "{{ports.pipeline}}", "--app-dir", "{{learn2rag_path}}/services/basic-pipeline", "server:app"]
+    command:
+      - "{{learn2rag_path}}/services/basic-pipeline/.venv/bin/uvicorn"
+      - "--host"
+      - "127.0.0.1"
+      - "--port"
+      - "{{ports.pipeline}}"
+      - "--app-dir"
+      - "{{learn2rag_path}}/services/basic-pipeline"
+      - "app:app"
     environment:
+      QDRANT__SERVICE__HTTP_PORT: "{{ports.qdrant_http}}"
+      PIPELINE_USER_CONFIG: "{{pipeline.storage_path}}/basic_user_config.json"
+      PIPELINE_OPT_CONFIG: "{{learn2rag_path}}/services/basic-pipeline/opt_config.json"
       LANGCHAIN_API_KEY: "1"
       LANGCHAIN_TRACING_V2: "false"
       LLM_API_TYPE: "{{language_model.api}}"
       LLM_API_URL: "{{language_model.url}}"
       LLM_API_TOKEN: "{{language_model.token}}"
       LLM_API_MODEL: "{{language_model.model}}"
-      REDIS_URL: "redis://localhost:{{ports.redis}}"
-      REDIS_INDEX_NAME: learn2rag
-      PROMPT_FILE: "{{learn2rag_path}}/services/basic-pipeline/prompts/langsmithhub/rlm/rag-prompt.json"
