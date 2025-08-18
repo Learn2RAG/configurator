@@ -98,7 +98,7 @@ async def stream(
                 ]
             }
             yield f"data: {json.dumps(msg)}\n\n"
-            await asyncio.sleep(0.1) # delay for stream check
+            # await asyncio.sleep(0.1) # delay for stream check
 
         msg = {
             "choices": [
