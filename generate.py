@@ -14,10 +14,10 @@ def generate(query, search_results, opt_config) -> str:
 
 def generate_stream(question: str, search_results, opt_config):
     context = "\n\n".join([result.payload['content'] for result in search_results])
-    prompt = opt_config["prompt"]
+    system_message = opt_config["prompt"]
 
     messages = [
-        ("system", prompt),
+        ("system", system_message),
         ("human", f"Context:\n{context}\n\nQuestion:\n{question}")
     ]
 

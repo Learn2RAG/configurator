@@ -4,12 +4,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 import generate
 import search
 
-
-executor = ThreadPoolExecutor()
 
 with open("user_config.json", "r") as file:
     user_config = json.load(file)
@@ -40,11 +39,12 @@ async def simple_chatbot_response(input: QuestionInput) -> str:
     return full_response
 
 
+example_query = "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
 example_messages = {
     "messages": [
         {
             "role": "user",
-            "content": "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
+            "content": example_query
         }
     ]
 }
@@ -57,17 +57,12 @@ async def qanda(
     input: QuestionInput = Body(
         ...,
         example={
-            "question": "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
+            "question": example_query
         }
     )
 ):
     answer = await simple_chatbot_response(input)
     return {"messages": [{"content": answer}]}
-
-
-@app.get("/test")
-async def test():
-    return {"message": "Hello World"}
 
 
 @app.post("/stream")
@@ -81,9 +76,6 @@ async def stream(
         question = inputs.messages[-1].content
         results = search.search(question, user_config, opt_config)
         sources = "\n".join(result.payload['path'] for result in results)
-
-        from concurrent.futures import ThreadPoolExecutor
-        import asyncio
 
         executor = ThreadPoolExecutor()
         loop = asyncio.get_event_loop()
@@ -106,7 +98,7 @@ async def stream(
                 ]
             }
             yield f"data: {json.dumps(msg)}\n\n"
-            # await asyncio.sleep(0.1) # stream check
+            await asyncio.sleep(0.1) # delay for stream check
 
         msg = {
             "choices": [
@@ -125,6 +117,11 @@ async def stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )
+
+
+@app.get("/test")
+async def test():
+    return {"message": "Hello World"}
 
 
 if __name__ == "__main__":
