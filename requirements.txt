@@ -8,6 +8,7 @@ langchain-community
 langchain-core
 langchain-huggingface
 langchain-ollama
+langchain-openai
 langchain-redis
 langgraph
 lxml
