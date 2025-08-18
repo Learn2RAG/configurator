@@ -1,4 +1,6 @@
 import json
+import os
+
 from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -10,10 +12,10 @@ import generate
 import search
 
 
-with open("user_config.json", "r") as file:
+with open(os.environ.get("PIPELINE_USER_CONFIG", "user_config.json"), "r") as file:
     user_config = json.load(file)
 
-with open("opt_config.json", "r") as file:
+with open(os.environ.get("PIPELINE_OPT_CONFIG", "opt_config.json"), "r") as file:
     opt_config = json.load(file)
 
 
