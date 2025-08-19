@@ -36,10 +36,10 @@ class ChatState(BaseModel):
 async def simple_chatbot_response(input: QuestionInput) -> str:
     question = input.question
     results = search_points.search(question, user_config, opt_config)
-    sources = "\n".join(set(result.payload['path'] for result in results))
+    # sources = "\n".join(set(result.payload['path'] for result in results))
     answer = generate.generate(question, results, opt_config)
-    full_response = f"{answer}\n\n{sources}"
-    return full_response
+    # full_response = f"{answer}\n\n{sources}"
+    return answer #full_response
 
 
 example_query = "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
@@ -78,7 +78,7 @@ async def stream(
     async def event_stream():
         question = inputs.messages[-1].content
         results = search_points.search(question, user_config, opt_config)
-        sources = "\n".join(set(result.payload['path'] for result in results))
+        # sources = "\n".join(set(result.payload['path'] for result in results))
 
         executor = ThreadPoolExecutor()
         loop = asyncio.get_event_loop()
@@ -103,15 +103,15 @@ async def stream(
             yield f"data: {json.dumps(msg)}\n\n"
             # await asyncio.sleep(0.1) # delay for stream check
 
-        msg = {
-            "choices": [
-                {
-                    "delta": {"content": "\n\n" + sources},
-                    "finish_reason": None
-                }
-            ]
-        }
-        yield f"data: {json.dumps(msg)}\n\n"
+        # msg = {
+        #     "choices": [
+        #         {
+        #             "delta": {"content": "\n\n" + sources},
+        #             "finish_reason": None
+        #         }
+        #     ]
+        # }
+        # yield f"data: {json.dumps(msg)}\n\n"
 
         yield f"data: {json.dumps({'choices':[{'delta':{}, 'finish_reason':'stop'}]})}\n\n"
 

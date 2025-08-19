@@ -1,9 +1,15 @@
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
 from llm import llm
 
+context_template ="""
+-----
+Source: {source}
+Content: 
+{content}
+"""
 
 def generate(query, search_results, opt_config) -> str:
-    context = "\n\n".join([result.payload['content'] for result in search_results])
+    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
     system_message = SystemMessagePromptTemplate.from_template(opt_config["prompt"])
     user_message = HumanMessagePromptTemplate.from_template("{question}")
     prompt = ChatPromptTemplate.from_messages([system_message, user_message])
@@ -13,7 +19,7 @@ def generate(query, search_results, opt_config) -> str:
 
 
 def generate_stream(query, search_results, opt_config):
-    context = "\n\n".join([result.payload["content"] for result in search_results])
+    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
     system_message = SystemMessagePromptTemplate.from_template(opt_config["prompt"])
     user_message = HumanMessagePromptTemplate.from_template("{question}")
     prompt = ChatPromptTemplate.from_messages([system_message, user_message])
