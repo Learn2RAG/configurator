@@ -3,7 +3,7 @@
 ## Requirements
 
 - Python 3.13.5
-- poetry (which version?)
+- poetry 2.1.3
 - direnv
 - Docker
 - Ollama
@@ -14,12 +14,14 @@ poetry install
 poetry shell
 ```
 
-Configure options in ``.envrc``:
+Configure your ``.env``:
 ```
-export OLLAMA_URL="http://localhost:11434"
-export OLLAMA_AUTH=""
+LLM_API_URL="http://localhost:11434"
+LLM_API_TOKEN=""
+LLM_API_MODEL="llama3.3:70b"
+LLM_API_PROXY=""
 ```
-You might need to run ``direnv allow`` in the same directory.
+You might need to run ``direnv allow`` in the same directory to export the environment variables to your shell.
 
 ### Ollama (not tested by USU!)
 ```

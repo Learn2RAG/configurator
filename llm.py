@@ -30,9 +30,9 @@ def ChatOpenAI(*, url, token, model, proxy):
 
 llm_kwargs = {
     'url': os.environ['LLM_API_URL'],
-    'token': os.environ.get('LLM_API_TOKEN'),
+    'token': os.environ.get('LLM_API_TOKEN') or None,
     'model': os.environ['LLM_API_MODEL'],
-    'proxy': os.environ.get('LLM_API_PROXY'),
+    'proxy': os.environ.get('LLM_API_PROXY') or None,
 }
 logging.info('LLM args: %s', llm_kwargs)
 
