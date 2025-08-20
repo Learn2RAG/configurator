@@ -52,7 +52,7 @@ class Pipeline:
         }
         
         headers = {
-            'accept': 'text/event-stream',
+            'Accept': 'text/event-stream',
             'Content-Type': 'application/json',
         }
         
