@@ -8,16 +8,10 @@ from typing import List
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
+from config import user_config, opt_config
 import generate
 import search as search_points
 import ingestion
-
-
-with open(os.environ.get("PIPELINE_USER_CONFIG", "user_config.json"), "r") as file:
-    user_config = json.load(file)
-
-with open(os.environ.get("PIPELINE_OPT_CONFIG", "opt_config.json"), "r") as file:
-    opt_config = json.load(file)
 
 
 class QuestionInput(BaseModel):
