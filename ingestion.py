@@ -86,3 +86,11 @@ def index(user_config, opt_config):
     for sample in chunks_with_embeddings:
         if not point_exists(qdrant, collection_name, sample['metadata']['source'], sample['chunk_hash']):
             insert(qdrant, collection_name, sample)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
+    from config import user_config, opt_config
+
+    index(user_config, opt_config)
