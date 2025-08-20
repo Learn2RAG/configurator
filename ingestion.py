@@ -1,3 +1,4 @@
+import logging
 from uuid import uuid4
 import hashlib
 from typing import Dict
@@ -48,9 +49,11 @@ def index(user_config, opt_config):
     # Load the documents from pdf
     # all_documents = loaders.sync_pdf_loader(user_config["file_path"])
     # TODO: use ifdt loader to load pdf in json, then:
+    logging.info('Loading documents')
     all_documents = loaders.json_loader("loaded_documents.json")
 
     # Split documents into chunks
+    logging.info('Splitting documents into chunks')
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=opt_config["chunk_size"], chunk_overlap=opt_config["chunk_overlap"]
     )
@@ -69,6 +72,7 @@ def index(user_config, opt_config):
     chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]
     # Todo: handle different vector lengths for batch encoding when using sparse vectors
 
+    logging.info('Creating embeddings...')
     embeddings = create_embeddings(chunks_content, opt_config["embedding_model"])
 
 
