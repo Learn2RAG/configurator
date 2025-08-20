@@ -48,8 +48,8 @@ class Pipeline:
             ) -> Union[str, Generator, Iterator]:
 
         data = {
-            "messages": [[msg['role'], msg['content']] for msg  in messages],
-            }
+            "messages": [{'role': msg['role'], 'content': msg['content']} for msg  in messages],
+        }
         
         headers = {
             'accept': 'text/event-stream',
