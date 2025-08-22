@@ -140,4 +140,4 @@ async def test():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9000)
+    uvicorn.run(app, host="127.0.0.1", port=os.environ.get('LEARN2RAG_PIPELINE_PORT', 9000))
