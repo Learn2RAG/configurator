@@ -19,3 +19,6 @@
 [submodule "services/qdrant"]
 	path = services/qdrant
 	url = https://github.com/qdrant/qdrant
+[submodule "pyapp"]
+	path = pyapp
+	url = https://github.com/learn2rag/pyapp

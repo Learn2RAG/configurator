@@ -31,7 +31,7 @@ rustup-init
 * Using the configurator
 ** Start
 #+begin_src sh
-  .venv/bin/flask --app learn2rag.ui run --host 0.0.0.0
+  .venv/bin/python -m learn2rag
 #+end_src
 
 ** Usage

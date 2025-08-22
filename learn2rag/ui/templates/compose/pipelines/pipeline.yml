@@ -16,8 +16,9 @@ files:
 services:
   open-webui:
     working_dir: "{{pipeline.storage_path}}"
-    command: ["{{learn2rag_path}}/services/open-webui/.venv/bin/open-webui", "serve", "--host", "0.0.0.0", "--port", "{{ports.ui}}"]
+    command: ["{{learn2rag_path}}/services/start-open-webui", "serve", "--host", "0.0.0.0", "--port", "{{ports.ui}}"]
     environment:
+      LEARN2RAG_PATH: "{{learn2rag_path}}"
       DATA_DIR: "{{pipeline.storage_path}}/open-webui-data"
       DEFAULT_LOCALE: "de"
       ENABLE_OPENAI_API: "True"
@@ -38,8 +39,10 @@ services:
     working_dir: "services/open-webui-pipelines"
     command: ["bash", "-eu", "{{learn2rag_path}}/services/start-open-webui-pipelines"]
     environment:
+      LEARN2RAG_PATH: "{{learn2rag_path}}"
       PIPELINE_STREAM_URL: "http://127.0.0.1:{{ports.pipeline}}/stream"
       PIPELINES_DIR: "{{learn2rag_path}}/open-webui-pipelines"
+      HOST: "127.0.0.1"
       PORT: "{{ports.open_webui_pipelines}}"
   qdrant:
     working_dir: "{{pipeline.storage_path}}"
@@ -62,16 +65,10 @@ services:
       ADMIN_USER_PASSWORD: "learn2rag"
   main:
     working_dir: "{{pipeline.storage_path}}"
-    command:
-      - "{{learn2rag_path}}/services/basic-pipeline/.venv/bin/uvicorn"
-      - "--host"
-      - "127.0.0.1"
-      - "--port"
-      - "{{ports.pipeline}}"
-      - "--app-dir"
-      - "{{learn2rag_path}}/services/basic-pipeline"
-      - "app:app"
+    command: "{{learn2rag_path}}/services/start-basic-pipeline"
     environment:
+      LEARN2RAG_PATH: "{{learn2rag_path}}"
+      LEARN2RAG_PIPELINE_PORT: "{{ports.pipeline}}"
       QDRANT__SERVICE__HTTP_PORT: "{{ports.qdrant_http}}"
       PIPELINE_USER_CONFIG: "{{pipeline.storage_path}}/basic_user_config.json"
       PIPELINE_OPT_CONFIG: "{{learn2rag_path}}/services/basic-pipeline/opt_config.json"
