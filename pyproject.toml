@@ -46,3 +46,7 @@ build-backend = "poetry.core.masonry.api"
 deptry = "^0.23.1"
 ruff = "^0.12.7"
 
+[tool.poetry]
+packages = [
+    { include = "*.py" },
+]
