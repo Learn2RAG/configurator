@@ -43,22 +43,9 @@ services:
         target: /qdrant/config/production.yaml
     volumes:
       - ./qdrant_data:/qdrant/storage
-  langgraph:
-    build: .
-    environment:
-      LANGCHAIN_API_KEY: 1
-      LANGCHAIN_TRACING_V2: "false"
-      LLM_API_PROXY: ${LLM_API_PROXY}
-      LLM_API_URL: ${LLM_API_URL}
-      LLM_API_TOKEN: ${LLM_API_TOKEN}
-      LLM_API_MODEL: ${LLM_API_MODEL}
-      REDIS_URL: redis://redis:6379
-      REDIS_INDEX_NAME: ${REDIS_INDEX_NAME}
-      PROMPT_FILE: ./prompts/langsmithhub/rlm/rag-prompt.json
 volumes:
   open-webui-data:
   open-webui-pipelines:
-  redis-data:
 configs:
   qdrant_config:
     content: |
