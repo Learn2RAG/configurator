@@ -48,5 +48,5 @@ ruff = "^0.12.7"
 
 [tool.poetry]
 packages = [
-    { include = "*.py" },
+    { include = "**/*.py" },
 ]
