@@ -37,7 +37,7 @@ services:
       WEBUI_NAME: "Learn2RAG"
   openwebui-pipelines:
     working_dir: "services/open-webui-pipelines"
-    command: ["bash", "-eu", "{{learn2rag_path}}/services/start-open-webui-pipelines"]
+    command: ["{{learn2rag_path}}/services/start-open-webui-pipelines"]
     environment:
       LEARN2RAG_PATH: "{{learn2rag_path}}"
       PIPELINE_STREAM_URL: "http://127.0.0.1:{{ports.pipeline}}/stream"

@@ -1,18 +1,14 @@
-#!/bin/sh
+#!/bin/bash
 set -eu
 
 BUNDLE=dist/linux
 
 mkdir -p $BUNDLE
-mkdir -p $BUNDLE/services/ollama/dist
-mkdir -p $BUNDLE/services/qdrant/target/release
-
-cp services/ollama/dist/ollama $BUNDLE/services/ollama/dist/
-
-cp services/qdrant/target/release/qdrant $BUNDLE/services/qdrant/target/release/
+mkdir -p $BUNDLE/services
 
 export PYAPP_DISTRIBUTION_EMBED=true
-#export PYAPP_FULL_ISOLATION=true
+export PYAPP_FULL_ISOLATION=true
+export PYAPP_EXPOSE_ALL_COMMANDS=true
 
 .venv/bin/python3 -m build
 (cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=learn2rag PYAPP_PROJECT_PATH=../dist/learn2rag-0.1.0.tar.gz cargo build --release)
@@ -29,3 +25,8 @@ cp pyapp/target/release/pyapp $BUNDLE/services/start-open-webui
 (cd services/open-webui-pipelines; poetry build)
 (cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui-pipelines PYAPP_PROJECT_PATH=../services/open-webui-pipelines/dist/open_webui_pipelines-0.1.0.tar.gz PYAPP_EXEC_MODULE=start cargo build --release)
 cp pyapp/target/release/pyapp $BUNDLE/services/start-open-webui-pipelines
+
+while read -u 100 file; do
+    mkdir -p $BUNDLE/$(dirname $file)
+    cp $file $BUNDLE/$file
+done 100<Distfiles
