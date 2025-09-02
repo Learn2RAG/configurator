@@ -129,17 +129,26 @@ def create_app(test_config=None):
     @app.get('/models')
     def models_list():
         models = learn2rag.data.get_all(app.instance_path, 'models')
+        ollama_available = False
         ollama_models = []
         try:
             if hasattr(ollama, "list"):
                 ollama_models = ollama.list()
+                ollama_available = True
                 app.logger.info('Ollama models: %s', ollama_models)
                 if hasattr(ollama_models, "models"):
                     ollama_models = ollama_models.models
+                else:
+                    app.logger.warning('ollama list response has no models attribute')
         except Exception as e:
             app.logger.warning("Ollama not available: %s", e)
 
-        return render_template('models_list.html', models=models, ollama_models=ollama_models)
+        return render_template(
+            'models_list.html',
+            models=models,
+            ollama_available=ollama_available,
+            ollama_models=ollama_models,
+        )
 
     @app.post('/models')
     def model_create():
