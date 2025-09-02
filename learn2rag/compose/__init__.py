@@ -89,7 +89,7 @@ class Project():
         cur.close()
         if stopped := list(filter(lambda row: not process_running(row['pid']), rows)):
             logger.info('Stopping project %s due to stopped services: %s', self.name, [row['name'] for row in stopped])
-            self.stop()
+            self.stop(stopped=stopped)
 
     def get(name, *, check=True):
         cur = con.cursor()
@@ -166,7 +166,7 @@ class Project():
         cur.close()
         self.running = True
 
-    def stop(self):
+    def stop(self, stopped=[]):
         cur = con.cursor()
         cur.row_factory = sqlite3.Row
         cur.execute('BEGIN EXCLUSIVE')
@@ -176,11 +176,12 @@ class Project():
             raise AssertionError('Could not mark the project as stopped')
         cur.execute('SELECT * FROM services WHERE project = :project', {'project': self.name})
         for row in cur.fetchall():
-            try:
-                os.killpg(os.getpgid(row['pid']), signal.SIGTERM)
-            except ProcessLookupError:
-                logger.debug('Process does not exist: %s', dict(row))
-            # TODO wait for services to actually terminate
+            if row['name'] not in {process['name'] for process in stopped}:
+                try:
+                    os.killpg(os.getpgid(row['pid']), signal.SIGTERM)
+                    # TODO wait for services to actually terminate
+                except ProcessLookupError:
+                    logger.debug('Attempted to stop a process which does not exist: %s', dict(row))
         cur.execute('DELETE FROM services WHERE project = :project', {'project': self.name})
         con.commit()
         cur.close()
