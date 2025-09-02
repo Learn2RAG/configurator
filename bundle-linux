@@ -33,5 +33,5 @@ cp pyapp/target/release/pyapp $BUNDLE/services/start-open-webui-pipelines
 
 while read -u 100 file; do
     mkdir -p $BUNDLE/$(dirname $file)
-    cp $file $BUNDLE/$file
+    cp -r $file $BUNDLE/$file
 done 100<Distfiles
