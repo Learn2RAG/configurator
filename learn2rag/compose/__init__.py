@@ -151,7 +151,7 @@ class Project():
                     start_new_session=True,
                 )
             except Exception as e:
-                # TODO stop already started processes
+                # TODO stop already started processes immediately
                 con.rollback()
                 raise e
             self.services.append(proc)
@@ -173,7 +173,7 @@ class Project():
         cur.execute('UPDATE projects SET running = FALSE WHERE name = :name AND running = TRUE', {'name': self.name})
         if cur.rowcount != 1:
             con.rollback()
-            raise AssertionError('Could not mark the project as stopped')
+            raise AssertionError(f'Could not mark the project {self.name} as stopped ({cur.rowcount} != 1)')
         cur.execute('SELECT * FROM services WHERE project = :project', {'project': self.name})
         for row in cur.fetchall():
             if row['name'] not in {process['name'] for process in stopped}:
@@ -186,3 +186,4 @@ class Project():
         con.commit()
         cur.close()
         self.running = False
+        logger.debug('Stopped project: %s', self.name)
