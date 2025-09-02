@@ -14,6 +14,8 @@ import yaml
 from learn2rag.compose import Project
 import learn2rag.data
 
+from datetime import datetime  # <-- ADD THIS
+
 
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
@@ -88,6 +90,10 @@ def create_app(test_config=None):
     app.pipeline_templates = {str(item.stem): yaml.safe_load(item.open()) for item in app.pipelines_template_path.glob('*.yml')}
     app.logger.debug('Loaded %i pipeline_templates: %s', len(app.pipeline_templates), list(app.pipeline_templates.keys()))
 
+    @app.context_processor
+    def inject_current_year():
+        return {'current_year': datetime.now().year}
+
     # TODO: let the user configure the directory for ollama data before starting it?
     try:
         project = start_project('ollama', app.components_template_path / 'ollama.yml', Path(app.instance_path) / 'ollama')
@@ -97,7 +103,19 @@ def create_app(test_config=None):
 
     @app.get('/')
     def start():
-        return render_template('start.html')
+        models = learn2rag.data.get_all(app.instance_path, 'models')
+        sources = learn2rag.data.get_all(app.instance_path, 'sources')
+        pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
+        projects = Project.get_all()
+        running_pipelines = sum(1 for k, p in projects.items() if k in pipelines and p.running)
+
+        return render_template(
+            'start.html',
+            models=models,
+            sources=sources,
+            pipelines=pipelines,
+            running_pipelines=running_pipelines
+        )
 
     @app.get('/components')
     def components():
@@ -111,9 +129,26 @@ def create_app(test_config=None):
     @app.get('/models')
     def models_list():
         models = learn2rag.data.get_all(app.instance_path, 'models')
-        ollama_models = ollama.list()
-        app.logger.info('Ollama models: %s', ollama_models)
-        return render_template('models_list.html', models=models, ollama_models=ollama_models.models)
+        ollama_available = False
+        ollama_models = []
+        try:
+            if hasattr(ollama, "list"):
+                ollama_models = ollama.list()
+                ollama_available = True
+                app.logger.info('Ollama models: %s', ollama_models)
+                if hasattr(ollama_models, "models"):
+                    ollama_models = ollama_models.models
+                else:
+                    app.logger.warning('ollama list response has no models attribute')
+        except Exception as e:
+            app.logger.warning("Ollama not available: %s", e)
+
+        return render_template(
+            'models_list.html',
+            models=models,
+            ollama_available=ollama_available,
+            ollama_models=ollama_models,
+        )
 
     @app.post('/models')
     def model_create():

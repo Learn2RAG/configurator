@@ -13,7 +13,12 @@ logger = logging.getLogger(__name__)
 
 # FIXME
 # remove child processes immediately when they exit
-signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+import platform
+import signal
+
+if hasattr(signal, "SIGCHLD"):
+    signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+
 
 init_sql = ['''
 CREATE TABLE IF NOT EXISTS projects (

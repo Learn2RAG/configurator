@@ -81,6 +81,7 @@
         </h2>
         <div id="collapseCreateOllamaDownload" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
           <div class="accordion-body">
+            {% if ollama_available %}
             <form method="POST">
               <div class="mb-3">
                 <label for="label" class="form-label">Label</label>
@@ -93,6 +94,11 @@
               <input type="hidden" name="ollama" value="pull"/>
               <button type="submit" class="btn btn-primary">Save</button>
             </form>
+            {% else %}
+            <div class="alert alert-warning" role="alert">
+              Ollama is not running!
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>
