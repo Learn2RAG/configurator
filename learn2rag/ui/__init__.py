@@ -107,7 +107,7 @@ def create_app(test_config=None):
         sources = learn2rag.data.get_all(app.instance_path, 'sources')
         pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
         projects = Project.get_all()
-        running_pipelines = sum(1 for p in projects if p.running)
+        running_pipelines = sum(1 for k, p in projects.items() if k in pipelines and p.running)
 
         return render_template(
             'start.html',
@@ -199,8 +199,7 @@ def create_app(test_config=None):
         language_models = learn2rag.data.get_all(app.instance_path, 'models')
         sources = learn2rag.data.get_all(app.instance_path, 'sources')
         projects = Project.get_all()
-        running_count = sum(1 for p in projects if p.running)
-        return render_template('pipelines_list.html', pipelines=pipelines, language_models=language_models, sources=sources, compose_templates=app.pipeline_templates, projects=projects,running_count=running_count )
+        return render_template('pipelines_list.html', pipelines=pipelines, language_models=language_models, sources=sources, compose_templates=app.pipeline_templates, projects=projects)
 
     @app.post('/pipelines')
     def pipeline_create():
