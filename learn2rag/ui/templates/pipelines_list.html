@@ -25,7 +25,7 @@
       <div class="mb-3">
         <label for="language_model" class="form-label">Sprachmodell</label>
         <select class="form-select" name="language_model">
-          {% for name, language_model in language_models.items() %}
+          {% for name, language_model in models.items() %}
           <option value="{{ name }}">{{ language_model.label }} ({{ language_model.model }})</option>
           {% endfor %}
         </select>
@@ -75,7 +75,7 @@
       </td>
       <td>{{ pipeline.storage_path }}</td>
       <td>
-        <span class="badge text-bg-secondary">{{ language_models[pipeline.language_model].label }}</span>
+        <span class="badge text-bg-secondary">{{ models[pipeline.language_model].label }}</span>
       </td>
       <td>
         {% for source in pipeline.sources %}

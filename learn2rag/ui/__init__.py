@@ -91,6 +91,20 @@ def create_app(test_config=None):
     app.logger.debug('Loaded %i pipeline_templates: %s', len(app.pipeline_templates), list(app.pipeline_templates.keys()))
 
     @app.context_processor
+    def inject_info():
+        return {
+            'compose_templates': app.pipeline_templates,
+        }
+
+    @app.context_processor
+    def inject_data():
+        return {
+            'models': learn2rag.data.get_all(app.instance_path, 'models'),
+            'sources': learn2rag.data.get_all(app.instance_path, 'sources'),
+            'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
+        }
+
+    @app.context_processor
     def inject_current_year():
         return {'current_year': datetime.now().year}
 
@@ -103,17 +117,12 @@ def create_app(test_config=None):
 
     @app.get('/')
     def start():
-        models = learn2rag.data.get_all(app.instance_path, 'models')
-        sources = learn2rag.data.get_all(app.instance_path, 'sources')
         pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
         projects = Project.get_all()
         running_pipelines = sum(1 for k, p in projects.items() if k in pipelines and p.running)
 
         return render_template(
             'start.html',
-            models=models,
-            sources=sources,
-            pipelines=pipelines,
             running_pipelines=running_pipelines
         )
 
@@ -128,7 +137,6 @@ def create_app(test_config=None):
 
     @app.get('/models')
     def models_list():
-        models = learn2rag.data.get_all(app.instance_path, 'models')
         ollama_available = False
         ollama_models = []
         try:
@@ -145,7 +153,6 @@ def create_app(test_config=None):
 
         return render_template(
             'models_list.html',
-            models=models,
             ollama_available=ollama_available,
             ollama_models=ollama_models,
         )
@@ -186,8 +193,7 @@ def create_app(test_config=None):
 
     @app.get('/sources')
     def sources_list():
-        sources = learn2rag.data.get_all(app.instance_path, 'sources')
-        return render_template('sources_list.html', sources=sources)
+        return render_template('sources_list.html')
 
     @app.post('/sources')
     def source_create():
@@ -203,12 +209,8 @@ def create_app(test_config=None):
 
     @app.get('/pipelines')
     def pipelines_list():
-        pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
-
-        language_models = learn2rag.data.get_all(app.instance_path, 'models')
-        sources = learn2rag.data.get_all(app.instance_path, 'sources')
         projects = Project.get_all()
-        return render_template('pipelines_list.html', pipelines=pipelines, language_models=language_models, sources=sources, compose_templates=app.pipeline_templates, projects=projects)
+        return render_template('pipelines_list.html', projects=projects)
 
     @app.post('/pipelines')
     def pipeline_create():
