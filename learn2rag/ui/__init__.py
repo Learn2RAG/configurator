@@ -22,7 +22,8 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 
 def start_project(name, template_file, storage_path, render_context = {}):
-    storage_path = storage_path.absolute()
+    storage_path = storage_path.expanduser().absolute()
+    logging.debug('Storage path: %s', storage_path)
     storage_path.mkdir(parents=True, exist_ok=True)
     project_file = storage_path / 'compose.yml'
 
@@ -233,11 +234,17 @@ def create_app(test_config=None):
             return 'Not implemented'
         elif request.form['action'].startswith('start:'):
             url = urllib.parse.urlparse(request.base_url)
+
+            sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
+            # expand "~" in paths
+            for name, source in sources.items():
+                source['path'] = str(Path(source['path']).expanduser().absolute())
+
             render_context = {
                 'learn2rag_hostname': url.hostname,
                 'pipeline': pipeline,
                 'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
-                'sources': learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources']),
+                'sources': sources,
             }
 
             app.logger.debug('Starting: %s', name)
