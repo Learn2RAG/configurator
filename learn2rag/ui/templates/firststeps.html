@@ -1,0 +1,7 @@
+{% if not models|length %}
+{% include 'firststeps_models.html' %}
+{% elif not sources|length %}
+{% include 'firststeps_sources.html' %}
+{% elif not pipelines|length %}
+{% include 'firststeps_pipelines.html' %}
+{% endif %}

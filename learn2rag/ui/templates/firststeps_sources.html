@@ -1,0 +1,18 @@
+<div class="alert alert-secondary" role="alert">
+  <h4 class="alert-heading">You do not have any data sources selected</h4>
+  <p>Do you want to add a folder now?</p>
+  <hr/>
+  <div class="btn-toolbar mb-3" role="toolbar">
+    <div class="input-group">
+      <form method="POST" action="{{ url_for('source_create') }}">
+        <input type="hidden" name="type" value="local"/>
+        <input type="hidden" name="label" value="~/Documents/RAG"/>
+        <input type="hidden" name="path" value="~/Documents/RAG"/>
+        <button type="submit" class="btn btn-primary">🪄 Yes, add my <code>~/Documents/RAG</code> folder</button>
+      </form>
+    </div>
+    <div class="btn-group me-2" role="group">
+      <a href="{{ url_for('sources_list') }}" class="btn btn-link">More options</a>
+    </div>
+  </div>
+</div>

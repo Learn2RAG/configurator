@@ -42,9 +42,7 @@
     <!-- Main Content -->
     <main class="flex-grow-1">
       <section class="container my-4">
-        <header>
-          {% block header %}{% endblock %}
-        </header>
+        {% include 'firststeps.html' %}
 
         {% for category, message in get_flashed_messages(with_categories=True) %}
           {% if category == 'error' %}
@@ -53,6 +51,10 @@
             <div class="alert alert-primary">{{ message }}</div>
           {% endif %}
         {% endfor %}
+
+        <header>
+          {% block header %}{% endblock %}
+        </header>
 
         {% block content %}{% endblock %}
       </section>

@@ -1,0 +1,23 @@
+<div class="alert alert-secondary" role="alert">
+  <h4 class="alert-heading">You do not have any pipelines configured</h4>
+  <p>Do you want to automatically configure a pipeline?</p>
+  <hr/>
+  <p>A pipeline would use one of your models and all the sources you have configured.</p>
+  <div class="btn-toolbar mb-3" role="toolbar">
+    <div class="input-group">
+      <form method="POST" action="{{ url_for('pipeline_create') }}">
+        <input type="hidden" name="label" value="Example pipeline">
+        <input type="hidden" name="storage_path" value="~/.local/share/learn2rag/example_pipeline">
+        <input type="hidden" name="language_model" value="{{ models|items|map(attribute=0)|first }}"/>
+        {% for name, source in sources.items() %}
+        <input type="hidden" name="sources" value="{{ name }}">
+        {% endfor %}
+        <input type="hidden" name="ports" type="number" value="9001">
+        <button type="submit" class="btn btn-primary">🪄 Yes, automatically configure a pipeline</button>
+      </form>
+    </div>
+    <div class="btn-group me-2" role="group">
+      <a href="{{ url_for('pipelines_list') }}" class="btn btn-link">More options</a>
+    </div>
+  </div>
+</div>
