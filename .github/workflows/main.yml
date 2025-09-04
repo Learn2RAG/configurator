@@ -5,9 +5,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.13.5"
       - uses: actions/setup-node@v2
         with:
           node-version: "22.10"
+      - run: python -m pip install poetry
       - run: ./install
       - run: ./bundle-linux
       - uses: actions/upload-artifact@v4
