@@ -1,0 +1,17 @@
+name: main
+on: push
+jobs:
+  main:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: "22.10"
+      - run: ./install
+      - run: ./bundle-linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: learn2rag-linux
+          path: dist/learn2rag-linux.zip
+          if-no-files-found: error

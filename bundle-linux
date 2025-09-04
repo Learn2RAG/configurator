@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eu
 
-BUNDLE=dist/linux
+BUNDLE=dist/learn2rag-linux
 
 mkdir -p $BUNDLE
 mkdir -p $BUNDLE/services
@@ -35,3 +35,5 @@ while read -u 100 file; do
     mkdir -p $BUNDLE/$(dirname $file)
     cp -r $file $BUNDLE/$file
 done 100<Distfiles
+
+(cd dist; zip -r learn2rag-linux learn2rag-linux)
