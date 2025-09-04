@@ -9,7 +9,7 @@ jobs:
           submodules: true
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.13.5"
+          python-version: "3.11.13"
       - uses: actions/setup-node@v2
         with:
           node-version: "22.10"
