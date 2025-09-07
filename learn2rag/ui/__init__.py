@@ -238,7 +238,7 @@ def create_app(test_config=None):
 
             sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
             # expand "~" in paths
-            for name, source in sources.items():
+            for path_name, source in sources.items():
                 source['path'] = str(Path(source['path']).expanduser().absolute())
 
             render_context = {
