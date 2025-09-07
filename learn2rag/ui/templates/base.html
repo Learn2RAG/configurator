@@ -52,8 +52,6 @@
     <!-- Main Content -->
     <main class="flex-grow-1">
       <section class="container my-4">
-        {% include 'firststeps.html' %}
-
         {% for category, message in get_flashed_messages(with_categories=True) %}
           {% if category == 'error' %}
             <div class="alert alert-danger">{{ message }}</div>
@@ -61,6 +59,8 @@
             <div class="alert alert-primary">{{ message }}</div>
           {% endif %}
         {% endfor %}
+
+        {% include 'firststeps.html' %}
 
         <header>
           {% block header %}{% endblock %}
