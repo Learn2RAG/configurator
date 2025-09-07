@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Active processes{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<table class="table" id="ps_list_table" hx-swap-oob="true" hx-get="" hx-trigger="every 15s" hx-swap="none">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Running</th>
+      <th scope="col">Content</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for name, project in projects.items() %}
+    <tr>
+      <th scope="row">{{ name }}</th>
+      <td>{{ project.running }}</td>
+      <td>{{ project.content }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

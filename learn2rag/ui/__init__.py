@@ -283,6 +283,11 @@ def create_app(test_config=None):
                 flash(f'Could not stop the pipeline: {e}', 'error')
         return redirect(url_for('pipelines_list'))
 
+    @app.get('/ps')
+    def ps_list():
+        projects = Project.get_all()
+        return render_template('ps_list.html', projects=projects)
+
     return app
 
 
