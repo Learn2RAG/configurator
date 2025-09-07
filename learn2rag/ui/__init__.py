@@ -22,6 +22,7 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 
 def start_project(name, template_file, storage_path, render_context = {}):
+    logging.debug('UI starting project: %s', name)
     storage_path = storage_path.expanduser().absolute()
     logging.debug('Storage path: %s', storage_path)
     storage_path.mkdir(parents=True, exist_ok=True)
@@ -247,7 +248,6 @@ def create_app(test_config=None):
                 'sources': sources,
             }
 
-            app.logger.debug('Starting: %s', name)
             template_name = request.form['action'].split(':', 2)[1]
             assert app.pipeline_templates[template_name]
             template_file = app.pipelines_template_path / (template_name + '.yml')
