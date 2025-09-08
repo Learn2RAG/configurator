@@ -2,8 +2,10 @@ name: main
 on: push
 jobs:
   main:
-    runs-on: ubuntu-22.04
+    runs-on: arc-runner-set-noble
     steps:
+      - name: Install system dependencies
+        run: sudo apt install -y bzip2 cmake golang-go libssl-dev protobuf-compiler
       - uses: actions/checkout@v2
         with:
           submodules: true
@@ -13,9 +15,18 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: "22.10"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.0"
+      - uses: actions/checkout@v2
+        with:
+          repository: pyenv/pyenv
+          path: .pyenv
+      - run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      - run: .pyenv/bin/pyenv install 3.13.5
       - run: python -m pip install poetry
-      - run: ./install
-      - run: ./bundle-linux
+      - run: PATH="$HOME/.cargo/bin:$PATH" .pyenv/bin/pyenv exec ./install
+      - run: PATH="$HOME/.cargo/bin:$PATH" .pyenv/bin/pyenv exec ./bundle-linux
       - uses: actions/upload-artifact@v4
         with:
           name: learn2rag-linux
