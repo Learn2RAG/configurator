@@ -3,6 +3,7 @@
   <p>Do you want to download a suggested model now?</p>
   <hr/>
   <div class="btn-toolbar mb-3" role="toolbar">
+    {% if ollama_available %}
     <div class="input-group">
       <form method="POST" action="{{ url_for('model_create') }}">
         <input type="hidden" name="label" value="tinyllama">
@@ -11,6 +12,7 @@
         <button type="submit" class="btn btn-primary">🪄 Yes, download a suggested model (tinyllama)</button>
       </form>
     </div>
+    {% endif %}
     <div class="btn-group me-2" role="group">
       <a href="{{ url_for('models_list') }}" class="btn btn-link">More options</a>
     </div>

@@ -71,6 +71,7 @@ def create_app(config={}):
     )
     app.config.from_mapping(
         SECRET_KEY='dev',
+        OLLAMA={'port': 11434},
     )
     app.config.from_mapping(config)
 
@@ -93,6 +94,7 @@ def create_app(config={}):
     def inject_info():
         return {
             'compose_templates': app.pipeline_templates,
+            'ollama_available': hasattr(app, 'ollama_client'),
         }
 
     @app.context_processor
@@ -109,7 +111,8 @@ def create_app(config={}):
 
     # TODO: let the user configure the directory for ollama data before starting it?
     try:
-        project = start_project('ollama', app.components_template_path / 'ollama.yml', Path(app.instance_path) / 'ollama')
+        project = start_project('ollama', app.components_template_path / 'ollama.yml', Path(app.instance_path) / 'ollama', app.config['OLLAMA'])
+        app.ollama_client = ollama.Client(host='http://localhost:' + str(app.config['OLLAMA']['port']))
     except Exception as e:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
@@ -136,12 +139,10 @@ def create_app(config={}):
 
     @app.get('/models')
     def models_list():
-        ollama_available = False
         ollama_models = []
         try:
-            if hasattr(ollama, "list"):
-                ollama_models = ollama.list()
-                ollama_available = True
+            if hasattr(app, 'ollama_client'):
+                ollama_models = app.ollama_client.list()
                 app.logger.info('Ollama models: %s', ollama_models)
                 if hasattr(ollama_models, "models"):
                     ollama_models = ollama_models.models
@@ -152,7 +153,6 @@ def create_app(config={}):
 
         return render_template(
             'models_list.html',
-            ollama_available=ollama_available,
             ollama_models=ollama_models,
         )
 
@@ -162,13 +162,12 @@ def create_app(config={}):
         model = request.form['model']
         if 'ollama' in request.form:
             api = 'ChatOllama'
-            # TODO allow to customize Ollama port?
-            url = 'http://127.0.0.1:11434/'
+            url = 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
             # TODO setup tokens
             token = ''
             if request.form['ollama'] == 'pull':
                 # TODO download in background
-                ollama.pull(model)
+                app.ollama_client.pull(model)
                 flash('Model downloaded')
         else:
             api = 'ChatOpenAI'
