@@ -6,6 +6,8 @@ BUNDLE=dist/learn2rag-linux
 mkdir -p $BUNDLE
 mkdir -p $BUNDLE/services
 
+./update-translations
+
 export PYAPP_DISTRIBUTION_EMBED=true
 export PYAPP_FULL_ISOLATION=true
 export PYAPP_EXPOSE_ALL_COMMANDS=true

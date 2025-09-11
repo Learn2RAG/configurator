@@ -6,6 +6,7 @@ import socket
 import urllib
 
 from flask import Flask, flash, redirect, render_template, request, url_for
+from flask_babel import Babel, gettext, ngettext
 import flask.logging
 import jinja2
 import ollama
@@ -80,6 +81,13 @@ def create_app(config={}):
         os.makedirs(app.instance_path)
     except OSError:
         pass
+
+    babel = Babel(app)
+
+    def get_locale():
+        translations = map(str, babel.list_translations())
+        return request.accept_languages.best_match(translations)
+    babel.init_app(app, locale_selector=get_locale)
 
     app.logger.info('create_app')
     app.logger.debug('cwd: %s', os.getcwd())
