@@ -176,7 +176,7 @@ def create_app(config={}):
             if request.form['ollama'] == 'pull':
                 # TODO download in background
                 app.ollama_client.pull(model)
-                flash('Model downloaded')
+                flash(gettext('Downloaded a model: %(model)s', model=model))
         else:
             api = 'ChatOpenAI'
             url = request.form['url']
@@ -188,7 +188,7 @@ def create_app(config={}):
             'model': model,
             'api': api,
         })
-        flash('New model added')
+        flash(gettext('Added a new model configuration: %(label)s', label=label))
         return redirect(url_for('models_list'))
 
     @app.post('/models/<model>')
