@@ -1,6 +1,5 @@
 #!/bin/sh
 set -eu
-cd learn2rag/ui
-pybabel extract -F babel.cfg -o messages.pot .
-pybabel update -i messages.pot -d translations
-pybabel compile -d translations
+.venv/bin/pybabel extract -F learn2rag/ui/babel.cfg -o learn2rag/ui/messages.pot learn2rag/ui
+.venv/bin/pybabel update -i learn2rag/ui/messages.pot -d learn2rag/ui/translations
+.venv/bin/pybabel compile -d learn2rag/ui/translations
