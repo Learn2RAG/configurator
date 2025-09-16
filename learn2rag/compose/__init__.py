@@ -2,20 +2,17 @@ from pathlib import Path
 import json
 import logging
 import os
-import signal
 import sqlite3
 import subprocess
+import platform
+import signal
 
 import psutil
 import yaml
 
 logger = logging.getLogger(__name__)
 
-# FIXME
-# remove child processes immediately when they exit
-import platform
-import signal
-
+# Ensure child processes are removed immediately when they exit (Unix only)
 if hasattr(signal, "SIGCHLD"):
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
 
@@ -53,13 +50,12 @@ def process_running(pid):
 
 con = sqlite3.connect(
     os.environ.get('COMPOSE_DB', 'compose.db'),
-    # FIXME
     check_same_thread=False,
 )
 init_db(con)
 
 
-class Project():
+class Project:
     def create(project_file, name):
         with open(project_file) as f:
             content = yaml.safe_load(f)
@@ -67,7 +63,10 @@ class Project():
         cur = con.cursor()
         cur.execute('BEGIN EXCLUSIVE')
         try:
-            cur.execute('INSERT INTO projects (name, content) VALUES (:name, :content)', {'name': name, 'content': json.dumps(content)})
+            cur.execute(
+                'INSERT INTO projects (name, content) VALUES (:name, :content)',
+                {'name': name, 'content': json.dumps(content)}
+            )
         except sqlite3.IntegrityError as e:
             con.rollback()
             raise e
@@ -93,7 +92,8 @@ class Project():
         rows = cur.fetchall()
         cur.close()
         if stopped := list(filter(lambda row: not process_running(row['pid']), rows)):
-            logger.info('Stopping project %s due to stopped services: %s', self.name, [row['name'] for row in stopped])
+            logger.info('Stopping project %s due to stopped services: %s',
+                        self.name, [row['name'] for row in stopped])
             self.stop(stopped=stopped)
 
     def get(name, *, check=True):
@@ -110,12 +110,16 @@ class Project():
         cur.execute('SELECT * FROM projects')
         rows = cur.fetchall()
         cur.close()
-        return {project.name: project for project in map(lambda row: Project._from_row(row, check=check), rows)}
+        return {
+            project.name: project
+            for project in map(lambda row: Project._from_row(row, check=check), rows)
+        }
 
     def remove(self):
         cur = con.cursor()
         cur.execute('BEGIN EXCLUSIVE')
-        cur.execute('DELETE FROM projects WHERE name = :name AND running = FALSE', {'name': self.name})
+        cur.execute('DELETE FROM projects WHERE name = :name AND running = FALSE',
+                    {'name': self.name})
         if cur.rowcount != 1:
             con.rollback()
             raise AssertionError('Could not delete the project')
@@ -125,12 +129,12 @@ class Project():
     def start(self):
         cur = con.cursor()
         cur.execute('BEGIN EXCLUSIVE')
-        cur.execute('UPDATE projects SET running = TRUE WHERE name = :name AND running = FALSE', {'name': self.name})
+        cur.execute('UPDATE projects SET running = TRUE WHERE name = :name AND running = FALSE',
+                    {'name': self.name})
         if cur.rowcount != 1:
             con.rollback()
             raise AssertionError('Could not mark the project as running')
 
-        # files
         try:
             for file in self.content.get('files', []):
                 file_path = Path(file['path'])
@@ -140,33 +144,39 @@ class Project():
             con.rollback()
             raise e
 
-        # services
         self.services = []
         for name, service in self.content['services'].items():
-            # working_dir
-            if working_dir := service.get('working_dir'):
+            working_dir = service.get('working_dir')
+            if working_dir:
                 Path(working_dir).mkdir(parents=True, exist_ok=True)
 
-            # command
             try:
+                logger.info("Launching command: %s", service['command'])
+                logger.info("Working directory: %s", working_dir)
+                logger.info("Environment: %s", service.get('environment', {}))
+
+                env = os.environ.copy()
+                env.update(service.get('environment', {}))
+                env['PYTHONUTF8'] = '1'
+
                 proc = subprocess.Popen(
                     service['command'],
                     cwd=working_dir,
-                    env=os.environ | service.get('environment', {}),
+                    env=env,
                     start_new_session=True,
                 )
+
             except Exception as e:
-                # TODO stop already started processes immediately
                 con.rollback()
                 raise e
+
             self.services.append(proc)
-            cur.execute('INSERT INTO services (project, name, pid) VALUES (:project, :name, :pid)', {
-                'project': self.name,
-                'name': name,
-                'pid': proc.pid,
-            })
+            cur.execute(
+                'INSERT INTO services (project, name, pid) VALUES (:project, :name, :pid)',
+                {'project': self.name, 'name': name, 'pid': proc.pid},
+            )
             del proc
-            # what if insert failed?
+
         con.commit()
         cur.close()
         self.running = True
@@ -174,20 +184,40 @@ class Project():
     def stop(self, stopped=[]):
         cur = con.cursor()
         cur.row_factory = sqlite3.Row
-        cur.execute('BEGIN EXCLUSIVE')
-        cur.execute('UPDATE projects SET running = FALSE WHERE name = :name AND running = TRUE', {'name': self.name})
+        if con.in_transaction:
+            logger.warning("Already in transaction — skipping BEGIN EXCLUSIVE in stop()")
+        else:
+            cur.execute('BEGIN EXCLUSIVE')
+
+        cur.execute('UPDATE projects SET running = FALSE WHERE name = :name AND running = TRUE',
+                    {'name': self.name})
         if cur.rowcount != 1:
             con.rollback()
-            raise AssertionError(f'Could not mark the project {self.name} as stopped ({cur.rowcount} != 1)')
-        cur.execute('SELECT * FROM services WHERE project = :project', {'project': self.name})
+            raise AssertionError(f'Could not mark the project {self.name} as stopped')
+
+        cur.execute('SELECT * FROM services WHERE project = :project',
+                    {'project': self.name})
         for row in cur.fetchall():
             if row['name'] not in {process['name'] for process in stopped}:
+                pid = int(row['pid'])
+
+                if not process_running(pid):
+                    logger.info("Skipping kill for already-dead PID %s", pid)
+                    continue
+
                 try:
-                    os.killpg(os.getpgid(row['pid']), signal.SIGTERM)
-                    # TODO wait for services to actually terminate
+                    if platform.system() == 'Windows':
+                        try:
+                            os.kill(pid, signal.SIGTERM)
+                        except (PermissionError, OSError) as e:
+                            logger.warning("Could not terminate PID %s on Windows: %s. Skipping.", pid, e)
+                    else:
+                        os.killpg(os.getpgid(pid), signal.SIGTERM)
                 except ProcessLookupError:
                     logger.debug('Attempted to stop a process which does not exist: %s', dict(row))
-        cur.execute('DELETE FROM services WHERE project = :project', {'project': self.name})
+
+        cur.execute('DELETE FROM services WHERE project = :project',
+                    {'project': self.name})
         con.commit()
         cur.close()
         self.running = False

@@ -1,0 +1,56 @@
+name: import
+ports:
+  - qdrant_http
+
+files:
+  - path: "{{ pipeline.storage_path }}/importer_config.json"
+    content: |
+      {
+        "loaders": [
+          {% for source in sources %}
+          {
+            "loader_type": "DirectoryLoader",
+            "path": "{{ source.path | replace('\\', '\\\\') }}",
+            "recursive": "True"
+          }{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ]
+      }
+
+  - path: "{{ pipeline.storage_path }}/basic_user_config.json"
+    content: |
+      {
+        "collection_name": "learn2rag",
+        "llm": "{{ language_model.model }}"
+      }
+
+services:
+  qdrant:
+    working_dir: "{{ pipeline.storage_path }}"
+    command:
+      - "{{ qdrant_bin }}"
+      - "--config-path"
+      - "{{ learn2rag_path }}/services/qdrant/config/config.yaml"
+    environment:
+      QDRANT__LOG_LEVEL: "INFO"
+      QDRANT__SERVICE__HOST: "127.0.0.1"
+      QDRANT__SERVICE__HTTP_PORT: "{{ ports.qdrant_http }}"
+      QDRANT__TELEMETRY_DISABLED: "true"
+
+  main:
+    working_dir: "{{ pipeline.storage_path }}"
+    command:
+      - "python"
+      - "{{ learn2rag_path }}/services/start-import-auto.py"
+    environment:
+      LEARN2RAG_PATH: "{{ learn2rag_path }}"
+      STORAGE_PATH: "{{ pipeline.storage_path }}"
+      QDRANT__SERVICE__HTTP_PORT: "{{ ports.qdrant_http }}"
+      PIPELINE_USER_CONFIG: "{{ pipeline.storage_path }}/basic_user_config.json"
+      PIPELINE_OPT_CONFIG: "{{ learn2rag_path }}/services/basic-pipeline/opt_config.json"
+      LANGCHAIN_API_KEY: "1"
+      LANGCHAIN_TRACING_V2: "false"
+      LLM_API_TYPE: "{{ language_model.api }}"
+      LLM_API_URL: "{{ language_model.url }}"
+      LLM_API_TOKEN: "{{ language_model.token }}"
+      LLM_API_MODEL: "{{ language_model.model }}"
