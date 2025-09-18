@@ -34,7 +34,18 @@ services:
       USER_PERMISSIONS_FEATURES_CODE_INTERPRETER: "False"
       USER_PERMISSIONS_FEATURES_IMAGE_GENERATION: "False"
       USER_PERMISSIONS_FEATURES_WEB_SEARCH: "False"
+      # https://docs.openwebui.com/getting-started/env-configuration/#webui_auth
+      # "turning off authentication is only possible for fresh installations without any existing users"
+      WEBUI_AUTH: "False"
       WEBUI_NAME: "Learn2RAG"
+  # # Only needed if WEBUI_AUTH is True for open-webui
+  # open-webui-setup:
+  #   working_dir: "{{storage_path}}"
+  #   command: ["bash", "-eu", "{{learn2rag_path}}/services/setup-open-webui"]
+  #   environment:
+  #     WEBUI_URL: "http://localhost:{{ports.ui}}/"
+  #     ADMIN_USER_EMAIL: "user@learn2rag.de"
+  #     ADMIN_USER_PASSWORD: "learn2rag"
   openwebui-pipelines:
     working_dir: "services/open-webui-pipelines"
     command: ["{{learn2rag_path}}/services/start-open-webui-pipelines"]
@@ -56,13 +67,6 @@ services:
       QDRANT__SERVICE__HOST: "127.0.0.1"
       QDRANT__SERVICE__HTTP_PORT: "{{ports.qdrant_http}}"
       QDRANT__TELEMETRY_DISABLED: "true"
-  open-webui-setup:
-    working_dir: "{{storage_path}}"
-    command: ["bash", "-eu", "{{learn2rag_path}}/services/setup-open-webui"]
-    environment:
-      WEBUI_URL: "http://localhost:{{ports.ui}}/"
-      ADMIN_USER_EMAIL: "user@learn2rag.de"
-      ADMIN_USER_PASSWORD: "learn2rag"
   main:
     working_dir: "{{storage_path}}"
     command: "{{learn2rag_path}}/services/start-basic-pipeline"
