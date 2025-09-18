@@ -1,5 +1,6 @@
 from pathlib import Path
 import atexit
+import importlib
 import logging
 import os
 import socket
@@ -64,6 +65,16 @@ def find_free_ports(n):
     return ports
 
 
+def merge(source, destination):
+    for key, value in source.items():
+        if isinstance(value, dict):
+            node = destination.setdefault(key, {})
+            merge(value, node)
+        else:
+            destination[key] = value
+    return destination
+
+
 def create_app(config={}):
     # create and configure the app
     app = Flask(
@@ -74,7 +85,9 @@ def create_app(config={}):
         SECRET_KEY='dev',
         OLLAMA={'port': 11434},
     )
-    app.config.from_mapping(config)
+    packaged_config = yaml.safe_load((importlib.resources.files(__package__) / 'config.yml').open())
+    app.logger.debug('Packaged config: %s', packaged_config)
+    app.config.from_mapping(merge(config, packaged_config))
 
     # ensure the instance folder exists
     try:
