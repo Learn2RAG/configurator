@@ -1,0 +1,21 @@
+#!/bin/sh
+set +e
+echo "Starting Learn2RAG..."
+echo "Initializing, please wait..."
+echo "========================================"
+echo "Initializing importer..."
+# TODO: remove redirection after implementing "exit" command
+# Currently they just crash due to missing options or configuration files
+services/start-importer >/dev/null 2>/dev/null
+echo "========================================"
+echo "Initializing pipeline..."
+services/start-basic-pipeline >/dev/null 2>/dev/null
+echo "========================================"
+echo "Initializing open-webui..."
+services/start-open-webui >/dev/null 2>/dev/null
+echo "========================================"
+echo "Initializing open-webui-pipelines..."
+services/start-open-webui-pipelines >/dev/null 2>/dev/null
+echo "========================================"
+echo "Initializing and starting configurator..."
+./configurator
