@@ -1,0 +1,9 @@
+SUGGESTED_MODELS:
+  tinyllama:
+    label: TinyLlama
+    image: models/tinyllama.png
+    link: https://github.com/jzhang38/TinyLlama
+    ollama: pull
+    config:
+      api: ChatOllama
+      model: tinyllama:latest

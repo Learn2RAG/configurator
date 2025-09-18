@@ -84,6 +84,7 @@ def create_app(config={}):
     app.config.from_mapping(
         SECRET_KEY='dev',
         OLLAMA={'port': 11434},
+        SUGGESTED_MODELS={},
     )
     packaged_config = yaml.safe_load((importlib.resources.files(__package__) / 'config.yml').open())
     app.logger.debug('Packaged config: %s', packaged_config)
@@ -121,6 +122,7 @@ def create_app(config={}):
     @app.context_processor
     def inject_data():
         return {
+            'suggested_models': app.config.get('SUGGESTED_MODELS'),
             'models': learn2rag.data.get_all(app.instance_path, 'models'),
             'sources': learn2rag.data.get_all(app.instance_path, 'sources'),
             'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
@@ -179,29 +181,33 @@ def create_app(config={}):
 
     @app.post('/models')
     def model_create():
+        ok = True
         label = request.form['label']
         model = request.form['model']
-        if 'ollama' in request.form:
-            api = 'ChatOllama'
-            url = 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
-            # TODO setup tokens
-            token = ''
-            if request.form['ollama'] == 'pull':
+        api = request.form['api']
+        if api == 'ChatOllama':
+            url = request.form.get('url') or 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
+            # TODO setup tokens for locally running ollama
+            token = request.form.get('token') or ''
+            if request.form.get('ollama') == 'pull':
                 # TODO download in background
                 app.ollama_client.pull(model)
-                flash(gettext('Downloaded a model: %(model)s', model=model))
-        else:
-            api = 'ChatOpenAI'
+                flash(gettext('Downloaded a language model: %(model)s', model=model))
+        elif api == 'ChatOpenAI':
             url = request.form['url']
             token = request.form['token']
-        learn2rag.data.create_entry(app.instance_path, 'models', {
-            'label': label,
-            'url': url,
-            'token': token,
-            'model': model,
-            'api': api,
-        })
-        flash(gettext('Added a new model configuration: %(label)s', label=label))
+        else:
+            ok = False
+            flash(gettext('API is not supported: %(api)s', api=api), 'error')
+        if ok:
+            learn2rag.data.create_entry(app.instance_path, 'models', {
+                'label': label,
+                'url': url,
+                'token': token,
+                'model': model,
+                'api': api,
+            })
+            flash(gettext('Added a new language model configuration: %(label)s', label=label))
         return redirect(url_for('models_list'))
 
     @app.post('/models/<model>')

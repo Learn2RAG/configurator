@@ -6,15 +6,18 @@
     {% if ollama_available %}
     <div class="input-group">
       <form method="POST" action="{{ url_for('model_create') }}">
-        <input type="hidden" name="label" value="tinyllama">
-        <input type="hidden" name="model" value="tinyllama:latest">
-        <input type="hidden" name="ollama" value="pull"/>
-        <button type="submit" class="btn btn-primary">🪄 Yes, download a suggested model (tinyllama)</button>
+        <input type="hidden" name="ollama" value="{{ suggested_models['tinyllama'].ollama }}"/>
+        <input type="hidden" name="label" value="{{ suggested_models.tinyllama.label }}"/>
+        <input type="hidden" name="api" value="{{ suggested_models.tinyllama.config.api }}"/>
+        <input type="hidden" name="url" value="{{ suggested_models.tinyllama.config.url }}"/>
+        <input type="hidden" name="model" value="{{ suggested_models.tinyllama.config.model }}"/>
+        <input type="hidden" name="token" value="{{ suggested_models.tinyllama.config.token }}"/>
+        <button type="submit" class="btn btn-primary">{{ pgettext('button', 'Download a suggested language model (%(model)s)', model=suggested_models.tinyllama.label) }}</button>
       </form>
     </div>
     {% endif %}
     <div class="btn-group me-2" role="group">
-      <a href="{{ url_for('models_list') }}" class="btn btn-link">More options</a>
+      <a href="{{ url_for('models_list') }}" class="btn btn-link">{{ pgettext('button', 'More options') }}</a>
     </div>
   </div>
 </div>
