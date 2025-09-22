@@ -240,9 +240,10 @@ def create_app(config={}):
 
     @app.post('/pipelines')
     def pipeline_create():
+        label = request.form['label']
         ports = [int(port) for port in request.form.getlist("ports") if port]
-        learn2rag.data.create_entry(app.instance_path, 'pipelines', {
-            'label': request.form['label'],
+        name = learn2rag.data.create_entry(app.instance_path, 'pipelines', {
+            'label': label,
             'storage_path': request.form['storage_path'],
             'language_model': request.form['language_model'],
             'sources': request.form.getlist('sources'),
