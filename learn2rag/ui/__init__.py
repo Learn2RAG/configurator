@@ -7,7 +7,7 @@ import socket
 import urllib
 
 from flask import Flask, flash, redirect, render_template, request, url_for
-from flask_babel import Babel, gettext, ngettext
+from flask_babel import Babel, gettext, ngettext, pgettext
 import flask.logging
 import jinja2
 import ollama
@@ -207,7 +207,7 @@ def create_app(config={}):
                 'model': model,
                 'api': api,
             })
-            flash(gettext('Added a new language model configuration: %(label)s', label=label))
+            flash(pgettext('flash', 'Added a new language model configuration: %(label)s', label=label))
         return redirect(url_for('models_list'))
 
     @app.post('/models/<model>')
@@ -226,6 +226,7 @@ def create_app(config={}):
             'label': request.form['label'],
             'path': request.form['path'],
         })
+        flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
 
     @app.post('/sources/<source>')
@@ -247,13 +248,14 @@ def create_app(config={}):
             'sources': request.form.getlist('sources'),
             'ports': ports,
         })
+        flash(pgettext('flash', 'Added a new pipeline configuration: %(label)s', label=label))
         return redirect(url_for('pipelines_list'))
 
     @app.post('/pipelines/<name>')
     def pipeline_action(name):
         pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
         if pipeline is None:
-            flash('Pipeline not found', 'error')
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
         elif request.form['action'] == 'delete':
             return 'Not implemented'
         elif request.form['action'].startswith('start:'):
@@ -287,23 +289,23 @@ def create_app(config={}):
             try:
                 project = start_project(name, template_file, storage_path, render_context)
                 if project and project.running:
-                    flash('Pipeline started')
+                    flash(pgettext('flash', 'Started the pipeline'))
                 else:
-                    flash('Pipeline failed to start', 'error')
+                    flash(pgettext('flash', 'Failed to start the pipeline'), 'error')
             except Exception as e:
                 app.logger.exception(e)
                 app.logger.error('Could not start the pipeline')
-                flash(f'Could not start the pipeline: {e}', 'error')
+                flash(pgettext('flash', 'Could not start the pipeline: %(message)s', message=e), 'error')
 
             # "load" the corresponding Ollama model
         elif request.form['action'] == 'stop':
             try:
                 stop_project(name)
-                flash('Pipeline stopped')
+                flash(pgettext('flash', 'Stopped the pipeline'))
             except Exception as e:
                 app.logger.exception(e)
                 app.logger.error('Could not stop the pipeline')
-                flash(f'Could not stop the pipeline: {e}', 'error')
+                flash(pgettext('flash', 'Could not stop the pipeline: %(message)s', message=e), 'error')
         return redirect(url_for('pipelines_list'))
 
     @app.get('/ps')

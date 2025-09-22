@@ -31,17 +31,17 @@
         <!-- Nav Links -->
         <div class="d-flex justify-content-start">
           <ul class="navbar-nav d-flex flex-row">
-            <li class="nav-item"><a class="nav-link" href="/models">Models</a></li>
-            <li class="nav-item"><a class="nav-link" href="/sources">Sources</a></li>
-            <li class="nav-item"><a class="nav-link" href="/pipelines">Pipelines</a></li>
+            <li class="nav-item"><a class="nav-link" href="/models">{{pgettext('nav', 'Language models')}}</a></li>
+            <li class="nav-item"><a class="nav-link" href="/sources">{{pgettext('nav', 'Data sources')}}</a></li>
+            <li class="nav-item"><a class="nav-link" href="/pipelines">{{pgettext('nav', 'Pipelines')}}</a></li>
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                More
+                {{pgettext('nav', 'More')}}
               </a>
               <ul class="dropdown-menu">
                 <li><a class="dropdown-item" href="/ps">Active processes</a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="https://learn2rag.de/" target="_blank">Learn2RAG website</a></li>
+                <li><a class="dropdown-item" href="https://learn2rag.de/" target="_blank">{{pgettext('nav', 'Learn2RAG website')}}</a></li>
               </ul>
             </li>
           </ul>
