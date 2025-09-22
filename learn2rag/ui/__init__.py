@@ -250,7 +250,51 @@ def create_app(config={}):
             'ports': ports,
         })
         flash(pgettext('flash', 'Added a new pipeline configuration: %(label)s', label=label))
+        if request.form.get('import'):
+            pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+            assert pipeline is not None
+            start_pipeline(name, pipeline, 'import')
         return redirect(url_for('pipelines_list'))
+
+    def start_pipeline(name, pipeline, template_name):
+        url = urllib.parse.urlparse(request.base_url)
+
+        sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
+        # expand "~" in paths
+        for path_name, source in sources.items():
+            source['path'] = str(Path(source['path']).expanduser().absolute())
+
+        render_context = {
+            'learn2rag_hostname': url.hostname,
+            'pipeline': pipeline,
+            'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
+            'sources': sources,
+        }
+
+        assert app.pipeline_templates[template_name]
+        template_file = app.pipelines_template_path / (template_name + '.yml')
+
+        with open(template_file) as f:
+            content = yaml.safe_load(f)
+            port_names = content.get('ports', [])
+            configured_ports = pipeline.get('ports', [])
+            ports = configured_ports + find_free_ports(len(port_names) - len(configured_ports))
+            render_context['ports'] = dict(zip(port_names, ports))
+
+        storage_path = Path(pipeline['storage_path'])
+
+        try:
+            project = start_project(name, template_file, storage_path, render_context)
+            if project and project.running:
+                flash(pgettext('flash', 'Started the pipeline'))
+            else:
+                flash(pgettext('flash', 'Failed to start the pipeline'), 'error')
+        except Exception as e:
+            app.logger.exception(e)
+            app.logger.error('Could not start the pipeline')
+            flash(pgettext('flash', 'Could not start the pipeline: %(message)s', message=e), 'error')
+
+        # TODO "load" the corresponding Ollama model
 
     @app.post('/pipelines/<name>')
     def pipeline_action(name):
@@ -260,45 +304,7 @@ def create_app(config={}):
         elif request.form['action'] == 'delete':
             return 'Not implemented'
         elif request.form['action'].startswith('start:'):
-            url = urllib.parse.urlparse(request.base_url)
-
-            sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
-            # expand "~" in paths
-            for path_name, source in sources.items():
-                source['path'] = str(Path(source['path']).expanduser().absolute())
-
-            render_context = {
-                'learn2rag_hostname': url.hostname,
-                'pipeline': pipeline,
-                'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
-                'sources': sources,
-            }
-
-            template_name = request.form['action'].split(':', 2)[1]
-            assert app.pipeline_templates[template_name]
-            template_file = app.pipelines_template_path / (template_name + '.yml')
-
-            with open(template_file) as f:
-                content = yaml.safe_load(f)
-            port_names = content.get('ports', [])
-            configured_ports = pipeline.get('ports', [])
-            ports = configured_ports + find_free_ports(len(port_names) - len(configured_ports))
-            render_context['ports'] = dict(zip(port_names, ports))
-
-            storage_path = Path(pipeline['storage_path'])
-
-            try:
-                project = start_project(name, template_file, storage_path, render_context)
-                if project and project.running:
-                    flash(pgettext('flash', 'Started the pipeline'))
-                else:
-                    flash(pgettext('flash', 'Failed to start the pipeline'), 'error')
-            except Exception as e:
-                app.logger.exception(e)
-                app.logger.error('Could not start the pipeline')
-                flash(pgettext('flash', 'Could not start the pipeline: %(message)s', message=e), 'error')
-
-            # "load" the corresponding Ollama model
+            start_pipeline(name, pipeline, request.form['action'].split(':', 2)[1])
         elif request.form['action'] == 'stop':
             try:
                 stop_project(name)
