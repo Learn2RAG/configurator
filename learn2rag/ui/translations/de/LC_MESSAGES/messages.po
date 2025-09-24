@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-09-22 10:58+0200\n"
+"POT-Creation-Date: 2025-09-24 15:29+0200\n"
 "PO-Revision-Date: 2025-09-11 15:01+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: de\n"
@@ -40,39 +40,39 @@ msgctxt "flash"
 msgid "Added a new data source configuration: %(label)s"
 msgstr "Neue Datenquellenkonfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:251
+#: learn2rag/ui/__init__.py:252
 #, python-format
 msgctxt "flash"
 msgid "Added a new pipeline configuration: %(label)s"
 msgstr "Neue Pipeline-Konfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:258
-msgctxt "flash"
-msgid "The requested pipeline is not found"
-msgstr ""
-
-#: learn2rag/ui/__init__.py:292
+#: learn2rag/ui/__init__.py:289
 msgctxt "flash"
 msgid "Started the pipeline"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:294
+#: learn2rag/ui/__init__.py:291
 msgctxt "flash"
 msgid "Failed to start the pipeline"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:298
+#: learn2rag/ui/__init__.py:295
 #, python-format
 msgctxt "flash"
 msgid "Could not start the pipeline: %(message)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:304
+#: learn2rag/ui/__init__.py:303
+msgctxt "flash"
+msgid "The requested pipeline is not found"
+msgstr ""
+
+#: learn2rag/ui/__init__.py:311
 msgctxt "flash"
 msgid "Stopped the pipeline"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:308
+#: learn2rag/ui/__init__.py:315
 #, python-format
 msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
@@ -99,6 +99,11 @@ msgid "More"
 msgstr "Mehr"
 
 #: learn2rag/ui/templates/base.html:44
+msgctxt "nav"
+msgid "Documentation"
+msgstr ""
+
+#: learn2rag/ui/templates/base.html:45
 msgctxt "nav"
 msgid "Learn2RAG website"
 msgstr ""
@@ -132,6 +137,9 @@ msgstr ""
 #: learn2rag/ui/templates/models_list.html:27
 #: learn2rag/ui/templates/models_list.html:65
 #: learn2rag/ui/templates/models_list.html:139
+#: learn2rag/ui/templates/pipelines_list.html:18
+#: learn2rag/ui/templates/sources_list.html:28
+#: learn2rag/ui/templates/sources_list.html:51
 msgctxt "form_label"
 msgid "Label"
 msgstr ""
@@ -166,12 +174,16 @@ msgstr ""
 #: learn2rag/ui/templates/models_list.html:46
 #: learn2rag/ui/templates/models_list.html:69
 #: learn2rag/ui/templates/models_list.html:143
+#: learn2rag/ui/templates/pipelines_list.html:26
 msgctxt "form_label"
 msgid "Language model"
 msgstr ""
 
 #: learn2rag/ui/templates/models_list.html:49
 #: learn2rag/ui/templates/models_list.html:78
+#: learn2rag/ui/templates/pipelines_list.html:58
+#: learn2rag/ui/templates/sources_list.html:35
+#: learn2rag/ui/templates/sources_list.html:58
 msgctxt "button"
 msgid "Save"
 msgstr ""
@@ -206,6 +218,8 @@ msgid "Ollama is not running. Try to restart the Learn2RAG configurator."
 msgstr ""
 
 #: learn2rag/ui/templates/models_list.html:166
+#: learn2rag/ui/templates/pipelines_list.html:67
+#: learn2rag/ui/templates/sources_list.html:71
 msgctxt "column_heading"
 msgid "Label"
 msgstr ""
@@ -226,13 +240,123 @@ msgid "Access token"
 msgstr ""
 
 #: learn2rag/ui/templates/models_list.html:170
+#: learn2rag/ui/templates/pipelines_list.html:69
 msgctxt "column_heading"
 msgid "Language model"
 msgstr ""
 
 #: learn2rag/ui/templates/models_list.html:185
+#: learn2rag/ui/templates/pipelines_list.html:129
+#: learn2rag/ui/templates/sources_list.html:84
 msgctxt "button"
 msgid "Remove"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:4
+msgctxt "title"
+msgid "Pipelines"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:10
+msgctxt "button"
+msgid "Add a new pipeline"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:22
+msgctxt "form_label"
+msgid "Storage directory path"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:34
+msgctxt "form_label"
+msgid "Data sources"
+msgstr "Datenquellen"
+
+#: learn2rag/ui/templates/pipelines_list.html:42
+msgctxt "form_label"
+msgid "Ports"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:43
+msgid "Optional"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:53
+msgctxt "form_label"
+msgid "Immediately do the data import"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:56
+msgid "You can always do the data import later."
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:68
+msgctxt "column_heading"
+msgid "Storage directory path"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:70
+msgctxt "column_heading"
+msgid "Data sources"
+msgstr "Datenquellen"
+
+#: learn2rag/ui/templates/pipelines_list.html:71
+msgctxt "column_heading"
+msgid "Ports"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:81
+msgid "running"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:105
+msgctxt "button"
+msgid "Start"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:119
+msgctxt "button"
+msgid "Open"
+msgstr ""
+
+#: learn2rag/ui/templates/pipelines_list.html:123
+msgctxt "button"
+msgid "Stop"
+msgstr ""
+
+#: learn2rag/ui/templates/sources_list.html:4
+msgctxt "title"
+msgid "Data sources"
+msgstr "Datenquellen"
+
+#: learn2rag/ui/templates/sources_list.html:10
+msgctxt "button"
+msgid "Add a new data source"
+msgstr ""
+
+#: learn2rag/ui/templates/sources_list.html:20
+msgctxt "heading"
+msgid "Local file or directory"
+msgstr ""
+
+#: learn2rag/ui/templates/sources_list.html:32
+msgctxt "form_label"
+msgid "Path on the local filesystem"
+msgstr ""
+
+#: learn2rag/ui/templates/sources_list.html:43
+msgctxt "heading"
+msgid "Web page"
+msgstr ""
+
+#: learn2rag/ui/templates/sources_list.html:55
+msgctxt "form_label"
+msgid "Web page URL"
+msgstr ""
+
+#: learn2rag/ui/templates/sources_list.html:72
+msgctxt "column_heading"
+msgid "Path"
 msgstr ""
 
 #: learn2rag/ui/templates/start.html:3 learn2rag/ui/templates/start.html:6

@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Pipelines{% endblock %}</h1>
+  <h1>{% block title %}{{pgettext('title', 'Pipelines')}}{% endblock %}</h1>
 {% endblock %}
 
 {% block content %}
 <p class="d-inline-flex gap-1">
   <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
-    Add new pipeline
+    {{pgettext('button', 'Add a new pipeline')}}
   </button>
 </p>
 <div class="collapse" id="collapseCreate">
@@ -15,15 +15,15 @@
 
     <form method="POST">
       <div class="mb-3">
-        <label for="label" class="form-label">Label</label>
+        <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
         <input class="form-control" name="label">
       </div>
       <div class="mb-3">
-        <label for="url" class="form-label">Storage path</label>
+        <label for="url" class="form-label">{{pgettext('form_label', 'Storage directory path')}}</label>
         <input class="form-control" name="storage_path" placeholder="/home/user/.local/share/learn2rag/my_first_pipeline">
       </div>
       <div class="mb-3">
-        <label for="language_model" class="form-label">Sprachmodell</label>
+        <label for="language_model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
         <select class="form-select" name="language_model">
           {% for name, language_model in models.items() %}
           <option value="{{ name }}">{{ language_model.label }} ({{ language_model.model }})</option>
@@ -31,7 +31,7 @@
         </select>
       </div>
       <div class="mb-3">
-        <label for="sources" class="form-label">Sources</label>
+        <label for="sources" class="form-label">{{pgettext('form_label', 'Data sources')}}</label>
         <select class="form-select" multiple="multiple" name="sources">
           {% for name, source in sources.items() %}
           <option value="{{ name }}" selected="selected">{{ source.label }} ({{ source.path }})</option>
@@ -39,7 +39,8 @@
         </select>
       </div>
       <div class="mb-3">
-        <label for="ports" class="form-label">Ports (optional)</label>
+        <label for="ports" class="form-label">{{pgettext('form_label', 'Ports')}}</label>
+        <small class="text-body-secondary">{{gettext('Optional')}}</small>
         <input class="form-control" name="ports" type="number" min="1" max="65535">
         <input class="form-control" name="ports" type="number" min="1" max="65535">
         <input class="form-control" name="ports" type="number" min="1" max="65535">
@@ -63,23 +64,21 @@
 <table class="table" id="pipelines_list_table" hx-swap-oob="true" hx-get="" hx-trigger="every 15s" hx-swap="none">
   <thead>
     <tr>
-      <th scope="col">#</th>
-      <th scope="col">Label</th>
-      <th scope="col">Storage path</th>
-      <th scope="col">Sprachmodell</th>
-      <th scope="col">Sources</th>
-      <th scope="col">Ports</th>
+      <th scope="col">{{pgettext('column_heading', 'Label')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Storage directory path')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Language model')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Data sources')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Ports')}}</th>
       <th scope="col"></th>
     </tr>
   </thead>
   <tbody>
     {% for name, pipeline in pipelines.items() %}
     <tr>
-      <th scope="row">{{ name }}</th>
-      <td>
+      <td title="{{ name }}">
         {{ pipeline.label }}
         {% if projects[name] and projects[name].running %}
-        <span class="badge text-bg-success">running</span>
+        <span class="badge text-bg-success">{{gettext('running')}}</span>
         {% endif %}
       </td>
       <td>{{ pipeline.storage_path }}</td>
@@ -103,7 +102,7 @@
               <div class="btn-group" role="group">
                 {% if not (projects[name] and projects[name].running) %}
                 <button class="btn btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  Start
+                  {{pgettext('button', 'Start')}}
                 </button>
                 <ul class="dropdown-menu">
                   {% for name, project in compose_templates.items() %}
@@ -117,17 +116,17 @@
             <div class="btn-group" role="group">
               {% if 'ui_url' in projects[name].content %}
               <a class="btn btn-primary" href="{{ projects[name].content['ui_url'] }}" role="button" target="_blank">
-                Open
+                {{pgettext('button', 'Open')}}
               </a>
               {% endif %}
               <button type="submit" class="btn btn-warning" name="action" value="stop">
-                Stop
+                {{pgettext('button', 'Stop')}}
               </button>
             </div>
             {% else %}
             <div class="btn-group" role="group">
               <button type="submit" class="btn btn-danger" name="action" value="delete">
-                Remove
+                {{pgettext('button', 'Remove')}}
               </button>
             </div>
             {% endif %}

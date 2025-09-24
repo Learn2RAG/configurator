@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Sources{% endblock %}</h1>
+  <h1>{% block title %}{{pgettext('title', 'Data sources')}}{% endblock %}</h1>
 {% endblock %}
 
 {% block content %}
 <p class="d-inline-flex gap-1">
   <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
-    Add new data source
+    {{pgettext('button', 'Add a new data source')}}
   </button>
 </p>
 <div class="collapse" id="collapseCreate">
@@ -17,7 +17,7 @@
       <div class="accordion-item">
         <h2 class="accordion-header">
           <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateLocal" aria-expanded="false" aria-controls="collapseCreateLocal">
-            Local file or directory
+            {{pgettext('heading', 'Local file or directory')}}
           </button>
         </h2>
         <div id="collapseCreateLocal" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
@@ -25,14 +25,14 @@
             <form method="POST">
               <input type="hidden" name="type" value="local"/>
               <div class="mb-3">
-                <label for="label" class="form-label">Label</label>
+                <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
                 <input class="form-control" name="label">
               </div>
               <div class="mb-3">
-                <label for="url" class="form-label">Local filesystem path</label>
+                <label for="url" class="form-label">{{pgettext('form_label', 'Path on the local filesystem')}}</label>
                 <input class="form-control" name="path" placeholder="/home/user/Documents">
               </div>
-              <button type="submit" class="btn btn-primary">Save</button>
+              <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
             </form>
           </div>
         </div>
@@ -40,7 +40,7 @@
       <div class="accordion-item">
         <h2 class="accordion-header">
           <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateWeb" aria-expanded="false" aria-controls="collapseCreateWeb">
-            Web page
+            {{pgettext('heading', 'Web page')}}
           </button>
         </h2>
         <div id="collapseCreateWeb" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
@@ -48,14 +48,14 @@
             <form method="POST">
               <input type="hidden" name="type" value="web"/>
               <div class="mb-3">
-                <label for="label" class="form-label">Label</label>
+                <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
                 <input class="form-control" name="label">
               </div>
               <div class="mb-3">
-                <label for="url" class="form-label">URL</label>
+                <label for="url" class="form-label">{{pgettext('form_label', 'Web page URL')}}</label>
                 <input class="form-control" name="path" placeholder="https://example.com/">
               </div>
-              <button type="submit" class="btn btn-primary">Save</button>
+              <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
             </form>
           </div>
         </div>
@@ -68,22 +68,20 @@
 <table class="table">
   <thead>
     <tr>
-      <th scope="col">#</th>
-      <th scope="col">Label</th>
-      <th scope="col">Path</th>
+      <th scope="col">{{pgettext('column_heading', 'Label')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Path')}}</th>
       <th scope="col"></th>
     </tr>
   </thead>
   <tbody>
     {% for name, item in sources.items() %}
     <tr>
-      <th scope="row">{{ name }}</th>
-      <td>{{ item.label }}</td>
+      <td title="{{ name }}">{{ item.label }}</td>
       <td>{{ item.path }}</td>
       <td>
         <form method="POST" action="{{ url_for('source_action', source=name) }}">
           <div class="btn-group" role="group">
-            <button type="submit" class="btn btn-danger" name="action" value="delete">Remove</button>
+            <button type="submit" class="btn btn-danger" name="action" value="delete">{{pgettext('button', 'Remove')}}</button>
           </div>
         </form>
       </td>
