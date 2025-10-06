@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import logging
+import sys
 from config.config_constants import LOGGING_CONFIG_PATH, JSON_CONFIG_PATH, LOGS_DIR, VERSION
 from utils.logging_setup import setup_logging
 from utils.config_loader import load_json_config, validate_config_entry
@@ -83,4 +84,6 @@ def main(args):
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ['init']:
+        sys.exit(0)
     main(ImporterArgumentParser().parse_args())
