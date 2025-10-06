@@ -1,5 +1,10 @@
 import json
 import os
+import sys
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ['init']:
+        sys.exit(0)
 
 from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse
