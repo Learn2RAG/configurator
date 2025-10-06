@@ -256,8 +256,9 @@ def create_app(config={}):
 
     @app.post('/sources')
     def source_create():
+        label = request.form['label']
         learn2rag.data.create_entry(app.instance_path, 'sources', {
-            'label': request.form['label'],
+            'label': label,
             'path': request.form['path'],
         })
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
