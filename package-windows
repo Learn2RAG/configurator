@@ -1,0 +1,57 @@
+#!/bin/bash
+set -eu
+
+./build-python
+
+CARGO_BUILD_TARGET=x86_64-pc-windows-gnu
+
+BUNDLE_DIR=dist
+BUNDLE_DIR=/data/dist
+BUNDLE_NAME=learn2rag-windows
+BUNDLE=$BUNDLE_DIR/$BUNDLE_NAME
+
+mkdir -p $BUNDLE
+mkdir -p $BUNDLE/services
+
+PYAPP_DISTRIBUTION_EMBED=true
+PYAPP_FULL_ISOLATION=true
+PYAPP_EXPOSE_ALL_COMMANDS=true
+
+cp dist/learn2rag-0.1.0.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=learn2rag PYAPP_PROJECT_PATH=learn2rag-0.1.0.tar.gz cross build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/configurator.exe
+
+cp services/importer/dist/importer-0.1.0.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=importer PYAPP_PROJECT_PATH=importer-0.1.0.tar.gz PYAPP_EXEC_MODULE=main cross build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/services/start-importer.exe
+cp services/start-import.windows.bat $BUNDLE/services/start-import.bat
+
+cp services/basic-pipeline/dist/basic_pipeline-0.1.0.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=basic-pipeline PYAPP_PROJECT_PATH=basic_pipeline-0.1.0.tar.gz PYAPP_EXEC_MODULE=app cross build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/services/start-basic-pipeline.exe
+
+cp services/open-webui/dist/open_webui-0.6.15.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui PYAPP_PROJECT_PATH=open_webui-0.6.15.tar.gz PYAPP_EXEC_SPEC=open_webui:app cross build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/services/start-open-webui.exe
+
+cp services/open-webui-pipelines/dist/open_webui_pipelines-0.1.0.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui-pipelines PYAPP_PROJECT_PATH=open_webui_pipelines-0.1.0.tar.gz PYAPP_EXEC_MODULE=start cross build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/services/start-open-webui-pipelines.exe
+
+while read -u 100 file; do
+    mkdir -p $BUNDLE/$(dirname $file)
+    cp -r $file $BUNDLE/$file
+done 100<Distfiles
+
+wget --continue -O $BUNDLE_DIR/ollama-windows.zip https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-windows-amd64.zip
+mkdir -p $BUNDLE/services/ollama/dist
+unzip -o $BUNDLE_DIR/ollama-windows.zip -d $BUNDLE/services/ollama/dist
+
+wget --continue -O $BUNDLE_DIR/qdrant-windows.zip https://github.com/qdrant/qdrant/releases/download/v1.15.4/qdrant-x86_64-pc-windows-msvc.zip
+mkdir -p $BUNDLE/services/qdrant/target/release
+unzip -o $BUNDLE_DIR/qdrant-windows.zip -d $BUNDLE/services/qdrant/target/release
+
+cp start.windows.bat $BUNDLE/start.bat
+
+# https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables
+[ -z "${GITHUB_ACTIONS-}" ] && (cd $BUNDLE_DIR; zip -r $BUNDLE_NAME $BUNDLE_NAME)

@@ -35,6 +35,13 @@ CREATE TABLE IF NOT EXISTS services (
 ''']
 
 
+def kill_process(pid):
+    if hasattr(os, 'killpg'):
+        os.killpg(os.getpgid(pid), signal.SIGTERM)
+    else:
+        os.kill(pid, signal.SIGTERM)
+
+
 def init_db(con):
     cur = con.cursor()
     for sql in init_sql:
@@ -149,12 +156,19 @@ class Project():
 
             # command
             try:
-                proc = subprocess.Popen(
-                    service['command'],
+                popen_args = dict(
                     cwd=working_dir,
                     env=os.environ | service.get('environment', {}),
-                    start_new_session=True,
                 )
+                if hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
+                    popen_args |= dict(
+                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                    )
+                else:
+                    popen_args |= dict(
+                        start_new_session=True,
+                    )
+                proc = subprocess.Popen(service['command'], **popen_args)
             except Exception as e:
                 # TODO stop already started processes immediately
                 con.rollback()
@@ -183,10 +197,12 @@ class Project():
         for row in cur.fetchall():
             if row['name'] not in {process['name'] for process in stopped}:
                 try:
-                    os.killpg(os.getpgid(row['pid']), signal.SIGTERM)
+                    kill_process(row['pid'])
                     # TODO wait for services to actually terminate
                 except ProcessLookupError:
                     logger.debug('Attempted to stop a process which does not exist: %s', dict(row))
+                except Exception as e:
+                    logger.debug('Attempted to stop a process but got exception: %s, %s', dict(row), e)
         cur.execute('DELETE FROM services WHERE project = :project', {'project': self.name})
         con.commit()
         cur.close()

@@ -1,5 +1,3 @@
-. scripts/env.sh
-go build -o dist/ollama .
-cmake --preset CPU
-cmake --build --preset CPU --parallel
-cmake --install build --component CPU --strip
+mkdir -p ollama
+wget --continue -O ollama/ollama-linux.tgz https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-linux-amd64.tgz
+tar -C ollama -xzvf ollama/ollama-linux.tgz

@@ -1,0 +1,57 @@
+#!/bin/bash
+set -eu
+
+./build-python
+
+CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
+
+BUNDLE_DIR=dist
+BUNDLE_DIR=/data/dist
+BUNDLE_NAME=learn2rag-linux
+BUNDLE=$BUNDLE_DIR/$BUNDLE_NAME
+
+mkdir -p $BUNDLE
+mkdir -p $BUNDLE/services
+
+PYAPP_DISTRIBUTION_EMBED=true
+PYAPP_FULL_ISOLATION=true
+PYAPP_EXPOSE_ALL_COMMANDS=true
+
+cp dist/learn2rag-0.1.0.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=learn2rag PYAPP_PROJECT_PATH=learn2rag-0.1.0.tar.gz cargo build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/configurator
+
+cp services/importer/dist/importer-0.1.0.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=importer PYAPP_PROJECT_PATH=importer-0.1.0.tar.gz PYAPP_EXEC_MODULE=main cargo build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/services/start-importer
+cp services/start-import.linux $BUNDLE/services/start-import
+
+cp services/basic-pipeline/dist/basic_pipeline-0.1.0.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=basic-pipeline PYAPP_PROJECT_PATH=basic_pipeline-0.1.0.tar.gz PYAPP_EXEC_MODULE=app cargo build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/services/start-basic-pipeline
+
+cp services/open-webui/dist/open_webui-0.6.15.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui PYAPP_PROJECT_PATH=open_webui-0.6.15.tar.gz PYAPP_EXEC_SPEC=open_webui:app cargo build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/services/start-open-webui
+
+cp services/open-webui-pipelines/dist/open_webui_pipelines-0.1.0.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui-pipelines PYAPP_PROJECT_PATH=open_webui_pipelines-0.1.0.tar.gz PYAPP_EXEC_MODULE=start cargo build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/services/start-open-webui-pipelines
+
+while read -u 100 file; do
+    mkdir -p $BUNDLE/$(dirname $file)
+    cp -r $file $BUNDLE/$file
+done 100<Distfiles
+
+wget --continue -O $BUNDLE_DIR/ollama-linux.tgz https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-linux-amd64.tgz
+mkdir -p $BUNDLE/services/ollama
+tar -C $BUNDLE/services/ollama -xzvf $BUNDLE_DIR/ollama-linux.tgz
+
+wget --continue -O $BUNDLE_DIR/qdrant-linux.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.15.4/qdrant-x86_64-unknown-linux-musl.tar.gz
+mkdir -p $BUNDLE/services/qdrant/target/release
+tar -C $BUNDLE/services/qdrant/target/release -xzvf $BUNDLE_DIR/qdrant-linux.tar.gz
+
+cp start.linux $BUNDLE/start
+
+# https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables
+[ -z "${GITHUB_ACTIONS-}" ] && (cd $BUNDLE_DIR; zip -r $BUNDLE_NAME $BUNDLE_NAME)

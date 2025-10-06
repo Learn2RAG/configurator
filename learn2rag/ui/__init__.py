@@ -3,7 +3,10 @@ import atexit
 import importlib
 import logging
 import os
+import platform
+import signal
 import socket
+import sys
 import urllib
 
 from flask import Flask, flash, redirect, render_template, request, make_response, url_for
@@ -25,13 +28,14 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 def start_project(name, template_file, storage_path, render_context = {}):
     logging.debug('UI starting project: %s', name)
-    storage_path = storage_path.expanduser().absolute()
+    storage_path = storage_path.absolute()
     logging.debug('Storage path: %s', storage_path)
     storage_path.mkdir(parents=True, exist_ok=True)
     project_file = storage_path / 'compose.yml'
 
     template = jinja2.Template(template_file.read_text())
     project_file.write_text(template.render(render_context | {
+        'is_windows': platform.system() == 'Windows',
         'learn2rag_path': Path('.').absolute(),
         'storage_path': storage_path,
     }))
@@ -114,9 +118,11 @@ def create_app(config={}):
 
     @app.context_processor
     def inject_info():
+        firststeps_storage_name = 'first'
         return {
             'compose_templates': app.pipeline_templates,
             'ollama_available': hasattr(app, 'ollama_client'),
+            'firststeps_storage_path': (os.getenv('LOCALAPPDATA') + '/Learn2RAG/storage/' if platform.system() == 'Windows' else '~/.local/share/learn2rag/storage/') + firststeps_storage_name,
         }
 
     @app.context_processor

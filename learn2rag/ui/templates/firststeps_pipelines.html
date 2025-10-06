@@ -7,7 +7,7 @@
     <div class="input-group">
       <form method="POST" action="{{ url_for('pipeline_create') }}">
         <input type="hidden" name="label" value="Example pipeline">
-        <input type="hidden" name="storage_path" value="~/.local/share/learn2rag/example_pipeline">
+        <input type="hidden" name="storage_path" value="{{firststeps_storage_path}}">
         <input type="hidden" name="language_model" value="{{ models|items|map(attribute=0)|first }}"/>
         {% for name, source in sources.items() %}
         <input type="hidden" name="sources" value="{{ name }}">

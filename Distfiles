@@ -1,7 +1,5 @@
 open-webui-pipelines/langgraph_stream_pipeline.py
 qdrant/config.yml
 services/basic-pipeline/opt_config.json
-services/ollama/dist/ollama
-services/qdrant/target/release/qdrant
 services/setup-open-webui
 uninstall

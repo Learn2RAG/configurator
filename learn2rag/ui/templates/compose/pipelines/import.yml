@@ -2,14 +2,14 @@ name: import
 ports:
   - qdrant_http
 files:
-  - path: "{{storage_path}}/importer_config.json"
+  - path: '{{storage_path}}/importer_config.json'
     content: |
       {
           "loaders": [
               {% for name, source in sources.items() %}
               {
                   "loader_type": "DirectoryLoader",
-                  "path": "{{source.path}}",
+                  "path": "{{source.path | replace('\\', '\\\\')}}",
                   "recursive": "True"
               }
               {% if not loop.last %}
@@ -19,7 +19,7 @@ files:
           ]
       }
 
-  - path: "{{storage_path}}/basic_user_config.json"
+  - path: '{{storage_path}}/basic_user_config.json'
     content: |
       {
           "collection_name": "learn2rag",
@@ -28,32 +28,30 @@ files:
 
 services:
   qdrant:
-    working_dir: "{{storage_path}}"
+    working_dir: '{{storage_path}}'
     command:
-      - "{{learn2rag_path}}/services/qdrant/target/release/qdrant"
-      - "--config-path"
-      - "{{learn2rag_path}}/qdrant/config.yml"
+      - '{{learn2rag_path}}/services/qdrant/target/release/qdrant{% if is_windows %}.exe{% endif %}'
+      - '--config-path'
+      - '{{learn2rag_path}}/qdrant/config.yml'
     environment:
       # https://qdrant.tech/documentation/guides/configuration/
-      QDRANT__LOG_LEVEL: "INFO"
-      QDRANT__SERVICE__HOST: "127.0.0.1"
-      QDRANT__SERVICE__HTTP_PORT: "{{ports.qdrant_http}}"
-      QDRANT__TELEMETRY_DISABLED: "true"
+      QDRANT__LOG_LEVEL: 'INFO'
+      QDRANT__SERVICE__HOST: '127.0.0.1'
+      QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
+      QDRANT__TELEMETRY_DISABLED: 'true'
   main:
-    working_dir: "{{storage_path}}"
+    working_dir: '{{storage_path}}'
     command:
-      - "bash"
-      - "-eu"
-      - "{{learn2rag_path}}/services/start-import"
+      - '{{learn2rag_path}}/services/start-import{% if is_windows %}.bat{% endif %}'
     environment:
-      LEARN2RAG_PATH: "{{learn2rag_path}}"
-      STORAGE_PATH: "{{storage_path}}"
-      QDRANT__SERVICE__HTTP_PORT: "{{ports.qdrant_http}}"
-      PIPELINE_USER_CONFIG: "{{storage_path}}/basic_user_config.json"
-      PIPELINE_OPT_CONFIG: "{{learn2rag_path}}/services/basic-pipeline/opt_config.json"
-      LANGCHAIN_API_KEY: "1"
-      LANGCHAIN_TRACING_V2: "false"
-      LLM_API_TYPE: "{{language_model.api}}"
-      LLM_API_URL: "{{language_model.url}}"
-      LLM_API_TOKEN: "{{language_model.token}}"
-      LLM_API_MODEL: "{{language_model.model}}"
+      LEARN2RAG_PATH: '{{learn2rag_path}}'
+      STORAGE_PATH: '{{storage_path}}'
+      QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
+      PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
+      PIPELINE_OPT_CONFIG: '{{learn2rag_path}}/services/basic-pipeline/opt_config.json'
+      LANGCHAIN_API_KEY: '1'
+      LANGCHAIN_TRACING_V2: 'false'
+      LLM_API_TYPE: '{{language_model.api}}'
+      LLM_API_URL: '{{language_model.url}}'
+      LLM_API_TOKEN: '{{language_model.token}}'
+      LLM_API_MODEL: '{{language_model.model}}'

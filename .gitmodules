@@ -7,9 +7,6 @@
 [submodule "services/basic-pipeline"]
 	path = services/basic-pipeline
 	url = https://github.com/learn2rag/basic-pipeline
-[submodule "services/ollama"]
-	path = services/ollama
-	url = https://github.com/learn2rag/ollama
 [submodule "services/importer"]
 	path = services/importer
 	url = https://github.com/learn2rag/learn2rag-importer
