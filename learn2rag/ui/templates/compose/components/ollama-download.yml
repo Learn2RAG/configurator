@@ -1,0 +1,3 @@
+services:
+  ollama_client:
+    command: ['{{learn2rag_path}}/configurator{% if is_windows %}.exe{% endif %}', 'ollama', 'pull', '{{model}}']

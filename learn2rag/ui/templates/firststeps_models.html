@@ -5,7 +5,7 @@
   <div class="btn-toolbar mb-3" role="toolbar">
     {% if ollama_available %}
     <div class="input-group">
-      <form method="POST" action="{{ url_for('model_create') }}">
+      <form method="POST" action="{{ url_for('model_create') }}" hx-boost="true" hx-target="#main">
         <input type="hidden" name="ollama" value="{{ suggested_models['tinyllama'].ollama }}"/>
         <input type="hidden" name="label" value="{{ suggested_models.tinyllama.label }}"/>
         <input type="hidden" name="api" value="{{ suggested_models.tinyllama.config.api }}"/>

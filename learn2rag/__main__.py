@@ -45,4 +45,11 @@ if __name__ == '__main__':
     except FileNotFoundError:
         pass
 
-    start_ui(config)
+    if sys.argv[1:2] == ['ollama']:
+        import learn2rag.ollama_tool as ollama_tool
+        # FIXME default config values
+        ollama_tool.main(sys.argv[2:], config=config.get('OLLAMA', {'port': 11434}))
+    elif sys.argv[1:] == []:
+        start_ui(config)
+    else:
+        raise Exception(f'Arguments: {sys.argv[1:]}')

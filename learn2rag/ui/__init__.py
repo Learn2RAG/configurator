@@ -6,7 +6,7 @@ import os
 import socket
 import urllib
 
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, flash, redirect, render_template, request, make_response, url_for
 from flask_babel import Babel, gettext, ngettext, pgettext
 import flask.logging
 import jinja2
@@ -160,8 +160,7 @@ def create_app(config={}):
     def component_action(name):
         return False
 
-    @app.get('/models')
-    def models_list():
+    def list_ollama_models():
         ollama_models = []
         try:
             if hasattr(app, 'ollama_client'):
@@ -173,16 +172,18 @@ def create_app(config={}):
                     app.logger.warning('ollama list response has no models attribute')
         except Exception as e:
             app.logger.warning("Ollama not available: %s", e)
+        return ollama_models
 
+    @app.get('/models')
+    def models_list():
         return render_template(
             'models_list.html',
-            ollama_models=ollama_models,
+            ollama_models=list_ollama_models(),
         )
 
     @app.post('/models')
     def model_create():
         ok = True
-        label = request.form['label']
         model = request.form['model']
         api = request.form['api']
         if api == 'ChatOllama':
@@ -190,9 +191,10 @@ def create_app(config={}):
             # TODO setup tokens for locally running ollama
             token = request.form.get('token') or ''
             if request.form.get('ollama') == 'pull':
-                # TODO download in background
-                app.ollama_client.pull(model)
-                flash(gettext('Downloaded a language model: %(model)s', model=model))
+                if model.find(':') == -1:
+                    model += ':latest'
+                start_project('ollama_download', app.components_template_path / 'ollama-download.yml', Path(), {'model': model})
+                return redirect(url_for('model_pulling', model=model))
         elif api == 'ChatOpenAI':
             url = request.form['url']
             token = request.form['token']
@@ -200,6 +202,7 @@ def create_app(config={}):
             ok = False
             flash(gettext('API is not supported: %(api)s', api=api), 'error')
         if ok:
+            label = request.form.get('label', model)
             learn2rag.data.create_entry(app.instance_path, 'models', {
                 'label': label,
                 'url': url,
@@ -209,6 +212,37 @@ def create_app(config={}):
             })
             flash(pgettext('flash', 'Added a new language model configuration: %(label)s', label=label))
         return redirect(url_for('models_list'))
+
+    @app.get('/models/download')
+    def model_pulling():
+        model = request.args['model']
+        ollama_downloader = Project.get('ollama_download')
+        if ollama_downloader is not None and not ollama_downloader.running:
+            ollama_downloader.remove()
+            ollama_models = list_ollama_models()
+            if any(ollama_model.model == model for ollama_model in ollama_models):
+                status = 'success'
+                learn2rag.data.create_entry(app.instance_path, 'models', {
+                    'label': model,
+                    'url': 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/',
+                    'token': '',
+                    'model': model,
+                    'api': 'ChatOllama',
+                })
+                flash(pgettext('flash', 'Downloaded a language model: %(model)s', model=model))
+                res = make_response(render_template('model_pulling_success.html'))
+                res.headers['HX-Redirect'] = url_for('models_list')
+                return res
+            else:
+                flash(pgettext('flash', 'Failed to download a language model: %(model)s', model=model), 'error')
+                res = make_response(render_template('model_pulling_failure.html'))
+                res.headers['HX-Redirect'] = url_for('models_list')
+                return res
+        elif ollama_downloader is None:
+            raise Exception('Unexpected downloader state')
+        return render_template(
+            'model_pulling.html',
+        )
 
     @app.post('/models/<model>')
     def model_action(model):

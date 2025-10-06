@@ -107,7 +107,7 @@
               </div>
               {% endif %}
               <div class="card-footer text-body-secondary">
-                <form method="POST" action="{{ url_for('model_create') }}">
+                <form method="POST" action="{{ url_for('model_create') }}" hx-boost="true" hx-target="#main">
                   {% if suggested_model.ollama %}
                   <input type="hidden" name="ollama" value="{{ suggested_model.ollama }}"/>
                   {% endif %}
@@ -134,11 +134,7 @@
         <div id="collapseCreateOllamaDownload" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
           <div class="accordion-body">
             {% if ollama_available %}
-            <form method="POST">
-              <div class="mb-3">
-                <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input class="form-control" name="label" placeholder="{{pgettext('form_placeholder', 'My model')}}">
-              </div>
+            <form method="POST" hx-boost="true" hx-target="#main">
               <div class="mb-3">
                 <label for="model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
                 <input class="form-control" name="model" placeholder="tinyllama:latest">
