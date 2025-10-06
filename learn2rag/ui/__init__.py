@@ -320,6 +320,12 @@ def create_app(config={}):
         projects = Project.get_all()
         return render_template('ps_list.html', projects=projects)
 
+    @app.post('/shutdown')
+    def shutdown():
+        atexit_handler()
+        os.kill(os.getpid(), signal.SIGTERM)
+        return pgettext('shutdown', 'Bye!')
+
     app.logger.info('App creation complete')
     return app
 

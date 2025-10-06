@@ -41,6 +41,8 @@
               <ul class="dropdown-menu">
                 <li><a class="dropdown-item" href="/ps">Active processes</a></li>
                 <li><hr class="dropdown-divider"></li>
+                <li><form action="{{url_for('shutdown')}}" method="POST"><button class="dropdown-item">{{pgettext('nav', 'Shutdown Learn2RAG')}}</button></form></li>
+                <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="https://github.com/Learn2RAG/basic-implemetation-docs" target="_blank">{{pgettext('nav', 'Documentation')}}</a></li>
                 <li><a class="dropdown-item" href="https://learn2rag.de/" target="_blank">{{pgettext('nav', 'Learn2RAG website')}}</a></li>
               </ul>
