@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-09-25 20:33+0200\n"
+"POT-Creation-Date: 2025-10-06 16:07+0200\n"
 "PO-Revision-Date: 2025-09-25 20:33+0200\n"
 "Last-Translator: \n"
 "Language: de\n"
@@ -18,65 +18,77 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: learn2rag/ui/__init__.py:195
-#, python-format
-msgid "Downloaded a language model: %(model)s"
-msgstr "Sprachmodell %(model)s  heruntergeladen"
-
-#: learn2rag/ui/__init__.py:201
+#: learn2rag/ui/__init__.py:209
 #, python-format
 msgid "API is not supported: %(api)s"
 msgstr "API wird nicht unterstützt: %(api)s"
 
-#: learn2rag/ui/__init__.py:210
+#: learn2rag/ui/__init__.py:219
 #, python-format
 msgctxt "flash"
 msgid "Added a new language model configuration: %(label)s"
 msgstr "Neue Modellkonfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:229
+#: learn2rag/ui/__init__.py:238
+#, fuzzy, python-format
+msgctxt "flash"
+msgid "Downloaded a language model: %(model)s"
+msgstr "Sprachmodell %(model)s  heruntergeladen"
+
+#: learn2rag/ui/__init__.py:243
+#, fuzzy, python-format
+msgctxt "flash"
+msgid "Failed to download a language model: %(model)s"
+msgstr "Sprachmodell %(model)s  heruntergeladen"
+
+#: learn2rag/ui/__init__.py:270
 #, python-format
 msgctxt "flash"
 msgid "Added a new data source configuration: %(label)s"
 msgstr "Neue Datenquellenkonfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:252
+#: learn2rag/ui/__init__.py:293
 #, python-format
 msgctxt "flash"
 msgid "Added a new pipeline configuration: %(label)s"
 msgstr "Neue Pipeline-Konfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:289
+#: learn2rag/ui/__init__.py:330
 msgctxt "flash"
 msgid "Started the pipeline"
 msgstr "Pipeline gestartet"
 
-#: learn2rag/ui/__init__.py:291
+#: learn2rag/ui/__init__.py:332
 msgctxt "flash"
 msgid "Failed to start the pipeline"
 msgstr "Pipeline konnte nicht gestartet werden"
 
-#: learn2rag/ui/__init__.py:295
+#: learn2rag/ui/__init__.py:336
 #, python-format
 msgctxt "flash"
 msgid "Could not start the pipeline: %(message)s"
 msgstr "Pipeline konnte nicht gestartet werden: %(message)s"
 
-#: learn2rag/ui/__init__.py:303
+#: learn2rag/ui/__init__.py:344
 msgctxt "flash"
 msgid "The requested pipeline is not found"
 msgstr "Die gewünschte Pipeline konnte nicht gefunden werden"
 
-#: learn2rag/ui/__init__.py:311
+#: learn2rag/ui/__init__.py:352
 msgctxt "flash"
 msgid "Stopped the pipeline"
 msgstr "Pipeline gestoppt"
 
-#: learn2rag/ui/__init__.py:315
+#: learn2rag/ui/__init__.py:356
 #, python-format
 msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
 msgstr "Pipeline konnte nicht gestoppt werden: %(message)s"
+
+#: learn2rag/ui/__init__.py:368
+msgctxt "shutdown"
+msgid "Bye!"
+msgstr ""
 
 #: learn2rag/ui/templates/base.html:34
 msgctxt "nav"
@@ -100,10 +112,16 @@ msgstr "Mehr"
 
 #: learn2rag/ui/templates/base.html:44
 msgctxt "nav"
-msgid "Documentation"
+msgid "Shutdown Learn2RAG"
+msgstr ""
+
+#: learn2rag/ui/templates/base.html:46
+#, fuzzy
+msgctxt "nav"
+msgid "Online documentation"
 msgstr "Dokumentation"
 
-#: learn2rag/ui/templates/base.html:45
+#: learn2rag/ui/templates/base.html:47
 msgctxt "nav"
 msgid "Learn2RAG website"
 msgstr "Learn2RAG Webseite"
@@ -118,6 +136,18 @@ msgstr "Empfohlenes Sprachmodell %(model)s herunterladen"
 msgctxt "button"
 msgid "More options"
 msgstr "Weitere Optionen"
+
+#: learn2rag/ui/templates/model_pulling.html:6
+msgid "The language model is downloading, please wait"
+msgstr ""
+
+#: learn2rag/ui/templates/model_pulling_failure.html:2
+msgid "Download failed"
+msgstr ""
+
+#: learn2rag/ui/templates/model_pulling_success.html:2
+msgid "Download done"
+msgstr ""
 
 #: learn2rag/ui/templates/models_list.html:4
 msgctxt "title"
@@ -136,7 +166,6 @@ msgstr "Ein externes Sprachmodell anbinden"
 
 #: learn2rag/ui/templates/models_list.html:27
 #: learn2rag/ui/templates/models_list.html:65
-#: learn2rag/ui/templates/models_list.html:139
 #: learn2rag/ui/templates/pipelines_list.html:18
 #: learn2rag/ui/templates/sources_list.html:28
 #: learn2rag/ui/templates/sources_list.html:51
@@ -146,7 +175,6 @@ msgstr "Name"
 
 #: learn2rag/ui/templates/models_list.html:28
 #: learn2rag/ui/templates/models_list.html:66
-#: learn2rag/ui/templates/models_list.html:140
 msgctxt "form_placeholder"
 msgid "My model"
 msgstr "Mein Modell"
@@ -173,7 +201,7 @@ msgstr "Zugans-Token"
 
 #: learn2rag/ui/templates/models_list.html:46
 #: learn2rag/ui/templates/models_list.html:69
-#: learn2rag/ui/templates/models_list.html:143
+#: learn2rag/ui/templates/models_list.html:139
 #: learn2rag/ui/templates/pipelines_list.html:26
 msgctxt "form_label"
 msgid "Language model"
@@ -213,39 +241,40 @@ msgctxt "heading"
 msgid "Download a new language model"
 msgstr "Neues Sprachmodell herunterladen"
 
-#: learn2rag/ui/templates/models_list.html:152
-msgid "Ollama is not running. Try to restart the Learn2RAG configurator."
+#: learn2rag/ui/templates/models_list.html:148
+#, fuzzy
+msgid "Ollama is not running. Please restart the Learn2RAG configurator."
 msgstr "Ollama ist nicht verfügbar. Es wird empfohlen Learn2RAG neuzustarten."
 
-#: learn2rag/ui/templates/models_list.html:166
+#: learn2rag/ui/templates/models_list.html:162
 #: learn2rag/ui/templates/pipelines_list.html:67
 #: learn2rag/ui/templates/sources_list.html:71
 msgctxt "column_heading"
 msgid "Label"
 msgstr "Name"
 
-#: learn2rag/ui/templates/models_list.html:167
+#: learn2rag/ui/templates/models_list.html:163
 msgctxt "column_heading"
 msgid "API type"
 msgstr "API Typ"
 
-#: learn2rag/ui/templates/models_list.html:168
+#: learn2rag/ui/templates/models_list.html:164
 msgctxt "column_heading"
 msgid "API URL"
 msgstr "API URL"
 
-#: learn2rag/ui/templates/models_list.html:169
+#: learn2rag/ui/templates/models_list.html:165
 msgctxt "column_heading"
 msgid "Access token"
 msgstr "Zugangs-Token"
 
-#: learn2rag/ui/templates/models_list.html:170
+#: learn2rag/ui/templates/models_list.html:166
 #: learn2rag/ui/templates/pipelines_list.html:69
 msgctxt "column_heading"
 msgid "Language model"
 msgstr "Sprachmodell"
 
-#: learn2rag/ui/templates/models_list.html:185
+#: learn2rag/ui/templates/models_list.html:181
 #: learn2rag/ui/templates/pipelines_list.html:129
 #: learn2rag/ui/templates/sources_list.html:84
 msgctxt "button"
