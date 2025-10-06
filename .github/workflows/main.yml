@@ -27,8 +27,3 @@ jobs:
       - run: python -m pip install poetry
       - run: PATH="$HOME/.cargo/bin:$PATH" .pyenv/bin/pyenv exec ./install
       - run: PATH="$HOME/.cargo/bin:$PATH" .pyenv/bin/pyenv exec ./bundle-linux
-      - uses: actions/upload-artifact@v4
-        with:
-          name: learn2rag-linux
-          path: dist/learn2rag-linux
-          if-no-files-found: error
