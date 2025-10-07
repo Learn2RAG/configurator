@@ -3,6 +3,8 @@ set -eu
 
 ./build-python
 
+# 64-bit MinGW (Windows 10+, Windows Server 2016+)
+# https://doc.rust-lang.org/rustc/platform-support.html#tier-1-with-host-tools
 CARGO_BUILD_TARGET=x86_64-pc-windows-gnu
 
 BUNDLE_DIR=dist
