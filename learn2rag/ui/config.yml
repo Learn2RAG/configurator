@@ -7,3 +7,15 @@ SUGGESTED_MODELS:
     config:
       api: ChatOllama
       model: tinyllama:latest
+  gemma3:27b-it-qat:
+    label: Gemma 3 (27B)
+    ollama: pull
+    config:
+      api: ChatOllama
+      model: gemma3:27b-it-qat
+  llama3.3:70b:
+    label: llama3.3:70b
+    ollama: pull
+    config:
+      api: ChatOllama
+      model: llama3.3:70b
