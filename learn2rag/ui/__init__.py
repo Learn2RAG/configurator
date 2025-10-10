@@ -215,7 +215,7 @@ def create_app(config={}):
                 if model.find(':') == -1:
                     model += ':latest'
                 start_project('ollama_download', app.components_template_path / 'ollama-download.yml', Path(), {'model': model})
-                return redirect(url_for('model_pulling', model=model))
+                return flask_redirect(url_for('model_pulling', model=model))
         elif api == 'ChatOpenAI':
             url = request.form['url']
             token = request.form['token']
