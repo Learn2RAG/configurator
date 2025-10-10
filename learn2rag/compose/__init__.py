@@ -140,7 +140,7 @@ class Project():
         # files
         try:
             for file in self.content.get('files', []):
-                file_path = Path(file['path'])
+                file_path = Path(file['path']).expanduser().absolute()
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 file_path.write_text(file['content'])
         except Exception as e:

@@ -26,9 +26,13 @@ logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
 
-def start_project(name, template_file, storage_path, render_context = {}):
+def expand_path(path):
+    return Path(path).expanduser().absolute()
+
+
+def start_project(name, template_file, storage_path, render_context={}):
     logging.debug('UI starting project: %s', name)
-    storage_path = storage_path.absolute()
+    storage_path = expand_path(storage_path)
     logging.debug('Storage path: %s', storage_path)
     storage_path.mkdir(parents=True, exist_ok=True)
     project_file = storage_path / 'compose.yml'
@@ -301,9 +305,8 @@ def create_app(config={}):
         url = urllib.parse.urlparse(request.base_url)
 
         sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
-        # expand "~" in paths
         for path_name, source in sources.items():
-            source['path'] = str(Path(source['path']).expanduser().absolute())
+            source['path'] = str(expand_path(source['path']))
 
         render_context = {
             'learn2rag_hostname': url.hostname,
