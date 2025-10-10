@@ -6,7 +6,8 @@ import os
 import platform
 import signal
 import socket
-import sys
+import threading
+import time
 import urllib
 
 from flask import Flask, flash, redirect, render_template, request, make_response, url_for
@@ -365,9 +366,8 @@ def create_app(config={}):
         return render_template('ps_list.html', projects=projects)
 
     @app.post('/shutdown')
-    def shutdown():
-        atexit_handler()
-        os.kill(os.getpid(), signal.SIGTERM)
+    def shutdown_request():
+        threading.Thread(target=shutdown).start()
         return pgettext('shutdown', 'Bye!')
 
     app.logger.info('App creation complete')
@@ -375,7 +375,8 @@ def create_app(config={}):
 
 
 def atexit_handler():
-    logging.info('Stopping Ollama')
+    logging.debug('Exit handler')
+    logging.info('Stopping Ollama...')
     project = Project.get('ollama')
     if project is not None:
         try:
@@ -386,6 +387,14 @@ def atexit_handler():
             project.remove()
         except Exception as e:
             logging.error(e)
+    logging.info('Done')
+
+
+def shutdown():
+    time.sleep(1)
+    logging.debug('Shutdown...')
+    atexit_handler()
+    os.kill(os.getpid(), signal.SIGTERM)
 
 
 atexit.register(atexit_handler)
