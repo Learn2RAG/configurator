@@ -4,6 +4,7 @@ import importlib
 import logging
 import os
 import platform
+import shutil
 import signal
 import socket
 import threading
@@ -347,7 +348,19 @@ def create_app(config={}):
         if pipeline is None:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
         elif request.form['action'] == 'delete':
-            return 'Not implemented'
+            ok = True
+            try:
+                storage_path = expand_path(pipeline['storage_path'])
+                shutil.rmtree(storage_path)
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                app.logger.error('Failed to remove directory: %s, %s', storage_path, e)
+                flash(pgettext('flash', 'Failed to remove directory: %(path)s', path=storage_path), 'error')
+                ok = False
+            if ok:
+                learn2rag.data.delete_entry(app.instance_path, 'pipelines', name)
+                flash(pgettext('flash', 'Removed pipeline: %(label)s', label=pipeline['label']))
         elif request.form['action'].startswith('start:'):
             start_pipeline(name, pipeline, request.form['action'].split(':', 2)[1])
         elif request.form['action'] == 'stop':
@@ -358,7 +371,12 @@ def create_app(config={}):
                 app.logger.exception(e)
                 app.logger.error('Could not stop the pipeline')
                 flash(pgettext('flash', 'Could not stop the pipeline: %(message)s', message=e), 'error')
-        return redirect(url_for('pipelines_list'))
+        if 'HX-Boosted' in request.headers:
+            response = make_response('', 204)
+            response.headers['HX-Redirect'] = url_for('pipelines_list')
+        else:
+            response = redirect(url_for('pipelines_list'))
+        return response
 
     @app.get('/ps')
     def ps_list():

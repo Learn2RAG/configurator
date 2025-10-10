@@ -96,42 +96,46 @@
         {% endfor %}
       </td>
       <td>
-        <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
-          <div class="dropdown">
-            <div class="btn-toolbar" role="toolbar">
-              <div class="btn-group" role="group">
-                {% if not (projects[name] and projects[name].running) %}
-                <button class="btn btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  {{pgettext('button', 'Start')}}
-                </button>
-                <ul class="dropdown-menu">
-                  {% for name, project in compose_templates.items() %}
-                  <li><button class="dropdown-item" type="submit" name="action" value="start:{{ name }}">{{ project.name }}</button></li>
-                  {% endfor %}
-                </ul>
-                {% endif %}
-              </div>
-            </div>
-            {% if projects[name] and projects[name].running %}
+        <div class="dropdown">
+          <div class="btn-toolbar" role="toolbar">
             <div class="btn-group" role="group">
-              {% if 'ui_url' in projects[name].content %}
-              <a class="btn btn-primary" href="{{ projects[name].content['ui_url'] }}" role="button" target="_blank">
-                {{pgettext('button', 'Open')}}
-              </a>
+              {% if not (projects[name] and projects[name].running) %}
+              <button class="btn btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                {{pgettext('button', 'Start')}}
+              </button>
+              <ul class="dropdown-menu">
+                {% for project_name, project in compose_templates.items() %}
+                <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
+                  <li><button class="dropdown-item" type="submit" name="action" value="start:{{ project.name }}">{{ project.name }}</button></li>
+                </form>
+                {% endfor %}
+              </ul>
               {% endif %}
+            </div>
+          </div>
+          {% if projects[name] and projects[name].running %}
+          <div class="btn-group" role="group">
+            {% if 'ui_url' in projects[name].content %}
+            <a class="btn btn-primary" href="{{ projects[name].content['ui_url'] }}" role="button" target="_blank">
+              {{pgettext('button', 'Open')}}
+            </a>
+            {% endif %}
+            <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
               <button type="submit" class="btn btn-warning" name="action" value="stop">
                 {{pgettext('button', 'Stop')}}
               </button>
-            </div>
-            {% else %}
-            <div class="btn-group" role="group">
+            </form>
+          </div>
+          {% else %}
+          <div class="btn-group" role="group">
+            <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this pipeline configuration and all stored data: %(label)s?', label=pipeline.label)}}">
               <button type="submit" class="btn btn-danger" name="action" value="delete">
                 {{pgettext('button', 'Remove')}}
               </button>
-            </div>
-            {% endif %}
+            </form>
           </div>
-        </form>
+          {% endif %}
+        </div>
       </td>
     </tr>
     {% endfor %}
