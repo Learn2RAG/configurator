@@ -58,6 +58,7 @@ mkdir -p $BUNDLE/services/qdrant/target/release
 tar -C $BUNDLE/services/qdrant/target/release -xzvf $BUNDLE_DIR/qdrant-linux.tar.gz
 
 cp start.linux $BUNDLE/start
+cp uninstall.linux $BUNDLE/uninstall
 
 # https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables
 [ -z "${GITHUB_ACTIONS-}" ] && (cd $BUNDLE_DIR; zip -r $BUNDLE_NAME $BUNDLE_NAME)

@@ -54,6 +54,7 @@ mkdir -p $BUNDLE/services/qdrant/target/release
 unzip -o $BUNDLE_DIR/qdrant-windows.zip -d $BUNDLE/services/qdrant/target/release
 
 cp start.windows.bat $BUNDLE/start.bat
+cp uninstall.windows.bat $BUNDLE/uninstall.bat
 
 # https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables
 [ -z "${GITHUB_ACTIONS-}" ] && (cd $BUNDLE_DIR; zip -r $BUNDLE_NAME $BUNDLE_NAME)
