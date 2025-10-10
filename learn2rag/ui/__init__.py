@@ -11,7 +11,7 @@ import threading
 import time
 import urllib
 
-from flask import Flask, flash, redirect, render_template, request, make_response, url_for
+from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
 from flask_babel import Babel, gettext, ngettext, pgettext
 import flask.logging
 import jinja2
@@ -30,6 +30,15 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 def expand_path(path):
     return Path(path).expanduser().absolute()
+
+
+def redirect(url):
+    if 'HX-Boosted' in request.headers:
+        response = make_response('', 204)
+        response.headers['HX-Redirect'] = url
+    else:
+        response = flask_redirect(url)
+    return response
 
 
 def start_project(name, template_file, storage_path, render_context={}):
@@ -276,9 +285,19 @@ def create_app(config={}):
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
 
-    @app.post('/sources/<source>')
-    def source_action(source):
-        return 'Not implemented'
+    @app.post('/sources/<name>')
+    def source_action(name):
+        source = learn2rag.data.get_entry(app.instance_path, 'sources', name)
+        if source is None:
+            flash(pgettext('flash', 'The requested data source configuration is not found'), 'error')
+        else:
+            pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
+            if any(True for p in pipelines.values() if name in p['sources']):
+                flash(pgettext('flash', 'Some configured pipelines use this data source configuration, remove them first'), 'error')
+            else:
+                learn2rag.data.delete_entry(app.instance_path, 'sources', name)
+                flash(pgettext('flash', 'Removed data source configuration: %(label)s', label=source['label']))
+        return redirect(url_for('sources_list'))
 
     @app.get('/pipelines')
     def pipelines_list():
@@ -371,12 +390,7 @@ def create_app(config={}):
                 app.logger.exception(e)
                 app.logger.error('Could not stop the pipeline')
                 flash(pgettext('flash', 'Could not stop the pipeline: %(message)s', message=e), 'error')
-        if 'HX-Boosted' in request.headers:
-            response = make_response('', 204)
-            response.headers['HX-Redirect'] = url_for('pipelines_list')
-        else:
-            response = redirect(url_for('pipelines_list'))
-        return response
+        return redirect(url_for('pipelines_list'))
 
     @app.get('/ps')
     def ps_list():

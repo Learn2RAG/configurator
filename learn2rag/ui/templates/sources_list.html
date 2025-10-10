@@ -79,7 +79,7 @@
       <td title="{{ name }}">{{ item.label }}</td>
       <td>{{ item.path }}</td>
       <td>
-        <form method="POST" action="{{ url_for('source_action', source=name) }}">
+        <form method="POST" action="{{ url_for('source_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this data source configuration: %(label)s?', label=item.label)}}">
           <div class="btn-group" role="group">
             <button type="submit" class="btn btn-danger" name="action" value="delete">{{pgettext('button', 'Remove')}}</button>
           </div>
