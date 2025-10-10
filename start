@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+FLASK_DEBUG=1
+./configurator
