@@ -6,7 +6,7 @@ ports:
   - open_webui_pipelines
 ui_url: 'http://{{learn2rag_hostname}}:{{ports.ui}}/'
 files:
-  - path: '{{pipeline.storage_path}}/basic_user_config.json'
+  - path: '{{storage_path}}/basic_user_config.json'
     content: |
       {
           "collection_name": "learn2rag",
@@ -15,7 +15,7 @@ files:
 
 services:
   open-webui:
-    working_dir: '{{pipeline.storage_path}}'
+    working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/services/start-open-webui{% if is_windows %}.exe{% endif %}'
       - 'serve'
@@ -25,7 +25,7 @@ services:
       - '{{ports.ui}}'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
-      DATA_DIR: '{{pipeline.storage_path}}/open-webui-data'
+      DATA_DIR: '{{storage_path}}/open-webui-data'
       DEFAULT_LOCALE: 'de'
       ENABLE_OPENAI_API: 'True'
       OPENAI_API_BASE_URL: 'http://localhost:{{ports.open_webui_pipelines}}'
