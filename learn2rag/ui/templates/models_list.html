@@ -176,7 +176,7 @@
       <td>{{ model.token }}</td>
       <td>{{ model.model }}</td>
       <td>
-        <form method="POST" action="{{ url_for('model_action', model=name) }}">
+        <form method="POST" action="{{ url_for('model_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this language model configuration: %(label)s?', label=model.label)}}">
           <div class="btn-group" role="group">
             <button type="submit" class="btn btn-danger" name="action" value="delete">{{pgettext('button', 'Remove')}}</button>
           </div>

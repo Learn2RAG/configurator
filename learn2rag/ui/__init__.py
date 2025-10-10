@@ -265,10 +265,19 @@ def create_app(config={}):
             'model_pulling.html',
         )
 
-    @app.post('/models/<model>')
-    def model_action(model):
-        if request.form['action'] == 'delete':
-            learn2rag.data.delete_entry(app.instance_path, 'models', model)
+    @app.post('/models/<name>')
+    def model_action(name):
+        model = learn2rag.data.get_entry(app.instance_path, 'models', name)
+        if model is None:
+            flash(pgettext('flash', 'The requested language model configuration is not found'), 'error')
+        else:
+            pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
+            if any(True for p in pipelines.values() if name == p['language_model']):
+                flash(pgettext('flash', 'Some configured pipelines use this language model configuration, remove them first'), 'error')
+            else:
+                # TODO if the model is on a local Ollama instance, remove it from there as well
+                learn2rag.data.delete_entry(app.instance_path, 'models', name)
+                flash(pgettext('flash', 'Removed language model configuration: %(label)s', label=model['label']))
         return redirect(url_for('models_list'))
 
     @app.get('/sources')
