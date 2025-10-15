@@ -10,6 +10,7 @@ dependencies = [
     "psutil>=7.0.0",
     "pyyaml>=0.2.5",
     "uvicorn",
+    "pyxdg",
 ]
 [build-system]
 requires = ["setuptools >= 77.0.3"]

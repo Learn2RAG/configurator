@@ -30,7 +30,7 @@ services:
   qdrant:
     working_dir: '{{storage_path}}'
     command:
-      - '{{learn2rag_path}}/services/qdrant/target/release/qdrant{% if is_windows %}.exe{% endif %}'
+      - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
       - '{{learn2rag_path}}/qdrant/config.yml'
     environment:

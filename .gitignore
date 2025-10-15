@@ -3,3 +3,5 @@
 *.mo
 __pycache__
 /.venv/
+/services/ollama/
+/services/qdrant/

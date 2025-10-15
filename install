@@ -7,4 +7,4 @@ python3 -m venv .venv
 (cd services/importer && bash -eu ../install-importer)
 (cd services/basic-pipeline && bash -eu ../install-basic-pipeline)
 (cd services && bash -eu ./install-ollama)
-(cd services/qdrant && bash -eu ../install-qdrant)
+(cd services && bash -eu ./install-qdrant)

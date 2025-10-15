@@ -4,6 +4,7 @@ import importlib
 import logging
 import os
 import platform
+import xdg.BaseDirectory
 import shutil
 import signal
 import socket
@@ -96,9 +97,10 @@ def merge(source, destination):
 
 def create_app(config={}):
     # create and configure the app
+    default_instance_path = os.getenv('LOCALAPPDATA') + '/Learn2RAG/instance' if platform.system() == 'Windows' else xdg.BaseDirectory.save_data_path('Learn2RAG/instance')
     app = Flask(
         __name__,
-        instance_path=config.get('flask', {}).get('instance_path'),
+        instance_path=config.get('flask', {}).get('instance_path', default_instance_path),
     )
     app.config.from_mapping(
         SECRET_KEY='dev',
@@ -133,11 +135,10 @@ def create_app(config={}):
 
     @app.context_processor
     def inject_info():
-        firststeps_storage_name = 'first'
         return {
             'compose_templates': app.pipeline_templates,
             'ollama_available': hasattr(app, 'ollama_client'),
-            'firststeps_storage_path': (os.getenv('LOCALAPPDATA') + '/Learn2RAG/storage/' if platform.system() == 'Windows' else '~/.local/share/learn2rag/storage/') + firststeps_storage_name,
+            'firststeps_storage_path': app.instance_path + '/example',
         }
 
     @app.context_processor

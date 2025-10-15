@@ -1,1 +1,3 @@
-cargo build --release
+mkdir -p qdrant
+wget --continue -O qdrant/qdrant-linux.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.15.4/qdrant-x86_64-unknown-linux-musl.tar.gz
+tar -C qdrant -xzvf qdrant/qdrant-linux.tar.gz
