@@ -11,6 +11,7 @@
       <th scope="col">#</th>
       <th scope="col">Running</th>
       <th scope="col">Content</th>
+      <th scope="col"></th>
     </tr>
   </thead>
   <tbody>
@@ -19,6 +20,15 @@
       <th scope="row">{{ name }}</th>
       <td>{{ project.running }}</td>
       <td>{{ project.content }}</td>
+      <td>
+        {% if project.running %}
+        <form method="POST" action="{{ url_for('ps_stop') }}">
+          <div class="btn-group" role="group">
+            <button type="submit" class="btn btn-danger" name="name" value="{{name}}">Stop</button>
+          </div>
+        </form>
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </tbody>

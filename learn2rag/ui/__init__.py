@@ -407,6 +407,15 @@ def create_app(config={}):
         projects = Project.get_all()
         return render_template('ps_list.html', projects=projects)
 
+    @app.post('/ps/stop')
+    def ps_stop():
+        try:
+            stop_project(request.form['name'])
+            flash('Stopped')
+        except Exception as e:
+            flash(f'Failed: {e}', 'error')
+        return redirect(url_for('ps_list'))
+
     @app.post('/shutdown')
     def shutdown_request():
         threading.Thread(target=shutdown).start()
