@@ -1,4 +1,22 @@
 SUGGESTED_MODELS:
+  gemma3_27b:
+    label: Google Gemma 3 (27B)
+    description: |
+      Download size: 17GB
+    link: https://ollama.com/library/gemma3
+    ollama: pull
+    config:
+      api: ChatOllama
+      model: gemma3:27b
+  llama3.3_70b:
+    label: Meta Llama 3.3
+    description: |
+      Download size: 43GB
+    link: https://ollama.com/library/llama3.3
+    ollama: pull
+    config:
+      api: ChatOllama
+      model: llama3.3:70b
   tinyllama:
     label: TinyLlama
     image: models/tinyllama.png
@@ -7,15 +25,3 @@ SUGGESTED_MODELS:
     config:
       api: ChatOllama
       model: tinyllama:latest
-  gemma3:27b-it-qat:
-    label: Gemma 3 (27B)
-    ollama: pull
-    config:
-      api: ChatOllama
-      model: gemma3:27b-it-qat
-  llama3.3:70b:
-    label: llama3.3:70b
-    ollama: pull
-    config:
-      api: ChatOllama
-      model: llama3.3:70b
