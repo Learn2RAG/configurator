@@ -99,6 +99,7 @@ def merge(source, destination):
 def create_app(config={}):
     # create and configure the app
     default_instance_path = os.getenv('LOCALAPPDATA') + '/Learn2RAG/instance' if platform.system() == 'Windows' else xdg.BaseDirectory.save_data_path('Learn2RAG/instance')
+    example_local_path = r'C:\Users\User\Documents' if platform.system() == 'Windows' else '/home/user/Documents'
     app = Flask(
         __name__,
         instance_path=config.get('flask', {}).get('instance_path', default_instance_path),
@@ -287,7 +288,7 @@ def create_app(config={}):
 
     @app.get('/sources')
     def sources_list():
-        return render_template('sources_list.html')
+        return render_template('sources_list.html', example_local_path=example_local_path)
 
     @app.post('/sources')
     def source_create():

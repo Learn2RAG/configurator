@@ -26,11 +26,17 @@
               <input type="hidden" name="type" value="local"/>
               <div class="mb-3">
                 <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input class="form-control" name="label">
+                <input class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
               </div>
               <div class="mb-3">
                 <label for="url" class="form-label">{{pgettext('form_label', 'Path on the local filesystem')}}</label>
-                <input class="form-control" name="path" placeholder="/home/user/Documents">
+                <input class="form-control" name="path" required="required"
+                       {% if is_windows %}
+                       title="{{pgettext('tooltip', 'For example: %(path)s', example_local_path)}}"
+                       {% else %}
+                       title="{{pgettext('tooltip', 'For example: /home/user/Documents')}}"
+                       {% endif %}
+                       >
               </div>
               <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
             </form>
@@ -49,11 +55,11 @@
               <input type="hidden" name="type" value="web"/>
               <div class="mb-3">
                 <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input class="form-control" name="label">
+                <input class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
               </div>
               <div class="mb-3">
                 <label for="url" class="form-label">{{pgettext('form_label', 'Web page URL')}}</label>
-                <input class="form-control" name="path" placeholder="https://example.com/">
+                <input class="form-control" name="path" required="required" title="{{pgettext('tooltip', 'For example: https://learn2rag.de/')}}">
               </div>
               <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
             </form>
