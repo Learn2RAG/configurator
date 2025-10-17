@@ -20,7 +20,7 @@
       </div>
       <div class="mb-3">
         <label for="url" class="form-label">{{pgettext('form_label', 'Storage directory path')}}</label>
-        <input class="form-control" name="storage_path" placeholder="/home/user/.local/share/learn2rag/my_first_pipeline">
+        <input class="form-control" name="storage_path" value="{{default_storage_prefix}}{{current_timestamp}}" data-default-prefix="{{default_storage_prefix}}"/>
       </div>
       <div class="mb-3">
         <label for="language_model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
@@ -141,4 +141,19 @@
     {% endfor %}
   </tbody>
 </table>
+
+<script>
+  const labelInput = document.querySelector('input[name=label]');
+  const storageInput = document.querySelector('input[name=storage_path]');
+  console.log('wtf');
+  console.log(labelInput);
+  labelInput.addEventListener('change', () => {
+      if (storageInput.value.startsWith(storageInput.dataset['defaultPrefix'])) {
+          const suffix = labelInput.value.replace(/[^A-Za-z0-9]/g, '_');
+          if (suffix.length > 0 && suffix.match(/[^_]/)) {
+              storageInput.value = storageInput.dataset['defaultPrefix'] + suffix;
+          }
+      }
+  });
+</script>
 {% endblock %}

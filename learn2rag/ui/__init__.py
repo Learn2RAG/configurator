@@ -2,6 +2,7 @@ from pathlib import Path
 import atexit
 import importlib
 import logging
+import math
 import os
 import platform
 import xdg.BaseDirectory
@@ -138,7 +139,8 @@ def create_app(config={}):
         return {
             'compose_templates': app.pipeline_templates,
             'ollama_available': hasattr(app, 'ollama_client'),
-            'firststeps_storage_path': app.instance_path + '/example',
+            'default_storage_prefix': app.instance_path + '/storage/',
+            'firststeps_storage_path': app.instance_path + '/storage/example',
         }
 
     @app.context_processor
@@ -312,7 +314,7 @@ def create_app(config={}):
     @app.get('/pipelines')
     def pipelines_list():
         projects = Project.get_all()
-        return render_template('pipelines_list.html', projects=projects)
+        return render_template('pipelines_list.html', projects=projects, current_timestamp=math.floor(time.time()))
 
     @app.post('/pipelines')
     def pipeline_create():
