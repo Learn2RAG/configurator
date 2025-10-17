@@ -46,10 +46,25 @@
       <div class="mb-3 collapse advanced-configuration">
         <label for="ports" class="form-label">{{pgettext('form_label', 'Ports')}}</label>
         <small class="text-body-secondary">{{gettext('Optional')}}</small>
-        <input class="form-control" name="ports" type="number" min="1" max="65535">
-        <input class="form-control" name="ports" type="number" min="1" max="65535">
-        <input class="form-control" name="ports" type="number" min="1" max="65535">
-        <input class="form-control" name="ports" type="number" min="1" max="65535">
+        <div>
+        </div>
+        {# TODO: labels in the interface currently assume a specific port order in all corresponding .yml files #}
+        <div class="form-floating mb-3">
+          <input class="form-control" name="ports" type="number" min="1" max="65535">
+          <label for="ports" class="form-label">{{pgettext('form_label', 'User interface')}}</label>
+        </div>
+        <div class="form-floating mb-3">
+          <input class="form-control" name="ports" type="number" min="1" max="65535">
+          <label for="ports">{{pgettext('form_label', 'RAG service')}}</label>
+        </div>
+        <div class="form-floating mb-3">
+          <input class="form-control" name="ports" type="number" min="1" max="65535">
+          <label for="ports">{{pgettext('form_label', 'Vector store')}}</label>
+        </div>
+        <div class="form-floating mb-3">
+          <input class="form-control" name="ports" type="number" min="1" max="65535">
+          <label for="ports">{{pgettext('form_label', 'Additional internal port')}}</label>
+        </div>
       </div>
       <div class="mb-3 collapse advanced-configuration">
         <div class="form-check">

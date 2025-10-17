@@ -1,5 +1,6 @@
 name: pipeline
 ports:
+  # TODO: labels in the interface currently assume a specific port order
   - ui
   - qdrant_http
   - pipeline

@@ -1,5 +1,7 @@
 name: import
 ports:
+  # TODO: UI port is not used; labels in the interface currently assume a specific port order
+  - ui
   - qdrant_http
 files:
   - path: '{{storage_path}}/importer_config.json'
