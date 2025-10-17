@@ -1,4 +1,5 @@
 name: pipeline
+label: RAG
 ports:
   # TODO: labels in the interface currently assume a specific port order
   - ui

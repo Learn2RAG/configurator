@@ -123,7 +123,7 @@
               {% if not (projects[name] and projects[name].running) %}
               {% for project_name, project in compose_templates.items() %}
               <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
-                <button class="btn btn-primary" type="submit" name="action" value="start:{{ project.name }}">{{project.name}}</button>
+                <button class="btn btn-primary" type="submit" name="action" value="start:{{ project.name }}">{{project.label}}</button>
               </form>
               {% endfor %}
               {% endif %}
