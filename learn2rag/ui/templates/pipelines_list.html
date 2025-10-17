@@ -31,12 +31,13 @@
         </select>
       </div>
       <div class="mb-3">
-        <label for="sources" class="form-label">{{pgettext('form_label', 'Data sources')}}</label>
-        <select class="form-select" multiple="multiple" name="sources">
+        {{pgettext('form_label', 'Data sources')}}
           {% for name, source in sources.items() %}
-          <option value="{{ name }}" selected="selected">{{ source.label }} ({{ source.path }})</option>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="sources" value="{{name}}" id="source-{{loop.index}}" checked="checked">
+            <label class="form-check-label" for="source-{{loop.index}}">{{source.label}} ({{source.path}})</label>
+          </div>
           {% endfor %}
-        </select>
       </div>
       <div class="mb-3">
         <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target=".advanced-configuration">
