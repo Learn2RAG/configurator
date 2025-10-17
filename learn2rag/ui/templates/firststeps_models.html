@@ -3,16 +3,18 @@
   <p>Do you want to download a suggested model now?</p>
   <hr/>
   <div class="btn-toolbar mb-3" role="toolbar">
-    {% if ollama_available %}
+    {% if ollama_available and firststeps_model %}
     <div class="input-group">
       <form method="POST" action="{{ url_for('model_create') }}" hx-boost="true" hx-target="#main">
-        <input type="hidden" name="ollama" value="{{ suggested_models['tinyllama'].ollama }}"/>
-        <input type="hidden" name="label" value="{{ suggested_models.tinyllama.label }}"/>
-        <input type="hidden" name="api" value="{{ suggested_models.tinyllama.config.api }}"/>
-        <input type="hidden" name="url" value="{{ suggested_models.tinyllama.config.url }}"/>
-        <input type="hidden" name="model" value="{{ suggested_models.tinyllama.config.model }}"/>
-        <input type="hidden" name="token" value="{{ suggested_models.tinyllama.config.token }}"/>
-        <button type="submit" class="btn btn-primary">{{ pgettext('button', 'Download a suggested language model (%(model)s)', model=suggested_models.tinyllama.label) }}</button>
+        <input type="hidden" name="ollama" value="{{ firststeps_model.ollama }}"/>
+        <input type="hidden" name="label" value="{{ firststeps_model.label }}"/>
+        <input type="hidden" name="api" value="{{ firststeps_model.config.api }}"/>
+        <input type="hidden" name="url" value="{{ firststeps_model.config.url }}"/>
+        <input type="hidden" name="model" value="{{ firststeps_model.config.model }}"/>
+        <input type="hidden" name="token" value="{{ firststeps_model.config.token }}"/>
+        <button type="submit" class="btn btn-primary" title="{{firststeps_model.description}}">
+          {{ pgettext('button', 'Download a suggested language model: %(model)s', model=firststeps_model.label) }}
+        </button>
       </form>
     </div>
     {% endif %}
