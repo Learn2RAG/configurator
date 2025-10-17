@@ -51,36 +51,6 @@
           </div>
         </div>
       </div>
-      {% if ollama_models %}
-      <div class="accordion-item">
-        <h2 class="accordion-header">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateOllamaSelect" aria-expanded="false" aria-controls="collapseCreateOllamaSelect">
-            {{pgettext('heading', 'Use previously downloaded model')}}
-          </button>
-        </h2>
-        <div id="collapseCreateOllamaSelect" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
-          <div class="accordion-body">
-            <form method="POST">
-              <div class="mb-3">
-                <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input class="form-control" name="label" placeholder="{{pgettext('form_placeholder', 'My model')}}">
-              </div>
-              <div class="mb-3">
-                <label for="ollama_list" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
-                <select class="form-select" name="model">
-                  {% for ollama_model in ollama_models %}
-                  <option value="{{ ollama_model.model }}">{{ ollama_model.model }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <input type="hidden" name="api" value="ChatOllama"/>
-              <input type="hidden" name="ollama" value="use"/>
-              <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
-            </form>
-          </div>
-        </div>
-      </div>
-      {% endif %}
       {% if suggested_models %}
       <div class="accordion-item">
         <h2 class="accordion-header">
@@ -144,6 +114,36 @@
                 {% endif %}
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      {% if ollama_models %}
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateOllamaSelect" aria-expanded="false" aria-controls="collapseCreateOllamaSelect">
+            {{pgettext('heading', 'Use previously downloaded model')}}
+          </button>
+        </h2>
+        <div id="collapseCreateOllamaSelect" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
+          <div class="accordion-body">
+            <form method="POST">
+              <div class="mb-3">
+                <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
+                <input class="form-control" name="label" placeholder="{{pgettext('form_placeholder', 'My model')}}">
+              </div>
+              <div class="mb-3">
+                <label for="ollama_list" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
+                <select class="form-select" name="model">
+                  {% for ollama_model in ollama_models %}
+                  <option value="{{ ollama_model.model }}">{{ ollama_model.model }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <input type="hidden" name="api" value="ChatOllama"/>
+              <input type="hidden" name="ollama" value="use"/>
+              <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
+            </form>
           </div>
         </div>
       </div>
