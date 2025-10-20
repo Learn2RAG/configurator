@@ -129,8 +129,18 @@
               {% endif %}
               {% if projects[name] and projects[name].running %}
               {% if 'ui_url' in projects[name].content %}
-              <a class="btn btn-primary" href="{{ projects[name].content['ui_url'] }}" role="button" target="_blank">
+              <a
+                class="btn {% if projects[name].health %}btn-primary{% else %}btn-secondary{% endif %}"
+                {% if not projects[name].health %}style="cursor: not-allowed;"{% endif %}
+                href="{{ projects[name].content['ui_url'] }}"
+                role="button"
+                target="_blank"
+                >
+                {% if projects[name].health %}
                 {{pgettext('button', 'Open')}}
+                {% else %}
+                <div class="spinner-border spinner-border-sm"></div>
+                {% endif %}
               </a>
               {% endif %}
               <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">

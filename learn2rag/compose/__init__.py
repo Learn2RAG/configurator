@@ -5,6 +5,7 @@ import os
 import signal
 import sqlite3
 import subprocess
+import urllib
 
 import psutil
 import yaml
@@ -58,6 +59,17 @@ def process_running(pid):
         return process.is_running()
 
 
+def healthy(value):
+    assert len(value) == 4
+    assert value[0:3] == ['CMD', 'curl' ,'-f']
+    url = value[3]
+    try:
+        with urllib.request.urlopen(url, timeout=1):
+            return True
+    except Exception:
+        return False
+
+
 con = sqlite3.connect(
     os.environ.get('COMPOSE_DB', 'compose.db'),
     # FIXME
@@ -87,9 +99,13 @@ class Project():
         project.name = row['name']
         project.content = json.loads(row['content'])
         project.running = row['running']
+        project.health = None
 
         if check and project.running:
             project.check()
+
+        if True or project.running:
+            project.healthcheck()
 
         return project
 
@@ -102,6 +118,10 @@ class Project():
         if stopped := list(filter(lambda row: not process_running(row['pid']), rows)):
             logger.info('Stopping project %s due to stopped services: %s', self.name, [row['name'] for row in stopped])
             self.stop(stopped=stopped)
+
+    def healthcheck(self):
+        # what it should be when there are no healthchecks defined?
+        self.health = all(map(healthy, filter(None, (service.get('healthcheck', {}).get('test') for service in self.content['services'].values()))))
 
     def get(name, *, check=True):
         cur = con.cursor()

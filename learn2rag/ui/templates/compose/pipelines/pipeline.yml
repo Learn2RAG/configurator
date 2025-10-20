@@ -46,6 +46,9 @@ services:
       # "turning off authentication is only possible for fresh installations without any existing users"
       WEBUI_AUTH: 'False'
       WEBUI_NAME: 'Learn2RAG'
+    healthcheck:
+      # TODO: We only support ['CMD', 'curl', '-f', ...]
+      test: ['CMD', 'curl', '-f', 'http://localhost:{{ports.ui}}/health']
   # # Only needed if WEBUI_AUTH is True for open-webui
   # open-webui-setup:
   #   working_dir: '{{storage_path}}'
