@@ -99,7 +99,7 @@
       <td title="{{ name }}">
         {{ pipeline.label }}
         {% if projects[name] and projects[name].running %}
-        <span class="badge text-bg-success">{{gettext('running')}}</span>
+        <span class="badge text-bg-success">{{projects[name].content.get('label', gettext('running'))}}</span>
         {% endif %}
       </td>
       <td>{{ pipeline.storage_path }}</td>
