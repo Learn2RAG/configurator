@@ -63,6 +63,7 @@ services:
     command: ['{{learn2rag_path}}/services/start-open-webui-pipelines{% if is_windows %}.exe{% endif %}']
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
+      GLOBAL_LOG_LEVEL: 'WARNING'
       PIPELINE_STREAM_URL: 'http://127.0.0.1:{{ports.pipeline}}/stream'
       PIPELINES_DIR: '{{learn2rag_path}}/open-webui-pipelines'
       HOST: '127.0.0.1'
