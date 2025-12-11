@@ -5,3 +5,5 @@ __pycache__
 /.venv/
 /services/ollama/
 /services/qdrant/
+# custom user config
+/config.yml
