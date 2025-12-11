@@ -1,0 +1,4 @@
+use vector_store RedisVectorStore hares
+load https://www.paderborn.de/tourismus-kultur/sehenswuerdigkeiten/Hasenfenster_Sehensw.php
+load https://www1.wdr.de/nachrichten/mehr-feldhasen-nrw-100.html
+index

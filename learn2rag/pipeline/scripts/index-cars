@@ -1,0 +1,3 @@
+use vector_store RedisVectorStore cars
+load ./tests/data/cars/
+index

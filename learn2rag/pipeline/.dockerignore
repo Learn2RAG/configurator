@@ -1,0 +1,4 @@
+.mypy_cache
+__pycache__
+tests/data
+.venv

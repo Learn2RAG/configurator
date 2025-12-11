@@ -1,0 +1,8 @@
+use vector_store RedisVectorStore cranes
+use prompt load_prompt ./prompts/langsmithhub/rlm/rag-prompt-llama3.json
+build
+query '"How to remove fog from windows in Liebherr crane?"'
+query '"How to remove fog from windows in Hitachi crane?"'
+query '"Which crane should be used to build a one-story house?"'
+query '"Which crane should be used to build a small pet house?"'
+query '"What is the maximum weight a crane can lift?"'
