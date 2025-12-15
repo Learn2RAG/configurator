@@ -1,5 +1,5 @@
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
-from llm import llm
+from .llm import llm
 
 context_template ="""
 -----

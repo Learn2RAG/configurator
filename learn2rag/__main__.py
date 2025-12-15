@@ -49,6 +49,12 @@ if __name__ == '__main__':
         import learn2rag.ollama_tool as ollama_tool
         # FIXME default config values
         ollama_tool.main(sys.argv[2:], config=config.get('OLLAMA', {'port': 11434}))
+    elif sys.argv[1:] == ['learn2rag.pipeline']:
+        import learn2rag.pipeline as pipeline
+        pipeline.main()
+    elif sys.argv[1:] == ['learn2rag.pipeline.ingestion']:
+        import learn2rag.pipeline.ingestion as ingestion
+        ingestion.main()
     elif sys.argv[1:] == []:
         start_ui(config)
     else:

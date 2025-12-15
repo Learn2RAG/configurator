@@ -1,4 +1,4 @@
 open-webui-pipelines/langgraph_stream_pipeline.py
 qdrant/config.yml
-services/basic-pipeline/opt_config.json
+learn2rag/pipeline/opt_config.json
 services/setup-open-webui

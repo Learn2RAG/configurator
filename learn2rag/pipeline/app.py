@@ -2,10 +2,6 @@ import json
 import os
 import sys
 
-if __name__ == "__main__":
-    if sys.argv[1:] == ['init']:
-        sys.exit(0)
-
 from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -13,10 +9,10 @@ from typing import List
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
-from config import user_config, opt_config
-import generate
-import search as search_points
-import ingestion
+from .config import user_config, opt_config
+from . import generate
+from . import search as search_points
+from . import ingestion
 
 
 class QuestionInput(BaseModel):
@@ -141,12 +137,3 @@ async def ingest():
 @app.get("/test")
 async def test():
     return {"message": "Hello World"}
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        app,
-        host="127.0.0.1",
-        port=int(os.environ.get('LEARN2RAG_PIPELINE_PORT', 9000)),
-    )

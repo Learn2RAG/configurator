@@ -4,11 +4,12 @@ import hashlib
 from typing import Dict
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from qdrant import Qdrant
+from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue
 
-import loaders
-from embeddings import create_embeddings
+
+from . import loaders
+from .embeddings import create_embeddings
 
 
 def point_exists(qdrant: Qdrant, collection_name: str, path: str, chunk_hash:str) -> bool:
@@ -50,7 +51,7 @@ def index(user_config, opt_config):
     # all_documents = loaders.sync_pdf_loader(user_config["file_path"])
     # TODO: use ifdt loader to load pdf in json, then:
     logging.info('Loading documents')
-    all_documents = loaders.json_loader("loaded_documents.json")
+    all_documents = loaders.json_loader(user_config['imported_documents_file_path'])
 
     # Split documents into chunks
     logging.info('Splitting documents into chunks')
@@ -92,9 +93,13 @@ def index(user_config, opt_config):
             insert(qdrant, collection_name, sample)
 
 
-if __name__ == "__main__":
+def main():
     logging.basicConfig(level=logging.INFO)
 
-    from config import user_config, opt_config
+    from .config import user_config, opt_config
 
     index(user_config, opt_config)
+
+
+if __name__ == "__main__":
+    main()

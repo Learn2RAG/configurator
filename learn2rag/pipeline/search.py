@@ -1,5 +1,5 @@
-from qdrant import Qdrant
-from embeddings import create_embeddings
+from .qdrant import Qdrant
+from .embeddings import create_embeddings
 
 # similarity search
 def search(query, user_config, opt_config) -> list:

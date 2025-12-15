@@ -3,7 +3,6 @@ set -u
 # TODO: use https://ofek.dev/pyapp/latest/runtime/#remove ?
 rm -rf "~/.local/share/pyapp/learn2rag"
 rm -rf "~/.local/share/pyapp/importer"
-rm -rf "~/.local/share/pyapp/basic-pipeline"
 rm -rf "~/.local/share/pyapp/open-webui"
 rm -rf "~/.local/share/pyapp/open-webui-pipelines"
 echo Done

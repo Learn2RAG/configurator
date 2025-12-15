@@ -28,10 +28,6 @@ cp services/importer/dist/importer-0.1.0.tar.gz pyapp
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/services/start-importer.exe
 cp services/start-import.windows.bat $BUNDLE/services/start-import.bat
 
-cp services/basic-pipeline/dist/basic_pipeline-0.1.0.tar.gz pyapp
-(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=basic-pipeline PYAPP_PROJECT_PATH=basic_pipeline-0.1.0.tar.gz PYAPP_EXEC_MODULE=app cross build --release --target $CARGO_BUILD_TARGET)
-cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/services/start-basic-pipeline.exe
-
 cp services/open-webui/dist/open_webui-0.6.15.tar.gz pyapp
 (cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui PYAPP_PROJECT_PATH=open_webui-0.6.15.tar.gz PYAPP_EXEC_SPEC=open_webui:app cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/services/start-open-webui.exe

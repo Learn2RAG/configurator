@@ -4,6 +4,5 @@ set -eu
 ./update-translations
 .venv/bin/python3 -m build
 (cd services/importer; poetry build)
-(cd services/basic-pipeline; poetry build)
 (cd services/open-webui; .venv/bin/python3 -m build)
 (cd services/open-webui-pipelines; poetry build)
