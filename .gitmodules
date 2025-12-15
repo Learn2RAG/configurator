@@ -4,9 +4,6 @@
 [submodule "services/open-webui-pipelines"]
 	path = services/open-webui-pipelines
 	url = https://github.com/learn2rag/open-webui-pipelines
-[submodule "services/basic-pipeline"]
-	path = services/basic-pipeline
-	url = https://github.com/learn2rag/basic-pipeline
 [submodule "services/importer"]
 	path = services/importer
 	url = https://github.com/learn2rag/learn2rag-importer
