@@ -4,9 +4,6 @@
 [submodule "services/open-webui-pipelines"]
 	path = services/open-webui-pipelines
 	url = https://github.com/learn2rag/open-webui-pipelines
-[submodule "services/importer"]
-	path = services/importer
-	url = https://github.com/learn2rag/learn2rag-importer
 [submodule "pyapp"]
 	path = pyapp
 	url = https://github.com/learn2rag/pyapp
