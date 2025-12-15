@@ -1,0 +1,27 @@
+version: 1
+formatters:
+  simple:
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  colored:
+    class: colorlog.ColoredFormatter
+    format: "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: colored
+    stream: ext://sys.stdout
+  file:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: colored
+    filename: logs/app.log
+    encoding: utf-8
+loggers:
+  Learn2RAGImporter:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: no
+root:
+  level: WARNING
+  handlers: [console]

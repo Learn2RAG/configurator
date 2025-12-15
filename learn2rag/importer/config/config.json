@@ -1,0 +1,14 @@
+{
+    "loaders": [
+        {
+            "loader_type": "DirectoryLoader",
+            "path": "C:\\Users\\km\\Downloads\\revisedmanuscriptfrontierspaper\\2",
+            "recursive": "True"
+        },
+        {
+            "loader_type": "HTMLLoader",
+            "url": "https://learn2rag.de",
+            "depth": 0
+        }
+    ]
+}
