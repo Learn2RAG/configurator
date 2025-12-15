@@ -12,7 +12,7 @@ Creation Date: June 10, 2025
 import hashlib
 import logging
 from datetime import datetime
-from globals import stop_loading
+from ..globals import stop_loading
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_core.documents import Document
 

@@ -23,9 +23,6 @@ cp dist/learn2rag-0.1.0.tar.gz pyapp
 (cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=learn2rag PYAPP_PROJECT_PATH=learn2rag-0.1.0.tar.gz cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/configurator.exe
 
-cp services/importer/dist/importer-0.1.0.tar.gz pyapp
-(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=importer PYAPP_PROJECT_PATH=importer-0.1.0.tar.gz PYAPP_EXEC_MODULE=main cross build --release --target $CARGO_BUILD_TARGET)
-cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/services/start-importer.exe
 cp services/start-import.windows.bat $BUNDLE/services/start-import.bat
 
 cp services/open-webui/dist/open_webui-0.6.15.tar.gz pyapp

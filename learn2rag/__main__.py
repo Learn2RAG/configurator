@@ -49,9 +49,13 @@ if __name__ == '__main__':
         import learn2rag.ollama_tool as ollama_tool
         # FIXME default config values
         ollama_tool.main(sys.argv[2:], config=config.get('OLLAMA', {'port': 11434}))
+    # TODO
     elif sys.argv[1:] == ['learn2rag.pipeline']:
         import learn2rag.pipeline as pipeline
         pipeline.main()
+    elif sys.argv[1:2] == ['learn2rag.pipeline.importer']:
+        import learn2rag.importer as importer
+        importer.main(importer.ImporterArgumentParser().parse_args(sys.argv[2:]))
     elif sys.argv[1:] == ['learn2rag.pipeline.ingestion']:
         import learn2rag.pipeline.ingestion as ingestion
         ingestion.main()

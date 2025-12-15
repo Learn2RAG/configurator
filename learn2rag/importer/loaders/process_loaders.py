@@ -13,10 +13,10 @@ Creation Date: June 10, 2025
 import keyboard
 import logging
 import threading
-from globals import stop_loading
-from loaders.directory_loader import load_from_directory
-from loaders.csv_loader import load_from_csv
-from loaders.html_loader import load_html_content
+from ..globals import stop_loading
+from .directory_loader import load_from_directory
+from .csv_loader import load_from_csv
+from .html_loader import load_html_content
 
 #
 # initialize logger

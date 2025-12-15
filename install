@@ -3,6 +3,5 @@ set -eu
 poetry install --no-root
 (cd services/open-webui && bash -eu ../install-open-webui)
 (cd services/open-webui-pipelines && bash -eu ../install-open-webui-pipelines)
-(cd services/importer && bash -eu ../install-importer)
 (cd services && bash -eu ./install-ollama)
 (cd services && bash -eu ./install-qdrant)

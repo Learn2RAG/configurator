@@ -13,7 +13,7 @@ Creation Date: July 28, 2025
 import hashlib
 from bs4 import BeautifulSoup
 from datetime import datetime
-from globals import stop_loading
+from ..globals import stop_loading
 from langchain_community.document_loaders import UnstructuredHTMLLoader
 from langchain_core.documents import Document
 import logging
