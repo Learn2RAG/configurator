@@ -5,5 +5,10 @@ __pycache__
 /.venv/
 /services/ollama/
 /services/qdrant/
+/learn2rag/evaluation/qdrant_data/
+/learn2rag/pipeline/qdrant_data/
+/datasets/
+# direnv
+/.envrc
 # custom user config
 /config.yml

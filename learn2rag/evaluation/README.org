@@ -1,0 +1,26 @@
+Working directory is assumed to be the project root.
+
+* Get datasets
+https://files.dice-research.org/projects/Learn2RAG/datasets/
+
+Save to ~./datasets~.
+* Import datasets
+#+begin_src sh
+poetry run python -m learn2rag.evaluation.importer
+#+end_src
+* Start the document database
+#+begin_src sh
+docker compose -f learn2rag/evaluation/docker-compose.yml up -d qdrant
+#+end_src
+* Ingest
+#+begin_src sh
+poetry run python -m learn2rag.evaluation.ingester
+#+end_src
+* Example queries from datasets
+#+begin_src sh
+poetry run python -m learn2rag.evaluation.example
+#+end_src
+* Stop the document database
+#+begin_src sh
+docker compose -f learn2rag/evaluation/docker-compose.yml up -d qdrant
+#+end_src

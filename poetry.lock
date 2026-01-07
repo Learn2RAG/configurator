@@ -2348,6 +2348,88 @@ files = [
 ]
 
 [[package]]
+name = "json-stream"
+version = "2.4.1"
+description = "Streaming JSON encoder and decoder"
+optional = false
+python-versions = "<4,>=3.5"
+groups = ["main"]
+files = [
+    {file = "json_stream-2.4.1-py3-none-any.whl", hash = "sha256:d31dc2dbc8586c21a6e71e4bf4868133f86c53fc7fd62eb482005db579a6e3e6"},
+    {file = "json_stream-2.4.1.tar.gz", hash = "sha256:9491041faae7ea05fdd3d40768b8f9ee7ea4e40b168f27240b028a8bb0a1a3c2"},
+]
+
+[package.dependencies]
+json-stream-rs-tokenizer = ">=0.4.17"
+
+[package.extras]
+httpx = ["httpx"]
+requests = ["requests"]
+
+[[package]]
+name = "json-stream-rs-tokenizer"
+version = "0.5.0"
+description = "A faster tokenizer for the json-stream Python library"
+optional = false
+python-versions = "<3.15,>=3.8"
+groups = ["main"]
+files = [
+    {file = "json_stream_rs_tokenizer-0.5.0-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:767f7bad22ef0e2cc9f5c2797751de77ff01b14bcc0aadbd394475c276e08b6d"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:8ecf0d1c7e8270c043837a711cdea585ec1a92b51ae9c0fc9cb02ac5d782fcd4"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:e9610157c5c87365b2d3a895d816dcf7ebf5b885aacd2f6946beefe622701b20"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:90a24a4b39a255ac809366fb38afdb19667f17902ddb2369aa9b2d23e8ff6b9f"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp310-cp310-win32.whl", hash = "sha256:70387ef52ea90c9ac4c149abb01746fcdf6bebcde6986ed251e329f90ca874b9"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp310-cp310-win_amd64.whl", hash = "sha256:d6e17c21b65a1303e428452fda5aed3a0cc920fa02cb1675ca13a33aa0edbe31"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:7dcc6830cada6984ecdbba3854cfb63258108bd1fc148617177f472f4a8e2d10"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:6cf274426b9ff691f10cc070b09cdc04873c7e6f0fa6b33c9ad14def24efae26"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:fd1c740af9c0d3906603cdda2b453571233ff90cd7ff554cb7b02ac678c6855b"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:715dcf3cb6cf46bb1b94e23eda019ce43d00073e4423f90576223ce7f570d4ee"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp311-cp311-win32.whl", hash = "sha256:7bdf1e4049bf7ae6dc3ccb1db23ea3f86da348c1bb8e5e106228f209ca29b429"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp311-cp311-win_amd64.whl", hash = "sha256:eca2b004e17e57dab512daaff605d38b3553fdee46fd1a0d548ff9303af03b43"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:a0bdf6a6e9bebaad68eb713872e0e5a4d9fa767489cc8753cc0f07a66a5570d7"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:172cfd0c6d22228575efe6a53e6fb9df169d51dff66d4b74069a220ee9ba2fa3"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:4217e4ca324bc08cacdfcf5d8a3e7594248616ac1065b57aabe92cab0f8b4713"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:f5590574b53a337f836f31add62ad21d68112ffa35b5d75c6ff2fa3fd492e69f"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp312-cp312-win32.whl", hash = "sha256:0890d7e6ca038846bf25a6aab66fd3d4dd8dc94bf5667c00d7ca4599817bc8fb"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp312-cp312-win_amd64.whl", hash = "sha256:9d7e97baa5c84e189ef54c52c2310a97ebce80db5341c8fa6bb371ee8d346706"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:a8300a0bf3846b2d9cd818b1b75107ae1e67f1f43d96587c1ed99bb8744039c9"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:040556e7e55979911ddf11bf96c8906b27f61105471ade52129094efa7fe9e1b"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:d163b06242d2f31cbd8efd6deb27386f7fc8fdf391a933c92463b24c94e74f56"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:501a4c5133aa68b642955e86b8d68bea7a563324570684627c0b10bccf3864aa"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp313-cp313-win32.whl", hash = "sha256:11d5771373ba232fe4589c49494874b51d2750102d2cbe760396fc71553bc438"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp313-cp313-win_amd64.whl", hash = "sha256:2141158a691205d85dc1192152a64dd2d5054c120851b9f89a1c195b34ac49c3"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:514c8d46ea1b4f05eb2787d47b281065333b094ddec2c9b61417837db005bf0b"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:ecc399d1bca1862e563a5d3d06260476890620fed4755ee3e57ae0e8ff476adf"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:f62cef6b75d8182ad5f62a44e2c98e583b37c94cab60d6fc5e72e508b12f5fc2"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:d42b70972c6b1acfa4058687d9e7bdd34cc864ed12942e22f601bb3313bd0d81"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp314-cp314-win32.whl", hash = "sha256:9ec0aa25e876499ea9977a1f0f8355330972c172f25c657a67f2ac4b6cc90020"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp314-cp314-win_amd64.whl", hash = "sha256:c71b9028c166a70436b6f84a24b56e348fdbb7d104c3ad8ebc7efaa4342016da"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp38-cp38-macosx_10_12_x86_64.whl", hash = "sha256:40e0d454f64e031750984993e415af2201f1b91a2005523ea76fc6b0b758bce7"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:04d3a9518ea67d0d098158747c467f8998985b00dfe07f620d42e18587051ada"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp38-cp38-manylinux_2_28_aarch64.whl", hash = "sha256:11c795d5438c3605cb34f2c3af466444dd8837df30084765fa233b7016bddded"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp38-cp38-manylinux_2_28_x86_64.whl", hash = "sha256:dec76d5c33dd936646d0963d33275dec4a317158642dbb27dd6aca7932d2dbeb"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp38-cp38-win32.whl", hash = "sha256:e116168ffb9ae2c8bf2b5ec7ed839ecb6258af7e4c62df9217049ea4a033d116"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp38-cp38-win_amd64.whl", hash = "sha256:1ffe8db582b8d20a7451f52204e280a36742d2d554df9543c6e6b834df2b270a"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp39-cp39-macosx_10_12_x86_64.whl", hash = "sha256:16d28e71bb81b3597b2c5ea065e043695e0c5bb12682768f8c6b2b118dfe0c45"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:27ad9ff72300b733f9d4f48a9195a7afe1478cf4fe2a680623bbe88728fdce6f"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:fb2f6269537c15c0822da3e33e833cb9dfdb2a9f3ee9f66d3f2dabdbd63e8646"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp39-cp39-manylinux_2_28_x86_64.whl", hash = "sha256:4f5b81207e7e2cf97f784fb129adf072a6f853401304b0f59f34b505a9ffa649"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp39-cp39-win32.whl", hash = "sha256:fe1d319a3053083de208998ac28d013279a003b12d151150d0cd4b6cd923cc58"},
+    {file = "json_stream_rs_tokenizer-0.5.0-cp39-cp39-win_amd64.whl", hash = "sha256:c0ed6f2b66136b74c33db4aa51c503ba0e34d462b36563c50aaca69c4ef96d39"},
+    {file = "json_stream_rs_tokenizer-0.5.0-pp311-pypy311_pp73-macosx_10_15_x86_64.whl", hash = "sha256:215f0494116cb2f6230e70085717cd8fdf4cee0ee9232a6041e67e9dc363db38"},
+    {file = "json_stream_rs_tokenizer-0.5.0-pp311-pypy311_pp73-macosx_11_0_arm64.whl", hash = "sha256:f8a209e98426e225668f8e1b66ceb60c2a12bb03a296077dffd7eb4c2cdaa1df"},
+    {file = "json_stream_rs_tokenizer-0.5.0-pp311-pypy311_pp73-manylinux_2_28_aarch64.whl", hash = "sha256:3544e5a5540800791176060cb9e2ea6fb96b455f48045b41442f6e63a9d24e3c"},
+    {file = "json_stream_rs_tokenizer-0.5.0-pp311-pypy311_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:e5d5c983c149beefed82299def72998f1882e3a31694737e0c76b8f94ac50aa8"},
+    {file = "json_stream_rs_tokenizer-0.5.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:45662b8bf48826c77d8512020c65b1030cf5248d76edd55c5914a50af9a2ec63"},
+    {file = "json_stream_rs_tokenizer-0.5.0.tar.gz", hash = "sha256:71f609eccb955357e882f5b5ea4aa8db15597fb4b03c8034b2c584210cabe2cd"},
+]
+
+[package.extras]
+benchmark = ["contexttimer (>=0.3,<0.4)", "json-stream-to-standard-types (>=0.1,<0.2)", "si-prefix (>=1.2,<2)", "tqdm (>=4.64,<5)", "typer (>=0.6,<0.7)"]
+stubtest = ["mypy (>=1,<2)", "types-tqdm"]
+test = ["json-stream (==2.3.2)", "json-stream-rs-tokenizer[benchmark]", "pytest (>7.1,<8)"]
+
+[[package]]
 name = "jsonpatch"
 version = "1.33"
 description = "Apply JSON-Patches (RFC 6902)"
@@ -11482,4 +11564,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "==3.13.5"
-content-hash = "fd08e3659feba3cb7ccb314c053c6c044a0ddfb1d43747b23993a67d6bd552c6"
+content-hash = "2244369862b4f5f58e8cccf4648b013afa2be086b9a3fc89a6ad6ee082342224"
