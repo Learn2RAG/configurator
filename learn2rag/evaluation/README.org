@@ -1,6 +1,10 @@
 * Usage
 Working directory is assumed to be the project root.
 ** Get datasets
+*** Download datasets from external sources
+#+begin_src sh
+poetry run python -m learn2rag.evaluation.downloader
+#+end_src
 
 *** Download datasets from our server
 https://files.dice-research.org/projects/Learn2RAG/datasets/
