@@ -50,3 +50,4 @@ configs:
   qdrant_config:
     content: |
       log_level: INFO
+      telemetry_disabled: true

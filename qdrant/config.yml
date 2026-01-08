@@ -1,2 +1,3 @@
 service:
   grpc_port: null
+telemetry_disabled: true
