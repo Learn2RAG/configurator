@@ -17,6 +17,13 @@ def key_document(key):
     return document
 
 
+def key_document_list(key):
+    def document(example):
+        for item in example[key]:
+            yield item
+    return document
+
+
 def hotpot_documents(example):
     context = example['context']
     for title, sentences in zip(context['title'], context['sentences']):
@@ -26,7 +33,7 @@ def hotpot_documents(example):
 @json_stream.streamable_list
 def generate_documents(dataset_dict, id_key, content_getter, dataset_name, content_counter):
     for split, dataset in dataset_dict.items():
-        for example in dataset:
+        for i, example in enumerate(dataset):
             for content in content_getter(example):
                 content_counter[content] += 1
                 if content_counter[content] == 1:  # don't include duplicate content
@@ -35,7 +42,7 @@ def generate_documents(dataset_dict, id_key, content_getter, dataset_name, conte
                         'metadata': {
                             'content_hash': hashlib.sha256(content.encode('utf-8')).hexdigest(),
                             'loader_type': 'Evaluation',
-                            'source': f'{dataset_name}/{split}/{example[id_key]}',
+                            'source': f'{dataset_name}/{split}/{example[id_key] if id_key is not None else i}',
                         },
                     }
 
