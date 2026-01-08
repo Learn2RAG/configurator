@@ -1,30 +1,37 @@
+* Usage
 Working directory is assumed to be the project root.
+** Get datasets
 
-* Get datasets
+*** Download datasets from our server
 https://files.dice-research.org/projects/Learn2RAG/datasets/
 
 Save to ~./datasets~.
-* Get the prepared document database
+** Get the prepared document database
 https://files.dice-research.org/projects/Learn2RAG/evaluation/qdrant_data.zip
 
 Unpack to ~./learn2rag/evaluation/qdrant_data~.
-* Start the document database
+** Start the document database
 #+begin_src sh
 docker compose -f learn2rag/evaluation/docker-compose.yml up -d qdrant
 #+end_src
-* Import datasets
+** Import datasets
 #+begin_src sh
 poetry run python -m learn2rag.evaluation.importer
 #+end_src
-* Ingest
+** Ingest
+GPU recommended.
+
 #+begin_src sh
 poetry run python -m learn2rag.evaluation.ingester
 #+end_src
-* Example queries from datasets
+** Example queries from datasets
 #+begin_src sh
 poetry run python -m learn2rag.evaluation.example
 #+end_src
-* Stop the document database
+** Stop the document database
 #+begin_src sh
 docker compose -f learn2rag/evaluation/docker-compose.yml down qdrant
 #+end_src
+* Documentation
+** qdrant
+qdrant contains a separate collection for each dataset.
