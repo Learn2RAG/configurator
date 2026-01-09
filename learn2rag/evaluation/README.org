@@ -11,7 +11,7 @@ https://files.dice-research.org/projects/Learn2RAG/datasets/
 
 Save to ~./datasets~.
 ** Get the prepared document database
-https://files.dice-research.org/projects/Learn2RAG/evaluation/qdrant_data.zip
+https://files.dice-research.org/projects/Learn2RAG/evaluation/qdrant_data/
 
 Unpack to ~./learn2rag/evaluation/qdrant_data~.
 ** Start the document database
