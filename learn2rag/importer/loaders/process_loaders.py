@@ -6,13 +6,12 @@ This module processes configuration entries and delegates loading to specific lo
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.2
+Version: 0.0.3
 Creation Date: June 10, 2025
+Last Modified: Jan 12, 2026
 """
 
-import keyboard
 import logging
-import threading
 from ..globals import stop_loading
 from .directory_loader import load_from_directory
 from .csv_loader import load_from_csv
@@ -21,17 +20,6 @@ from .html_loader import load_html_content
 #
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
-
-# function wathing the ESC key
-def monitor_esc_key():
-    """
-    Monitor the ESC key and set the stop_loading flag when pressed.
-    """
-    global stop_loading
-    keyboard.wait("esc")  # waiting for ESC
-    stop_loading = True
-    logger.info("ESC key pressed. Aborting loading process...")
-    raise KeyboardInterrupt("Process interrupted by user via ESC key.")
 
 def process_configuration_entries(config_entries):
     """
@@ -45,10 +33,6 @@ def process_configuration_entries(config_entries):
     """
 
     all_documents = []
-
-    # Starting monitoring thread
-    esc_thread = threading.Thread(target=monitor_esc_key, daemon=True)
-    esc_thread.start()
 
     for entry in config_entries:
         loader_type = entry.get("loader_type")
