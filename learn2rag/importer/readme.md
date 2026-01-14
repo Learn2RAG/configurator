@@ -165,7 +165,7 @@ Prerequisites
   - updated dependencies
   - better ouput description for files loaded
   - fixed error if only HTMLLoader is used
- - v0.0.5
+- v0.0.5
   - removed keyboard monitoring, since not running interactive mode
   - changed to relative path config
   - supress magic warning
