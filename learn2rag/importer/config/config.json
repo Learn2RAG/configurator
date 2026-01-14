@@ -9,6 +9,16 @@
             "loader_type": "HTMLLoader",
             "url": "https://learn2rag.de",
             "depth": 0
+        },
+        {
+            "loader_type": "SharepointLoader",
+            "client_id": "YourClientIDHere",
+            "client_secret": "YourClientSecretHere",
+            "tenant_id": "YourTenantIDHere",
+            "document_library_id": "YourDocumentLibraryIDHere",
+            "recursive": "True",
+            "auth_with_token": "True"
         }
+
     ]
 }

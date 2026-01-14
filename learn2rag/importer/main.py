@@ -69,7 +69,8 @@ def main(args):
         validation_errors = False
         for index, entry in enumerate(config.get("loaders", []), start=1): 
             try:
-                logger.info(f"Validated configuration configuration entry {index}: {entry}")
+                loader_type = entry.get("loader_type", "Unknown")
+                logger.info(f"Validated configuration entry {index}: {loader_type}")
                 validate_config_entry(entry)
             except ValueError as e:
                 logger.error(f"Validation error in configuration entry {index}: {e}")

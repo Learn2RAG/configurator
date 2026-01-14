@@ -6,12 +6,14 @@ This module provides a function to load configuration files (e.g., JSON, YAML) f
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.1
+Version: 0.0.2
 Creation Date: June 10, 2025
+Last Modified: Jan 17, 2026
 """
 
 import json
 import yaml
+from ..config.config_constants import ALLOWED_LOADERS
 
 def load_json_config(config_path):
     """Load a JSON configuration file with error handling."""
@@ -27,24 +29,28 @@ def load_json_config(config_path):
 def validate_config_entry(entry):
     """Validate individual configuration entries based on their type."""
     loader_type = entry.get("loader_type")
-    path = entry.get("path")
-    recursive = entry.get("recursive")
-    url = entry.get("url")
-
     if not loader_type:
         raise ValueError("Missing 'loader_type' in configuration entry.")
     
+    if loader_type not in ALLOWED_LOADERS:
+        raise ValueError(f"Unknown 'loader_type': {loader_type}")
+
+    
     if loader_type == "DirectoryLoader":
-        if not path:
+        if not entry.get("path"):
             raise ValueError("Missing 'path' for 'DirectoryLoader' in configuration entry.")
-        if not recursive:
+        if not entry.get("recursive"):
             raise ValueError("Missing 'recursive' flag for 'DirectoryLoader'. Please set it to True or False.")
     elif loader_type == "CSVLoader":
-        if not path:
+        if not entry.get("path"):
             raise ValueError("Missing 'path' for 'CSVLoader' in configuration entry.")
     elif loader_type == "HTMLLoader":
-        if not url:
-            raise ValueError("Missing 'url' to access for 'HTMLLoader' in configuration entry.")  
+        if not entry.get("url"):
+            raise ValueError("Missing 'url' to access for 'HTMLLoader' in configuration entry.") 
+    elif loader_type == "SharepointLoader":  
+        if not entry.get("client_id") or not entry.get("client_secret") or not entry.get("tenant_id") or not entry.get("document_library_id"):
+            raise ValueError("Missing required parameters for SharePointLoader: client_id, client_secret, tenant_id, document_library_id.")
+     
     else:
         raise ValueError(f"Unknown 'loader_type': {loader_type}")
 

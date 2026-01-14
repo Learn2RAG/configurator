@@ -133,6 +133,24 @@ where
 - medatdata will contain metadata to the pages processed
     - mata_properties will hold all meta_tags set in the webpage itself
 - content will hold the actual text content of the page as text
+
+### Sharepoint Loader Prerequisites
+
+Prerequisites
+
+    Register an application with the Microsoft identity platform instructions.
+    When registration finishes, the Azure portal displays the app registration’s Overview pane. You see the Application (client) ID. Also called the client ID, this value uniquely identifies your application in the Microsoft identity platform.
+    During the steps you will be following at item 1, you can set the redirect URI as https://login.microsoftonline.com/common/oauth2/nativeclient
+    During the steps you will be following at item 1, generate a new password (client_secret) under Application Secrets section.
+    Follow the instructions at this document to add the following SCOPES (offline_access and Sites.Read.All) to your application.
+    To retrieve files from your Document Library, you will need its ID. To obtain it, you will need values of Tenant Name, Collection ID, and Subsite ID.
+    To find your Tenant Name follow the instructions at this document. Once you got this, just remove .onmicrosoft.com from the value and hold the rest as your Tenant Name.
+    To obtain your Collection ID and Subsite ID, you will need your SharePoint site-name. Your SharePoint site URL has the following format https://<tenant-name>.sharepoint.com/sites/<site-name>. The last part of this URL is the site-name.
+    To Get the Site Collection ID, hit this URL in the browser: https://<tenant>.sharepoint.com/sites/<site-name>/_api/site/id and copy the value of the Edm.Guid property.
+    To get the Subsite ID (or web ID) use: https://<tenant>.sharepoint.com/sites/<site-name>/_api/web/id and copy the value of the Edm.Guid property.
+    The SharePoint site ID has the following format: <tenant-name>.sharepoint.com,<Collection ID>,<subsite ID>. You can hold that value to use in the next step.
+    Visit the Graph Explorer Playground to obtain your Document Library ID. The first step is to ensure you are logged in with the account associated with your SharePoint site. Then you need to make a request to https://graph.microsoft.com/v1.0/sites/<SharePoint site ID>/drive and the response will return a payload with a field id that holds the ID of your Document Library ID.
+
   
 
 
@@ -152,3 +170,6 @@ where
   - changed to relative path config
   - supress magic warning
   - added permission info for metadata in directory loader
+- v0.0.6
+  - removed permission information from metadata in directory loader
+  - added SharePoint Loader
