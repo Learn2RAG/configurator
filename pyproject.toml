@@ -189,7 +189,7 @@ version = "0.1.0"
 [build-system]
 build-backend = "setuptools.build_meta"
 requires = ["setuptools >= 77.0.3"]
-[pytest]
+[tool.pytest.ini_options]
 strict = true
 [tool.setuptools]
 include-package-data = true
