@@ -189,6 +189,8 @@ version = "0.1.0"
 [build-system]
 build-backend = "setuptools.build_meta"
 requires = ["setuptools >= 77.0.3"]
+[pytest]
+strict = true
 [tool.setuptools]
 include-package-data = true
 [tool.setuptools.package-data]
@@ -197,3 +199,8 @@ include-package-data = true
 include = ["learn2rag*"]
 namespaces = false
 where = ["."]
+
+[dependency-groups]
+test = [
+    "pytest (>=9.0.2,<10.0.0)"
+]
