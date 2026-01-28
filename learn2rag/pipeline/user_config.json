@@ -1,6 +1,6 @@
 {
   "file_path": "data/pdfs/repliqa_4",
-  "collection_name": "Learn2RAG-repliqa_4_review",
+  "collection_name": "Learn2RAG-repliqa_4_hybridtest",
   "imported_documents_file_path": "learn2rag/pipeline/loaded_documents.json",
   "llm": ""
 }
