@@ -163,7 +163,7 @@ dependencies = [
     "unstructured[pptx] (>=0.18.27,<0.19.0)",
     "unstructured-client==0.42.2",
     "unstructured[docx]",
-    "unstructured-inference==1.0.5",
+    "unstructured-inference==1.1.6",
     "unstructured[md]",
     "unstructured[odt]",
     "unstructured[pdf]",
