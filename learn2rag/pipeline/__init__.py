@@ -2,10 +2,9 @@ import os
 
 import uvicorn
 
-from .app import app
-
 
 def main():
+    from .app import app
     uvicorn.run(
         app,
         host="127.0.0.1",
