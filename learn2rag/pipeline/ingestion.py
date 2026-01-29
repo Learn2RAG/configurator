@@ -5,7 +5,7 @@ from typing import Dict
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from .qdrant import Qdrant
-from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector
+from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
 
 from . import loaders
@@ -30,11 +30,6 @@ def insert(qdrant: Qdrant, collection_name: str, sample: Dict):
         id=uuid4().hex,
         vector={
             "dense": sample["dense_vec"],
-            # "sparse": SparseVector(
-            #     indices=[int(x) for x in sample["sparse_vec"].keys()],
-            #     values=sample["sparse_vec"].values(),
-            # ),
-            # "colbert": sample["colbert_vec"],
         },
         payload={
             "content": sample["page_content"],
@@ -45,7 +40,7 @@ def insert(qdrant: Qdrant, collection_name: str, sample: Dict):
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
 
-def insert_hybrid(qdrant: Qdrant, collection_name: str, sample: Dict):
+def insert_dense_sparse(qdrant: Qdrant, collection_name: str, sample: Dict):
     point = PointStruct(
         id=uuid4().hex,
         vector={
@@ -63,6 +58,25 @@ def insert_hybrid(qdrant: Qdrant, collection_name: str, sample: Dict):
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
+def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: Dict):
+    point = PointStruct(
+        id=uuid4().hex,
+        vector={
+            "dense": sample["dense_vec"],
+            "sparse": SparseVector(
+                indices=[int(x) for x in sample["lexical_weights"].keys()],
+                values=sample["lexical_weights"].values(),
+            ),
+            "colbert": sample["colbert_vecs"],
+        },
+        payload={
+            "content": sample["page_content"],
+            "path": sample["metadata"]["source"],
+            "content_hash": sample["chunk_hash"],
+        },
+    )
+    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+ 
 
 def index(user_config, opt_config):
     # TODO: enable list of file paths in loader and adapt user_config
@@ -103,7 +117,7 @@ def index(user_config, opt_config):
                 dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
                 for chunk, dense, c_hash in zip(chunks, embeddings["dense_vecs"], chunk_hash)
             ]
-        if opt_config["search_mode"] == "hybrid":
+        if opt_config["search_mode"] == "dense_sparse":
             chunks_with_embeddings = [
                 dict(chunk)
                 | {"dense_vec": dense, "lexical_weights": sparse, "chunk_hash": c_hash}
@@ -111,6 +125,18 @@ def index(user_config, opt_config):
                     chunks,
                     list(embeddings["dense_vecs"]),
                     list(embeddings["lexical_weights"]),
+                    chunk_hash,
+                )
+            ]
+        if opt_config["search_mode"] == "dense_sparse_colbert":
+            chunks_with_embeddings = [
+                dict(chunk)
+                | {"dense_vec": dense, "lexical_weights": sparse, "colbert_vecs": colbert, "chunk_hash": c_hash}
+                for chunk, dense, sparse, colbert, c_hash in zip(
+                    chunks,
+                    list(embeddings["dense_vecs"]),
+                    list(embeddings["lexical_weights"]),
+                    list(embeddings['colbert_vecs']),
                     chunk_hash,
                 )
             ]
@@ -122,8 +148,10 @@ def index(user_config, opt_config):
 
     for sample in chunks_with_embeddings:
         if not point_exists(qdrant, collection_name, sample['metadata']['source'], sample['chunk_hash']):
-            if opt_config["search_mode"] == "hybrid":
-                insert_hybrid(qdrant, collection_name, sample)
+            if opt_config["search_mode"] == "dense_sparse":
+                insert_dense_sparse(qdrant, collection_name, sample)
+            elif opt_config["search_mode"] == "dense_sparse_colbert":
+                insert_dense_sparse_colbert(qdrant, collection_name, sample)
             else:
                 insert(qdrant, collection_name, sample)
 

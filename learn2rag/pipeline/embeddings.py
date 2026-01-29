@@ -15,13 +15,21 @@ def create_embeddings(input_sample: List[str], model_name: str = "BAAI/bge-m3", 
                 return_sparse=False,
                 return_colbert_vecs=False,
             )
-        elif embedding_mode == "hybrid":
+        elif embedding_mode == "dense_sparse":
             embeddings = model.encode(
                 input_sample,
                 batch_size=512,
                 return_dense=True,
                 return_sparse=True,
                 return_colbert_vecs=False,
+            )
+        elif embedding_mode == "dense_sparse_colbert":
+            embeddings = model.encode(
+                input_sample,
+                batch_size=512,
+                return_dense=True,
+                return_sparse=True,
+                return_colbert_vecs=True,
             )
         else:
             warnings.warn(
