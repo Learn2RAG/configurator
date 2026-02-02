@@ -2,6 +2,7 @@ from .qdrant import Qdrant
 from .embeddings import create_embeddings
 import warnings
 from qdrant_client import models
+import numpy as np
 
 # similarity search
 def search(query, user_config, opt_config) -> list:
@@ -15,9 +16,8 @@ def search(query, user_config, opt_config) -> list:
     # Init vector store
     qdrant = Qdrant(
         collection_name=collection_name,
-        vector_size=opt_config["vector_size"][opt_config["embedding_model"]],
-        search_mode=opt_config["search_mode"]
-    )
+        opt_config=opt_config
+        )
 
     if opt_config["embedding_model"] == "BAAI/bge-m3":
         if opt_config["search_mode"] == "dense_sparse":
@@ -26,6 +26,11 @@ def search(query, user_config, opt_config) -> list:
             query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense_sparse_colbert")
         if opt_config["search_mode"] == "dense":
             query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense")["dense_vecs"]
+        if opt_config["search_mode"] == "multi_search":
+            vecs_to_concat = []
+            for item in ["content"]+opt_config["multi_search"]:
+                vecs_to_concat.append(create_embeddings(query[item], opt_config["embedding_model"], opt_config["search_mode"])["dense_vecs"])
+            query_embedding = np.concatenate(vecs_to_concat, axis=0)
     else:
         query_embedding = create_embeddings(query, opt_config["embedding_model"])
 
@@ -81,6 +86,14 @@ def search(query, user_config, opt_config) -> list:
                 ),
             ],
             query=models.FusionQuery(fusion=fusion_mode),
+            limit=opt_config["top_k"],
+        )
+
+    elif opt_config["search_mode"] == "multi_search":
+        results = qdrant.client.query_points(
+            collection_name=collection_name,
+            query = query_embedding,
+            using = "multi",
             limit=opt_config["top_k"],
         )
 
