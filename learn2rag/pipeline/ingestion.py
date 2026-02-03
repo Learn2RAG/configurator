@@ -2,6 +2,7 @@ import logging
 from uuid import uuid4
 import hashlib
 from typing import Dict
+import numpy as np
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from .qdrant import Qdrant
@@ -76,6 +77,20 @@ def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: Di
         },
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+
+def insert_multi(qdrant: Qdrant, collection_name: str, sample: Dict):
+    point = PointStruct(
+        id=uuid4().hex,
+        vector={
+            "multi": sample["dense_vec"],
+        },
+        payload={
+            "content": sample["page_content"],
+            "path": sample["metadata"]["source"],
+            "content_hash": sample["chunk_hash"],
+        },
+    )
+    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
  
 
 def index(user_config, opt_config):
@@ -98,21 +113,34 @@ def index(user_config, opt_config):
     # Init vector store
     qdrant = Qdrant(
         collection_name=collection_name,
-        vector_size=opt_config["vector_size"][opt_config["embedding_model"]],
-        search_mode=opt_config["search_mode"],
+        opt_config=opt_config
     )
 
 
     chunks_content = [chunk.page_content for chunk in chunks]
+    if len(opt_config["multi_search"]) > 0:
+        chunks_metadata =  {}
+        embeddings_metadata = {}
+        for item in opt_config["multi_search"]:
+            chunks_metadata[item] = [chunk.metadata[item] for chunk in chunks]
+            embeddings_metadata[item] = create_embeddings(chunks_metadata[item], opt_config["embedding_model"], opt_config["search_mode"])
+    # TODO: hash if you want to monitore changes in metadata
     chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]
     # Todo: handle different vector lengths for batch encoding when using sparse vectors
 
     logging.info('Creating embeddings...')
     embeddings = create_embeddings(chunks_content, opt_config["embedding_model"], opt_config["search_mode"])
-
+    if len(opt_config["multi_search"]) > 0:
+        mmembeddings = [] 
+        for i in range(len(embeddings['dense_vecs'])):
+            vecs_to_concat = [embeddings['dense_vecs'][i]]
+            for item in embeddings_metadata.keys():
+                vecs_to_concat.append(embeddings_metadata[item]['dense_vecs'][i])
+            mmembeddings.append(np.concatenate(vecs_to_concat, axis=0))
+        embeddings['dense_vecs'] = mmembeddings
 
     if isinstance(embeddings, dict) and "dense_vecs" in embeddings:
-        if opt_config["search_mode"] == "dense":
+        if opt_config["search_mode"] == "dense" or opt_config["search_mode"] == "multi_search" :
             chunks_with_embeddings = [
                 dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
                 for chunk, dense, c_hash in zip(chunks, embeddings["dense_vecs"], chunk_hash)
@@ -152,6 +180,8 @@ def index(user_config, opt_config):
                 insert_dense_sparse(qdrant, collection_name, sample)
             elif opt_config["search_mode"] == "dense_sparse_colbert":
                 insert_dense_sparse_colbert(qdrant, collection_name, sample)
+            elif opt_config["search_mode"] == "multi_search":
+                insert_multi(qdrant, collection_name, sample)
             else:
                 insert(qdrant, collection_name, sample)
 
