@@ -1,4 +1,7 @@
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
+import logging
+import openai
+
 from .llm import llm
 
 context_template ="""
@@ -26,7 +29,14 @@ def generate_stream(query, search_results, opt_config):
 
     messages = prompt.format_messages(context=context, question=query)
 
-    for chunk in llm.stream(messages):
-        text_chunk = chunk.text()
-        if text_chunk:
-            yield text_chunk
+    # TODO here an exception might happen due to problems with the llm
+    # for example, openai.BadRequestError
+    try:
+        for chunk in llm.stream(messages):
+            text_chunk = chunk.text()
+            if text_chunk:
+                yield text_chunk
+    except (openai.AuthenticationError, openai.BadRequestError) as e:
+        logging.error('%s: %s', e.__class__, e)
+        # FIXME
+        yield 'There is a problem with Learn2RAG configuration. Please contact your administrator.'
