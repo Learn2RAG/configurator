@@ -13,7 +13,7 @@
 <div class="collapse" id="collapseCreate">
   <div class="card card-body">
 
-    <form method="POST">
+    <form method="POST" id="addPipeline">
       <div class="mb-3">
         <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
         <input class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this pipeline')}}">
@@ -165,17 +165,17 @@
 </table>
 
 <script>
-  const labelInput = document.querySelector('input[name=label]');
-  const storageInput = document.querySelector('input[name=storage_path]');
-  console.log('wtf');
-  console.log(labelInput);
-  labelInput.addEventListener('change', () => {
-      if (storageInput.value.startsWith(storageInput.dataset['defaultPrefix'])) {
+  const labelInput = document.querySelector('#addPipeline input[name=label]');
+  const storageInput = document.querySelector('#addPipeline input[name=storage_path]');
+  const update = (event) => {
+      if (storageInput.value.startsWith(storageInput.dataset.defaultPrefix)) {
           const suffix = labelInput.value.replace(/[^A-Za-z0-9]/g, '_');
-          if (suffix.length > 0 && suffix.match(/[^_]/)) {
-              storageInput.value = storageInput.dataset['defaultPrefix'] + suffix;
+          if (/[^_]/.test(suffix)) {
+              storageInput.value = storageInput.dataset.defaultPrefix + suffix;
           }
       }
-  });
+  };
+  labelInput.addEventListener('change', update);
+  labelInput.addEventListener('input', update);
 </script>
 {% endblock %}
