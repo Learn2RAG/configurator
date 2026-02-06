@@ -53,7 +53,7 @@ if __name__ == '__main__':
     elif sys.argv[1:] == ['learn2rag.pipeline']:
         import learn2rag.pipeline as pipeline
         pipeline.main()
-    elif sys.argv[1:2] == ['learn2rag.pipeline.importer']:
+    elif sys.argv[1:2] == ['learn2rag.importer']:
         import learn2rag.importer as importer
         importer.main(importer.ImporterArgumentParser().parse_args(sys.argv[2:]))
     elif sys.argv[1:] == ['learn2rag.pipeline.ingestion']:
