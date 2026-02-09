@@ -9,6 +9,7 @@ files:
     content: |
       log_level: INFO
       service:
+        api_key: '{{qdrant_api_key}}'
         grpc_port: null
         http_port: '{{ports.qdrant_http}}'
         host: '127.0.0.1'
@@ -35,7 +36,10 @@ files:
       {
           "collection_name": "learn2rag",
           "imported_documents_file_path": "loaded_documents.json",
-          "llm": "{{language_model.model}}"
+          "llm": "{{language_model.model}}",
+          "qdrant": {
+              "api_key": "{{qdrant_api_key}}"
+          }
       }
 
 services:

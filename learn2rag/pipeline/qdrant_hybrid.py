@@ -25,6 +25,7 @@ from langchain.document_loaders import PyPDFLoader
 
 from langchain_ollama import ChatOllama
 
+from .config import user_config
 
 
 #%%
@@ -57,7 +58,10 @@ vectors = model.encode(chunks["chunk"][0:10], batch_size=512, return_dense=True,
 #%%
 # Setup Qdrant client
 qdrant = QdrantClient(
-    host="localhost", port=6333
+    host="localhost",
+    port=6333,
+    api_key=user_config['qdrant']['api_key'],
+    https=False,
 )
 # Create collection if not exists
 collection_name = "Learn2RAG-repliqa_4"
