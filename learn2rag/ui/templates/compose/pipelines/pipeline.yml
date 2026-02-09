@@ -8,6 +8,14 @@ ports:
   - open_webui_pipelines
 ui_url: 'http://{{learn2rag_hostname}}:{{ports.ui}}/'
 files:
+  - path: '{{storage_path}}/qdrant_config.yml'
+    content: |
+      log_level: INFO
+      service:
+        grpc_port: null
+        http_port: '{{ports.qdrant_http}}'
+        host: '127.0.0.1'
+      telemetry_disabled: true
   - path: '{{storage_path}}/basic_user_config.json'
     content: |
       {
@@ -74,13 +82,7 @@ services:
     command:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
-      - '{{learn2rag_path}}/qdrant/config.yml'
-    environment:
-      # https://qdrant.tech/documentation/guides/configuration/
-      QDRANT__LOG_LEVEL: 'INFO'
-      QDRANT__SERVICE__HOST: '127.0.0.1'
-      QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
-      QDRANT__TELEMETRY_DISABLED: 'true'
+      - '{{storage_path}}/qdrant_config.yml'
   main:
     working_dir: '{{storage_path}}'
     command:
