@@ -3,6 +3,10 @@ from uuid import uuid4
 import hashlib
 from typing import Dict
 import numpy as np
+<<<<<<< HEAD
+=======
+import warnings
+>>>>>>> 7a73593 (improved handling of multi search)
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from .qdrant import Qdrant
@@ -118,19 +122,37 @@ def index(user_config, opt_config):
 
 
     chunks_content = [chunk.page_content for chunk in chunks]
+<<<<<<< HEAD
     if len(opt_config["multi_search"]) > 0:
         chunks_metadata =  {}
         embeddings_metadata = {}
         for item in opt_config["multi_search"]:
             chunks_metadata[item] = [chunk.metadata[item] for chunk in chunks]
             embeddings_metadata[item] = create_embeddings(chunks_metadata[item], opt_config["embedding_model"], opt_config["search_mode"])
+=======
+    if len(opt_config["multi_search"]) > 0 and opt_config["search_mode"] == "multi_search":
+        chunks_metadata =  {}
+        embeddings_metadata = {}
+        for item in opt_config["multi_search"]:
+            if item in chunks[0].metadata:
+                chunks_metadata[item] = [chunk.metadata[item] for chunk in chunks]
+                embeddings_metadata[item] = create_embeddings(chunks_metadata[item], opt_config["embedding_model"], opt_config["search_mode"])
+            else:
+                warnings.warn(f"{item} not a known metadata. Using empty string")
+                embeddings_metadata[item] = create_embeddings("", opt_config["embedding_model"], opt_config["search_mode"])
+                
+>>>>>>> 7a73593 (improved handling of multi search)
     # TODO: hash if you want to monitore changes in metadata
     chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]
     # Todo: handle different vector lengths for batch encoding when using sparse vectors
 
     logging.info('Creating embeddings...')
     embeddings = create_embeddings(chunks_content, opt_config["embedding_model"], opt_config["search_mode"])
+<<<<<<< HEAD
     if len(opt_config["multi_search"]) > 0:
+=======
+    if len(opt_config["multi_search"]) > 0 and opt_config["search_mode"] == "multi_search":
+>>>>>>> 7a73593 (improved handling of multi search)
         mmembeddings = [] 
         for i in range(len(embeddings['dense_vecs'])):
             vecs_to_concat = [embeddings['dense_vecs'][i]]
