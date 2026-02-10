@@ -1,3 +1,4 @@
+import itertools
 import json
 import os
 import sys
@@ -30,7 +31,7 @@ class ChatState(BaseModel):
 
 def build_search_query(question):
     if opt_config["search_mode"] == "multi_search":
-        return {"content": question}
+        return dict(itertools.product(["content"] + opt_config["multi_search"], [question]))
     else:
         return question
 
