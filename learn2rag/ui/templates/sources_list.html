@@ -26,7 +26,7 @@
               <input type="hidden" name="type" value="local"/>
               <div class="mb-3">
                 <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
+                <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
               </div>
               <div class="mb-3">
                 <label for="path" class="form-label">{{pgettext('form_label', 'Path on the local filesystem')}}</label>
@@ -55,7 +55,7 @@
               <input type="hidden" name="type" value="web"/>
               <div class="mb-3">
                 <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
+                <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
               </div>
               <div class="mb-3">
                 <label for="path" class="form-label">{{pgettext('form_label', 'Web page URL')}}</label>

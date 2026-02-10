@@ -8,7 +8,12 @@ __pycache__
 /learn2rag/evaluation/qdrant_data/
 /learn2rag/pipeline/qdrant_data/
 /datasets/
+#IDE
+/.idea
 # direnv
 /.envrc
 # custom user config
 /config.yml
+#generate during install step
+compose.db
+compose.yml
