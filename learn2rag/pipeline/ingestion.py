@@ -14,6 +14,18 @@ from . import loaders
 from .embeddings import create_embeddings
 
 
+def get_chunks_metadata(chunks, item):
+    missing = 0
+    for chunk in chunks:
+        if item in chunk.metadata:
+            yield chunk.metadata[item]
+        else:
+            missing += 1
+            yield ''
+    if missing != 0:
+        logging.warning('%d out of %d chunks are missing "%s" in metadata; using empty string', missing, len(chunks), item)
+
+
 def point_exists(qdrant: Qdrant, collection_name: str, path: str, chunk_hash:str) -> bool:
     filter = Filter(
         must=[
@@ -124,12 +136,9 @@ def index(user_config, opt_config):
         chunks_metadata =  {}
         embeddings_metadata = {}
         for item in opt_config["multi_search"]:
-            if item in chunks[0].metadata:
-                chunks_metadata[item] = [chunk.metadata[item] for chunk in chunks]
-                embeddings_metadata[item] = create_embeddings(chunks_metadata[item], opt_config["embedding_model"], opt_config["search_mode"])
-            else:
-                warnings.warn(f"{item} not a known metadata. Using empty string")
-                embeddings_metadata[item] = create_embeddings("", opt_config["embedding_model"], opt_config["search_mode"])
+            chunks_metadata[item] = list(get_chunks_metadata(chunks, item))
+            embeddings_metadata[item] = create_embeddings(chunks_metadata[item], opt_config["embedding_model"], opt_config["search_mode"])
+            assert embeddings_metadata[item]['dense_vecs'].ndim == 2, embeddings_metadata[item]['dense_vecs'].shape
                 
     # TODO: hash if you want to monitore changes in metadata
     chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]
