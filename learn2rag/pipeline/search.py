@@ -6,6 +6,7 @@ import numpy as np
 
 # similarity search
 def search(query, user_config, opt_config) -> list:
+    # FIXME: query can be str or dict (with multi_search), maybe always use a dict?
     collection_name = user_config["collection_name"]
 
     if opt_config["fusion_mode"] == "RRF":
