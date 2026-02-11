@@ -1,3 +1,4 @@
+import itertools
 import json
 import os
 import sys
@@ -26,6 +27,13 @@ class Message(BaseModel):
 
 class ChatState(BaseModel):
     messages: List[Message]
+
+
+def build_search_query(question):
+    if opt_config["search_mode"] == "multi_search":
+        return dict(itertools.product(["content"] + opt_config["multi_search"], [question]))
+    else:
+        return question
 
 
 async def simple_chatbot_response(input: QuestionInput) -> str:
@@ -72,7 +80,9 @@ async def stream(
 ):
     async def event_stream():
         question = inputs.messages[-1].content
-        results = search_points.search(question, user_config, opt_config)
+        search_query = build_search_query(question)
+
+        results = search_points.search(search_query, user_config, opt_config)
         # sources = "\n".join(set(result.payload['path'] for result in results))
 
         executor = ThreadPoolExecutor()
@@ -126,7 +136,8 @@ async def search(
         }
     )
 ):
-    return search_points.search(input.question, user_config, opt_config)
+    search_query = build_search_query(input.question)
+    return search_points.search(search_query, user_config, opt_config)
 
 
 @app.post("/ingest")
