@@ -12,3 +12,9 @@ __pycache__
 /.envrc
 # custom user config
 /config.yml
+/learn2rag/pipeline/data/loaded_documents_kcenter.json
+/.env
+/.local.envrc
+*.pdf
+.vscode/launch.json
+learn2rag/pipeline/.env
