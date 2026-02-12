@@ -2,6 +2,7 @@ from .qdrant import Qdrant
 from .embeddings import create_embeddings
 from qdrant_client import models
 import numpy as np
+from FlagEmbedding import FlagReranker
 
 # similarity search
 def search(query, user_config, opt_config) -> list:
@@ -22,7 +23,7 @@ def search(query, user_config, opt_config) -> list:
     if opt_config["embedding_model"] == "BAAI/bge-m3":
         if opt_config["search_mode"] == "dense_sparse":
             query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense_sparse")
-        if opt_config["search_mode"] == "dense_sparse_colbert" or opt_config["search_mode"] == "reranking_with_colbert":
+        if opt_config["search_mode"] == "dense_sparse_colbert" or opt_config["search_mode"] == "reranking_with_colbert" or opt_config["search_mode"] == "reranking_with_flagreranker":
             query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense_sparse_colbert")
         if opt_config["search_mode"] == "dense":
             query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense")["dense_vecs"]
@@ -119,5 +120,40 @@ def search(query, user_config, opt_config) -> list:
             using="colbert",
             limit=opt_config["top_k"],
         )
+
+    elif opt_config["search_mode"] == "reranking_with_flagreranker":
+      reranker = FlagReranker('BAAI/bge-reranker-v2-m3', use_fp16=True)
+      indices = [int(k) for k in query_embedding["lexical_weights"].keys()]
+      values = [float(v) for v in query_embedding["lexical_weights"].values()]
+      results = qdrant.client.query_points(
+        collection_name=collection_name,
+        prefetch=[
+            models.Prefetch(
+                query=models.SparseVector(indices=indices, values=values),
+                using="sparse",
+                limit=opt_config["prefetch_limit_sparse"],
+            ),
+            models.Prefetch(
+                query=query_embedding["dense_vecs"],
+                using="dense",
+                limit=opt_config["prefetch_limit_dense"],
+            )
+        ],
+        query=models.FusionQuery(fusion=models.Fusion.RRF),
+        limit=opt_config["prefetch_limit_sparse"]+opt_config["prefetch_limit_dense"],
+        )
+      reranker = FlagReranker('BAAI/bge-reranker-v2-m3', use_fp16=True)
+      scores = reranker.compute_score([[query, res.payload['content']] for res in results.points])
+      
+      for i in range(len(results.points)):
+          results.points[i].payload['reranking_score'] = scores[i]
+          
+      results = sorted(
+      results.points, 
+      key=lambda x: x.payload["reranking_score"], 
+      reverse=True
+      )[:opt_config["top_k"]]
+ 
+
 
     return results
