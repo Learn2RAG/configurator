@@ -87,6 +87,8 @@ def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: Di
             "content": sample["page_content"],
             "path": sample["metadata"]["source"],
             "content_hash": sample["chunk_hash"],
+            "title": sample["metadata"]["title"],
+            "uri": sample["metadata"]["uri"]
         },
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
