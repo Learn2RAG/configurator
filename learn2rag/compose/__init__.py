@@ -84,7 +84,7 @@ class Project():
     content: dict[str, Any]
 
     @staticmethod
-    def create(project_file: str, name: str) -> 'Project | None':
+    def create(project_file: str | Path, name: str) -> 'Project | None':
         with open(project_file) as f:
             content = yaml.safe_load(f)
         assert len(content['services']) > 0
