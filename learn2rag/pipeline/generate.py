@@ -9,6 +9,8 @@ Content:
 """
 
 def generate(query, search_results, opt_config) -> str:
+    if hasattr(search_results, "points"):
+        search_results = search_results.points
     context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
     system_message = SystemMessagePromptTemplate.from_template(opt_config["prompt"])
     user_message = HumanMessagePromptTemplate.from_template("{question}")
@@ -19,6 +21,8 @@ def generate(query, search_results, opt_config) -> str:
 
 
 def generate_stream(query, search_results, opt_config):
+    if hasattr(search_results, "points"):
+        search_results = search_results.points
     context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
     system_message = SystemMessagePromptTemplate.from_template(opt_config["prompt"])
     user_message = HumanMessagePromptTemplate.from_template("{question}")
