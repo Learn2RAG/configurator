@@ -27,13 +27,13 @@ from .loaders.process_loaders import process_configuration_entries
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="magic") # Suppress SyntaxWarnings from the 'magic' module
 
 class ImporterArgumentParser(argparse.ArgumentParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         json_config_path = importlib.resources.files("learn2rag.importer.config") / "config.json"
         self.add_argument('--config', default=str(json_config_path))
 
 #main function to run the application
-def main(args):
+def main(args: argparse.Namespace) -> None:
 
     # Display a small textual description about the app
     print("------------------------------------------------------------")
