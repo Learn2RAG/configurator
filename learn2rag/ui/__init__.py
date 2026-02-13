@@ -29,6 +29,8 @@ from datetime import datetime  # <-- ADD THIS
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
+# for now hardcode here , we can change it
+DEFAULT_PIPELINE_PORTS = [9001, 9002, 9003, 9004, 9005]
 
 def expand_path(path):
     return Path(path).expanduser().absolute()
@@ -72,17 +74,52 @@ def stop_project(name):
     project.stop()
 
 
-def find_free_ports(n):
+# def find_free_ports(n):
+#     ports = []
+#     sockets = []
+#     for i in range(n):
+#         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#         s.bind(('', 0))
+#         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+#         sockets.append(s)
+#         ports.append(s.getsockname()[1])
+#     for s in sockets:
+#         s.close()
+#     return ports
+
+def find_free_ports(n, preferred_ports=None):
+    """
+    Finds n free ports. Prioritizes preferred_ports if provided.
+    """
     ports = []
-    sockets = []
-    for i in range(n):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('', 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sockets.append(s)
-        ports.append(s.getsockname()[1])
-    for s in sockets:
-        s.close()
+    preferred_ports = preferred_ports or []
+
+    # 1. Try preferred ports first
+    for p in preferred_ports:
+        if len(ports) >= n:
+            break
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                # Set REUSEADDR to handle ports in TIME_WAIT state
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(('', p))
+                ports.append(p)
+        except OSError:
+            continue  # Port is taken, skip to next or fallback
+
+    # 2. Fallback to OS-assigned random ports if we still need more
+    remaining = n - len(ports)
+    if remaining > 0:
+        temp_sockets = []
+        for _ in range(remaining):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(('', 0))
+            ports.append(s.getsockname()[1])
+            temp_sockets.append(s)
+
+        for s in temp_sockets:
+            s.close()
+
     return ports
 
 
@@ -358,7 +395,8 @@ def create_app(config={}):
             content = yaml.safe_load(f)
             port_names = content.get('ports', [])
             configured_ports = pipeline.get('ports', [])
-            ports = configured_ports + find_free_ports(len(port_names) - len(configured_ports))
+
+            ports = configured_ports + find_free_ports(len(port_names) - len(configured_ports), DEFAULT_PIPELINE_PORTS)
             render_context['ports'] = dict(zip(port_names, ports))
 
         storage_path = Path(pipeline['storage_path'])
