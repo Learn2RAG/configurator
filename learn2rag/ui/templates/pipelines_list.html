@@ -142,6 +142,10 @@
                 <div class="spinner-border spinner-border-sm"></div>
                 {% endif %}
               </a>
+              {% else %}
+              <a class="btn btn-secondary">
+                <div class="spinner-border spinner-border-sm"></div>
+              </a>
               {% endif %}
               <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
                 <button type="submit" class="btn btn-warning" name="action" value="stop">
