@@ -73,20 +73,6 @@ def stop_project(name):
     assert project is not None, 'project should not be None'
     project.stop()
 
-
-# def find_free_ports(n):
-#     ports = []
-#     sockets = []
-#     for i in range(n):
-#         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#         s.bind(('', 0))
-#         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-#         sockets.append(s)
-#         ports.append(s.getsockname()[1])
-#     for s in sockets:
-#         s.close()
-#     return ports
-
 def find_free_ports(n, preferred_ports=None):
     """
     Finds n free ports. Prioritizes preferred_ports if provided.
