@@ -153,11 +153,22 @@
                 </button>
               </form>
               {% else %}
-              <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this pipeline configuration and all stored data: %(label)s?', label=pipeline.label)}}">
-                <button type="submit" class="btn btn-danger" name="action" value="delete">
-                  {{pgettext('button', 'Remove')}}
+              <div class="dropdown">
+                <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  {{pgettext('button', 'More')}}
                 </button>
-              </form>
+                <ul class="dropdown-menu">
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this pipeline configuration and all stored data: %(label)s?', label=pipeline.label)}}">
+                      <input type="hidden" name="action" value="delete"/>
+                      <button type="submit" class="dropdown-item text-bg-danger">
+                        {{pgettext('button', 'Remove')}}
+                      </button>
+                    </form>
+                  </li>
+                </ul>
+              </div>
               {% endif %}
             </div>
           </div>
