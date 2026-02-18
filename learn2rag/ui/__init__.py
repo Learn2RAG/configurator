@@ -9,6 +9,7 @@ import xdg.BaseDirectory
 import shutil
 import signal
 import socket
+import subprocess
 import threading
 import time
 import urllib
@@ -18,6 +19,7 @@ from flask_babel import Babel, gettext, ngettext, pgettext
 import flask.logging
 import jinja2
 import ollama
+import uvicorn
 import yaml
 
 from learn2rag.compose import Project
@@ -453,3 +455,34 @@ def shutdown():
     logging.debug('Shutdown...')
     atexit_handler()
     os.kill(os.getpid(), signal.SIGTERM)
+
+
+def webbrowser_open(url):
+    try:
+        if platform.system() == 'Windows':
+            subprocess.Popen(['explorer', url])
+        else:
+            subprocess.Popen(['xdg-open', url])
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(e)
+
+
+def main(config):
+    app = create_app(config=config)
+
+    port = config.get('port', '9000')
+
+    url = 'http://localhost:' + port
+    webbrowser_open(url)
+    print('*' * 40)
+    print('Learn2RAG: ' + url)
+    print('*' * 40)
+
+    uvicorn.run(
+        app,
+        interface='wsgi',
+        host=config.get('host', '0.0.0.0'),
+        port=int(port),
+    )
