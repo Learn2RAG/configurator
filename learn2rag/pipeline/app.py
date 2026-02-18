@@ -29,7 +29,7 @@ class ChatState(BaseModel):
     messages: List[Message]
 
 
-def build_search_query(question):
+def build_search_query(question: str):
     if opt_config["search_mode"] == "multi_search":
         return dict(itertools.product(["content"] + opt_config["multi_search"], [question]))
     else:
@@ -38,7 +38,8 @@ def build_search_query(question):
 
 async def simple_chatbot_response(input: QuestionInput) -> str:
     question = input.question
-    results = search_points.search(question, user_config, opt_config)
+    search_query = build_search_query(question)
+    results = search_points.search(search_query, user_config, opt_config)
     # sources = "\n".join(set(result.payload['path'] for result in results))
     answer = generate.generate(question, results, opt_config)
     # full_response = f"{answer}\n\n{sources}"
