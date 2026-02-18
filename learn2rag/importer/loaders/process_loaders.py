@@ -73,6 +73,7 @@ def process_configuration_entries(config_entries):
                 tenant_id = entry.get("tenant_id", "common")  
                 folder_path = entry.get("folder_path") 
                 folder_id = entry.get("folder_id") 
+                site_id = entry.get("site_id")
                 object_ids = entry.get("object_ids")
                 
                 recursive = entry.get("recursive", False)
@@ -101,7 +102,8 @@ def process_configuration_entries(config_entries):
                     recursive=recursive,
                     auth_with_token=auth_with_token,
                     reset_token=reset_token,
-                    tenant_id=tenant_id 
+                    tenant_id=tenant_id ,
+                    site_id=site_id
                 )
                 logger.info(f"Loaded {len(documents)} documents from SharePoint using {loader_type}.")
             
