@@ -45,11 +45,7 @@ def insert(qdrant: Qdrant, collection_name: str, sample: Dict):
         vector={
             "dense": sample["dense_vec"],
         },
-        payload={
-            "content": sample["page_content"],
-            "path": sample["metadata"]["source"],
-            "content_hash": sample["chunk_hash"],
-        },
+        payload=payload(sample),
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
@@ -64,11 +60,7 @@ def insert_dense_sparse(qdrant: Qdrant, collection_name: str, sample: Dict):
                 values=sample["lexical_weights"].values(),
             ),
         },
-        payload={
-            "content": sample["page_content"],
-            "path": sample["metadata"]["source"],
-            "content_hash": sample["chunk_hash"],
-        },
+        payload=payload(sample),
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
@@ -83,13 +75,7 @@ def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: Di
             ),
             "colbert": sample["colbert_vecs"],
         },
-        payload={
-            "content": sample["page_content"],
-            "path": sample["metadata"]["source"],
-            "content_hash": sample["chunk_hash"],
-            "title": sample["metadata"]["title"],
-            "uri": sample["metadata"]["uri"]
-        },
+        payload=payload(sample),
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
@@ -99,13 +85,20 @@ def insert_multi(qdrant: Qdrant, collection_name: str, sample: Dict):
         vector={
             "multi": sample["dense_vec"],
         },
-        payload={
-            "content": sample["page_content"],
-            "path": sample["metadata"]["source"],
-            "content_hash": sample["chunk_hash"],
-        },
+        payload=payload(sample),
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+
+def payload(sample: Dict) -> Dict:
+    return {
+        "content": sample["page_content"],
+        "path": sample["metadata"]["source"],
+        "content_hash": sample["chunk_hash"],
+        "title": sample["metadata"].get("title",""),
+        "uri": sample["metadata"].get("uri",""),
+        "loader_id": sample["metadata"]["loader_id"],
+        "document_id": sample["metadata"].get("document_id", "")
+    }
 
 def index(user_config, opt_config):
     # TODO: enable list of file paths in loader and adapt user_config
