@@ -1,3 +1,5 @@
+from qdrant_client.http.models import QueryResponse
+
 from .qdrant import Qdrant
 from .embeddings import create_embeddings
 from qdrant_client import models
@@ -5,7 +7,7 @@ import numpy as np
 from FlagEmbedding import FlagReranker
 
 # similarity search
-def search(query, user_config, opt_config) -> list:
+def search(query, user_config, opt_config) -> QueryResponse:
     # FIXME: query can be str or dict (with multi_search), maybe always use a dict?
     collection_name = user_config["collection_name"]
 

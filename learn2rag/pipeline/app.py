@@ -1,23 +1,23 @@
+import asyncio
 import itertools
 import json
-import os
-import sys
+from concurrent.futures import ThreadPoolExecutor
+from typing import List
 
 from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List
-from concurrent.futures import ThreadPoolExecutor
-import asyncio
 
-from .config import user_config, opt_config
 from . import generate
-from . import search as search_points
 from . import ingestion
+from . import search as search_points
+from .authorization import filter_authorized
+from .config import user_config, opt_config
 
 
 class QuestionInput(BaseModel):
     question: str
+    user: str
 
 
 class Message(BaseModel):
@@ -43,7 +43,7 @@ async def simple_chatbot_response(input: QuestionInput) -> str:
     # sources = "\n".join(set(result.payload['path'] for result in results))
     answer = generate.generate(question, results, opt_config)
     # full_response = f"{answer}\n\n{sources}"
-    return answer #full_response
+    return answer  # full_response
 
 
 example_query = "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
@@ -56,17 +56,17 @@ example_messages = {
     ]
 }
 
-
 app = FastAPI()
+
 
 @app.post("/qanda")
 async def qanda(
-    input: QuestionInput = Body(
-        ...,
-        example={
-            "question": example_query
-        }
-    )
+        input: QuestionInput = Body(
+            ...,
+            example={
+                "question": example_query
+            }
+        )
 ):
     answer = await simple_chatbot_response(input)
     return {"messages": [{"content": answer}]}
@@ -74,10 +74,10 @@ async def qanda(
 
 @app.post("/stream")
 async def stream(
-    inputs: ChatState = Body(
-        ...,
-        example=example_messages
-    )
+        inputs: ChatState = Body(
+            ...,
+            example=example_messages
+        )
 ):
     async def event_stream():
         question = inputs.messages[-1].content
@@ -95,7 +95,7 @@ async def stream(
 
         chunks = await loop.run_in_executor(executor, lambda: list(sync_gen()))
 
-        yield f"data: {json.dumps({'choices':[{'delta':{}, 'finish_reason': None}]})}\n\n"
+        yield f"data: {json.dumps({'choices': [{'delta': {}, 'finish_reason': None}]})}\n\n"
 
         for chunk in chunks:
             msg = {
@@ -119,7 +119,7 @@ async def stream(
         # }
         # yield f"data: {json.dumps(msg)}\n\n"
 
-        yield f"data: {json.dumps({'choices':[{'delta':{}, 'finish_reason':'stop'}]})}\n\n"
+        yield f"data: {json.dumps({'choices': [{'delta': {}, 'finish_reason': 'stop'}]})}\n\n"
 
     return StreamingResponse(
         event_stream(),
@@ -130,15 +130,18 @@ async def stream(
 
 @app.post("/search")
 async def search(
-    input: QuestionInput = Body(
-        ...,
-        example={
-            "question": example_query
-        }
-    )
+        input: QuestionInput = Body(
+            ...,
+            example={
+                "question": example_query,
+                "user": "d56d14d0-79c7-4c49-9499-07634a2610c2"
+            }
+        )
 ):
     search_query = build_search_query(input.question)
-    return search_points.search(search_query, user_config, opt_config)
+    points = search_points.search(search_query, user_config, opt_config)
+    authorized_points = filter_authorized(input.user, points)
+    return authorized_points
 
 
 @app.post("/ingest")
