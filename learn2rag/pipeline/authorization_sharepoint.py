@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class SharepointAuthorizationFilter(AuthorizationFilter):
-    """Authorization Filter for files uploaded to sharepoint"""
+    """Authorization Filter for files uploaded to sharepoint
+    Required permissions(application): Directory.Read.All, Files.Read.All"""
 
     def __init__(
             self,
