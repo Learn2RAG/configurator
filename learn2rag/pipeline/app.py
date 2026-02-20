@@ -1,5 +1,4 @@
 import asyncio
-import itertools
 import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
@@ -10,9 +9,8 @@ from pydantic import BaseModel
 
 from . import generate
 from . import ingestion
-from . import search as search_points
-from .authorization import filter_authorized
 from .config import user_config, opt_config
+from .search import search_authorized
 
 
 class QuestionInput(BaseModel):
@@ -27,21 +25,13 @@ class Message(BaseModel):
 
 class ChatState(BaseModel):
     messages: List[Message]
-
-
-def build_search_query(question: str):
-    if opt_config["search_mode"] == "multi_search":
-        return dict(itertools.product(["content"] + opt_config["multi_search"], [question]))
-    else:
-        return question
+    user: str
 
 
 async def simple_chatbot_response(input: QuestionInput) -> str:
-    question = input.question
-    search_query = build_search_query(question)
-    results = search_points.search(search_query, user_config, opt_config)
+    results = await search_authorized(question=input.question, user=input.user)
     # sources = "\n".join(set(result.payload['path'] for result in results))
-    answer = generate.generate(question, results, opt_config)
+    answer = generate.generate(input.question, results, opt_config)
     # full_response = f"{answer}\n\n{sources}"
     return answer  # full_response
 
@@ -53,7 +43,8 @@ example_messages = {
             "role": "user",
             "content": example_query
         }
-    ]
+    ],
+    "user": "d56d14d0-79c7-4c49-9499-07634a2610c2"
 }
 
 app = FastAPI()
@@ -64,7 +55,8 @@ async def qanda(
         input: QuestionInput = Body(
             ...,
             example={
-                "question": example_query
+                "question": example_query,
+                "user": "d56d14d0-79c7-4c49-9499-07634a2610c2"
             }
         )
 ):
@@ -81,9 +73,8 @@ async def stream(
 ):
     async def event_stream():
         question = inputs.messages[-1].content
-        search_query = build_search_query(question)
 
-        results = search_points.search(search_query, user_config, opt_config)
+        results = await search_authorized(user=inputs.user, question=question)
         # sources = "\n".join(set(result.payload['path'] for result in results))
 
         executor = ThreadPoolExecutor()
@@ -138,10 +129,7 @@ async def search(
             }
         )
 ):
-    search_query = build_search_query(input.question)
-    points = search_points.search(search_query, user_config, opt_config)
-    authorized_points = await filter_authorized(input.user, points)
-    return authorized_points
+    return await search_authorized(user=input.user, question=input.question)
 
 
 @app.post("/ingest")
