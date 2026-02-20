@@ -6,13 +6,15 @@ This module handles loading documents from HTML sources.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.3
+Version: 0.0.4
 Creation Date: July 28, 2025
+Last Modified: February 20, 2026
 """
 
 import hashlib
 from bs4 import BeautifulSoup
 from datetime import datetime
+from typing import List, Optional, Set
 from ..globals import stop_loading
 from langchain_community.document_loaders import UnstructuredHTMLLoader
 from langchain_core.documents import Document
@@ -24,7 +26,7 @@ import requests
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
 
-def load_html_content(url, depth=0, visited=None) -> list[Document]:
+def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = None) -> List[Document]:
     """
     Load HTML content from a URL and optionally follow links recursively.
 
@@ -89,9 +91,10 @@ def load_html_content(url, depth=0, visited=None) -> list[Document]:
             soup = BeautifulSoup(response.text, "html.parser")
             links = [a["href"] for a in soup.find_all("a", href=True)]
             for link in links:
-                # Resolve relative URLs
-                absolute_link = requests.compat.urljoin(url, link)
-                documents.extend(load_html_content(absolute_link, depth=depth - 1, visited=visited))
+                if isinstance(link, str):
+                    # Resolve relative URLs
+                    absolute_link = requests.compat.urljoin(url, link)
+                    documents.extend(load_html_content(absolute_link, depth=depth - 1, visited=visited))
 
     except Exception as e:
         logger.error(f"Error loading content from {url}: {e}")
