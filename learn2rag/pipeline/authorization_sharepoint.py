@@ -129,13 +129,17 @@ class SharepointAuthorizationFilter(AuthorizationFilter):
         Returns:
             List of authorized document IDs
         """
-        drive = self._get_drive()
-        member_group_ids = await self._get_groups(user)
-        owned_group_ids = await self._get_owned_groups(user)
-        authorized_ids = []
-        for doc_id in document_ids:
-            is_authorized = await self._user_has_access(user, doc_id, drive, member_group_ids, owned_group_ids)
-            if is_authorized:
-                authorized_ids.append(doc_id)
+        try:
+            drive = self._get_drive()
+            member_group_ids = await self._get_groups(user)
+            owned_group_ids = await self._get_owned_groups(user)
+            authorized_ids = []
+            for doc_id in document_ids:
+                is_authorized = await self._user_has_access(user, doc_id, drive, member_group_ids, owned_group_ids)
+                if is_authorized:
+                    authorized_ids.append(doc_id)
 
-        return set(authorized_ids)
+            return set(authorized_ids)
+        except Exception as e:
+            logger.warning(f"Could not authorizes user %s", e.__str__())
+            return set()
