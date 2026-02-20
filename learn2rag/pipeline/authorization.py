@@ -12,7 +12,7 @@ from learn2rag.pipeline.config import importer_config
 class NoAuthorizationFilter(AuthorizationFilter):
     """Authorization filter that allows access to all documents."""
 
-    def filter_documents(self, user: str, document_ids: Set[str]) -> Set[str]:
+    async def filter_documents(self, user: str, document_ids: Set[str]) -> Set[str]:
         """
         Return all document IDs without filtering.
 
@@ -65,13 +65,13 @@ def _get_authorization_filter(loader_id: str) -> AuthorizationFilter:
     return _filters[loader_id]
 
 
-def filter_authorized(user: str, search_results: QueryResponse) -> List[ScoredPoint]:
+async def filter_authorized(user: str, search_results: QueryResponse) -> List[ScoredPoint]:
     by_loader = defaultdict(list)
     [by_loader[point.payload.get('loader_id', 'unknown')].append(point.payload.get("document_id", "")) for point in
      search_results.points]
     authorized_ids = []
     for loader in by_loader:
         auth_filter = _get_authorization_filter(loader)
-        authorized_ids.extend(auth_filter.filter_documents(user, set(by_loader[loader])))
+        authorized_ids.extend(await auth_filter.filter_documents(user, set(by_loader[loader])))
     return [point for point in search_results.points if
             authorized_ids.__contains__(point.payload.get("document_id", ""))]

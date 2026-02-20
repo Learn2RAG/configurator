@@ -1,8 +1,10 @@
 import logging
-from typing import Optional, Set, List
+from typing import Set, List
 
-from O365 import Account
-from O365.drive import Drive
+from azure.identity import ClientSecretCredential
+from msgraph import GraphServiceClient
+from msgraph.generated.drives.item.drive_item_request_builder import DriveItemRequestBuilder
+from msgraph.generated.models.share_point_identity_set import SharePointIdentitySet
 
 from learn2rag.pipeline.authorization_filter import AuthorizationFilter
 
@@ -39,32 +41,49 @@ class SharepointAuthorizationFilter(AuthorizationFilter):
         self.site_id = site_id
         self.document_library_id = document_library_id
 
-        credentials = (client_id, client_secret)
-        self.account = Account(credentials, auth_flow_type='credentials', tenant_id=tenant_id)
+        scopes = ['https://graph.microsoft.com/.default']
+        credential = ClientSecretCredential(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            client_secret=client_secret)
+        self.graph_client = GraphServiceClient(credential, scopes) # type: ignore
 
-        if not self.account.authenticate():
-            raise ValueError("Failed to authenticate with SharePoint")
-
-    def _get_drive(self) -> Optional[Drive]:
+    def _get_drive(self) -> DriveItemRequestBuilder:
         """Get the SharePoint drive for the configured site."""
-        try:
-            sharepoint = self.account.sharepoint()
-            site = sharepoint.get_site(self.site_id)
-            return site.get_document_library(self.document_library_id)
-        except Exception:
-            return None
+        return self.graph_client.drives.by_drive_id(self.document_library_id)
 
-    def _get_groups(self, user_id: str) -> List[str]:
-        groups = self.account.groups().get_user_groups(user_id)
-        return [group.object_id for group in groups]
+    async def _get_groups(self, user_id: str) -> List[str]:
+        groups = await self.graph_client.users.by_user_id(user_id).transitive_member_of.get()
+        return [group.id for group in list(groups.value)]
+    
+    async def _get_owned_groups(self, user_id: str) -> List[str]:
+        groups = await self.graph_client.users.by_user_id(user_id).owned_objects.graph_group.get()
+        return [group.id for group in list(groups.value)]
 
     @staticmethod
-    def _user_has_access(user: str, document_id: str, drive: Drive, group_ids: List[str]) -> bool:
+    def _is_owner_permission(permission: SharePointIdentitySet) -> bool:
+        
+        site_user = permission.site_user
+        if site_user is None:
+            return False
+        group = permission.group
+        if group is None:
+            return False
+        return site_user.login_name == f"c:0o.c|federateddirectoryclaimprovider|{group.id}_o"
+
+    @staticmethod
+    async def _user_has_access(
+            user_id: str,
+            document_id: str,
+            drive: DriveItemRequestBuilder,
+            group_ids: List[str],
+            owned_group_ids: List[str],
+        ) -> bool:
         """
         Check if a user has access to a specific file.
 
         Args:
-            user: User identifier (email)
+            user_id: User identifier (email)
             document_id: The id of the drive item in sharepoint
             drive: SharePoint drive object
 
@@ -73,28 +92,33 @@ class SharepointAuthorizationFilter(AuthorizationFilter):
         """
         try:
             # Navigate to the file
-            item = drive.get_item(document_id)
+            item = drive.items.by_drive_item_id(document_id)
             if not item:
                 return False
 
             # Get permissions for the file
-            permissions = item.get_permissions()
+            permissions = await item.permissions.get()
 
-            # Check if user has access through any permission
-            for permission in permissions:
-                if hasattr(permission, 'granted_to_identities'):
-                    for identity in permission.granted_to_identities:
-                        if hasattr(identity, 'user') and identity.user.email.lower() == user.lower():
+            # Check if the user has access through any permission
+            for permission in list(permissions.value):
+                v2 = permission.granted_to_v2
+                if v2 is None:
+                    continue
+                if v2.user is not None and v2.user.id == user_id:
+                    return True
+                if v2.group is not None:
+                    group = v2.group
+                    if SharepointAuthorizationFilter._is_owner_permission(v2):
+                        if owned_group_ids.__contains__(group.id):
                             return True
-                elif hasattr(permission, 'granted_to') and hasattr(permission.granted_to, 'user'):
-                    if permission.granted_to.user.email.lower() == user.lower():
-                        return True
-
+                    else:
+                        if group_ids.__contains__(group.id):
+                            return True
             return False
         except Exception:
             return False
 
-    def filter_documents(self, user: str, document_ids: Set[str]) -> Set[str]:
+    async def filter_documents(self, user: str, document_ids: Set[str]) -> Set[str]:
         """
         Filter document IDs based on SharePoint permissions.
 
@@ -106,14 +130,12 @@ class SharepointAuthorizationFilter(AuthorizationFilter):
             List of authorized document IDs
         """
         drive = self._get_drive()
-        if not drive:
-            logger.warning("loader %s could not authorize documents: drive does not exist", self.loader_id)
-            return set([])
-
-        group_ids = self._get_groups(user)
+        member_group_ids = await self._get_groups(user)
+        owned_group_ids = await self._get_owned_groups(user)
         authorized_ids = []
         for doc_id in document_ids:
-            if self._user_has_access(user, doc_id, drive, group_ids):
+            is_authorized = await self._user_has_access(user, doc_id, drive, member_group_ids, owned_group_ids)
+            if is_authorized:
                 authorized_ids.append(doc_id)
 
         return set(authorized_ids)

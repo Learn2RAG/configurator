@@ -140,7 +140,7 @@ async def search(
 ):
     search_query = build_search_query(input.question)
     points = search_points.search(search_query, user_config, opt_config)
-    authorized_points = filter_authorized(input.user, points)
+    authorized_points = await filter_authorized(input.user, points)
     return authorized_points
 
 
