@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import List, Dict
+from typing import List, Dict, Any
 from typing import Set
 
 from qdrant_client.http.models import QueryResponse, ScoredPoint
@@ -65,13 +65,20 @@ def _get_authorization_filter(loader_id: str) -> AuthorizationFilter:
     return _filters[loader_id]
 
 
+async def _get_loader_id(point: ScoredPoint) -> Any:
+    return point.payload.get('loader_id', 'unknown')
+
+
+async def _get_doc_id(point: ScoredPoint) -> Any:
+    return point.payload.get("document_id", "")
+
+
 async def filter_authorized(user: str, search_results: QueryResponse) -> List[ScoredPoint]:
     by_loader = defaultdict(list)
-    [by_loader[point.payload.get('loader_id', 'unknown')].append(point.payload.get("document_id", "")) for point in
-     search_results.points]
-    authorized_ids = []
+    [by_loader[await _get_loader_id(point)].append(await _get_doc_id(point)) for point in search_results.points]
+    authorized_ids = {}
     for loader in by_loader:
         auth_filter = _get_authorization_filter(loader)
-        authorized_ids.extend(await auth_filter.filter_documents(user, set(by_loader[loader])))
+        authorized_ids[loader] = await auth_filter.filter_documents(user, set(by_loader[loader]))
     return [point for point in search_results.points if
-            authorized_ids.__contains__(point.payload.get("document_id", ""))]
+            authorized_ids[await _get_loader_id(point)].__contains__(await _get_doc_id(point))]
