@@ -342,6 +342,13 @@ def create_app(config={}):
     @app.get('/pipelines')
     def pipelines_list():
         projects = Project.get_all()
+        if request.headers.get('HX-Request'):
+            return render_template(
+                '_pipelines_list_table.html',
+                projects=projects,
+                current_timestamp=math.floor(time.time())
+            )
+
         return render_template('pipelines_list.html', projects=projects, current_timestamp=math.floor(time.time()))
 
     @app.post('/pipelines')
