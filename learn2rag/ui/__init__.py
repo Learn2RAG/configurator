@@ -160,6 +160,8 @@ def create_app(config={}):
     def inject_current_year():
         return {'current_year': datetime.now().year}
 
+    atexit.register(atexit_handler)
+
     # TODO: let the user configure the directory for ollama data before starting it?
     try:
         project = start_project('ollama', app.components_template_path / 'ollama.yml', Path(app.instance_path) / 'ollama', app.config['OLLAMA'])
@@ -453,6 +455,3 @@ def shutdown():
     logging.debug('Shutdown...')
     atexit_handler()
     os.kill(os.getpid(), signal.SIGTERM)
-
-
-atexit.register(atexit_handler)
