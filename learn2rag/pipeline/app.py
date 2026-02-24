@@ -1,10 +1,12 @@
 import asyncio
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
-from fastapi import FastAPI, Body
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Body, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from . import generate
@@ -48,6 +50,14 @@ example_messages = {
 }
 
 app = FastAPI()
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    message = str(exc)
+    logging.error(f"validation_exception_handler: {message}")
+    content = {'message': message}
+    return JSONResponse(content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
 
 @app.post("/qanda")
