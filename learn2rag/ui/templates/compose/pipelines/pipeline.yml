@@ -91,6 +91,7 @@ services:
       LEARN2RAG_PIPELINE_PORT: '{{ports.pipeline}}'
       QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
       PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
+      IMPORTER_CONFIG: '{{storage_path}}/importer_config.json'
       PIPELINE_OPT_CONFIG: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
       LANGCHAIN_API_KEY: '1'
       LANGCHAIN_TRACING_V2: 'false'
