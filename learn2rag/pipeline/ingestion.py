@@ -202,7 +202,7 @@ def index(user_config, opt_config):
                 insert(qdrant, collection_name, sample)
 
 
-def main():
+def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     from .config import user_config, opt_config
