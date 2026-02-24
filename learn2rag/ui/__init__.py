@@ -6,6 +6,7 @@ import math
 import os
 import platform
 import xdg.BaseDirectory
+import secrets
 import shutil
 import signal
 import socket
@@ -352,6 +353,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'pipeline': pipeline,
             'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
             'sources': sources,
+            'qdrant_api_key': secrets.token_hex(16),
         }
 
         assert pipeline_templates[template_name]
