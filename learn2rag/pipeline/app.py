@@ -27,7 +27,7 @@ class Message(BaseModel):
 
 class ChatState(BaseModel):
     messages: List[Message]
-    user: str
+    user: str | None = None  # FIXME
 
 
 async def simple_chatbot_response(input: QuestionInput) -> str:
