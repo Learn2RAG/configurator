@@ -1,3 +1,8 @@
+ssl_keyfile: "/etc/ssl/private/irb-managed/key.pem"
+ssl_certfile: "/etc/ssl/private/irb-managed/cert.pem"
+port: 9000
+host: "0.0.0.0"
+
 SUGGESTED_MODELS:
   gemma3_27b:
     label: Google Gemma 3 (27B)

@@ -1,6 +1,7 @@
 import platform
 import subprocess
 import sys
+import os
 from typing import Any
 
 import uvicorn
@@ -24,26 +25,52 @@ def start_ui(config: dict[str, Any]) -> None:
     app = create_app(config=config)
 
     port = config.get('port', '9000')
+    host = config.get('host', '0.0.0.0')
 
-    url = 'http://localhost:' + port
+    ssl_key = config.get('ssl_keyfile')
+    ssl_cert = config.get('ssl_certfile')
+
+    use_https = False
+    if ssl_key and ssl_cert:
+        if os.path.exists(ssl_key) and os.path.exists(ssl_cert):
+            print(f" SSL files defined and found at {ssl_key} or {ssl_cert}")
+            use_https = True
+        else:
+            print(f"Warning: SSL files defined but not found at {ssl_key} or {ssl_cert}")
+    else:
+        print(f"no SSL files provided then switch to HTTP mode")
+
+    protocol = 'https' if use_https else 'http'
+    url = f"{protocol}://localhost:{port}"
     webbrowser_open(url)
     print('*' * 40)
     print('Learn2RAG: ' + url)
     print('*' * 40)
 
-    uvicorn.run(
-        app,
-        interface='wsgi',
-        host=config.get('host', '0.0.0.0'),
-        port=int(port),
-    )
+    uvicorn_kwargs = {
+        "app": app,
+        "host": host,
+        "port": int(port),
+        "log_level": "info",
+        "interface": "wsgi",
+    }
+
+    if use_https:
+        uvicorn_kwargs["ssl_keyfile"] = ssl_key
+        uvicorn_kwargs["ssl_certfile"] = ssl_cert
+
+    uvicorn.run(**uvicorn_kwargs)
 
 
 if __name__ == '__main__':
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(base_path, 'ui', 'config.yml')
     config = {}
     try:
-        config = yaml.safe_load(open('config.yml'))
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
     except FileNotFoundError:
+        print(f"No config file used !")
         pass
 
     if sys.argv[1:2] == ['ollama']:
