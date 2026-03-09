@@ -342,18 +342,30 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         return redirect(url_for('pipelines_list'))
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
+        cert_path = app.config.get('ssl_certfile')
+        key_path = app.config.get('ssl_keyfile')
+        has_ssl = cert_path and key_path and Path(cert_path).exists() and Path(key_path).exists()
+
         url = urllib.parse.urlparse(request.base_url)
+        scheme = 'https' if has_ssl else url.scheme
+
 
         sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
         for path_name, source in sources.items():
             source['path'] = str(expand_path(source['path']))
 
+
+        protocol = 'https' if has_ssl else 'http'
         render_context = {
             'learn2rag_hostname': url.hostname,
             'pipeline': pipeline,
             'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
             'sources': sources,
             'qdrant_api_key': secrets.token_hex(16),
+            'ssl_cert': cert_path if has_ssl else None,
+            'ssl_key': key_path if has_ssl else None,
+            'use_ssl': has_ssl,
+            'protocol': protocol,
         }
 
         assert pipeline_templates[template_name]

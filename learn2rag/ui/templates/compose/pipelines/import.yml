@@ -11,7 +11,14 @@ files:
       service:
         api_key: '{{qdrant_api_key}}'
         grpc_port: null
-        http_port: '{{ports.qdrant_http}}'
+        {% if use_ssl %}
+        https_port: {{ports.qdrant_http}}        
+        tls:
+          cert: '{{ssl_cert}}'
+          key: '{{ssl_key}}'
+        {% else %}
+        http_port: {{ports.qdrant_http}}
+        {% endif %}
         host: '127.0.0.1'
       telemetry_disabled: true
   - path: '{{storage_path}}/importer_config.json'
@@ -62,6 +69,6 @@ services:
       LANGCHAIN_API_KEY: '1'
       LANGCHAIN_TRACING_V2: 'false'
       LLM_API_TYPE: '{{language_model.api}}'
-      LLM_API_URL: '{{language_model.url}}'
+      LLM_API_URL: '{{ protocol }}://{{ learn2rag_hostname }}:{{ some_port }}'
       LLM_API_TOKEN: '{{language_model.token}}'
       LLM_API_MODEL: '{{language_model.model}}'
