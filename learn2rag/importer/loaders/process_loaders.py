@@ -12,7 +12,9 @@ Last Modified: Jan 17, 2026
 """
 
 import logging
+from typing import List, Dict, Any
 from ..globals import stop_loading
+from langchain_core.documents import Document
 from .directory_loader import load_from_directory
 from .csv_loader import load_from_csv
 from .html_loader import load_html_content
@@ -22,7 +24,7 @@ from .sharepoint_loader import load_from_sharepoint
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
 
-def process_configuration_entries(config_entries):
+def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[Document]:
     """
     Process configuration entries and load documents based on loader type.
 

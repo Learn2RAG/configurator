@@ -5,9 +5,10 @@ Description:
 This module handles loading documents from directories.
 
 Author: Kyrill Meyer
-Version: 0.0.2
+Version: 0.0.3
 Institution: IFDT
 Creation Date: June 10, 2025
+Last Modified: February 20, 2026
 """
 import hashlib
 import logging
@@ -15,6 +16,7 @@ import os
 import platform
 import stat
 from datetime import datetime
+from typing import List, Union
 from ..globals import stop_loading
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_core.documents import Document
@@ -26,7 +28,7 @@ logging.getLogger("pdfminer").setLevel(logging.ERROR)
 logger = logging.getLogger("Learn2RAGImporter")
 
 
-def load_from_directory(path, recursive) -> list[Document]:
+def load_from_directory(path: str, recursive: Union[bool, str]) -> List[Document]:
     """
     Load documents from a directory and set metadata.
 

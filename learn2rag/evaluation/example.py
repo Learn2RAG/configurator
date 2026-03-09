@@ -2,19 +2,20 @@ import json
 import logging
 import pathlib
 import time
+from typing import Any
 
-import json_stream
+import json_stream  # type: ignore[import-untyped]
 
 from .tools import read_dataset_qa, basic_pipeline
 
 
 class JSONEncoder(json.JSONEncoder):
-    def default(self, o):
+    def default(self, o: Any) -> Any:
         return o.__dict__
 
 
-@json_stream.streamable_list
-def generate_results(dataset_name, qa_rows):
+@json_stream.streamable_list  # type: ignore[untyped-decorator]
+def generate_results(dataset_name: str, qa_rows: list[dict[str, Any]]) -> Any:
     for qa_item in qa_rows:
         question = qa_item['question']
         logging.info(f'{question=}')
@@ -27,7 +28,7 @@ def generate_results(dataset_name, qa_rows):
         }
 
 
-def process_qa(dataset_name, qa_rows):
+def process_qa(dataset_name: str, qa_rows: Any) -> None:
     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
     experiment_dir = dataset_work_dir / 'results' / str(time.time())
     experiment_dir.mkdir(parents=True)

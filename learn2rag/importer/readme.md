@@ -5,6 +5,7 @@ This application is an importer for data that is to be used within the learn2rag
 Author: IFDT, KM
 Version: 0.0.4
 
+
 ## Installation
     
 - to better determine filetypes, make sure all requirements are met
@@ -18,6 +19,41 @@ apt install libgl1 libmagic1
 ```
 brew install libmagic
 ```
+
+## Architecture
+
+```mermaid
+graph TD
+    A[config.json] --> B[Importer Main]
+    B --> C{Loader-Typ}
+    C -->|DirectoryLoader| D[Verzeichnis scannen]
+    C -->|CSVLoader| E[CSV-Datei parsen]
+
+    C -->|HTMLLoader| F[Webseite laden]
+    C -->|SharepointLoader| G[SharePoint API abfragen]
+    D --> H[Dokumente extrahieren]
+    E --> H
+    F --> H
+    G --> H
+    H --> I[Metadaten anreichern]
+    I --> J[loaded_documents.json]
+    J --> K[Output für Pipeline]
+
+    %% Styles: Lila Boxen mit schwarzem Rand, weißer Hintergrund (Standard)
+    classDef purple fill:#9370db,stroke:#000000,stroke-width:2px
+    A:::purple
+    B:::purple
+    C:::purple
+    D:::purple
+    E:::purple
+    F:::purple
+    G:::purple
+    H:::purple
+    I:::purple
+    J:::purple
+    K:::purple
+```
+
 
 ## Configuration
 - change /config/config.json according to your needs. Add a entry for each loader that you want to configure (see examples)
@@ -41,6 +77,13 @@ brew install libmagic
 }   
 ```
 
+## Verfügbare Loader
+Der Importer unterstützt die folgenden Loader-Typen:
+
+- **DirectoryLoader**: Lädt Dokumente aus einem Verzeichnis, unterstützt verschiedene Dateiformate (.csv, .doc, .docx, .eml, .epub, .html, .json, .md, .odt, .pdf, .ppt, .pptx, .rst, .rtf, .txt, .tsv, .cls, .xlsx, .xml)
+- **CSVLoader**: Lädt Dokumente aus CSV-Dateien, jede Zeile wird als separates Dokument behandelt
+- **HTMLLoader**: Lädt Inhalte von Webseiten, kann rekursiv Links folgen
+- **SharepointLoader**: Lädt Dokumente aus SharePoint-Dokumentbibliotheken mit App-Only-Authentifizierung
 
 ## Output
 - output will be produced as json in the main directory in loaded_documents.json
@@ -134,6 +177,97 @@ where
     - mata_properties will hold all meta_tags set in the webpage itself
 - content will hold the actual text content of the page as text
 
+### Example Config and Result for CSVLoader
+CSVLoader lädt Dokumente aus CSV-Dateien und extrahiert den Inhalt jeder Zeile als separates Dokument.
+
+Um eine CSV-Datei zu konfigurieren, fügen Sie der config.json einen Abschnitt unter "loaders" hinzu:
+
+```
+ {
+   "loader_type": "CSVLoader",
+   "path": "C:\\Users\\foo\\data.csv"
+ },
+```
+
+wo
+- "loader_type" auf "CSVLoader" gesetzt ist, um die Verwendung des CSVLoaders anzugeben
+- "path" auf den Pfad zur CSV-Datei im Dateisystem gesetzt ist
+
+Alle Ergebnisse werden in die loaded_documents.json geschrieben. Für jede Zeile in der CSV-Datei wird ein Eintrag wie folgt generiert:
+
+```
+{
+    "metadata": {
+        "source": "C:\\Users\\foo\\data.csv",
+        "loader_type": "CSVLoader",
+        "file_name": "data.csv",
+        "file_extension": "csv",
+        "row": 1
+    },
+    "content": "Spalte1: Wert1, Spalte2: Wert2, ..."
+},
+```
+
+wo
+- metadata Metadaten zur Datei und Zeile enthält
+- content den extrahierten Textinhalt der Zeile hält
+
+### Example Config and Result for SharepointLoader
+SharepointLoader lädt Dokumente aus einer SharePoint-Dokumentbibliothek unter Verwendung von App-Only-Authentifizierung.
+
+Um SharePoint zu konfigurieren, fügen Sie der config.json einen Abschnitt unter "loaders" hinzu:
+
+```
+ {
+   "loader_type": "SharepointLoader",
+   "client_id": "your-client-id",
+   "client_secret": "your-client-secret",
+   "tenant_id": "your-tenant-id",
+   "document_library_id": "your-document-library-id",
+   "folder_path": "/path/to/folder",
+   "recursive": true
+ },
+```
+
+wo
+- "loader_type" auf "SharepointLoader" gesetzt ist
+- "client_id", "client_secret", "tenant_id" die Authentifizierungsdaten sind
+- "document_library_id" die ID der Dokumentbibliothek
+- "folder_path" der Pfad zum Ordner (optional)
+- "recursive" angibt, ob Unterordner durchsucht werden sollen
+
+Zusätzlich zu den erforderlichen Parametern unterstützt der SharepointLoader mehrere optionale Parameter:
+
+- "folder_id": Die ID eines spezifischen Ordners in der Dokumentbibliothek, von dem aus geladen werden soll (alternative zu folder_path)
+- "object_ids": Eine Liste von spezifischen Objekt-IDs, die geladen werden sollen (z. B. einzelne Dateien)
+- "recursive": Boolescher Wert (true/false), ob Unterordner rekursiv durchsucht werden sollen (Standard: false)
+- "auth_with_token": Boolescher Wert (true/false), ob ein gespeichertes Token für die Authentifizierung verwendet werden soll (Standard: true)
+- "reset_token": Boolescher Wert (true/false), ob das gespeicherte Token zurückgesetzt werden soll (z. B. bei Ablauf, Standard: false)
+- "tenant_id": Die Tenant-ID für die Authentifizierung (Standard: "common")
+- "site_id": Die ID einer spezifischen SharePoint-Site (optional, falls nicht die Root-Site verwendet wird)
+
+Alle Ergebnisse werden in die loaded_documents.json geschrieben. Für jede Datei wird ein Eintrag generiert, ähnlich wie bei DirectoryLoader.
+
+Beispiel-Output für SharepointLoader:
+
+```
+{
+    "metadata": {
+        "source": "https://mysharepointserver.sharepoint.com/sites/examples/_layouts/15/Doc.aspx?sourcedoc=%01XXXXBDTXXXX&file=Aufteilung%20Reisetypen.docx&action=default&mobileredirect=true",
+        "sharepoint_id": "01XXXXBDTXXXX",
+        "name": "Aufteilung Reisetypen.docx",
+        "created": "2024-09-26 09:13:40+02:00",
+        "modified": "2024-09-26 09:13:40+02:00",
+        "loader_type": "SharepointLoader"
+    },
+    "content": "Es fallen zu verschiedenen Zwecken Reisen an, die in 4 Typen gegliedert werden können. Diese werden im Folgenden erläutert:..."
+},
+```
+
+wo
+- metadata Metadaten zur SharePoint-Datei enthält, einschließlich ID, Name, Erstellungs- und Änderungsdatum
+- content den extrahierten Textinhalt der Datei hält
+
 ### Sharepoint Loader Prerequisites
 
 Prerequisites
@@ -173,3 +307,5 @@ Prerequisites
 - v0.0.6
   - removed permission information from metadata in directory loader
   - added SharePoint Loader
+- v0.0.7
+  - added type checks

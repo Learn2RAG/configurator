@@ -6,27 +6,28 @@ This module provides a function to load configuration files (e.g., JSON, YAML) f
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.2
+Version: 0.0.3
 Creation Date: June 10, 2025
-Last Modified: Jan 17, 2026
+Last Modified: February 20, 2026
 """
 
 import json
 import yaml
+from typing import Dict, Any, cast
 from ..config.config_constants import ALLOWED_LOADERS
 
-def load_json_config(config_path):
+def load_json_config(config_path: str) -> Dict[str, Any]:
     """Load a JSON configuration file with error handling."""
     try:
         with open(config_path, 'r') as file:
             config = json.load(file)
-            return config
+            return cast(Dict[str, Any], config)
     except FileNotFoundError:
         raise FileNotFoundError(f"JSON configuration file not found: {config_path}")
     except json.JSONDecodeError:
         raise ValueError(f"Error decoding JSON configuration file: {config_path}")
  
-def validate_config_entry(entry):
+def validate_config_entry(entry: Dict[str, Any]) -> bool:
     """Validate individual configuration entries based on their type."""
     loader_type = entry.get("loader_type")
     if not loader_type:

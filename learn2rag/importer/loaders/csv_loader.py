@@ -6,13 +6,16 @@ This module handles loading documents from CSV files.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.1
+Version: 0.0.2
 Creation Date: June 10, 2025
+Last Modified: February 20, 2026
 """
 from datetime import datetime
+from typing import List
 from langchain_community.document_loaders import CSVLoader
+from langchain_core.documents import Document
 
-def load_from_csv(path):
+def load_from_csv(path: str) -> List[Document]:
     """
     Load documents from a CSV file and set metadata.
 

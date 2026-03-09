@@ -5,6 +5,15 @@ ports:
   - ui
   - qdrant_http
 files:
+  - path: '{{storage_path}}/qdrant_config.yml'
+    content: |
+      log_level: INFO
+      service:
+        api_key: '{{qdrant_api_key}}'
+        grpc_port: null
+        http_port: '{{ports.qdrant_http}}'
+        host: '127.0.0.1'
+      telemetry_disabled: true
   - path: '{{storage_path}}/importer_config.json'
     content: |
       {
@@ -27,7 +36,10 @@ files:
       {
           "collection_name": "learn2rag",
           "imported_documents_file_path": "loaded_documents.json",
-          "llm": "{{language_model.model}}"
+          "llm": "{{language_model.model}}",
+          "qdrant": {
+              "api_key": "{{qdrant_api_key}}"
+          }
       }
 
 services:
@@ -36,13 +48,7 @@ services:
     command:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
-      - '{{learn2rag_path}}/qdrant/config.yml'
-    environment:
-      # https://qdrant.tech/documentation/guides/configuration/
-      QDRANT__LOG_LEVEL: 'INFO'
-      QDRANT__SERVICE__HOST: '127.0.0.1'
-      QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
-      QDRANT__TELEMETRY_DISABLED: 'true'
+      - '{{storage_path}}/qdrant_config.yml'
   main:
     working_dir: '{{storage_path}}'
     command:
