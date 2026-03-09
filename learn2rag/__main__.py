@@ -1,6 +1,8 @@
 import argparse
 import importlib
 import logging
+import os
+import pathlib
 import sys
 
 import yaml
@@ -10,11 +12,21 @@ class LauncherArgumentParser(argparse.ArgumentParser):
     def __init__(self):
         super().__init__()
         self.add_argument('module', type=str, nargs='?', default='learn2rag.ui')
+        self.add_argument('--logging-config', type=pathlib.Path)
 
 
 def excepthook(*exc_info: tuple) -> None:
+    os.environ['NO_COLOR'] = '1'
     logging.critical('Uncaught exception', exc_info=exc_info)
     sys.__excepthook__(*exc_info)
+
+
+def configure_logging(config_path):
+    if config_path is not None:
+        with config_path.open(encoding='utf-8') as f:
+            logging.config.dictConfig(yaml.safe_load(f))
+    else:
+        logging.basicConfig(level=logging.INFO)
 
 
 if __name__ == '__main__':
@@ -28,6 +40,8 @@ if __name__ == '__main__':
 
     args, rest = LauncherArgumentParser().parse_known_args()
     module = importlib.import_module(args.module)
+    configure_logging(args.logging_config)
+    logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
     # TODO
     if args.module == 'learn2rag.ollama_tool':
         # FIXME default config values

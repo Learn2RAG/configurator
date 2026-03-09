@@ -24,7 +24,9 @@ from .utils.config_loader import load_json_config, validate_config_entry
 from .loaders.process_loaders import process_configuration_entries
 
 
+logger = logging.getLogger("Learn2RAGImporter")
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="magic") # Suppress SyntaxWarnings from the 'magic' module
+
 
 class ImporterArgumentParser(argparse.ArgumentParser):
     def __init__(self):
@@ -32,9 +34,8 @@ class ImporterArgumentParser(argparse.ArgumentParser):
         json_config_path = importlib.resources.files("learn2rag.importer.config") / "config.json"
         self.add_argument('--config', default=str(json_config_path))
 
-#main function to run the application
-def main(args):
 
+def init(args):
     # Display a small textual description about the app
     print("------------------------------------------------------------")
     print("Learn2RAG Importer - DataImporter for Learn2RAG.")
@@ -57,9 +58,11 @@ def main(args):
     else:
         # Set up logging configuration
         setup_logging(str(logging_config_path))  
-    logger = logging.getLogger("Learn2RAGImporter")
     logger.info("Application started.")
 
+
+#main function to run the application
+def main(args):
     # Load JSON configuration
     try:
         config = load_json_config(args.config)
@@ -92,3 +95,9 @@ def main(args):
 
     except Exception as e:
         logger.error(f"Error loading configuration: {e}")
+
+
+if __name__ == "__main__":
+    args = ImporterArgumentParser().parse_args()
+    init(args)
+    main(args)

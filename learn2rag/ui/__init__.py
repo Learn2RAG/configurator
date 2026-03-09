@@ -411,6 +411,25 @@ def create_app(config={}):
                 flash(pgettext('flash', 'Could not stop the pipeline: %(message)s', message=e), 'error')
         return redirect(url_for('pipelines_list'))
 
+    @app.get('/pipelines/<name>/logs/<file>')
+    def pipeline_logs(name, file):
+        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        if pipeline is None:
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+        elif file in ['debug.log', 'error.log']:
+            storage_path = expand_path(pipeline['storage_path'])
+            log_file = storage_path / 'logs' / file
+            try:
+                content = log_file.read_text()
+            except FileNotFoundError:
+                content = ''
+            return render_template(
+                'logs.html',
+                content=content,
+                file=file,
+            )
+        return redirect(url_for('pipelines_list'))
+
     @app.get('/ps')
     def ps_list():
         projects = Project.get_all()
