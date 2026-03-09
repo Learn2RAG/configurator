@@ -14,6 +14,7 @@ class LauncherArgumentParser(argparse.ArgumentParser):
 
 def excepthook(*exc_info: tuple) -> None:
     logging.critical('Uncaught exception', exc_info=exc_info)
+    sys.__excepthook__(*exc_info)
 
 
 if __name__ == '__main__':

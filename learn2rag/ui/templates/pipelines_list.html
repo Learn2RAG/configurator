@@ -90,6 +90,7 @@
       <th scope="col">{{pgettext('column_heading', 'Language model')}}</th>
       <th scope="col">{{pgettext('column_heading', 'Data sources')}}</th>
       <th scope="col">{{pgettext('column_heading', 'Ports')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Status')}}</th>
       <th scope="col"></th>
     </tr>
   </thead>
@@ -98,9 +99,6 @@
     <tr>
       <td title="{{ name }}">
         {{ pipeline.label }}
-        {% if projects[name] and projects[name].running %}
-        <span class="badge text-bg-success">{{projects[name].content.get('label', gettext('running'))}}</span>
-        {% endif %}
       </td>
       <td>{{ pipeline.storage_path }}</td>
       <td>
@@ -115,6 +113,15 @@
         {% for port in pipeline.ports %}
         <span class="badge text-bg-secondary">{{ port }}</span>
         {% endfor %}
+      </td>
+      <td>
+        {% if projects[name] and not projects[name].running %}
+        {% if projects[name].succeeded %}<span title="{{pgettext('tooltip', 'succeeded')}}" style="cursor: default;">✔️</span>{% endif %}
+        {% if projects[name].failed %}<span title="{{pgettext('tooltip', 'failed')}}" style="cursor: default;">❌</span>{% endif %}
+        {% endif %}
+        {% if projects[name] and projects[name].running %}
+        <span class="badge text-bg-success">{{projects[name].content.get('label', gettext('running'))}}</span>
+        {% endif %}
       </td>
       <td>
         <div class="dropdown">

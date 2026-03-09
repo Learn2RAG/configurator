@@ -1,4 +1,5 @@
 from pathlib import Path
+import contextlib
 import json
 import logging
 import os
@@ -17,8 +18,17 @@ logger = logging.getLogger(__name__)
 import platform
 import signal
 
+
+exit_statuses = {}
+
 if hasattr(signal, "SIGCHLD"):
-    signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+    def handle_SIGCHLD(*args):
+        with contextlib.suppress(ChildProcessError):
+            while True:
+                pid, status = os.waitpid(-1, os.WNOHANG)
+                if pid == 0: break
+                exit_statuses[pid] = status
+    signal.signal(signal.SIGCHLD, handle_SIGCHLD)
 
 
 init_sql = ['''
@@ -27,6 +37,10 @@ CREATE TABLE IF NOT EXISTS projects (
   content TEXT NOT NULL,
   running BOOLEAN NOT NULL DEFAULT FALSE
 );
+''', '''
+ALTER TABLE projects ADD succeeded BOOLEAN NOT NULL DEFAULT FALSE;
+''', '''
+ALTER TABLE projects ADD failed BOOLEAN NOT NULL DEFAULT FALSE;
 ''', '''
 CREATE TABLE IF NOT EXISTS services (
   project TEXT NOT NULL,
@@ -46,10 +60,17 @@ def kill_process(pid):
 def init_db(con):
     cur = con.cursor()
     for sql in init_sql:
-        cur.execute(sql)
+        try:
+            cur.execute(sql)
+        except sqlite3.OperationalError as e:
+            logger.warning('Database initialization: %s', e)
 
 
 def process_running(pid):
+    # if process := popens.get(pid):
+    #     returncode = process.poll()
+    #     print(returncode)
+    #     return returncode == None
     try:
         process = psutil.Process(pid)
         os.kill(pid, 0)
@@ -100,6 +121,8 @@ class Project():
         project.content = json.loads(row['content'])
         project.running = row['running']
         project.health = None
+        project.succeeded = bool(row['succeeded'])
+        project.failed = bool(row['failed'])
 
         if check and project.running:
             project.check()
@@ -206,10 +229,17 @@ class Project():
         self.running = True
 
     def stop(self, stopped=[]):
+        # FIXME: consider only main process exiting with exit code 0 as success
+        self.succeeded = len(stopped) != 0 and all(process['pid'] in exit_statuses for process in stopped) and all(exit_statuses[process['pid']] == 0 for process in stopped)
+        self.failed = any(process['pid'] in exit_statuses and exit_statuses[process['pid']] != 0 for process in stopped)
         cur = con.cursor()
         cur.row_factory = sqlite3.Row
         cur.execute('BEGIN EXCLUSIVE')
-        cur.execute('UPDATE projects SET running = FALSE WHERE name = :name AND running = TRUE', {'name': self.name})
+        cur.execute('UPDATE projects SET running = FALSE, succeeded = :succeeded, failed = :failed WHERE name = :name AND running = TRUE', {
+            'name': self.name,
+            'succeeded': self.succeeded,
+            'failed': self.failed,
+        })
         if cur.rowcount != 1:
             con.rollback()
             raise AssertionError(f'Could not mark the project {self.name} as stopped ({cur.rowcount} != 1)')
