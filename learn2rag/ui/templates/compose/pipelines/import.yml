@@ -7,7 +7,7 @@ ports:
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |
-      log_level: INFO
+      log_level: DEBUG
       service:
         api_key: '{{qdrant_api_key}}'
         grpc_port: null

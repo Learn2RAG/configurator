@@ -365,6 +365,9 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'learn2rag_scheme':url.scheme
         }
 
+        print(f"DEBUG: Rendering Qdrant config with SSL={has_ssl}")
+        print(f"DEBUG: Cert path is {cert_path} key_path is {key_path}")
+
         assert pipeline_templates[template_name]
         template_file = pipelines_template_path / (template_name + '.yml')
 
