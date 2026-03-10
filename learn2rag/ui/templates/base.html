@@ -55,6 +55,9 @@
     <!-- Main Content -->
     <main class="flex-grow-1" id="main">
       <section class="container my-4">
+        {% if debug_logging %}
+        <div class="alert alert-warning">{{gettext('Debug logging is enabled in config file <code>%(file)s</code>. It might capture sensitive information.', file='config.yml')}}</div>
+        {% endif %}
         <div id="flashed_messages">
           {% for category, message in get_flashed_messages(with_categories=True) %}
           {% if category == 'error' %}

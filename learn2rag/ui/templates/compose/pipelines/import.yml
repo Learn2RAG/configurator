@@ -51,9 +51,22 @@ files:
           formatter: simple
           filename: '{{storage_path}}/logs/error.log'
           encoding: utf-8
+        {% if debug_logging %}
+        debug_file:
+          class: logging.FileHandler
+          level: DEBUG
+          formatter: simple
+          filename: '{{storage_path}}/logs/debug.log'
+          encoding: utf-8
+        {% endif %}
       root:
         level: DEBUG
-        handlers: [display, errors_file]
+        handlers:
+          - display
+          - errors_file
+          {% if debug_logging %}
+          - debug_file
+          {% endif %}
 
   - path: '{{storage_path}}/logs/.keep'
     content: ''

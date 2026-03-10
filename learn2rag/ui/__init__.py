@@ -144,6 +144,7 @@ def create_app(config={}):
             'ollama_available': hasattr(app, 'ollama_client'),
             'default_storage_prefix': app.instance_path + '/storage/',
             'firststeps_storage_path': app.instance_path + '/storage/example',
+            'debug_logging': config.get('logging', {}).get('debug', False),
         }
 
     @app.context_processor
@@ -353,6 +354,7 @@ def create_app(config={}):
             'pipeline': pipeline,
             'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
             'sources': sources,
+            'debug_logging': config.get('logging', {}).get('debug', False),
         }
 
         assert app.pipeline_templates[template_name]

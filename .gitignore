@@ -8,6 +8,7 @@ __pycache__
 /learn2rag/evaluation/qdrant_data/
 /learn2rag/pipeline/qdrant_data/
 /datasets/
+/debug.log
 # direnv
 /.envrc
 # custom user config

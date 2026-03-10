@@ -1,5 +1,6 @@
 import argparse
 import importlib
+import importlib.resources
 import logging
 import os
 import pathlib
@@ -21,12 +22,18 @@ def excepthook(*exc_info: tuple) -> None:
     sys.__excepthook__(*exc_info)
 
 
-def configure_logging(config_path):
+def configure_logging(config_path: pathlib.Path, debug: bool) -> None:
+    if config_path is None:
+        if not debug:
+            config_path = importlib.resources.files("learn2rag") / "logging.yml"
+        else:
+            config_path = importlib.resources.files("learn2rag") / "logging-debug.yml"
     if config_path is not None:
         with config_path.open(encoding='utf-8') as f:
             logging.config.dictConfig(yaml.safe_load(f))
     else:
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=logging.INFO if not debug else logging.DEBUG)
+        logging.info('Using basic logging config')
 
 
 if __name__ == '__main__':
@@ -40,7 +47,7 @@ if __name__ == '__main__':
 
     args, rest = LauncherArgumentParser().parse_known_args()
     module = importlib.import_module(args.module)
-    configure_logging(args.logging_config)
+    configure_logging(args.logging_config, config.get('logging', {}).get('debug', False))
     logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
     # TODO
     if args.module == 'learn2rag.ollama_tool':

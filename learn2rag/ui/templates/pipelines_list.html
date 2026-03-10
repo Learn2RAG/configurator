@@ -165,6 +165,13 @@
                   {{pgettext('button', 'More')}}
                 </button>
                 <ul class="dropdown-menu">
+                  {% if debug_logging %}
+                  <li>
+                    <a href="{{ url_for('pipeline_logs', name=name, file='debug.log') }}" class="dropdown-item">
+                      {{pgettext('button', 'Show debug log')}}
+                    </a>
+                  </li>
+                  {% endif %}
                   <li>
                     <a href="{{ url_for('pipeline_logs', name=name, file='error.log') }}" class="dropdown-item">
                       {{pgettext('button', 'Show error log')}}
