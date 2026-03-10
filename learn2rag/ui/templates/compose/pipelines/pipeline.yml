@@ -10,12 +10,21 @@ ui_url: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |
+      # TEMPLATE DEBUG: use_ssl is {{use_ssl}}
+      # TEMPLATE DEBUG: cert path is {{ssl_cert}}
       log_level: INFO
       service:
         api_key: '{{qdrant_api_key}}'
-        grpc_port: null
-        http_port: '{{ports.qdrant_http}}'
-        host: '127.0.0.1'
+        {% if use_ssl %}
+        https_port: {{ports.qdrant_http}}        
+        tls:
+          cert: '{{ssl_cert}}'
+          key: '{{ssl_key}}'
+        {% else %}
+        http_port: {{ports.qdrant_http}}
+        # SSL WAS DISABLED IN TEMPLATE
+        {% endif %}
+        host: '0.0.0.0'
       telemetry_disabled: true
   - path: '{{storage_path}}/basic_user_config.json'
     content: |
