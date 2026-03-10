@@ -6,7 +6,7 @@ ports:
   - qdrant_http
   - pipeline
   - open_webui_pipelines
-ui_url: 'http://{{learn2rag_hostname}}:{{ports.ui}}/'
+ui_url: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |

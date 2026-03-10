@@ -347,15 +347,12 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         has_ssl = cert_path and key_path and Path(cert_path).exists() and Path(key_path).exists()
 
         url = urllib.parse.urlparse(request.base_url)
-        scheme = 'https' if has_ssl else url.scheme
-
+        assert url.scheme
 
         sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
         for path_name, source in sources.items():
             source['path'] = str(expand_path(source['path']))
 
-
-        protocol = 'https' if has_ssl else 'http'
         render_context = {
             'learn2rag_hostname': url.hostname,
             'pipeline': pipeline,
@@ -365,7 +362,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'ssl_cert': cert_path if has_ssl else None,
             'ssl_key': key_path if has_ssl else None,
             'use_ssl': has_ssl,
-            'protocol': protocol,
+            'learn2rag_scheme':url.scheme
         }
 
         assert pipeline_templates[template_name]

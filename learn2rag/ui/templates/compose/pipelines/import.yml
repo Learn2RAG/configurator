@@ -69,6 +69,6 @@ services:
       LANGCHAIN_API_KEY: '1'
       LANGCHAIN_TRACING_V2: 'false'
       LLM_API_TYPE: '{{language_model.api}}'
-      LLM_API_URL: '{{ protocol }}://{{ learn2rag_hostname }}:{{ some_port }}'
+      LLM_API_URL: '{{ learn2rag_scheme }}://{{ learn2rag_hostname }}:{{ ports.ui }}'
       LLM_API_TOKEN: '{{language_model.token}}'
       LLM_API_MODEL: '{{language_model.model}}'
