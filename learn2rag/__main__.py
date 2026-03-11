@@ -30,6 +30,11 @@ def start_ui(config: dict[str, Any]) -> None:
     ssl_key = config.get('ssl_keyfile')
     ssl_cert = config.get('ssl_certfile')
 
+    if ssl_key:
+        os.environ['LEARN2RAG_SSL_KEY'] = ssl_key
+    if ssl_cert:
+        os.environ['LEARN2RAG_SSL_CERT'] = ssl_cert
+
     use_https = False
     if ssl_key and ssl_cert:
         if os.path.exists(ssl_key) and os.path.exists(ssl_cert):
