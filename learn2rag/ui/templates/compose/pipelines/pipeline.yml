@@ -15,16 +15,9 @@ files:
       log_level: INFO
       service:
         api_key: '{{qdrant_api_key}}'
-        {% if use_ssl %}
-        https_port: {{ports.qdrant_http}}        
-        tls:
-          cert: '{{ssl_cert}}'
-          key: '{{ssl_key}}'
-        {% else %}
-        http_port: {{ports.qdrant_http}}
-        # SSL WAS DISABLED IN TEMPLATE
-        {% endif %}
-        host: '0.0.0.0'
+        grpc_port: null
+        http_port: '{{ports.qdrant_http}}'
+        host: '127.0.0.1'
       telemetry_disabled: true
   - path: '{{storage_path}}/basic_user_config.json'
     content: |
@@ -69,6 +62,7 @@ services:
       # "turning off authentication is only possible for fresh installations without any existing users"
       WEBUI_AUTH: 'False'
       WEBUI_NAME: 'Learn2RAG'
+      PUBLIC_URL: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
     healthcheck:
       # TODO: We only support ['CMD', 'curl', '-f', ...]
       test: ['CMD', 'curl', '-f', 'http://localhost:{{ports.ui}}/health']
@@ -105,6 +99,7 @@ services:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       LEARN2RAG_PIPELINE_PORT: '{{ports.pipeline}}'
       QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
+      QDRANT_URL: 'http://127.0.0.1:{{ports.qdrant_http}}'
       PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
       PIPELINE_OPT_CONFIG: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
       LANGCHAIN_API_KEY: '1'
