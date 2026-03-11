@@ -106,7 +106,6 @@ class Project():
         project.content = json.loads(row['content'])
         project.running = row['running']
         project.health = False
-        print(f"DEBUG: Project {project.name} content: {project.content}")
         if check and project.running:
             project.check()
 
