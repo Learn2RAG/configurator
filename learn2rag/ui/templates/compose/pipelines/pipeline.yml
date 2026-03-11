@@ -28,12 +28,12 @@ files:
           }
       }
 
+#      - '{{learn2rag_path}}/services/start-open-webui{% if is_windows %}.exe{% endif %}'
+#Bypass the bash wrapper and run Uvicorn natively ( TODO: remove if not work)
 services:
   open-webui:
     working_dir: '{{storage_path}}'
     command:
-#      - '{{learn2rag_path}}/services/start-open-webui{% if is_windows %}.exe{% endif %}'
-      #Bypass the bash wrapper and run Uvicorn natively ( TODO: remove if not work)
       - '{{learn2rag_path}}/services/open-webui/.venv/bin/uvicorn'
       - 'serve'
       - '--host'
