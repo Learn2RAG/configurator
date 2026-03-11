@@ -62,6 +62,7 @@ def process_running(pid: int) -> bool:
 
 
 def healthy(value: list[str]) -> bool:
+    print(f"len(value) is {len(value)} and value is : {' '.join(value)}")
     assert len(value) == 4
     assert value[0:3] == ['CMD', 'curl' ,'-f']
     url = value[3]
