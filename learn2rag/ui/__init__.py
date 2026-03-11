@@ -362,7 +362,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'ssl_cert': cert_path if has_ssl else None,
             'ssl_key': key_path if has_ssl else None,
             'use_ssl': has_ssl,
-            'learn2rag_scheme':url.scheme
+            'learn2rag_scheme': 'https' if has_ssl else url.scheme
         }
 
         print(f"DEBUG: Rendering Qdrant config with SSL={has_ssl}")
