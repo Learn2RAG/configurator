@@ -38,11 +38,11 @@ services:
       - '-c'
       - >
         mkdir -p '{{storage_path}}/open-webui-data' &&
-        { % if use_ssl % }
+        {% if use_ssl %}
         exec {{learn2rag_path}}/services/open-webui/.venv/bin/uvicorn open_webui.main:app --host 0.0.0.0 --port {{ports.ui}} --forwarded-allow-ips '*' --ssl-certfile '{{ssl_cert}}' --ssl-keyfile '{{ssl_key}}'
-        { % else % }
+        {% else %}
         exec {{learn2rag_path}}/services/open-webui/.venv/bin/uvicorn open_webui.main:app --host 0.0.0.0 --port {{ports.ui}} --forwarded-allow-ips '*'
-        { % endif % }
+        {% endif %}
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       DATA_DIR: '{{storage_path}}/open-webui-data'
