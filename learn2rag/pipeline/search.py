@@ -1,12 +1,16 @@
+from typing import Any
+import warnings
+
 from .qdrant import Qdrant
 from .embeddings import create_embeddings
 from qdrant_client import models
+from qdrant_client.http.models import QueryResponse
 import numpy as np
 from FlagEmbedding import FlagReranker
 
 # similarity search
-def search(query, user_config, opt_config) -> list:
-    # FIXME: query can be str or dict (with multi_search), maybe always use a dict?
+def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
+    
     collection_name = user_config["collection_name"]
 
     if opt_config["fusion_mode"] == "RRF":
@@ -153,7 +157,35 @@ def search(query, user_config, opt_config) -> list:
       key=lambda x: x.payload["reranking_score"], 
       reverse=True
       )[:opt_config["top_k"]]
- 
 
+    return results
+ 
+def search_multi(query: dict[str, str], user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
+    collection_name = user_config["collection_name"]
+
+    # Init vector store
+    qdrant = Qdrant(
+        collection_name=collection_name,
+        opt_config=opt_config
+        )
+
+    if opt_config["embedding_model"] == "BAAI/bge-m3":
+        if opt_config["query_mode"] == "multi":
+            vecs_to_concat = []
+            for item in ["content"]+opt_config["multi_search"]:
+                vecs_to_concat.append(create_embeddings(query[item], opt_config["embedding_model"], opt_config["search_mode"])["dense_vecs"])
+            query_embedding = np.concatenate(vecs_to_concat, axis=0)
+    else:
+        query_embedding = create_embeddings(query, opt_config["embedding_model"])
+
+    if opt_config["search_mode"] != "dense":
+        warnings.warn(f"Search mode {opt_config["search_mode"]} for multimodal vector is not implemented yet. Using dense.")
+
+    results = qdrant.client.query_points(
+        collection_name=collection_name,
+        query=query_embedding,
+        using="multi",
+        limit=opt_config["top_k"],
+    )
 
     return results

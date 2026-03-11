@@ -1,11 +1,13 @@
 import logging
 from uuid import uuid4
 import hashlib
-from typing import Dict
+from typing import Any
 import numpy as np
 import warnings
+from collections.abc import Iterator
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.documents.base import Document
 from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
@@ -14,7 +16,7 @@ from . import loaders
 from .embeddings import create_embeddings
 
 
-def get_chunks_metadata(chunks, item):
+def get_chunks_metadata(chunks: list[Document], item: str) -> Iterator[str]:
     missing = 0
     for chunk in chunks:
         if item in chunk.metadata:
@@ -39,7 +41,7 @@ def point_exists(qdrant: Qdrant, collection_name: str, path: str, chunk_hash:str
     return len(result) > 0
 
 
-def insert(qdrant: Qdrant, collection_name: str, sample: Dict):
+def insert(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
     point = PointStruct(
         id=uuid4().hex,
         vector={
@@ -54,7 +56,7 @@ def insert(qdrant: Qdrant, collection_name: str, sample: Dict):
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
 
-def insert_dense_sparse(qdrant: Qdrant, collection_name: str, sample: Dict):
+def insert_dense_sparse(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
     point = PointStruct(
         id=uuid4().hex,
         vector={
@@ -72,7 +74,7 @@ def insert_dense_sparse(qdrant: Qdrant, collection_name: str, sample: Dict):
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
-def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: Dict):
+def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
     point = PointStruct(
         id=uuid4().hex,
         vector={
@@ -93,7 +95,7 @@ def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: Di
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
-def insert_multi(qdrant: Qdrant, collection_name: str, sample: Dict):
+def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
     point = PointStruct(
         id=uuid4().hex,
         vector={
@@ -107,7 +109,7 @@ def insert_multi(qdrant: Qdrant, collection_name: str, sample: Dict):
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
-def index(user_config, opt_config):
+def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     # TODO: enable list of file paths in loader and adapt user_config
     # Load the documents from pdf
     # all_documents = loaders.sync_pdf_loader(user_config["file_path"])
@@ -132,7 +134,7 @@ def index(user_config, opt_config):
 
 
     chunks_content = [chunk.page_content for chunk in chunks]
-    if len(opt_config["multi_search"]) > 0 and opt_config["search_mode"] == "multi_search":
+    if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
         chunks_metadata =  {}
         embeddings_metadata = {}
         for item in opt_config["multi_search"]:
@@ -146,7 +148,7 @@ def index(user_config, opt_config):
 
     logging.info('Creating embeddings...')
     embeddings = create_embeddings(chunks_content, opt_config["embedding_model"], opt_config["search_mode"])
-    if len(opt_config["multi_search"]) > 0 and opt_config["search_mode"] == "multi_search":
+    if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
         mmembeddings = [] 
         for i in range(len(embeddings['dense_vecs'])):
             vecs_to_concat = [embeddings['dense_vecs'][i]]
@@ -156,7 +158,7 @@ def index(user_config, opt_config):
         embeddings['dense_vecs'] = mmembeddings
 
     if isinstance(embeddings, dict) and "dense_vecs" in embeddings:
-        if opt_config["search_mode"] == "dense" or opt_config["search_mode"] == "multi_search" :
+        if opt_config["search_mode"] == "dense":
             chunks_with_embeddings = [
                 dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
                 for chunk, dense, c_hash in zip(chunks, embeddings["dense_vecs"], chunk_hash)
@@ -196,7 +198,7 @@ def index(user_config, opt_config):
                 insert_dense_sparse(qdrant, collection_name, sample)
             elif opt_config["search_mode"] == "dense_sparse_colbert":
                 insert_dense_sparse_colbert(qdrant, collection_name, sample)
-            elif opt_config["search_mode"] == "multi_search":
+            elif opt_config["query_mode"] == "multi":
                 insert_multi(qdrant, collection_name, sample)
             else:
                 insert(qdrant, collection_name, sample)

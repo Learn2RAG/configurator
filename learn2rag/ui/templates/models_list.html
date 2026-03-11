@@ -30,8 +30,8 @@
               <div class="mb-3">
                 <label for="api" class="form-label">{{pgettext('form_label', 'API type')}}</label>
                 <select class="form-select" name="api">
-                  <option selected="selected">ChatOpenAI</option>
-                  <option>ChatOllama</option>
+                  <option selected="selected">openai_clientent</option>
+                  <option>ollama_clientent</option>
                 </select>
               </div>
               <div class="mb-3">
@@ -103,7 +103,7 @@
                     <label for="model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
                     <input class="form-control" name="model" required="required" title="{{pgettext('tooltip', 'For example: %(model)s', model=firststeps_model.get('config', {}).get('model'))}}">
                   </div>
-                  <input type="hidden" name="api" value="ChatOllama"/>
+                  <input type="hidden" name="api" value="ollama_clientent"/>
                   <input type="hidden" name="ollama" value="pull"/>
                   <button type="submit" class="btn btn-primary">Save</button>
                 </form>
@@ -140,7 +140,7 @@
                   {% endfor %}
                 </select>
               </div>
-              <input type="hidden" name="api" value="ChatOllama"/>
+              <input type="hidden" name="api" value="ollama_clientent"/>
               <input type="hidden" name="ollama" value="use"/>
               <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
             </form>

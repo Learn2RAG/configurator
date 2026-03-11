@@ -7,7 +7,7 @@ import warnings
 def create_embeddings(input_sample: List[str], model_name: str = "BAAI/bge-m3", embedding_mode: str = "dense") -> Union[np.ndarray, dict]:
     if model_name == "BAAI/bge-m3":
         model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=True)
-        if embedding_mode == "dense" or embedding_mode == "multi_search":
+        if embedding_mode == "dense":
             embeddings = model.encode(
                 input_sample,
                 batch_size=512,

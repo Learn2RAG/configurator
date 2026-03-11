@@ -1,3 +1,4 @@
+from typing import Any, Generator
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
 from .llm import llm
 
@@ -8,7 +9,7 @@ Content:
 {content}
 """
 
-def generate(query, search_results, opt_config) -> str:
+def generate(query: dict, search_results: list, opt_config: dict[str, Any]) -> str:
     if hasattr(search_results, "points"):
         search_results = search_results.points
     context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
@@ -20,7 +21,7 @@ def generate(query, search_results, opt_config) -> str:
     return answer.content
 
 
-def generate_stream(query, search_results, opt_config):
+def generate_stream(query: dict, search_results: list, opt_config: dict[str, Any]) -> Generator[str, None, None]:
     if hasattr(search_results, "points"):
         search_results = search_results.points
     context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
