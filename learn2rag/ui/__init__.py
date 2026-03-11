@@ -344,7 +344,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
         cert_path = app.config.get('ssl_certfile')
         key_path = app.config.get('ssl_keyfile')
-        has_ssl = cert_path and key_path and Path(cert_path).exists() and Path(key_path).exists()
+
+        from pathlib import Path
+        has_ssl = bool(cert_path and key_path and Path(cert_path).exists() and Path(key_path).exists())
+        print(f"DEBUG: has ssl is : {has_ssl} , cert_path:{cert_path}  ,key_path: {key_path}")
 
         url = urllib.parse.urlparse(request.base_url)
         assert url.scheme
@@ -359,8 +362,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
             'sources': sources,
             'qdrant_api_key': secrets.token_hex(16),
-            'ssl_cert': cert_path if has_ssl else None,
-            'ssl_key': key_path if has_ssl else None,
+            'ssl_cert': cert_path if has_ssl else "",
+            'ssl_key': key_path if has_ssl else "",
             'use_ssl': has_ssl,
             'learn2rag_scheme': 'https' if has_ssl else url.scheme
         }
