@@ -15,7 +15,7 @@ import time
 from typing import Any
 import urllib
 
-from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
+from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for, current_app
 from flask_babel import Babel, gettext, ngettext, pgettext  # type: ignore[import-untyped]
 import flask.logging
 import jinja2
@@ -342,8 +342,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         return redirect(url_for('pipelines_list'))
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
-        cert_path = app.config.get('ssl_certfile')
-        key_path = app.config.get('ssl_keyfile')
+        cert_path = current_app.config.get('ssl_certfile')
+        key_path = current_app.config.get('ssl_keyfile')
 
         from pathlib import Path
         has_ssl = bool(cert_path and key_path and Path(cert_path).exists() and Path(key_path).exists())
