@@ -1,6 +1,7 @@
 import itertools
 import json
 import os
+import secrets
 import sys
 
 from fastapi import FastAPI, Body
@@ -79,17 +80,18 @@ async def stream(
     )
 ):
     async def event_stream():
+        request_id = secrets.token_hex()
         question = inputs.messages[-1].content
         search_query = build_search_query(question)
 
-        results = search_points.search(search_query, user_config, opt_config)
+        results = search_points.search(search_query, user_config, opt_config, request_id=request_id)
         # sources = "\n".join(set(result.payload['path'] for result in results))
 
         executor = ThreadPoolExecutor()
         loop = asyncio.get_event_loop()
 
         def sync_gen():
-            for chunk in generate.generate_stream(question, results, opt_config):
+            for chunk in generate.generate_stream(question, results, opt_config, request_id=request_id):
                 yield chunk
 
         chunks = await loop.run_in_executor(executor, lambda: list(sync_gen()))

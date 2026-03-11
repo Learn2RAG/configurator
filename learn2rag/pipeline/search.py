@@ -1,11 +1,17 @@
+import logging
 from .qdrant import Qdrant
 from .embeddings import create_embeddings
 import warnings
 from qdrant_client import models
 import numpy as np
 
+
+profilingLogger = logging.getLogger('profiling')
+
+
 # similarity search
-def search(query, user_config, opt_config) -> list:
+def search(query, user_config, opt_config, *, request_id: str | None=None) -> list:
+    profilingLogger.info('start', extra={'activity': 'search', 'request_id': request_id})
     # FIXME: query can be str or dict (with multi_search), maybe always use a dict?
     collection_name = user_config["collection_name"]
 
@@ -97,5 +103,7 @@ def search(query, user_config, opt_config) -> list:
             using = "multi",
             limit=opt_config["top_k"],
         )
+
+    profilingLogger.info('end', extra={'activity': 'search', 'request_id': request_id})
 
     return results
