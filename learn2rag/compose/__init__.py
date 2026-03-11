@@ -6,6 +6,7 @@ import signal
 import sqlite3
 import subprocess
 import urllib.request
+import ssl
 from typing import Any
 
 import psutil
@@ -65,7 +66,10 @@ def healthy(value: list[str]) -> bool:
     assert value[0:3] == ['CMD', 'curl' ,'-f']
     url = value[3]
     try:
-        with urllib.request.urlopen(url, timeout=1):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(url, timeout=1, context=ctx):
             return True
     except Exception:
         return False

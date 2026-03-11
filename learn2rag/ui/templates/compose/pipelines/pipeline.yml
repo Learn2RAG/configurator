@@ -68,7 +68,7 @@ services:
       PUBLIC_URL: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
     healthcheck:
       # TODO: We only support ['CMD', 'curl', '-f', ...]
-      test: ['CMD', 'curl', '-fk', '{{learn2rag_scheme}}://localhost:{{ports.ui}}/health']
+      test: ['CMD', 'curl', '-f', '{{learn2rag_scheme}}://localhost:{{ports.ui}}/health']
   # # Only needed if WEBUI_AUTH is True for open-webui
   # open-webui-setup:
   #   working_dir: '{{storage_path}}'
