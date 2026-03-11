@@ -127,7 +127,7 @@ class Project():
         if check and project.running:
             project.check()
 
-        if True or project.running:
+        if project.running:
             project.healthcheck()
 
         return project
