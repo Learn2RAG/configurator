@@ -135,7 +135,7 @@ services:
       - '{{learn2rag_path}}/qdrant/config.yml'
     environment:
       # https://qdrant.tech/documentation/guides/configuration/
-      QDRANT__LOG_LEVEL: 'INFO'
+      QDRANT__LOG_LEVEL: 'ERROR'
       QDRANT__SERVICE__HOST: '127.0.0.1'
       QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
       QDRANT__TELEMETRY_DISABLED: 'true'
