@@ -35,17 +35,15 @@ services:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/services/open-webui/.venv/bin/uvicorn'
-      - 'serve'
+      - 'open_webui.main:app'
       - '--host'
       - '0.0.0.0'
       - '--port'
       - '{{ports.ui}}'
-      - { % if use_ssl % }
       - '--ssl-certfile'
       - '{{ssl_cert}}'
       - '--ssl-keyfile'
       - '{{ssl_key}}'
-      - { % endif % }
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       DATA_DIR: '{{storage_path}}/open-webui-data'
