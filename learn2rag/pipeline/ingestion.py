@@ -91,7 +91,7 @@ def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
-def payload(sample: Dict) -> Dict:
+def payload(sample: dict[str, Any]) -> dict[str, str]:
     return {
         "content": sample["page_content"],
         "path": sample["metadata"]["source"],
