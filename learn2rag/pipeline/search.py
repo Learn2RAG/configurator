@@ -31,18 +31,18 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) 
 
     if opt_config["embedding_model"] == "BAAI/bge-m3":
         if opt_config["search_mode"] == "dense_sparse":
-            query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense_sparse")
+            query_embedding = create_embeddings(list(query), opt_config["embedding_model"], embedding_mode="dense_sparse")
         if opt_config["search_mode"] == "dense_sparse_colbert" or opt_config["search_mode"] == "reranking_with_colbert" or opt_config["search_mode"] == "reranking_with_flagreranker":
-            query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense_sparse_colbert")
+            query_embedding = create_embeddings(list(query), opt_config["embedding_model"], embedding_mode="dense_sparse_colbert")
         if opt_config["search_mode"] == "dense":
-            query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense")["dense_vecs"]
+            query_embedding = create_embeddings(list(query), opt_config["embedding_model"], embedding_mode="dense")["dense_vecs"]
         if opt_config["search_mode"] == "multi_search":
             vecs_to_concat = []
             for item in ["content"]+opt_config["multi_search"]:
-                vecs_to_concat.append(create_embeddings(query[item], opt_config["embedding_model"], opt_config["search_mode"])["dense_vecs"])
+                vecs_to_concat.append(create_embeddings(list(query[item]), opt_config["embedding_model"], opt_config["search_mode"])["dense_vecs"])
             query_embedding = np.concatenate(vecs_to_concat, axis=0)
     else:
-        query_embedding = create_embeddings(query, opt_config["embedding_model"])
+        query_embedding = create_embeddings(list(query), opt_config["embedding_model"])
 
     if opt_config["search_mode"] == "dense":
         results = qdrant.client.query_points(

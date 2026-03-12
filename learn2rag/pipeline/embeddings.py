@@ -1,10 +1,10 @@
 from FlagEmbedding import BGEM3FlagModel
 from sentence_transformers import SentenceTransformer
-from typing import List, Union
+from typing import List, Union, Any
 import numpy as np
 import warnings
 
-def create_embeddings(input_sample: List[str], model_name: str = "BAAI/bge-m3", embedding_mode: str = "dense") -> Union[np.ndarray, dict]:
+def create_embeddings(input_sample: List[str], model_name: str = "BAAI/bge-m3", embedding_mode: str = "dense") -> Union[np.ndarray[Any, Any], dict[str, Any]]:
     if model_name == "BAAI/bge-m3":
         model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=True)
         if embedding_mode == "dense":

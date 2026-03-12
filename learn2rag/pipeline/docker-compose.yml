@@ -38,7 +38,7 @@ services:
       - 6334
       - 6335
     environment:
-      - QDRANT__SERVICE__API_KEY=akKnewmv73AnrkMeqMn7
+      - QDRANT__SERVICE__API_KEY=${QDRANT__SERVICE__API_KEY}
     configs:
       - source: qdrant_config
         target: /qdrant/config/production.yaml

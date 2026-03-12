@@ -1,5 +1,6 @@
 from typing import Any, Generator
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
+from qdrant_client.http.models import ScoredPoint
 from .llm import llm
 
 context_template ="""
@@ -9,7 +10,7 @@ Content:
 {content}
 """
 
-def generate(query: dict, search_results: list, opt_config: dict[str, Any]) -> str:
+def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> str:
     if hasattr(search_results, "points"):
         search_results = search_results.points
     context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
@@ -21,7 +22,7 @@ def generate(query: dict, search_results: list, opt_config: dict[str, Any]) -> s
     return answer.content
 
 
-def generate_stream(query: dict, search_results: list, opt_config: dict[str, Any]) -> Generator[str, None, None]:
+def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Generator[str, None, None]:
     if hasattr(search_results, "points"):
         search_results = search_results.points
     context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
