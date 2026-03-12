@@ -1,12 +1,17 @@
-from typing import Any
 import warnings
+import itertools
+from typing import List, Any
 
-from .qdrant import Qdrant
-from .embeddings import create_embeddings
-from qdrant_client import models
-from qdrant_client.http.models import QueryResponse
 import numpy as np
 from FlagEmbedding import FlagReranker
+from qdrant_client import models
+from qdrant_client.http.models import QueryResponse, ScoredPoint
+
+from .authorization import filter_authorized
+from .config import opt_config, user_config
+from .embeddings import create_embeddings
+from .qdrant import Qdrant
+
 
 # similarity search
 def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
@@ -189,3 +194,16 @@ def search_multi(query: dict[str, str], user_config: dict[str, Any], opt_config:
     )
 
     return results
+
+
+def _build_search_query(question: str):
+    if opt_config["search_mode"] == "multi_search":
+        return dict(itertools.product(["content"] + opt_config["multi_search"], [question]))
+    else:
+        return question
+
+async def search_authorized(question: str, user: str) -> List[ScoredPoint]:
+    search_query = _build_search_query(question)
+    points = search(search_query, user_config, opt_config)
+    authorized_points = await filter_authorized(user, points)
+    return authorized_points

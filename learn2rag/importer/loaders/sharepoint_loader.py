@@ -100,7 +100,7 @@ def _parse_file(file_path: Path, original_item: Any) -> List[Document]:
             # We keep existing metadata from Unstructured and add our own
             doc.metadata.update({
                 "source": original_item.web_url,
-                "sharepoint_id": original_item.object_id,
+                "document_id": original_item.object_id,
                 "name": original_item.name,
                 "created": str(original_item.created),
                 "modified": str(original_item.modified),
