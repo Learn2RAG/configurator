@@ -36,10 +36,7 @@ files:
       {
           "collection_name": "learn2rag",
           "imported_documents_file_path": "loaded_documents.json",
-          "llm": "{{language_model.model}}",
-          "qdrant": {
-              "api_key": "{{qdrant_api_key}}"
-          }
+          "llm": "{{language_model.model}}"
       }
 
 services:
@@ -57,6 +54,7 @@ services:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       STORAGE_PATH: '{{storage_path}}'
       QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
+      QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'
       PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
       IMPORTER_CONFIG: '{{storage_path}}/importer_config.json'
       PIPELINE_OPT_CONFIG: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
