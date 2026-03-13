@@ -24,4 +24,4 @@ learn2rag/pipeline/.env
 *.lock
 compose.db
 /services/package-lock.json
-
+/logs
