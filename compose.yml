@@ -1,3 +1,0 @@
-services:
-  ollama_client:
-    command: ['/home/farshad/projects/l2r/configurator/configurator', 'ollama', 'pull', 'tinyllama:latest']
