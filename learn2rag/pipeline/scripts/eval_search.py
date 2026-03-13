@@ -1,9 +1,9 @@
 # %%
 import pandas as pd
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from .qdrant import Qdrant
-from . import search
-from .config import user_config, opt_config
+from ..qdrant import Qdrant
+from .. import search
+from ..config import user_config, opt_config
 
 
 # Read eval data
@@ -12,15 +12,23 @@ from .config import user_config, opt_config
 #labels = df["document_id"]
 
 df = pd.read_csv('/home/usicwalter/l2r/learn2rag/pipeline/data/eval_samples_chatgpt.csv', sep=";")
-queries = df['query']
-labels = df["document_id"]
+queries = df['query'][:2]
+labels = df["document_id"][:2]
 
 dg = pd.read_csv('/home/usicwalter/l2r/learn2rag/pipeline/data/eval_samples_csc.csv', sep=";")
 all_queries = pd.concat([queries, dg['query']])
 all_labels = pd.concat([labels, dg["document_id"]])
 
 
-search_results = [[search.search(query, user_config, opt_config)] for query in queries]
+#query = {"content": "What is USM AI?", "title": "USM AI Documentation", "summary": "In this document the basic usage of USM AI is described.", "source_path":"USU/ITSM/"}
+
+def mmquery(query):
+    return {"content": query, "title": query, "summary": query, "source_path": query}
+
+if opt_config["search_mode"] == "multi_search":
+    search_results = [[search.search(mmquery(query), user_config, opt_config)] for query in queries]
+else:
+    search_results = [[search.search(query, user_config, opt_config)] for query in queries]
 
 def recall(search_results, labels):
     count = 0

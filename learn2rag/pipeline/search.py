@@ -195,15 +195,7 @@ def search_multi(query: dict[str, str], user_config: dict[str, Any], opt_config:
 
     return results
 
-
-def _build_search_query(question: str):
-    if opt_config["search_mode"] == "multi_search":
-        return dict(itertools.product(["content"] + opt_config["multi_search"], [question]))
-    else:
-        return question
-
 async def search_authorized(question: str, user: str) -> List[ScoredPoint]:
-    search_query = _build_search_query(question)
-    points = search(search_query, user_config, opt_config)
+    points = search(question, user_config, opt_config)
     authorized_points = await filter_authorized(user, points)
     return authorized_points

@@ -1,5 +1,5 @@
 import os
-import datasets
+import datasets # type: ignore[import-untyped]
 import huggingface_hub
 
 local_dir = "data"
