@@ -10,7 +10,7 @@ ui_url: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |
-      log_level: ERROR
+      log_level: INFO
       service:
         api_key: '{{qdrant_api_key}}'
         grpc_port: null
