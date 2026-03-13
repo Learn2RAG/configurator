@@ -3,8 +3,8 @@ set -eu
 echo ">>> Setting up Open WebUI Pipelines..."
 echo ">>> Working in: $PWD"
 
-# 3. CRITICAL FIX: Use Python 3.11 (Compatible with the project)
-# We use --no-install-project to avoid installing the package itself, just deps
+# 3. We use --no-install-project to avoid installing the package itself, just deps
+# TODO : the versions should read from a config if the changes are good
 uv sync --no-install-project --python 3.11
 
 # 4. Run the setup script using the 3.11 environment
