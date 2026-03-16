@@ -18,6 +18,14 @@ class UIMiscTestCase(unittest.TestCase):
         ports = find_free_ports(2, preferred_ports=preferred)
         self.assertEqual(ports, preferred)
 
+    def test_find_free_ports_configured_in_preferred(self):
+        # Using specific ports that are likely free
+        # if this failed check if ports are free
+        configured = [9990]
+        preferred = [9990, 9991]
+        ports = find_free_ports(2, configured_ports=configured, preferred_ports=preferred)
+        self.assertEqual(ports, [9990, 9991])
+
     def test_find_free_ports_collision(self):
         # Create a collision to test fallback
         blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

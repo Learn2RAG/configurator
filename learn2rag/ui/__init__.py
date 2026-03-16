@@ -78,15 +78,14 @@ def stop_project(name: str) -> None:
     assert project is not None, 'project should not be None'
     project.stop()
 
-def find_free_ports(n: int, preferred_ports: list[int] | None=None) -> list[int]:
+def find_free_ports(n: int, *, configured_ports: list[int]=[], preferred_ports: list[int]=[]) -> list[int]:
     """
     Finds n free ports. Prioritizes preferred_ports if provided.
     """
-    ports = []
-    preferred_ports = preferred_ports or []
+    ports = [*configured_ports]
 
     # 1. Try preferred ports first
-    for p in preferred_ports:
+    for p in filter(lambda p: p not in ports, preferred_ports):
         if len(ports) >= n:
             break
         try:
@@ -395,7 +394,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             port_names = content.get('ports', [])
             configured_ports = pipeline.get('ports', [])
 
-            ports = configured_ports + find_free_ports(len(port_names) - len(configured_ports), DEFAULT_PIPELINE_PORTS)
+            ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=DEFAULT_PIPELINE_PORTS)
             render_context['ports'] = dict(zip(port_names, ports))
 
         storage_path = Path(pipeline['storage_path'])
