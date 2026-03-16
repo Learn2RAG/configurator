@@ -31,9 +31,9 @@
         <!-- Nav Links -->
         <div class="d-flex justify-content-start">
           <ul class="navbar-nav d-flex flex-row">
-            <li class="nav-item"><a class="nav-link" href="/models">{{pgettext('nav', 'Language models')}}</a></li>
-            <li class="nav-item"><a class="nav-link" href="/sources">{{pgettext('nav', 'Data sources')}}</a></li>
-            <li class="nav-item"><a class="nav-link" href="/pipelines">{{pgettext('nav', 'Pipelines')}}</a></li>
+            <li class="nav-item"><a class="nav-link" href="/models" accesskey="1">{{pgettext('nav', 'Language models')}}</a></li>
+            <li class="nav-item"><a class="nav-link" href="/sources" accesskey="2">{{pgettext('nav', 'Data sources')}}</a></li>
+            <li class="nav-item"><a class="nav-link" href="/pipelines" accesskey="3">{{pgettext('nav', 'Pipelines')}}</a></li>
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                 {{pgettext('nav', 'More')}}
@@ -61,9 +61,15 @@
         <div id="flashed_messages">
           {% for category, message in get_flashed_messages(with_categories=True) %}
           {% if category == 'error' %}
-          <div class="alert alert-danger">{{ message }}</div>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
           {% else %}
-          <div class="alert alert-primary">{{ message }}</div>
+            <div class="alert alert-primary  alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close float-right" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
           {% endif %}
           {% endfor %}
         </div>

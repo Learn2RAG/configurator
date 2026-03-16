@@ -6,16 +6,18 @@ import math
 import os
 import platform
 import xdg.BaseDirectory
+import secrets
 import shutil
 import signal
 import socket
 import subprocess
 import threading
 import time
+from typing import Any
 import urllib
 
 from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
-from flask_babel import Babel, gettext, ngettext, pgettext
+from flask_babel import Babel, gettext, ngettext, pgettext  # type: ignore[import-untyped]
 import flask.logging
 import jinja2
 import ollama
@@ -31,21 +33,24 @@ from datetime import datetime  # <-- ADD THIS
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
+# for now hardcode here , we can change it
+DEFAULT_PIPELINE_PORTS = [9001, 9002, 9003, 9004, 9005]
 
-def expand_path(path):
+def expand_path(path: Path) -> Path:
     return Path(path).expanduser().absolute()
 
 
-def redirect(url):
+import werkzeug
+def redirect(url: str) -> 'werkzeug.wrappers.response.Response':
     if 'HX-Boosted' in request.headers:
         response = make_response('', 204)
         response.headers['HX-Redirect'] = url
+        return response
     else:
-        response = flask_redirect(url)
-    return response
+        return flask_redirect(url)
 
 
-def start_project(name, template_file, storage_path, render_context={}):
+def start_project(name: str, template_file: Path, storage_path: Path, render_context: dict[str, Any]={}) -> Project:
     logging.debug('UI starting project: %s', name)
     storage_path = expand_path(storage_path)
     logging.debug('Storage path: %s', storage_path)
@@ -68,27 +73,48 @@ def start_project(name, template_file, storage_path, render_context={}):
     return project
 
 
-def stop_project(name):
+def stop_project(name: str) -> None:
     project = Project.get(name)
     assert project is not None, 'project should not be None'
     project.stop()
 
-
-def find_free_ports(n):
+def find_free_ports(n: int, preferred_ports: list[int] | None=None) -> list[int]:
+    """
+    Finds n free ports. Prioritizes preferred_ports if provided.
+    """
     ports = []
-    sockets = []
-    for i in range(n):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('', 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sockets.append(s)
-        ports.append(s.getsockname()[1])
-    for s in sockets:
-        s.close()
+    preferred_ports = preferred_ports or []
+
+    # 1. Try preferred ports first
+    for p in preferred_ports:
+        if len(ports) >= n:
+            break
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                # Set REUSEADDR to handle ports in TIME_WAIT state
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(('', p))
+                ports.append(p)
+        except OSError:
+            continue  # Port is taken, skip to next or fallback
+
+    # 2. Fallback to OS-assigned random ports if we still need more
+    remaining = n - len(ports)
+    if remaining > 0:
+        temp_sockets = []
+        for _ in range(remaining):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(('', 0))
+            ports.append(s.getsockname()[1])
+            temp_sockets.append(s)
+
+        for s in temp_sockets:
+            s.close()
+
     return ports
 
 
-def merge(source, destination):
+def merge(source: dict[str, Any], destination: dict[str, Any]) -> dict[str, Any]:
     for key, value in source.items():
         if isinstance(value, dict):
             node = destination.setdefault(key, {})
@@ -98,9 +124,15 @@ def merge(source, destination):
     return destination
 
 
-def create_app(config={}):
+def create_app(config: dict[str, Any]={}) -> Flask:
     # create and configure the app
-    default_instance_path = os.getenv('LOCALAPPDATA') + '/Learn2RAG/instance' if platform.system() == 'Windows' else xdg.BaseDirectory.save_data_path('Learn2RAG/instance')
+    if platform.system() == 'Windows':
+        windows_app_data = os.getenv('LOCALAPPDATA')
+        assert windows_app_data is not None
+        default_instance_path = windows_app_data + '/Learn2RAG/instance'
+    else:
+        default_instance_path = xdg.BaseDirectory.save_data_path('Learn2RAG/instance')
+
     example_local_path = r'C:\Users\User\Documents' if platform.system() == 'Windows' else '/home/user/Documents'
     app = Flask(
         __name__,
@@ -123,33 +155,36 @@ def create_app(config={}):
 
     babel = Babel(app)
 
-    def get_locale():
+    def get_locale() -> str:
         translations = map(str, babel.list_translations())
-        return request.accept_languages.best_match(translations)
+        default_translation = 'de'  # FIXME
+        return request.accept_languages.best_match(translations) or default_translation
     babel.init_app(app, locale_selector=get_locale)
 
     app.logger.info('create_app')
     app.logger.debug('cwd: %s', os.getcwd())
     app.logger.debug('root_path: %s', app.root_path)
+    assert app.template_folder is not None
     compose_template_path = Path(app.root_path) / app.template_folder / 'compose'
-    app.pipelines_template_path = compose_template_path / 'pipelines'
-    app.components_template_path = compose_template_path / 'components'
-    app.pipeline_templates = {str(item.stem): yaml.safe_load(item.open()) for item in app.pipelines_template_path.glob('*.yml')}
-    app.logger.debug('Loaded %i pipeline_templates: %s', len(app.pipeline_templates), list(app.pipeline_templates.keys()))
+    pipelines_template_path = compose_template_path / 'pipelines'
+    components_template_path = compose_template_path / 'components'
+    pipeline_templates = {str(item.stem): yaml.safe_load(item.open()) for item in pipelines_template_path.glob('*.yml')}
+    app.logger.debug('Loaded %i pipeline_templates: %s', len(pipeline_templates), list(pipeline_templates.keys()))
 
     @app.context_processor
-    def inject_info():
+    def inject_info() -> dict[str, Any]:
         return {
-            'compose_templates': app.pipeline_templates,
+            'compose_templates': pipeline_templates,
             'ollama_available': hasattr(app, 'ollama_client'),
             'default_storage_prefix': app.instance_path + '/storage/',
             'firststeps_storage_path': app.instance_path + '/storage/example',
             'debug_logging': config.get('logging', {}).get('debug', False),
+            'current_timestamp': math.floor(time.time()),
         }
 
     @app.context_processor
-    def inject_data():
-        suggested_models = app.config.get('SUGGESTED_MODELS')
+    def inject_data() -> dict[str, Any]:
+        suggested_models = app.config.get('SUGGESTED_MODELS', {})
         return {
             'suggested_models': suggested_models,
             'firststeps_model': suggested_models.get('gemma3_27b'),
@@ -159,21 +194,21 @@ def create_app(config={}):
         }
 
     @app.context_processor
-    def inject_current_year():
+    def inject_current_year() -> dict[str, Any]:
         return {'current_year': datetime.now().year}
 
     atexit.register(atexit_handler)
 
     # TODO: let the user configure the directory for ollama data before starting it?
     try:
-        project = start_project('ollama', app.components_template_path / 'ollama.yml', Path(app.instance_path) / 'ollama', app.config['OLLAMA'])
-        app.ollama_client = ollama.Client(host='http://localhost:' + str(app.config['OLLAMA']['port']))
+        project = start_project('ollama', components_template_path / 'ollama.yml', Path(app.instance_path) / 'ollama', app.config['OLLAMA'])
+        setattr(app, 'ollama_client', ollama.Client(host='http://localhost:' + str(app.config['OLLAMA']['port'])))
     except Exception as e:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
 
     @app.get('/')
-    def start():
+    def start() -> 'str | werkzeug.wrappers.response.Response':
         pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
         projects = Project.get_all()
         running_pipelines = sum(1 for k, p in projects.items() if k in pipelines and p.running)
@@ -183,16 +218,7 @@ def create_app(config={}):
             running_pipelines=running_pipelines
         )
 
-    @app.get('/components')
-    def components():
-        projects = Project.get_all()
-        return render_template('components.html', projects=projects)
-
-    @app.post('/components/<name>')
-    def component_action(name):
-        return False
-
-    def list_ollama_models():
+    def list_ollama_models() -> list[Any]:
         ollama_models = []
         try:
             if hasattr(app, 'ollama_client'):
@@ -207,14 +233,14 @@ def create_app(config={}):
         return ollama_models
 
     @app.get('/models')
-    def models_list():
+    def models_list() -> 'str | werkzeug.wrappers.response.Response':
         return render_template(
             'models_list.html',
             ollama_models=list_ollama_models(),
         )
 
     @app.post('/models')
-    def model_create():
+    def model_create() -> 'str | werkzeug.wrappers.response.Response':
         ok = True
         model = request.form['model']
         api = request.form['api']
@@ -225,7 +251,7 @@ def create_app(config={}):
             if request.form.get('ollama') == 'pull':
                 if model.find(':') == -1:
                     model += ':latest'
-                start_project('ollama_download', app.components_template_path / 'ollama-download.yml', Path(), {'model': model})
+                start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(), {'model': model})
                 return flask_redirect(url_for('model_pulling', model=model))
         elif api == 'ChatOpenAI':
             url = request.form['url']
@@ -246,7 +272,7 @@ def create_app(config={}):
         return redirect(url_for('models_list'))
 
     @app.get('/models/download')
-    def model_pulling():
+    def model_pulling() -> 'str | werkzeug.wrappers.response.Response':
         model = request.args['model']
         ollama_downloader = Project.get('ollama_download')
         if ollama_downloader is not None and not ollama_downloader.running:
@@ -277,7 +303,7 @@ def create_app(config={}):
         )
 
     @app.post('/models/<name>')
-    def model_action(name):
+    def model_action(name: str) -> 'str | werkzeug.wrappers.response.Response':
         model = learn2rag.data.get_entry(app.instance_path, 'models', name)
         if model is None:
             flash(pgettext('flash', 'The requested language model configuration is not found'), 'error')
@@ -292,11 +318,11 @@ def create_app(config={}):
         return redirect(url_for('models_list'))
 
     @app.get('/sources')
-    def sources_list():
+    def sources_list() -> 'str | werkzeug.wrappers.response.Response':
         return render_template('sources_list.html', example_local_path=example_local_path)
 
     @app.post('/sources')
-    def source_create():
+    def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
         learn2rag.data.create_entry(app.instance_path, 'sources', {
             'label': label,
@@ -306,7 +332,7 @@ def create_app(config={}):
         return redirect(url_for('sources_list'))
 
     @app.post('/sources/<name>')
-    def source_action(name):
+    def source_action(name: str) -> 'str | werkzeug.wrappers.response.Response':
         source = learn2rag.data.get_entry(app.instance_path, 'sources', name)
         if source is None:
             flash(pgettext('flash', 'The requested data source configuration is not found'), 'error')
@@ -320,12 +346,15 @@ def create_app(config={}):
         return redirect(url_for('sources_list'))
 
     @app.get('/pipelines')
-    def pipelines_list():
-        projects = Project.get_all()
-        return render_template('pipelines_list.html', projects=projects, current_timestamp=math.floor(time.time()))
+    def pipelines_list() -> 'str | werkzeug.wrappers.response.Response':
+        context = {
+            'projects': Project.get_all(),
+        }
+        template = '_pipelines_list_table.html' if request.headers.get('HX-Request') else 'pipelines_list.html'
+        return render_template(template, **context)
 
     @app.post('/pipelines')
-    def pipeline_create():
+    def pipeline_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
         ports = [int(port) for port in request.form.getlist("ports") if port]
         name = learn2rag.data.create_entry(app.instance_path, 'pipelines', {
@@ -342,7 +371,7 @@ def create_app(config={}):
             start_pipeline(name, pipeline, 'import')
         return redirect(url_for('pipelines_list'))
 
-    def start_pipeline(name, pipeline, template_name):
+    def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
         url = urllib.parse.urlparse(request.base_url)
 
         sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
@@ -355,16 +384,18 @@ def create_app(config={}):
             'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
             'sources': sources,
             'debug_logging': config.get('logging', {}).get('debug', False),
+            'qdrant_api_key': secrets.token_hex(16),
         }
 
-        assert app.pipeline_templates[template_name]
-        template_file = app.pipelines_template_path / (template_name + '.yml')
+        assert pipeline_templates[template_name]
+        template_file = pipelines_template_path / (template_name + '.yml')
 
         with open(template_file) as f:
             content = yaml.safe_load(f)
             port_names = content.get('ports', [])
             configured_ports = pipeline.get('ports', [])
-            ports = configured_ports + find_free_ports(len(port_names) - len(configured_ports))
+
+            ports = configured_ports + find_free_ports(len(port_names) - len(configured_ports), DEFAULT_PIPELINE_PORTS)
             render_context['ports'] = dict(zip(port_names, ports))
 
         storage_path = Path(pipeline['storage_path'])
@@ -383,7 +414,7 @@ def create_app(config={}):
         # TODO "load" the corresponding Ollama model
 
     @app.post('/pipelines/<name>')
-    def pipeline_action(name):
+    def pipeline_action(name: str) -> 'str | werkzeug.wrappers.response.Response':
         pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
         if pipeline is None:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
@@ -433,12 +464,12 @@ def create_app(config={}):
         return redirect(url_for('pipelines_list'))
 
     @app.get('/ps')
-    def ps_list():
+    def ps_list() -> 'str | werkzeug.wrappers.response.Response':
         projects = Project.get_all()
         return render_template('ps_list.html', projects=projects)
 
     @app.post('/ps/stop')
-    def ps_stop():
+    def ps_stop() -> 'str | werkzeug.wrappers.response.Response':
         try:
             stop_project(request.form['name'])
             flash('Stopped')
@@ -447,15 +478,15 @@ def create_app(config={}):
         return redirect(url_for('ps_list'))
 
     @app.post('/shutdown')
-    def shutdown_request():
+    def shutdown_request() -> 'str | werkzeug.wrappers.response.Response':
         threading.Thread(target=shutdown).start()
-        return pgettext('shutdown', 'Bye!')
+        return pgettext('shutdown', 'Bye!')  # type: ignore[no-any-return]
 
     app.logger.info('App creation complete')
     return app
 
 
-def atexit_handler():
+def atexit_handler() -> None:
     logging.debug('Exit handler')
     logging.info('Stopping Ollama...')
     project = Project.get('ollama')
@@ -471,7 +502,7 @@ def atexit_handler():
     logging.info('Done')
 
 
-def shutdown():
+def shutdown() -> None:
     time.sleep(1)
     logging.debug('Shutdown...')
     atexit_handler()
@@ -490,7 +521,7 @@ def webbrowser_open(url):
         print(e)
 
 
-def main(config):
+def main(config: dict[str, Any]) -> None:
     app = create_app(config=config)
 
     port = config.get('port', '9000')

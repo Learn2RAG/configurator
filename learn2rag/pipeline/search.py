@@ -1,16 +1,24 @@
+import itertools
 import logging
-from .qdrant import Qdrant
-from .embeddings import create_embeddings
-import warnings
-from qdrant_client import models
+from typing import List
+
 import numpy as np
+from FlagEmbedding import FlagReranker
+from qdrant_client import models
+from qdrant_client.http.models import QueryResponse, ScoredPoint
+
+from .authorization import filter_authorized
+from .config import opt_config, user_config
+from .embeddings import create_embeddings
+from .qdrant import Qdrant
+
 
 
 profilingLogger = logging.getLogger('profiling')
 
 
 # similarity search
-def search(query, user_config, opt_config, *, request_id: str | None=None) -> list:
+def search(query, user_config, opt_config, *, request_id: str | None=None) -> QueryResponse:
     profilingLogger.info('start', extra={'activity': 'search', 'request_id': request_id})
     # FIXME: query can be str or dict (with multi_search), maybe always use a dict?
     collection_name = user_config["collection_name"]
@@ -29,7 +37,7 @@ def search(query, user_config, opt_config, *, request_id: str | None=None) -> li
     if opt_config["embedding_model"] == "BAAI/bge-m3":
         if opt_config["search_mode"] == "dense_sparse":
             query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense_sparse")
-        if opt_config["search_mode"] == "dense_sparse_colbert":
+        if opt_config["search_mode"] == "dense_sparse_colbert" or opt_config["search_mode"] == "reranking_with_colbert" or opt_config["search_mode"] == "reranking_with_flagreranker":
             query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense_sparse_colbert")
         if opt_config["search_mode"] == "dense":
             query_embedding = create_embeddings(query, opt_config["embedding_model"], embedding_mode="dense")["dense_vecs"]
@@ -44,8 +52,8 @@ def search(query, user_config, opt_config, *, request_id: str | None=None) -> li
     if opt_config["search_mode"] == "dense":
         results = qdrant.client.query_points(
             collection_name=collection_name,
-            query = query_embedding,
-            using = "dense",
+            query=query_embedding,
+            using="dense",
             limit=opt_config["top_k"],
         )
 
@@ -99,11 +107,78 @@ def search(query, user_config, opt_config, *, request_id: str | None=None) -> li
     elif opt_config["search_mode"] == "multi_search":
         results = qdrant.client.query_points(
             collection_name=collection_name,
-            query = query_embedding,
-            using = "multi",
+            query=query_embedding,
+            using="multi",
             limit=opt_config["top_k"],
         )
 
-    profilingLogger.info('end', extra={'activity': 'search', 'request_id': request_id})
+    elif opt_config["search_mode"] == "reranking_with_colbert":
+        indices = [int(k) for k in query_embedding["lexical_weights"].keys()]
+        values = [float(v) for v in query_embedding["lexical_weights"].values()]
+        results = qdrant.client.query_points(
+            collection_name=collection_name,
+            prefetch=[
+                models.Prefetch(
+                    query=models.SparseVector(indices=indices, values=values),
+                    using="sparse",
+                    limit=opt_config["prefetch_limit_sparse"],
+                ),
+                models.Prefetch(
+                    query=query_embedding["dense_vecs"],
+                    using="dense",
+                    limit=opt_config["prefetch_limit_dense"],
+                )
+            ],
+            query=list(query_embedding["colbert_vecs"]),
+            using="colbert",
+            limit=opt_config["top_k"],
+        )
 
+    elif opt_config["search_mode"] == "reranking_with_flagreranker":
+      reranker = FlagReranker('BAAI/bge-reranker-v2-m3', use_fp16=True)
+      indices = [int(k) for k in query_embedding["lexical_weights"].keys()]
+      values = [float(v) for v in query_embedding["lexical_weights"].values()]
+      results = qdrant.client.query_points(
+        collection_name=collection_name,
+        prefetch=[
+            models.Prefetch(
+                query=models.SparseVector(indices=indices, values=values),
+                using="sparse",
+                limit=opt_config["prefetch_limit_sparse"],
+            ),
+            models.Prefetch(
+                query=query_embedding["dense_vecs"],
+                using="dense",
+                limit=opt_config["prefetch_limit_dense"],
+            )
+        ],
+        query=models.FusionQuery(fusion=models.Fusion.RRF),
+        limit=opt_config["prefetch_limit_sparse"]+opt_config["prefetch_limit_dense"],
+        )
+      reranker = FlagReranker('BAAI/bge-reranker-v2-m3', use_fp16=True)
+      scores = reranker.compute_score([[query, res.payload['content']] for res in results.points])
+      
+      for i in range(len(results.points)):
+          results.points[i].payload['reranking_score'] = scores[i]
+          
+      results = sorted(
+      results.points, 
+      key=lambda x: x.payload["reranking_score"], 
+      reverse=True
+      )[:opt_config["top_k"]]
+ 
+    profilingLogger.info('end', extra={'activity': 'search', 'request_id': request_id})
     return results
+
+
+def _build_search_query(question: str):
+    if opt_config["search_mode"] == "multi_search":
+        return dict(itertools.product(["content"] + opt_config["multi_search"], [question]))
+    else:
+        return question
+
+async def search_authorized(question: str, user: str, *, request_id: str|None=None) -> List[ScoredPoint]:
+    search_query = _build_search_query(question)
+    points = search(search_query, user_config, opt_config, request_id=request_id)
+    authorized_points = await filter_authorized(user, points)
+    return authorized_points

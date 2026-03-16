@@ -4,7 +4,7 @@ from ..embeddings import create_embeddings
 
 
 class PipelineMiscTestCase(unittest.TestCase):
-    def test_embeddings(self):
+    def test_embeddings(self) -> None:
         input_sample = [
             'Paderborn is a city in eastern North Rhine-Westphalia, Germany, capital of the Paderborn district.',
             'Bielefeld is a city in the Ostwestfalen-Lippe Region in the north-east of North Rhine-Westphalia, Germany.',

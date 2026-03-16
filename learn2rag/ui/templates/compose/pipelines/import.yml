@@ -5,6 +5,15 @@ ports:
   - ui
   - qdrant_http
 files:
+  - path: '{{storage_path}}/qdrant_config.yml'
+    content: |
+      log_level: INFO
+      service:
+        api_key: '{{qdrant_api_key}}'
+        grpc_port: null
+        http_port: '{{ports.qdrant_http}}'
+        host: '127.0.0.1'
+      telemetry_disabled: true
   - path: '{{storage_path}}/importer_config.json'
     content: |
       {
@@ -27,7 +36,10 @@ files:
       {
           "collection_name": "learn2rag",
           "imported_documents_file_path": "loaded_documents.json",
-          "llm": "{{language_model.model}}"
+          "llm": "{{language_model.model}}",
+          "qdrant": {
+              "api_key": "{{qdrant_api_key}}"
+          }
       }
 
   - path: '{{storage_path}}/logging_config.yml'
@@ -77,9 +89,9 @@ services:
     command:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
-      - '{{learn2rag_path}}/qdrant/config.yml'
+      - '{{storage_path}}/qdrant_config.yml'
+    # https://qdrant.tech/documentation/guides/configuration/
     environment:
-      # https://qdrant.tech/documentation/guides/configuration/
       QDRANT__LOG_LEVEL: 'ERROR'
       QDRANT__SERVICE__HOST: '127.0.0.1'
       QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
@@ -93,6 +105,7 @@ services:
       STORAGE_PATH: '{{storage_path}}'
       QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
       PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
+      IMPORTER_CONFIG: '{{storage_path}}/importer_config.json'
       PIPELINE_OPT_CONFIG: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
       LANGCHAIN_API_KEY: '1'
       LANGCHAIN_TRACING_V2: 'false'

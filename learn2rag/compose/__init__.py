@@ -6,7 +6,8 @@ import os
 import signal
 import sqlite3
 import subprocess
-import urllib
+import urllib.request
+from typing import Any
 
 import psutil
 import yaml
@@ -50,14 +51,14 @@ CREATE TABLE IF NOT EXISTS services (
 ''']
 
 
-def kill_process(pid):
+def kill_process(pid: int) -> None:
     if hasattr(os, 'killpg'):
         os.killpg(os.getpgid(pid), signal.SIGTERM)
     else:
         os.kill(pid, signal.SIGTERM)
 
 
-def init_db(con):
+def init_db(con: sqlite3.Connection) -> None:
     cur = con.cursor()
     for sql in init_sql:
         try:
@@ -66,7 +67,7 @@ def init_db(con):
             logger.warning('Database initialization: %s', e)
 
 
-def process_running(pid):
+def process_running(pid: int) -> bool:
     # if process := popens.get(pid):
     #     returncode = process.poll()
     #     print(returncode)
@@ -80,7 +81,7 @@ def process_running(pid):
         return process.is_running()
 
 
-def healthy(value):
+def healthy(value: list[str]) -> bool:
     assert len(value) == 4
     assert value[0:3] == ['CMD', 'curl' ,'-f']
     url = value[3]
@@ -100,7 +101,11 @@ init_db(con)
 
 
 class Project():
-    def create(project_file, name):
+    name: str
+    content: dict[str, Any]
+
+    @staticmethod
+    def create(project_file: str | Path, name: str) -> 'Project | None':
         with open(project_file) as f:
             content = yaml.safe_load(f)
         assert len(content['services']) > 0
@@ -115,12 +120,13 @@ class Project():
         cur.close()
         return Project.get(name, check=False)
 
-    def _from_row(row, *, check):
+    @staticmethod
+    def _from_row(row: sqlite3.Row, *, check: bool) -> 'Project':
         project = Project()
         project.name = row['name']
         project.content = json.loads(row['content'])
         project.running = row['running']
-        project.health = None
+        project.health = False
         project.succeeded = bool(row['succeeded'])
         project.failed = bool(row['failed'])
 
@@ -132,9 +138,9 @@ class Project():
 
         return project
 
-    def check(self):
+    def check(self) -> None:
         cur = con.cursor()
-        cur.row_factory = sqlite3.Row
+        cur.row_factory = sqlite3.Row  # type: ignore[assignment]
         cur.execute('SELECT * FROM services WHERE project = :project', {'project': self.name})
         rows = cur.fetchall()
         cur.close()
@@ -142,27 +148,29 @@ class Project():
             logger.info('Stopping project %s due to stopped services: %s', self.name, [row['name'] for row in stopped])
             self.stop(stopped=stopped)
 
-    def healthcheck(self):
+    def healthcheck(self) -> None:
         # what it should be when there are no healthchecks defined?
         self.health = all(map(healthy, filter(None, (service.get('healthcheck', {}).get('test') for service in self.content['services'].values()))))
 
-    def get(name, *, check=True):
+    @staticmethod
+    def get(name: str, *, check: bool=True) -> 'Project | None':
         cur = con.cursor()
-        cur.row_factory = sqlite3.Row
+        cur.row_factory = sqlite3.Row  # type: ignore[assignment]
         cur.execute('SELECT * FROM projects WHERE name = ?', (name,))
         row = cur.fetchone()
         cur.close()
         return Project._from_row(row, check=check) if row else None
 
-    def get_all(*, check=True):
+    @staticmethod
+    def get_all(*, check: bool=True) -> dict[str, 'Project']:
         cur = con.cursor()
-        cur.row_factory = sqlite3.Row
+        cur.row_factory = sqlite3.Row  # type: ignore[assignment]
         cur.execute('SELECT * FROM projects')
         rows = cur.fetchall()
         cur.close()
         return {project.name: project for project in map(lambda row: Project._from_row(row, check=check), rows)}
 
-    def remove(self):
+    def remove(self) -> None:
         cur = con.cursor()
         cur.execute('BEGIN EXCLUSIVE')
         cur.execute('DELETE FROM projects WHERE name = :name AND running = FALSE', {'name': self.name})
@@ -172,7 +180,7 @@ class Project():
         con.commit()
         cur.close()
 
-    def start(self):
+    def start(self) -> None:
         cur = con.cursor()
         cur.execute('BEGIN EXCLUSIVE')
         cur.execute('UPDATE projects SET running = TRUE WHERE name = :name AND running = FALSE', {'name': self.name})
@@ -228,12 +236,12 @@ class Project():
         cur.close()
         self.running = True
 
-    def stop(self, stopped=[]):
+    def stop(self, stopped: list[dict[str, Any]]=[]) -> None:
         # FIXME: consider only main process exiting with exit code 0 as success
         self.succeeded = len(stopped) != 0 and all(process['pid'] in exit_statuses for process in stopped) and all(exit_statuses[process['pid']] == 0 for process in stopped)
         self.failed = any(process['pid'] in exit_statuses and exit_statuses[process['pid']] != 0 for process in stopped)
         cur = con.cursor()
-        cur.row_factory = sqlite3.Row
+        cur.row_factory = sqlite3.Row  # type: ignore[assignment]
         cur.execute('BEGIN EXCLUSIVE')
         cur.execute('UPDATE projects SET running = FALSE, succeeded = :succeeded, failed = :failed WHERE name = :name AND running = TRUE', {
             'name': self.name,

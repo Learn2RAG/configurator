@@ -19,13 +19,19 @@ if args.command == 'create':
         print('Failed')
 elif args.command == 'start':
     assert args.name is not None
-    Project.get(args.name).start()
+    project = Project.get(args.name)
+    assert project is not None
+    project.start()
 elif args.command == 'stop':
     assert args.name is not None
-    Project.get(args.name).stop()
+    project = Project.get(args.name)
+    assert project is not None
+    project.stop()
 elif args.command == 'remove':
     assert args.name is not None
-    Project.get(args.name).remove()
+    project = Project.get(args.name)
+    assert project is not None
+    project.remove()
 elif args.command == 'list':
     pprint(Project.get_all())
 else:

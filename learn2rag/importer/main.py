@@ -6,9 +6,9 @@ This is the main script of the learn2rag-importer project, which is designed to 
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.2
+Version: 0.0.3
 Creation Date: June 10, 2025
-Last Modified: Jan 12, 2026
+Last Modified: February 20, 2026
 """
 
 import argparse
@@ -18,6 +18,7 @@ import logging
 import sys
 import importlib.resources
 import warnings  
+from pathlib import Path
 from .config.config_constants import LOGS_DIR, VERSION
 from .utils.logging_setup import setup_logging
 from .utils.config_loader import load_json_config, validate_config_entry
@@ -29,7 +30,7 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module="magic") # Supp
 
 
 class ImporterArgumentParser(argparse.ArgumentParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         json_config_path = importlib.resources.files("learn2rag.importer.config") / "config.json"
         self.add_argument('--config', default=str(json_config_path))
@@ -39,7 +40,7 @@ def init(args):
     # Display a small textual description about the app
     print("------------------------------------------------------------")
     print("Learn2RAG Importer - DataImporter for Learn2RAG.")
-    print(f"Version: {VERSION} | Author: IFDT (KM) | Date: Jan 12, 2026\n")
+    print(f"Version: {VERSION} | Author: IFDT (KM) | Date: February 20, 2026\n")
     print("https://github.com/Learn2RAG/")
     print("------------------------------------------------------------\n")
 
@@ -52,7 +53,7 @@ def init(args):
     logging_config_path = importlib.resources.files("learn2rag.importer.config") / "logging.yaml"
 
     # Check if the logging configuration file exists
-    if not logging_config_path.exists():
+    if not Path(str(logging_config_path)).exists():
         logging.basicConfig()
         logging.error("Logging configuration file not found at %s", logging_config_path)
     else:
@@ -62,7 +63,7 @@ def init(args):
 
 
 #main function to run the application
-def main(args):
+def main(args: argparse.Namespace) -> None:
     # Load JSON configuration
     try:
         config = load_json_config(args.config)
