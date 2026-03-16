@@ -34,7 +34,7 @@
         {{pgettext('form_label', 'Data sources')}}
           {% for name, source in sources.items() %}
           <div class="form-check">
-            <input required="required" class="form-check-input" type="checkbox" name="sources" value="{{name}}" id="source-{{loop.index}}" checked="checked">
+            <input class="form-check-input" type="checkbox" name="sources" value="{{name}}" id="source-{{loop.index}}" checked="checked">
             <label class="form-check-label" for="source-{{loop.index}}">{{source.label}} ({{source.path}})</label>
           </div>
           {% endfor %}
