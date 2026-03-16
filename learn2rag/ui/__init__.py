@@ -165,6 +165,7 @@ def create_app(config={}):
             'ollama_available': hasattr(app, 'ollama_client'),
             'default_storage_prefix': app.instance_path + '/storage/',
             'firststeps_storage_path': app.instance_path + '/storage/example',
+            'current_timestamp': math.floor(time.time()),
         }
 
     @app.context_processor
@@ -346,10 +347,9 @@ def create_app(config={}):
             return render_template(
                 '_pipelines_list_table.html',
                 projects=projects,
-                current_timestamp=math.floor(time.time())
             )
 
-        return render_template('pipelines_list.html', projects=projects, current_timestamp=math.floor(time.time()))
+        return render_template('pipelines_list.html', projects=projects)
 
     @app.post('/pipelines')
     def pipeline_create():
