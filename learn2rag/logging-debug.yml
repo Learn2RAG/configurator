@@ -11,6 +11,12 @@ handlers:
     level: DEBUG
     formatter: colored
     stream: ext://sys.stderr
+  errors_file:
+    class: logging.FileHandler
+    level: ERROR
+    formatter: simple
+    filename: 'error.log'
+    encoding: utf-8
   file:
     class: logging.FileHandler
     level: DEBUG
@@ -19,4 +25,7 @@ handlers:
     encoding: utf-8
 root:
   level: DEBUG
-  handlers: [display, file]
+  handlers:
+    - display
+    - errors_file
+    - file
