@@ -342,14 +342,11 @@ def create_app(config={}):
 
     @app.get('/pipelines')
     def pipelines_list():
-        projects = Project.get_all()
-        if request.headers.get('HX-Request'):
-            return render_template(
-                '_pipelines_list_table.html',
-                projects=projects,
-            )
-
-        return render_template('pipelines_list.html', projects=projects)
+        context = {
+            'projects': Project.get_all(),
+        }
+        template = '_pipelines_list_table.html' if request.headers.get('HX-Request') else 'pipelines_list.html'
+        return render_template(template, **context)
 
     @app.post('/pipelines')
     def pipeline_create():
