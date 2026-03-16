@@ -13,5 +13,5 @@ jobs:
           python-version: '3.13.5'
           cache: 'poetry'
       - run: poetry install --no-root
-      - run: poetry run mypy --strict --exclude '^learn2rag/pipeline/scripts/' learn2rag
+      - run: poetry run mypy
       - run: poetry run pytest
