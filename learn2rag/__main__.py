@@ -1,12 +1,13 @@
 import platform
 import subprocess
 import sys
+from typing import Any
 
 import uvicorn
 import yaml
 
 
-def webbrowser_open(url):
+def webbrowser_open(url: str) -> None:
     try:
         if platform.system() == 'Windows':
             subprocess.Popen(['explorer', url])
@@ -18,7 +19,7 @@ def webbrowser_open(url):
         print(e)
 
 
-def start_ui(config):
+def start_ui(config: dict[str, Any]) -> None:
     from learn2rag.ui import create_app
     app = create_app(config=config)
 

@@ -12,17 +12,19 @@ Last Modified: Jan 17, 2026
 """
 
 import logging
+from typing import List, Dict, Any
 from ..globals import stop_loading
+from langchain_core.documents import Document
 from .directory_loader import load_from_directory
 from .csv_loader import load_from_csv
 from .html_loader import load_html_content
-from .sharepoint_loader import load_from_sharepoint 
+from .sharepoint_loader import load_from_sharepoint
 
 #
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
 
-def process_configuration_entries(config_entries):
+def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[Document]:
     """
     Process configuration entries and load documents based on loader type.
 
@@ -44,6 +46,7 @@ def process_configuration_entries(config_entries):
 
         try:
             logger.info(f"Processing entry: {entry}, please wait...")
+            loader_id = entry.get("loader_id")
             if loader_type == "DirectoryLoader":
                 path = entry.get("path")
                 recursive = entry.get("recursive", False)
@@ -70,15 +73,16 @@ def process_configuration_entries(config_entries):
                 client_id = entry.get("client_id")
                 client_secret = entry.get("client_secret")
                 document_library_id = entry.get("document_library_id")
-                tenant_id = entry.get("tenant_id", "common")  
-                folder_path = entry.get("folder_path") 
-                folder_id = entry.get("folder_id") 
+                tenant_id = entry.get("tenant_id", "common")
+                folder_path = entry.get("folder_path")
+                folder_id = entry.get("folder_id")
+                site_id = entry.get("site_id")
                 object_ids = entry.get("object_ids")
-                
+
                 recursive = entry.get("recursive", False)
                 if isinstance(recursive, str):
                     recursive = recursive.lower() == "true"
-                
+
                 auth_with_token = entry.get("auth_with_token", False)
                 if isinstance(auth_with_token, str):
                     auth_with_token = auth_with_token.lower() == "true"
@@ -86,11 +90,12 @@ def process_configuration_entries(config_entries):
                 reset_token = entry.get("reset_token", False)
                 if isinstance(reset_token, str):
                     reset_token = reset_token.lower() == "true"
-                
+
                 if not client_id or not client_secret or not tenant_id or not document_library_id:
-                    logger.error(f"Invalid configuration for SharepointLoader: Missing required parameters. Entry: {entry}")
+                    logger.error(
+                        f"Invalid configuration for SharepointLoader: Missing required parameters. Entry: {entry}")
                     continue
-                
+
                 documents = load_from_sharepoint(
                     client_id=client_id,
                     client_secret=client_secret,
@@ -101,17 +106,18 @@ def process_configuration_entries(config_entries):
                     recursive=recursive,
                     auth_with_token=auth_with_token,
                     reset_token=reset_token,
-                    tenant_id=tenant_id 
+                    tenant_id=tenant_id,
+                    site_id=site_id,
                 )
                 logger.info(f"Loaded {len(documents)} documents from SharePoint using {loader_type}.")
-            
+
             else:
                 logger.error(f"Unknown loader type: {loader_type}")
                 continue
-
+            for doc in documents:
+                doc.metadata["loader_id"] = loader_id
             all_documents.extend(documents)
         except Exception as e:
             logger.error(f"Error processing entry {entry}: {e}")
 
     return all_documents
-

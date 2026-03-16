@@ -5,33 +5,34 @@ import pathlib
 import json
 import logging
 import datasets
-import json_stream
+import json_stream  # type: ignore[import-untyped]
+from typing import Any, Callable
 
 import learn2rag.pipeline.ingestion
 from learn2rag.pipeline.config import opt_config
 
 
-def key_document(key):
-    def document(example):
+def key_document(key: str) -> Callable[[Any], Any]:
+    def document(example: Any) -> Any:
         yield example[key]
     return document
 
 
-def key_document_list(key):
-    def document(example):
+def key_document_list(key: str) -> Callable[[Any], Any]:
+    def document(example: Any) -> Any:
         for item in example[key]:
             yield item
     return document
 
 
-def hotpot_documents(example):
+def hotpot_documents(example: dict[str, Any]) -> Any:
     context = example['context']
     for title, sentences in zip(context['title'], context['sentences']):
         yield ' '.join([title] + sentences)
 
 
-@json_stream.streamable_list
-def generate_documents(dataset_dict, id_key, content_getter, dataset_name, content_counter):
+@json_stream.streamable_list  # type: ignore[untyped-decorator]
+def generate_documents(dataset_dict: Any, id_key: str | None, content_getter: Callable[[Any], Any], dataset_name: str, content_counter: collections.Counter[str]) -> Any:
     for split, dataset in dataset_dict.items():
         for i, example in enumerate(dataset):
             for content in content_getter(example):
@@ -47,11 +48,11 @@ def generate_documents(dataset_dict, id_key, content_getter, dataset_name, conte
                     }
 
 
-def import_dataset_documents(dataset_name, subdirectory, id_key, content_getter):
+def import_dataset_documents(dataset_name: str, subdirectory: str, id_key: str | None, content_getter: Callable[[Any], Any]) -> None:
     logging.debug(f'{dataset_name=}')
     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
     dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
-    content_counter = collections.Counter()
+    content_counter = collections.Counter[str]()
     with (dataset_work_dir / 'loaded_documents.json').open('w') as f:
         json.dump(generate_documents(dataset_dict, id_key, content_getter, dataset_name, content_counter), f)
     questions_per_document_count = collections.Counter(sorted(content_counter.values(), reverse=True))
@@ -62,7 +63,7 @@ def import_dataset_documents(dataset_name, subdirectory, id_key, content_getter)
             wr.writerow(item)
 
 
-def ingest_dataset_documents(dataset_name):
+def ingest_dataset_documents(dataset_name: str) -> None:
     logging.debug(f'{dataset_name=}')
     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
     documents_path = dataset_work_dir / 'loaded_documents.json'
@@ -76,14 +77,14 @@ def ingest_dataset_documents(dataset_name):
     learn2rag.pipeline.ingestion.index(user_config, opt_config)
 
 
-def read_dataset_qa(dataset_name, subdirectory, split=None):
+def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
     logging.debug(f'{dataset_name=}')
     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
     dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
     return dataset_dict[split] if split is not None else dataset_dict
 
 
-def basic_pipeline(dataset_name, question):
+def basic_pipeline(dataset_name: str, question: str) -> dict[str, Any]:
     user_config = {
         'file_path': None,
         'collection_name': dataset_name,

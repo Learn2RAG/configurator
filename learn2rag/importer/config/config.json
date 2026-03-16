@@ -2,19 +2,23 @@
     "loaders": [
         {
             "loader_type": "DirectoryLoader",
+            "loader-id": "directory-test",
             "path": "C:\\Users\\km\\Downloads\\revisedmanuscriptfrontierspaper\\2",
             "recursive": "True"
         },
         {
             "loader_type": "HTMLLoader",
+            "loader-id": "html-test",
             "url": "https://learn2rag.de",
             "depth": 0
         },
         {
             "loader_type": "SharepointLoader",
+            "loader_id": "sharepoint-test",
             "client_id": "YourClientIDHere",
             "client_secret": "YourClientSecretHere",
             "tenant_id": "YourTenantIDHere",
+            "site_id": "YourSiteId",
             "document_library_id": "YourDocumentLibraryIDHere",
             "recursive": "True",
             "auth_with_token": "True"

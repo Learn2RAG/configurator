@@ -3,7 +3,7 @@ import os
 import uvicorn
 
 
-def main():
+def main() -> None:
     from .app import app
     uvicorn.run(
         app,

@@ -4,7 +4,7 @@ import unittest
 from ..loaders.html_loader import load_html_content
 
 class ImporterLoadersTestCase(unittest.TestCase):
-    def test_remote_url(self):
+    def test_remote_url(self) -> None:
         docs = load_html_content('https://dice-research.org')
         assert len(docs) == 1
         doc, = docs

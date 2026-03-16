@@ -7,35 +7,37 @@ It includes robust handling for App-Only Authentication (Client Credentials)
 and Site-Specific contexts.
 
 Author: Kyrill Meyer
-Version: 0.0.3
+Version: 0.0.4
 Institution: IFDT
 Creation Date: January 14, 2026
+Last Modified Date: February 20, 2026
 """
 import logging
 import os
 import tempfile
 import shutil
 from pathlib import Path
+from typing import List, Optional, Any, Union
 from langchain_community.document_loaders import UnstructuredFileLoader, TextLoader, UnstructuredExcelLoader, PyPDFLoader
 from langchain_core.documents import Document
-from O365 import Account, FileSystemTokenBackend  
+from O365 import Account, FileSystemTokenBackend  # type: ignore
 from ..globals import stop_loading
 
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
 
-
-
-def _parse_file(file_path, original_item):
+def _parse_file(file_path: Path, original_item: Any) -> List[Document]:
     """
     Parses file using the robust UnstructuredFileLoader.
     """
-    docs = []
+    docs: List[Document] = []
     
     # Check file extension (lowercase)
     suffix = file_path.suffix.lower()
 
     try:
+        loader: Union[UnstructuredExcelLoader, PyPDFLoader, UnstructuredFileLoader, TextLoader]
+        
         # SPECIAL HANDLING FOR EXCEL
         if suffix in [".xlsx", ".xls"]:
             logger.info(f"Detected Excel file: {file_path.name} - using UnstructuredExcelLoader")
@@ -98,7 +100,7 @@ def _parse_file(file_path, original_item):
             # We keep existing metadata from Unstructured and add our own
             doc.metadata.update({
                 "source": original_item.web_url,
-                "sharepoint_id": original_item.object_id,
+                "document_id": original_item.object_id,
                 "name": original_item.name,
                 "created": str(original_item.created),
                 "modified": str(original_item.modified),
@@ -143,7 +145,7 @@ def _parse_file(file_path, original_item):
         
         return docs
     
-def reset_o365_token():
+def reset_o365_token() -> None:
     """
     Reset the O365 token by deleting the token file.
     This forces a new authentication on the next load attempt.
@@ -155,7 +157,7 @@ def reset_o365_token():
     else:
         logger.info("O365 token file does not exist; nothing to reset.")
 
-def _authenticate_directly_with_o365(client_id, client_secret, tenant_id):
+def _authenticate_directly_with_o365(client_id: str, client_secret: str, tenant_id: str) -> None:
     """
     Helper function to authenticate directly using the O365 library.
     This ensures the tenant_id is correctly used for URL generation.
@@ -184,7 +186,7 @@ def _authenticate_directly_with_o365(client_id, client_secret, tenant_id):
     else:
         logger.info("O365 Library reports: Already authenticated.")
 
-def _list_available_drives(account, search_term=None):
+def _list_available_drives(account: Account, search_term: Optional[str] = None) -> None:
     """
     Helper to list available drives/sites visible to the app.
     This helps in finding the correct Drive ID.
@@ -231,13 +233,13 @@ def _list_available_drives(account, search_term=None):
     except Exception as e:
         logger.error(f"Error while listing available drives: {e}")
 
-def _load_items_manual_traversal(drive, folder_id=None, recursive=True):
+def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, recursive: bool = True) -> List[Document]:
     """
     Internal helper to manually traverse and load items into Document objects.
     This bypasses LangChain's internal 'storage()' call which fails in App-Only context.
     It initiates downloads and uses Unstructured for parsing.
     """
-    documents = []
+    documents: List[Document] = []
     
     # 1. Determine entry point
     if folder_id:
@@ -260,7 +262,7 @@ def _load_items_manual_traversal(drive, folder_id=None, recursive=True):
     logger.info(f"Created temp directory for downloads: {temp_dir}")
 
     try:
-        def _process_folder_items(item_list):
+        def _process_folder_items(item_list: Any) -> None:
             for item in item_list:
                 if stop_loading: return
 
@@ -305,16 +307,16 @@ def _load_items_manual_traversal(drive, folder_id=None, recursive=True):
 
 
 def load_from_sharepoint(client_id: str, client_secret: str, document_library_id: str, 
-                         folder_path: str = None, folder_id: str = None, 
-                         object_ids: list = None, recursive: bool = False, 
+                         folder_path: Optional[str] = None, folder_id: Optional[str] = None, 
+                         object_ids: Optional[List[str]] = None, recursive: bool = False, 
                          auth_with_token: bool = True, load_extended_metadata: bool = True,
                          reset_token: bool = False, tenant_id: str = "common",
-                         site_id: str = None) -> list[Document]:
+                         site_id: Optional[str] = None) -> List[Document]:
     """
     Load documents from SharePoint and set metadata.
     """
 
-    documents = []
+    documents: List[Document] = []
 
     # Reset token if requested
     if reset_token:
