@@ -7,10 +7,10 @@ It includes robust handling for App-Only Authentication (Client Credentials)
 and Site-Specific contexts.
 
 Author: Kyrill Meyer
-Version: 0.0.4
+Version: 0.0.5
 Institution: IFDT
 Creation Date: January 14, 2026
-Last Modified Date: February 20, 2026
+Last Modified Date: March 17, 2026
 """
 import logging
 import os
@@ -26,7 +26,7 @@ from ..globals import stop_loading
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
 
-def _parse_file(file_path: Path, original_item: Any) -> List[Document]:
+def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> List[Document]:
     """
     Parses file using the robust UnstructuredFileLoader.
     """
@@ -104,7 +104,8 @@ def _parse_file(file_path: Path, original_item: Any) -> List[Document]:
                 "name": original_item.name,
                 "created": str(original_item.created),
                 "modified": str(original_item.modified),
-                "loader": "SharePointLoader"
+                "loader": "SharePointLoader",
+                "loader_id": loader_id
             })
         return docs
 
@@ -233,7 +234,7 @@ def _list_available_drives(account: Account, search_term: Optional[str] = None) 
     except Exception as e:
         logger.error(f"Error while listing available drives: {e}")
 
-def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, recursive: bool = True) -> List[Document]:
+def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, recursive: bool = True, loader_id: str = "N/A") -> List[Document]:
     """
     Internal helper to manually traverse and load items into Document objects.
     This bypasses LangChain's internal 'storage()' call which fails in App-Only context.
@@ -284,7 +285,7 @@ def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, re
                             # 3. Parse file using Unstructured
                             if local_file_path.exists():
                                 logger.info(f"Parsing with Unstructured: {item.name} ...")
-                                parsed_docs = _parse_file(local_file_path, item)
+                                parsed_docs = _parse_file(local_file_path, item, loader_id=loader_id)
                                 documents.extend(parsed_docs)
                                 
                                 # Clean up immediately to save space
@@ -311,7 +312,7 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
                          object_ids: Optional[List[str]] = None, recursive: bool = False, 
                          auth_with_token: bool = True, load_extended_metadata: bool = True,
                          reset_token: bool = False, tenant_id: str = "common",
-                         site_id: Optional[str] = None) -> List[Document]:
+                         site_id: Optional[str] = None, loader_id: str = "N/A") -> List[Document]:
     """
     Load documents from SharePoint and set metadata.
     """
@@ -371,7 +372,7 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
         
         # Load documents using internal helper function
         # Use folder_id if provided, otherwise use Root of the Drive
-        loaded_docs = _load_items_manual_traversal(drive, folder_id=folder_id, recursive=recursive)
+        loaded_docs = _load_items_manual_traversal(drive, folder_id=folder_id, recursive=recursive, loader_id=loader_id)
         
         logger.info(f"Found {len(loaded_docs)} documents.")
 
