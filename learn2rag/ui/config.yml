@@ -1,7 +1,7 @@
-ssl_keyfile: "/etc/ssl/private/irb-managed/key.pem"
-ssl_certfile: "/etc/ssl/private/irb-managed/cert.pem"
+ssl_keyfile: ""
+ssl_certfile: ""
 port: 9000
-host: "0.0.0.0"
+host: ""
 
 SUGGESTED_MODELS:
   gemma3_27b:
