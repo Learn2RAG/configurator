@@ -2,11 +2,13 @@ import platform
 import subprocess
 import sys
 import os
+import logging
 from typing import Any
 
 import uvicorn
 import yaml
 
+logger = logging.getLogger(__name__)
 
 def webbrowser_open(url: str) -> None:
     try:
@@ -17,7 +19,7 @@ def webbrowser_open(url: str) -> None:
     except FileNotFoundError:
         pass
     except Exception as e:
-        print(e)
+        logger.error(e)
 
 
 def start_ui(config: dict[str, Any]) -> None:
@@ -38,19 +40,20 @@ def start_ui(config: dict[str, Any]) -> None:
     use_https = False
     if ssl_key and ssl_cert:
         if os.path.exists(ssl_key) and os.path.exists(ssl_cert):
-            print(f" SSL files defined and found at {ssl_key} or {ssl_cert}")
+            logger.info(f" SSL files defined and found at {ssl_key} or {ssl_cert}")
             use_https = True
         else:
-            print(f"Warning: SSL files defined but not found at {ssl_key} or {ssl_cert}")
+            logger.error(f"Warning: SSL files defined but not found at {ssl_key} or {ssl_cert}")
+            raise FileNotFoundError(f"SSL files defined but not found at {ssl_key} or {ssl_cert}")
     else:
-        print(f"no SSL files provided then switch to HTTP mode")
+        logger.info(f"no SSL files provided then switch to HTTP mode")
 
     protocol = 'https' if use_https else 'http'
     url = f"{protocol}://localhost:{port}"
     webbrowser_open(url)
-    print('*' * 40)
-    print('Learn2RAG: ' + url)
-    print('*' * 40)
+    logger.info('*' * 40)
+    logger.info('Learn2RAG: ' + url)
+    logger.info('*' * 40)
 
     uvicorn_kwargs = {
         "app": app,
@@ -75,7 +78,7 @@ if __name__ == '__main__':
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
-        print(f"No config file used !")
+        logger.exception(f"No config file used !")
         pass
 
     if sys.argv[1:2] == ['ollama']:
