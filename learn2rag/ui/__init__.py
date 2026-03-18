@@ -217,6 +217,15 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         ok = True
         model = request.form['model']
         api = request.form['api']
+
+        cert_path = os.environ.get('LEARN2RAG_SSL_CERT')
+        key_path = os.environ.get('LEARN2RAG_SSL_KEY')
+        has_ssl = bool(cert_path and key_path and Path(cert_path).exists())
+        protocol = 'https' if has_ssl else 'http'
+
+        app.logger.info(f"cert_path: {cert_path} , has_ssl:{has_ssl} , protocol : {protocol}" )
+        app.logger.info(f"api {api} model {model}")
+
         if api == 'ChatOllama':
             url = request.form.get('url') or 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
             # TODO setup tokens for locally running ollama
