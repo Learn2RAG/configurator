@@ -1,23 +1,23 @@
-  #!/bin/bash
-  set -eu
+#!/bin/bash
+set -eu
 
 
-  #export UV_CACHE_DIR="/opt/uv/cache"
-  #export UV_PYTHON_INSTALL_DIR="/opt/uv/python"
-  #export UV_TOOL_BIN_DIR="/opt/uv/bin"
-  #export UV_DATA_DIR="/opt/uv/data"
-  #export PATH="/opt/uv:$PATH"
+#export UV_CACHE_DIR="/opt/uv/cache"
+#export UV_PYTHON_INSTALL_DIR="/opt/uv/python"
+#export UV_TOOL_BIN_DIR="/opt/uv/bin"
+#export UV_DATA_DIR="/opt/uv/data"
+#export PATH="/opt/uv:$PATH"
 
 
-  #in restricted environment we use /opt/uv to install uv
-  source /opt/uv/.local_bashrc
-  uv sync --no-install-project
+#in restricted environment we use /opt/uv to install uv
+source /opt/uv/.local_bashrc
+uv sync --no-install-project
 
-  echo ">>> Root Python installed."
+echo ">>> Root Python installed."
 
-  (cd services/open-webui &&  bash -eu ../install-open-webui)
-  (cd services/open-webui-pipelines &&  bash -eu ../install-open-webui-pipelines)
-  (cd services &&  bash -eu ./install-ollama)
-  (cd services &&  bash -eu ./install-qdrant)
+(cd services/open-webui &&  bash -eu ../install-open-webui)
+(cd services/open-webui-pipelines &&  bash -eu ../install-open-webui-pipelines)
+(cd services &&  bash -eu ./install-ollama)
+(cd services &&  bash -eu ./install-qdrant)
 
-  echo ">>> All services installed!"
+echo ">>> All services installed!"
