@@ -10,15 +10,8 @@ files:
       log_level: INFO
       service:
         api_key: '{{qdrant_api_key}}'
-        grpc_port: null
-        {% if use_ssl %}
-        https_port: {{ports.qdrant_http}}        
-        tls:
-          cert: '{{ssl_cert}}'
-          key: '{{ssl_key}}'
-        {% else %}
+        grpc_port: null      
         http_port: {{ports.qdrant_http}}
-        {% endif %}
         host: '127.0.0.1'
       telemetry_disabled: true
   - path: '{{storage_path}}/importer_config.json'
