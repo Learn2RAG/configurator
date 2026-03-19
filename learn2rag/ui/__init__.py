@@ -364,10 +364,17 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         for path_name, source in sources.items():
             source['path'] = str(expand_path(source['path']))
 
+        #  Fetch the language model configuration first let see if it works
+        language_model = learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model'])
+        app.logger.info(f"Original LLM API URL: {language_model.get('url')}")
+        if has_ssl and language_model.get('url') and language_model['url'].startswith('http://'):
+            language_model['url'] = language_model['url'].replace('http://', 'https://', 1)
+            app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
+
         render_context = {
             'learn2rag_hostname': url.hostname,
             'pipeline': pipeline,
-            'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
+            'language_model': language_model,
             'sources': sources,
             'qdrant_api_key': secrets.token_hex(16),
             'ssl_cert': cert_path if has_ssl else "",
