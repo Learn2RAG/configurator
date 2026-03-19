@@ -134,7 +134,7 @@ dependencies = [
     "pywin32 ; sys_platform == 'win32'",
     "pyxdg",
     "pyyaml (>=6.0.2,<7.0.0)",
-    "qdrant-client (>=1.14.3,<1.16.0)",
+    "qdrant-client (>=1.16.0,<1.18.0)",
     "RapidFuzz==3.13.0",
     "regex==2025.7.34",
     "requests==2.32.4",

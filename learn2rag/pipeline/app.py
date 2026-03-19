@@ -2,12 +2,13 @@ import asyncio
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
+from typing import List, TypedDict, Generator, Any, AsyncGenerator
 
 from fastapi import FastAPI, Body, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+from qdrant_client.models import ScoredPoint
 
 from . import generate
 from . import ingestion
@@ -29,8 +30,10 @@ class ChatState(BaseModel):
     messages: List[Message]
     user: str | None = None  # FIXME
 
+class TestResponse(BaseModel):
+    message: str
 
-async def simple_chatbot_response(input: QuestionInput) -> str:
+async def simple_chatbot_response(input: QuestionInput) -> Any:
     results = await search_authorized(question=input.question, user=input.user)
     # sources = "\n".join(set(result.payload['path'] for result in results))
     answer = generate.generate(input.question, results, opt_config)
@@ -53,7 +56,7 @@ app = FastAPI()
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     message = str(exc)
     logging.error(f"validation_exception_handler: {message}")
     content = {'message': message}
@@ -69,9 +72,10 @@ async def qanda(
                 "user": "d56d14d0-79c7-4c49-9499-07634a2610c2"
             }
         )
-):
+) -> ChatState:
     answer = await simple_chatbot_response(input)
-    return {"messages": [{"content": answer}]}
+    
+    return ChatState(messages=[Message(content=answer, role="model")])
 
 
 @app.post("/stream")
@@ -80,9 +84,12 @@ async def stream(
             ...,
             example=example_messages
         )
-):
-    async def event_stream():
+) -> StreamingResponse:
+    async def event_stream() -> AsyncGenerator[Any, Any]:
         question = inputs.messages[-1].content
+
+        if not inputs.user:
+            raise ValueError("User Missing")
 
         results = await search_authorized(user=inputs.user, question=question)
         # sources = "\n".join(set(result.payload['path'] for result in results))
@@ -90,7 +97,7 @@ async def stream(
         executor = ThreadPoolExecutor()
         loop = asyncio.get_event_loop()
 
-        def sync_gen():
+        def sync_gen() -> Generator[str, Any, None]:
             for chunk in generate.generate_stream(question, results, opt_config):
                 yield chunk
 
@@ -138,15 +145,18 @@ async def search(
                 "user": "d56d14d0-79c7-4c49-9499-07634a2610c2"
             }
         )
-):
+) -> List[ScoredPoint]:
     return await search_authorized(user=input.user, question=input.question)
 
 
+
+
 @app.post("/ingest")
-async def ingest():
+async def ingest() -> None:
     ingestion.index(user_config, opt_config)
 
 
+
 @app.get("/test")
-async def test():
-    return {"message": "Hello World"}
+async def test() -> TestResponse:
+    return TestResponse(message="Hello World")

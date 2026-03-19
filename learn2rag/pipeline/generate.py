@@ -10,10 +10,10 @@ Content:
 {content}
 """
 
-def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> str:
+def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Any:
     if hasattr(search_results, "points"):
         search_results = search_results.points
-    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
+    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results]) # type: ignore[index]
     system_message = SystemMessagePromptTemplate.from_template(opt_config["prompt"])
     user_message = HumanMessagePromptTemplate.from_template("{question}")
     prompt = ChatPromptTemplate.from_messages([system_message, user_message])
@@ -25,7 +25,7 @@ def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str
 def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Generator[str, None, None]:
     if hasattr(search_results, "points"):
         search_results = search_results.points
-    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
+    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results]) # type: ignore[index]
     system_message = SystemMessagePromptTemplate.from_template(opt_config["prompt"])
     user_message = HumanMessagePromptTemplate.from_template("{question}")
     prompt = ChatPromptTemplate.from_messages([system_message, user_message])

@@ -1,7 +1,7 @@
 import logging
 from uuid import uuid4
 import hashlib
-from typing import Any
+from typing import Any, cast
 import numpy as np
 import warnings
 from collections.abc import Iterator
@@ -133,7 +133,11 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
         for item in opt_config["multi_search"]:
             chunks_metadata[item] = list(get_chunks_metadata(chunks, item))
             embeddings_metadata[item] = create_embeddings(chunks_metadata[item], opt_config["embedding_model"], opt_config["search_mode"])
-            assert embeddings_metadata[item]['dense_vecs'].ndim == 2, embeddings_metadata[item]['dense_vecs'].shape
+            dense_vecs = embeddings_metadata[item]["dense_vecs"]
+            if isinstance(dense_vecs, np.ndarray):
+                assert dense_vecs.ndim == 2, dense_vecs.shape
+            else:
+                raise TypeError(f"dense_vecs must be np.ndarray, got {type(dense_vecs)}")
                 
     # TODO: hash if you want to monitore changes in metadata
     chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]
@@ -142,11 +146,11 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     logging.info('Creating embeddings...')
     embeddings = create_embeddings(chunks_content, opt_config["embedding_model"], opt_config["search_mode"])
     if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
-        mmembeddings = [] 
+        mmembeddings: list[np.ndarray[Any, Any]] = []
         for i in range(len(embeddings['dense_vecs'])):
-            vecs_to_concat = [embeddings['dense_vecs'][i]]
+            vecs_to_concat: list[np.ndarray[Any, Any]] = [cast(np.ndarray[Any, Any], embeddings['dense_vecs'][i])]
             for item in embeddings_metadata.keys():
-                vecs_to_concat.append(embeddings_metadata[item]['dense_vecs'][i])
+                vecs_to_concat.append(cast(np.ndarray[Any, Any], embeddings_metadata[item]['dense_vecs'][i]))
             mmembeddings.append(np.concatenate(vecs_to_concat, axis=0))
         embeddings['dense_vecs'] = mmembeddings
 

@@ -1,8 +1,9 @@
 import logging
 import os
-
+from pydantic import SecretStr
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
+from typing import Callable, Any
 
 
 def ollama_client(*, url: str, token: str | None, model: str, proxy: str | None) -> ChatOllama:
@@ -17,7 +18,7 @@ def ollama_client(*, url: str, token: str | None, model: str, proxy: str | None)
     )
 
 
-def openai_client(*, url: str, token: str | None, model: str, proxy: str | None) -> ChatOpenAI:
+def openai_client(*, url: str, token: SecretStr, model: str, proxy: str | None) -> ChatOpenAI:
     return ChatOpenAI(
         model=model,
         temperature=0,
@@ -37,7 +38,7 @@ llm_kwargs = {
 logging.info('LLM args: %s', llm_kwargs)
 
 # the keys are written by the configurator UI
-llms = {
+llms: dict[str, Callable[..., Any]] = {
     'ChatOllama': ollama_client,
     'ChatOpenAI': openai_client,
 }
