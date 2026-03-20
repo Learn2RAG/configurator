@@ -10,7 +10,8 @@ set -eu
 
 
 #in restricted environment we use /opt/uv to install uv
-source /opt/uv/.local_bashrc
+#source /opt/uv/.local_bashrc
+
 uv sync --no-install-project
 
 echo ">>> Root Python installed."
