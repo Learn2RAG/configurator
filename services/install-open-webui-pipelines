@@ -10,4 +10,7 @@ uv sync --no-install-project --python 3.11
 # 4. Run the setup script using the 3.11 environment
 uv run --python 3.11 ./start.sh --mode setup
 
+# Open WebUI-pipelines assumes pip is available at runtime to install pipeline script dependencies
+uv pip install pip
+
 echo "✅ Pipelines Setup Complete!"
