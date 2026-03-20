@@ -42,6 +42,47 @@ files:
           }
       }
 
+  - path: '{{storage_path}}/logging_config.yml'
+    content: |
+      version: 1
+      formatters:
+        simple:
+          format: "%(asctime)s %(levelname)-8s %(name)s %(message)s"
+        colored:
+          class: colorlog.ColoredFormatter
+          format: "%(log_color)s%(asctime)s %(levelname)-8s %(name)s %(message)s"
+      handlers:
+        display:
+          class: logging.StreamHandler
+          level: INFO
+          formatter: colored
+          stream: ext://sys.stderr
+        errors_file:
+          class: logging.FileHandler
+          level: ERROR
+          formatter: simple
+          filename: '{{storage_path}}/logs/error.log'
+          encoding: utf-8
+        {% if debug_logging %}
+        debug_file:
+          class: logging.FileHandler
+          level: DEBUG
+          formatter: simple
+          filename: '{{storage_path}}/logs/debug.log'
+          encoding: utf-8
+        {% endif %}
+      root:
+        level: DEBUG
+        handlers:
+          - display
+          - errors_file
+          {% if debug_logging %}
+          - debug_file
+          {% endif %}
+
+  - path: '{{storage_path}}/logs/.keep'
+    content: ''
+
 services:
   qdrant:
     working_dir: '{{storage_path}}'
@@ -49,6 +90,12 @@ services:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
       - '{{storage_path}}/qdrant_config.yml'
+    # https://qdrant.tech/documentation/guides/configuration/
+    environment:
+      QDRANT__LOG_LEVEL: 'ERROR'
+      QDRANT__SERVICE__HOST: '127.0.0.1'
+      QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
+      QDRANT__TELEMETRY_DISABLED: 'true'
   main:
     working_dir: '{{storage_path}}'
     command:

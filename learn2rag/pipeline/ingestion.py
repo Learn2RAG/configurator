@@ -1,6 +1,8 @@
+import argparse
 import logging
 from uuid import uuid4
 import hashlib
+import pathlib
 from typing import Dict
 import numpy as np
 import warnings
@@ -197,11 +199,10 @@ def index(user_config, opt_config):
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-
     from .config import user_config, opt_config
-
     index(user_config, opt_config)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main()

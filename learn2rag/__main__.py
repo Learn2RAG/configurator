@@ -1,101 +1,66 @@
-import platform
-import subprocess
+import argparse
+import importlib
+import importlib.resources
+import logging
+import os
+import pathlib
 import sys
 import os
 import logging
 from typing import Any
 
-import uvicorn
 import yaml
 
 logger = logging.getLogger(__name__)
 
-def webbrowser_open(url: str) -> None:
-    try:
-        if platform.system() == 'Windows':
-            subprocess.Popen(['explorer', url])
+class LauncherArgumentParser(argparse.ArgumentParser):
+    def __init__(self):
+        super().__init__()
+        self.add_argument('module', type=str, nargs='?', default='learn2rag.ui')
+        self.add_argument('--logging-config', type=pathlib.Path)
+
+
+def excepthook(*exc_info: tuple) -> None:
+    os.environ['NO_COLOR'] = '1'
+    logging.critical('Uncaught exception', exc_info=exc_info)
+    sys.__excepthook__(*exc_info)
+
+
+def configure_logging(config_path: pathlib.Path, debug: bool) -> None:
+    if config_path is None:
+        if not debug:
+            config_path = importlib.resources.files("learn2rag") / "logging.yml"
         else:
-            subprocess.Popen(['xdg-open', url])
-    except FileNotFoundError:
-        pass
-    except Exception as e:
-        logger.error(e)
-
-
-def start_ui(config: dict[str, Any]) -> None:
-    from learn2rag.ui import create_app
-    app = create_app(config=config)
-
-    port = config.get('port', '9000')
-    host = config.get('host', '0.0.0.0')
-
-    ssl_key = config.get('ssl_keyfile')
-    ssl_cert = config.get('ssl_certfile')
-
-    if ssl_key:
-        os.environ['LEARN2RAG_SSL_KEY'] = ssl_key
-    if ssl_cert:
-        os.environ['LEARN2RAG_SSL_CERT'] = ssl_cert
-
-    use_https = False
-    if ssl_key and ssl_cert:
-        if os.path.exists(ssl_key) and os.path.exists(ssl_cert):
-            logger.info(f" SSL files defined and found at {ssl_key} or {ssl_cert}")
-            use_https = True
-        else:
-            logger.error(f"Warning: SSL files defined but not found at {ssl_key} or {ssl_cert}")
-            raise FileNotFoundError(f"SSL files defined but not found at {ssl_key} or {ssl_cert}")
+            config_path = importlib.resources.files("learn2rag") / "logging-debug.yml"
+    if config_path is not None:
+        with config_path.open(encoding='utf-8') as f:
+            logging.config.dictConfig(yaml.safe_load(f))
     else:
-        logger.info(f"no SSL files provided then switch to HTTP mode")
-
-    protocol = 'https' if use_https else 'http'
-    url = f"{protocol}://localhost:{port}"
-    webbrowser_open(url)
-    logger.info('*' * 40)
-    logger.info('Learn2RAG: ' + url)
-    logger.info('*' * 40)
-
-    uvicorn_kwargs = {
-        "app": app,
-        "host": host,
-        "port": int(port),
-        "log_level": "info",
-        "interface": "wsgi",
-    }
-
-    if use_https:
-        uvicorn_kwargs["ssl_keyfile"] = ssl_key
-        uvicorn_kwargs["ssl_certfile"] = ssl_cert
-
-    uvicorn.run(**uvicorn_kwargs)
+        logging.basicConfig(level=logging.INFO if not debug else logging.DEBUG)
+        logging.info('Using basic logging config')
 
 
 if __name__ == '__main__':
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(base_path, 'ui', 'config.yml')
+    sys.excepthook = excepthook
+
     config = {}
     try:
-        with open(config_path, 'r') as f:
+        with open('config.yml', 'r') as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
-        logger.exception(f"No config file used !")
-        pass
+        logger.debug('No user config file (config.yml)')
 
-    if sys.argv[1:2] == ['ollama']:
-        import learn2rag.ollama_tool as ollama_tool
-        # FIXME default config values
-        ollama_tool.main(sys.argv[2:], config=config.get('OLLAMA', {'port': 11434}))
+    args, rest = LauncherArgumentParser().parse_known_args()
+    module = importlib.import_module(args.module)
+    configure_logging(args.logging_config, config.get('logging', {}).get('debug', False))
+    logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
     # TODO
-    elif sys.argv[1:] == ['learn2rag.pipeline']:
-        import learn2rag.pipeline as pipeline
-        pipeline.main()
-    elif sys.argv[1:2] == ['learn2rag.pipeline.importer']:
-        import learn2rag.importer as importer
-        importer.main(importer.ImporterArgumentParser().parse_args(sys.argv[2:]))
-    elif sys.argv[1:] == ['learn2rag.pipeline.ingestion']:
-        import learn2rag.pipeline.ingestion as ingestion
-        ingestion.main()
-    elif sys.argv[1:] == []:
-        start_ui(config)
+    if args.module == 'learn2rag.ollama_tool':
+        # FIXME default config values
+        module.main(rest, config=config.get('OLLAMA', {'port': 11434}))
+    elif args.module == 'learn2rag.importer':
+        module.main(module.ImporterArgumentParser().parse_args(rest))
+    elif args.module == 'learn2rag.ui':
+        module.main(config)
     else:
-        raise Exception(f'Arguments: {sys.argv[1:]}')
+        module.main()

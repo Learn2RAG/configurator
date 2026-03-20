@@ -31,9 +31,9 @@
         <!-- Nav Links -->
         <div class="d-flex justify-content-start">
           <ul class="navbar-nav d-flex flex-row">
-            <li class="nav-item"><a class="nav-link" href="/models">{{pgettext('nav', 'Language models')}}</a></li>
-            <li class="nav-item"><a class="nav-link" href="/sources">{{pgettext('nav', 'Data sources')}}</a></li>
-            <li class="nav-item"><a class="nav-link" href="/pipelines">{{pgettext('nav', 'Pipelines')}}</a></li>
+            <li class="nav-item"><a class="nav-link" href="/models" accesskey="1">{{pgettext('nav', 'Language models')}}</a></li>
+            <li class="nav-item"><a class="nav-link" href="/sources" accesskey="2">{{pgettext('nav', 'Data sources')}}</a></li>
+            <li class="nav-item"><a class="nav-link" href="/pipelines" accesskey="3">{{pgettext('nav', 'Pipelines')}}</a></li>
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                 {{pgettext('nav', 'More')}}
@@ -55,13 +55,24 @@
     <!-- Main Content -->
     <main class="flex-grow-1" id="main">
       <section class="container my-4">
-        {% for category, message in get_flashed_messages(with_categories=True) %}
+        {% if debug_logging %}
+        <div class="alert alert-warning">{{gettext('Debug logging is enabled in config file <code>%(file)s</code>. It might capture sensitive information.', file='config.yml')}}</div>
+        {% endif %}
+        <div id="flashed_messages">
+          {% for category, message in get_flashed_messages(with_categories=True) %}
           {% if category == 'error' %}
-            <div class="alert alert-danger">{{ message }}</div>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
           {% else %}
-            <div class="alert alert-primary">{{ message }}</div>
+            <div class="alert alert-primary  alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close float-right" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
           {% endif %}
-        {% endfor %}
+          {% endfor %}
+        </div>
 
         {% include 'firststeps.html' %}
 
@@ -75,5 +86,21 @@
 
     <!-- Footer -->
     {% include 'footer.html' %}
+
+    <script type="text/javascript">
+      // FIXME
+      const errorHandler = event => {
+          console.log(event.type);
+          if (!document.querySelector('#communication_error')) {
+              const el = document.createElement('div');
+              el.className = 'alert alert-danger';
+              el.id = 'communication_error';
+              el.innerText = 'Server communication error';
+              document.querySelector('#flashed_messages').append(el);
+          }
+      };
+      document.body.addEventListener('htmx:sendError', errorHandler);
+      document.body.addEventListener('htmx:responseError', errorHandler);
+    </script>
   </body>
 </html>

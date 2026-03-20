@@ -1,5 +1,9 @@
+import logging
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
 from .llm import llm
+
+
+profilingLogger = logging.getLogger('profiling')
 
 context_template ="""
 -----
@@ -20,7 +24,9 @@ def generate(query, search_results, opt_config) -> str:
     return answer.content
 
 
-def generate_stream(query, search_results, opt_config):
+def generate_stream(query, search_results, opt_config, *, request_id: str | None=None):
+    profilingLogger.info('start', extra={'activity': 'generate', 'request_id': request_id})
+
     if hasattr(search_results, "points"):
         search_results = search_results.points
     context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
@@ -34,3 +40,5 @@ def generate_stream(query, search_results, opt_config):
         text_chunk = chunk.text()
         if text_chunk:
             yield text_chunk
+
+    profilingLogger.info('end', extra={'activity': 'generate', 'request_id': request_id})

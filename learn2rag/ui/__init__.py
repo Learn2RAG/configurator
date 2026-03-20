@@ -10,6 +10,7 @@ import secrets
 import shutil
 import signal
 import socket
+import subprocess
 import threading
 import time
 from typing import Any
@@ -20,6 +21,7 @@ from flask_babel import Babel, gettext, ngettext, pgettext  # type: ignore[impor
 import flask.logging
 import jinja2
 import ollama
+import uvicorn
 import yaml
 
 from learn2rag.compose import Project
@@ -31,6 +33,8 @@ from datetime import datetime  # <-- ADD THIS
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
+# for now hardcode here , we can change it
+DEFAULT_PIPELINE_PORTS = [9001, 9002, 9003, 9004, 9005]
 
 def expand_path(path: Path) -> Path:
     return Path(path).expanduser().absolute()
@@ -74,18 +78,38 @@ def stop_project(name: str) -> None:
     assert project is not None, 'project should not be None'
     project.stop()
 
+def find_free_ports(n: int, *, configured_ports: list[int]=[], preferred_ports: list[int]=[]) -> list[int]:
+    """
+    Finds n free ports. Prioritizes preferred_ports if provided.
+    """
+    ports = [*configured_ports]
 
-def find_free_ports(how_many: int) -> list[int]:
-    ports = []
-    sockets = []
-    for i in range(how_many):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('', 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sockets.append(s)
-        ports.append(s.getsockname()[1])
-    for s in sockets:
-        s.close()
+    # 1. Try preferred ports first
+    for p in filter(lambda p: p not in ports, preferred_ports):
+        if len(ports) >= n:
+            break
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                # Set REUSEADDR to handle ports in TIME_WAIT state
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(('', p))
+                ports.append(p)
+        except OSError:
+            continue  # Port is taken, skip to next or fallback
+
+    # 2. Fallback to OS-assigned random ports if we still need more
+    remaining = n - len(ports)
+    if remaining > 0:
+        temp_sockets = []
+        for _ in range(remaining):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(('', 0))
+            ports.append(s.getsockname()[1])
+            temp_sockets.append(s)
+
+        for s in temp_sockets:
+            s.close()
+
     return ports
 
 
@@ -153,6 +177,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'ollama_available': hasattr(app, 'ollama_client'),
             'default_storage_prefix': app.instance_path + '/storage/',
             'firststeps_storage_path': app.instance_path + '/storage/example',
+            'debug_logging': config.get('logging', {}).get('debug', False),
+            'current_timestamp': math.floor(time.time()),
         }
 
     @app.context_processor
@@ -329,8 +355,11 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/pipelines')
     def pipelines_list() -> 'str | werkzeug.wrappers.response.Response':
-        projects = Project.get_all()
-        return render_template('pipelines_list.html', projects=projects, current_timestamp=math.floor(time.time()))
+        context = {
+            'projects': Project.get_all(),
+        }
+        template = '_pipelines_list_table.html' if request.headers.get('HX-Request') else 'pipelines_list.html'
+        return render_template(template, **context)
 
     @app.post('/pipelines')
     def pipeline_create() -> 'str | werkzeug.wrappers.response.Response':
@@ -376,6 +405,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'pipeline': pipeline,
             'language_model': language_model,
             'sources': sources,
+            'debug_logging': config.get('logging', {}).get('debug', False),
             'qdrant_api_key': secrets.token_hex(16),
             'ssl_cert': cert_path if has_ssl else "",
             'ssl_key': key_path if has_ssl else "",
@@ -393,7 +423,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             content = yaml.safe_load(f)
             port_names = content.get('ports', [])
             configured_ports = pipeline.get('ports', [])
-            ports = configured_ports + find_free_ports(len(port_names) - len(configured_ports))
+
+            ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=DEFAULT_PIPELINE_PORTS)
             render_context['ports'] = dict(zip(port_names, ports))
 
         storage_path = Path(pipeline['storage_path'])
@@ -442,6 +473,25 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                 flash(pgettext('flash', 'Could not stop the pipeline: %(message)s', message=e), 'error')
         return redirect(url_for('pipelines_list'))
 
+    @app.get('/pipelines/<name>/logs/<file>')
+    def pipeline_logs(name, file):
+        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        if pipeline is None:
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+        elif file in ['debug.log', 'error.log']:
+            storage_path = expand_path(pipeline['storage_path'])
+            log_file = storage_path / 'logs' / file
+            try:
+                content = log_file.read_text()
+            except FileNotFoundError:
+                content = ''
+            return render_template(
+                'logs.html',
+                content=content,
+                file=file,
+            )
+        return redirect(url_for('pipelines_list'))
+
     @app.get('/ps')
     def ps_list() -> 'str | werkzeug.wrappers.response.Response':
         projects = Project.get_all()
@@ -486,3 +536,62 @@ def shutdown() -> None:
     logging.debug('Shutdown...')
     atexit_handler()
     os.kill(os.getpid(), signal.SIGTERM)
+
+
+def webbrowser_open(url):
+    try:
+        if platform.system() == 'Windows':
+            subprocess.Popen(['explorer', url])
+        else:
+            subprocess.Popen(['xdg-open', url])
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(e)
+
+
+def main(config: dict[str, Any]) -> None:
+    app = create_app(config=config)
+
+    port = config.get('port', '9000')
+    host = config.get('host', '0.0.0.0')
+
+    ssl_key = config.get('ssl_keyfile')
+    ssl_cert = config.get('ssl_certfile')
+
+    if ssl_key:
+        os.environ['LEARN2RAG_SSL_KEY'] = ssl_key
+    if ssl_cert:
+        os.environ['LEARN2RAG_SSL_CERT'] = ssl_cert
+
+    use_https = False
+    if ssl_key and ssl_cert:
+        if os.path.exists(ssl_key) and os.path.exists(ssl_cert):
+            logging.info(f" SSL files defined and found at {ssl_key} or {ssl_cert}")
+            use_https = True
+        else:
+            logging.error(f"Warning: SSL files defined but not found at {ssl_key} or {ssl_cert}")
+            raise FileNotFoundError(f"SSL files defined but not found at {ssl_key} or {ssl_cert}")
+    else:
+        logging.info(f"no SSL files provided then switch to HTTP mode")
+
+    protocol = 'https' if use_https else 'http'
+    url = f"{protocol}://localhost:{port}"
+    webbrowser_open(url)
+    logging.info('*' * 40)
+    logging.info('Learn2RAG: ' + url)
+    logging.info('*' * 40)
+
+    uvicorn_kwargs = {
+        "app": app,
+        "host": host,
+        "port": int(port),
+        "log_level": "info",
+        "interface": "wsgi",
+    }
+
+    if use_https:
+        uvicorn_kwargs["ssl_keyfile"] = ssl_key
+        uvicorn_kwargs["ssl_certfile"] = ssl_cert
+
+    uvicorn.run(**uvicorn_kwargs)

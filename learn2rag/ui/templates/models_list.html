@@ -6,7 +6,7 @@
 
 {% block content %}
 <p class="d-inline-flex gap-1">
-  <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
+  <button accesskey="n" class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
     {{pgettext('button', 'Add a new language model')}}
   </button>
 </p>
@@ -25,18 +25,18 @@
             <form method="POST" action="{{ url_for('model_create') }}">
               <div class="mb-3">
                 <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this language model')}}">
+                <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this language model')}}">
               </div>
               <div class="mb-3">
                 <label for="api" class="form-label">{{pgettext('form_label', 'API type')}}</label>
-                <select class="form-select" name="api">
+                <select required="required" class="form-select" name="api">
                   <option selected="selected">ChatOpenAI</option>
                   <option>ChatOllama</option>
                 </select>
               </div>
               <div class="mb-3">
                 <label for="url" class="form-label">{{pgettext('form_label', 'API URL')}}</label>
-                <input class="form-control" name="url" title="{{pgettext('tooltip', 'For example: https://example.com/api')}}">
+                <input required="required" type="url" class="form-control" name="url" title="{{pgettext('tooltip', 'For example: https://example.com/api')}}">
               </div>
               <div class="mb-3">
                 <label for="token" class="form-label">{{pgettext('form_label', 'Access token')}}</label>
@@ -44,7 +44,7 @@
               </div>
               <div class="mb-3">
                 <label for="model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
-                <input class="form-control" name="model" title="{{pgettext('tooltip', 'For example: %(model)s', model=firststeps_model.get('config', {}).get('model'))}}">
+                <input required="required" class="form-control" name="model" title="{{pgettext('tooltip', 'For example: %(model)s', model=firststeps_model.get('config', {}).get('model'))}}">
               </div>
               <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
             </form>
@@ -130,7 +130,7 @@
             <form method="POST">
               <div class="mb-3">
                 <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this language model')}}">
+                <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this language model')}}">
               </div>
               <div class="mb-3">
                 <label for="ollama_list" class="form-label">{{pgettext('form_label', 'Language model')}}</label>

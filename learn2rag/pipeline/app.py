@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import secrets
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
@@ -82,16 +83,17 @@ async def stream(
         )
 ):
     async def event_stream():
+        request_id = secrets.token_hex()
         question = inputs.messages[-1].content
 
-        results = await search_authorized(user=inputs.user, question=question)
+        results = await search_authorized(user=inputs.user, question=question, request_id=request_id)
         # sources = "\n".join(set(result.payload['path'] for result in results))
 
         executor = ThreadPoolExecutor()
         loop = asyncio.get_event_loop()
 
         def sync_gen():
-            for chunk in generate.generate_stream(question, results, opt_config):
+            for chunk in generate.generate_stream(question, results, opt_config, request_id=request_id):
                 yield chunk
 
         chunks = await loop.run_in_executor(executor, lambda: list(sync_gen()))

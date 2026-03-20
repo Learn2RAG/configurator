@@ -1,4 +1,5 @@
 import itertools
+import logging
 from typing import List
 
 import numpy as np
@@ -12,8 +13,13 @@ from .embeddings import create_embeddings
 from .qdrant import Qdrant
 
 
+
+profilingLogger = logging.getLogger('profiling')
+
+
 # similarity search
-def search(query, user_config, opt_config) -> QueryResponse:
+def search(query, user_config, opt_config, *, request_id: str | None=None) -> QueryResponse:
+    profilingLogger.info('start', extra={'activity': 'search', 'request_id': request_id})
     # FIXME: query can be str or dict (with multi_search), maybe always use a dict?
     collection_name = user_config["collection_name"]
 
@@ -106,7 +112,6 @@ def search(query, user_config, opt_config) -> QueryResponse:
             limit=opt_config["top_k"],
         )
 
-
     elif opt_config["search_mode"] == "reranking_with_colbert":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()]
         values = [float(v) for v in query_embedding["lexical_weights"].values()]
@@ -162,8 +167,7 @@ def search(query, user_config, opt_config) -> QueryResponse:
       reverse=True
       )[:opt_config["top_k"]]
  
-
-
+    profilingLogger.info('end', extra={'activity': 'search', 'request_id': request_id})
     return results
 
 
@@ -173,8 +177,8 @@ def _build_search_query(question: str):
     else:
         return question
 
-async def search_authorized(question: str, user: str) -> List[ScoredPoint]:
+async def search_authorized(question: str, user: str, *, request_id: str|None=None) -> List[ScoredPoint]:
     search_query = _build_search_query(question)
-    points = search(search_query, user_config, opt_config)
+    points = search(search_query, user_config, opt_config, request_id=request_id)
     authorized_points = await filter_authorized(user, points)
     return authorized_points
