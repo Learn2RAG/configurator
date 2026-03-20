@@ -27,7 +27,4 @@ compose.yml
 learn2rag/pipeline/.env
 /learn2rag/pipeline/data/eval_samples_csc.csv
 /learn2rag/pipeline/data/eval_samples_chatgpt.csv
-*.lock
-compose.db
-/services/package-lock.json
 /logs
