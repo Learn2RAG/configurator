@@ -23,6 +23,7 @@ import jinja2
 import ollama
 import uvicorn
 import yaml
+import werkzeug.wrappers
 
 from learn2rag.compose import Project
 import learn2rag.data
@@ -169,6 +170,14 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     components_template_path = compose_template_path / 'components'
     pipeline_templates = {str(item.stem): yaml.safe_load(item.open()) for item in pipelines_template_path.glob('*.yml')}
     app.logger.debug('Loaded %i pipeline_templates: %s', len(pipeline_templates), list(pipeline_templates.keys()))
+
+    @app.before_request
+    def simple_auth() -> 'werkzeug.wrappers.response.Response | None':
+        # https://github.com/pallets/werkzeug/blob/main/examples/httpbasicauth.py
+        if conf := app.config.get('SIMPLE_AUTH'):
+            auth = request.authorization
+            if not auth or not (auth.username == conf['username'] and auth.password == conf['password']):
+                return werkzeug.wrappers.Response('login required', 401, {"WWW-Authenticate": f'Basic realm="Learn2RAG"'})
 
     @app.context_processor
     def inject_info() -> dict[str, Any]:
