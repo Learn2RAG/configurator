@@ -200,6 +200,8 @@ files = "learn2rag"
 exclude = "^learn2rag/pipeline/scripts/"
 strict = true
 [tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "DEBUG"
 strict = true
 testpaths = "learn2rag"
 [tool.setuptools]

@@ -1,0 +1,6 @@
+services:
+  main:
+    command:
+      - '/bin/sh'
+      - '-c'
+      - 'exit 1'

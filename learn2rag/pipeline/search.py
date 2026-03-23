@@ -2,6 +2,7 @@ import logging
 import warnings
 import itertools
 from typing import List, Any, cast
+import logging
 
 import numpy as np
 from FlagEmbedding import FlagReranker # type: ignore[import-untyped]
@@ -14,9 +15,13 @@ from .embeddings import create_embeddings
 from .qdrant import Qdrant
 
 
+
+profilingLogger = logging.getLogger('profiling')
+
+
 # similarity search
-def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
-    
+def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], *, request_id: str | None=None) -> QueryResponse:
+    profilingLogger.info('start', extra={'activity': 'search', 'request_id': request_id})
     collection_name = user_config["collection_name"]
 
     if opt_config["fusion_mode"] == "RRF":
@@ -120,7 +125,6 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) 
             limit=opt_config["top_k"],
         )
 
-
     elif opt_config["search_mode"] == "reranking_with_colbert":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()] # type: ignore[union-attr]
         values = [float(v) for v in query_embedding["lexical_weights"].values()] # type: ignore[union-attr]
@@ -215,10 +219,10 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
         using="multi",
         limit=opt_config["top_k"],
     )
-
+    profilingLogger.info('end', extra={'activity': 'search', 'request_id': request_id})
     return results
 
-async def search_authorized(question: str, user: str) -> List[ScoredPoint]:
-    query_response = search(question, user_config, opt_config)
+async def search_authorized(question: str, user: str, *, request_id: str|None=None) -> List[ScoredPoint]:
+    query_response = search(question, user_config, opt_config, request_id=request_id)
     authorized_points = await filter_authorized(user, query_response)
     return authorized_points

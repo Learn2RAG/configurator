@@ -1,7 +1,11 @@
 from typing import Any, Generator
+import logging
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
 from qdrant_client.http.models import ScoredPoint
 from .llm import llm
+
+
+profilingLogger = logging.getLogger('profiling')
 
 context_template ="""
 -----
@@ -22,7 +26,9 @@ def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str
     return answer.content
 
 
-def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Generator[str, None, None]:
+def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], request_id: str | None=None) -> Generator[str, None, None]:
+    profilingLogger.info('start', extra={'activity': 'generate', 'request_id': request_id})
+
     if hasattr(search_results, "points"):
         search_results = search_results.points
     context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results]) # type: ignore[index]
@@ -36,3 +42,5 @@ def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: d
         text_chunk = chunk.text()
         if text_chunk:
             yield text_chunk
+
+    profilingLogger.info('end', extra={'activity': 'generate', 'request_id': request_id})

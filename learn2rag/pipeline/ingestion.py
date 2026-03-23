@@ -1,3 +1,4 @@
+import argparse
 import logging
 from uuid import uuid4
 import hashlib
@@ -203,11 +204,10 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-
     from .config import user_config, opt_config
-
     index(user_config, opt_config)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main()
