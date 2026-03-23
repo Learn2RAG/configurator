@@ -188,7 +188,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
         results.points = points
     return results
  
-def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
+def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_config: dict[str, Any], request_id: str | None=None) -> QueryResponse:
     collection_name = user_config["collection_name"]
 
     # Init vector store
