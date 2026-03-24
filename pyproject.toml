@@ -189,9 +189,15 @@ dependencies = [
     "pandas-stubs (>=3.0.0.260204,<4.0.0.0)",
 ]
 description = ""
+license = "MIT"
 name = "learn2rag"
 requires-python = "==3.13.5"
 version = "0.1.0"
+[project.urls]
+Homepage = "https://learn2rag.de/"
+Documentation = "https://docs.learn2rag.de/"
+Repository = "https://github.com/Learn2RAG/configurator.git"
+Issues = "https://github.com/Learn2RAG/configurator/issues"
 [build-system]
 build-backend = "setuptools.build_meta"
 requires = ["setuptools >= 77.0.3"]
