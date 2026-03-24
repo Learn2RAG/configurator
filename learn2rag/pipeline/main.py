@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
     from .config import user_config, opt_config
 
-    #ingestion.index(user_config, opt_config)
+    ingestion.index(user_config, opt_config)
 
     if opt_config["query_mode"] == "multi":
         # in query_mode 'multi' different querys for each vector in the multi-vector are allowed
