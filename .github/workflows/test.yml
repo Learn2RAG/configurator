@@ -13,5 +13,5 @@ jobs:
           python-version: '3.13.5'
           cache: 'poetry'
       - run: poetry install --no-root
-      # - run: poetry run mypy --strict learn2rag
+      - run: poetry run mypy --no-incremental --warn-unused-configs
       - run: poetry run pytest

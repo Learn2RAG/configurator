@@ -36,7 +36,7 @@ class ImporterArgumentParser(argparse.ArgumentParser):
         self.add_argument('--config', default=str(json_config_path))
 
 
-def init(args):
+def init(args: argparse.Namespace) -> None:
     # Display a small textual description about the app
     print("------------------------------------------------------------")
     print("Learn2RAG Importer - DataImporter for Learn2RAG.")

@@ -27,16 +27,19 @@ class NoAuthorizationFilter(AuthorizationFilter):
 
 def _create_authorization_filter(entry: Dict[str, str]) -> AuthorizationFilter:
     loader_type = entry.get("loader_type")
-    loader_id = entry.get("loader_id")
 
     if loader_type == "SharepointLoader":
-        return SharepointAuthorizationFilter(
-            loader_id=loader_id,
-            client_id=entry.get("client_id"),
-            client_secret=entry.get("client_secret"),
-            tenant_id=entry.get("tenant_id"),
-            site_id=entry.get("site_id"),
-            document_library_id=entry.get("document_library_id")
+        for elem in ('loader_id', 'client_id', 'client_secret', 'tenant_id', 'site_id', 'document_library_id'):
+            if elem not in entry:
+                raise RuntimeError(f'Key {elem} is required for SharepointLoader')
+
+        return SharepointAuthorizationFilter( 
+            loader_id=entry["loader_id"],
+            client_id=entry["client_id"],
+            client_secret=entry["client_secret"],
+            tenant_id=entry["tenant_id"],
+            site_id=entry["site_id"],
+            document_library_id=entry["document_library_id"]
         )
 
     return NoAuthorizationFilter()
@@ -66,16 +69,24 @@ def _get_authorization_filter(loader_id: str) -> AuthorizationFilter:
 
 
 async def _get_loader_id(point: ScoredPoint) -> Any:
+    if not point.payload:
+        return 'unknown'
     return point.payload.get('loader_id', 'unknown')
 
 
 async def _get_doc_id(point: ScoredPoint) -> Any:
+    if not point.payload:
+        return ''
     return point.payload.get("document_id", "")
 
 
 async def filter_authorized(user: str, search_results: QueryResponse) -> List[ScoredPoint]:
     by_loader = defaultdict(list)
-    [by_loader[await _get_loader_id(point)].append(await _get_doc_id(point)) for point in search_results.points]
+    for point in search_results.points:
+        loader_id = await _get_loader_id(point)
+        doc_id = await _get_doc_id(point)
+        by_loader[loader_id].append(doc_id)
+
     authorized_ids = {}
     for loader in by_loader:
         auth_filter = _get_authorization_filter(loader)

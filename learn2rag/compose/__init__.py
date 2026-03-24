@@ -7,7 +7,7 @@ import signal
 import sqlite3
 import subprocess
 import urllib.request
-from typing import Any
+from typing import Any, Optional
 
 import psutil
 import yaml
@@ -23,7 +23,7 @@ import signal
 exit_statuses = {}
 
 if hasattr(signal, "SIGCHLD"):
-    def handle_SIGCHLD(*args):
+    def handle_SIGCHLD(signum: int, frame: Optional[Any]) -> None:
         with contextlib.suppress(ChildProcessError):
             while True:
                 pid, status = os.waitpid(-1, os.WNOHANG)

@@ -1,12 +1,13 @@
 import logging
 import os
+from pydantic import SecretStr
+from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
+from typing import Callable, Any
 
-import langchain_ollama
-import langchain_openai
 
-
-def ChatOllama(*, url, token, model, proxy):
-    return langchain_ollama.ChatOllama(
+def ollama_client(*, url: str, token: str | None, model: str, proxy: str | None) -> ChatOllama:
+    return ChatOllama(
         model=model,
         temperature=0,
         base_url=url,
@@ -17,8 +18,8 @@ def ChatOllama(*, url, token, model, proxy):
     )
 
 
-def ChatOpenAI(*, url, token, model, proxy):
-    return langchain_openai.ChatOpenAI(
+def openai_client(*, url: str, token: SecretStr, model: str, proxy: str | None) -> ChatOpenAI:
+    return ChatOpenAI(
         model=model,
         temperature=0,
         base_url=url,
@@ -36,4 +37,10 @@ llm_kwargs = {
 }
 logging.info('LLM args: %s', llm_kwargs)
 
-llm = globals()[os.environ.get('LLM_API_TYPE', 'ChatOllama')](**llm_kwargs)
+# the keys are written by the configurator UI
+llms: dict[str, Callable[..., Any]] = {
+    'ChatOllama': ollama_client,
+    'ChatOpenAI': openai_client,
+}
+
+llm = llms[os.environ.get('LLM_API_TYPE', 'ChatOllama')](**llm_kwargs)
