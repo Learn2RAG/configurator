@@ -11,7 +11,6 @@ from typing import Any
 
 import yaml
 
-logger = logging.getLogger(__name__)
 
 class LauncherArgumentParser(argparse.ArgumentParser):
     def __init__(self):
@@ -48,7 +47,7 @@ if __name__ == '__main__':
         with open('config.yml', 'r') as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
-        logger.debug('No user config file (config.yml)')
+        print('No user config file (config.yml)')
 
     args, rest = LauncherArgumentParser().parse_known_args()
     module = importlib.import_module(args.module)
