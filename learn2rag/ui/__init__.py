@@ -408,6 +408,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
 
         render_context = {
+            'config': app.config,
             'learn2rag_hostname': url.hostname,
             'pipeline': pipeline,
             'language_model': language_model,
