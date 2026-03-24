@@ -1,6 +1,8 @@
 /dist
 *.egg-info
+*.key
 *.mo
+*.pem
 __pycache__
 /.venv/
 /services/ollama/
