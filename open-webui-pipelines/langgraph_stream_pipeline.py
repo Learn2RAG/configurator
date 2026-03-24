@@ -49,6 +49,7 @@ class Pipeline:
 
         data = {
             "messages": [{'role': msg['role'], 'content': msg['content']} for msg  in messages],
+            "user": "anonymous",  # FIXME
         }
         
         headers = {
