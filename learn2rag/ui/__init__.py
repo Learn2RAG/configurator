@@ -34,8 +34,6 @@ from datetime import datetime  # <-- ADD THIS
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
-# for now hardcode here , we can change it
-DEFAULT_PIPELINE_PORTS = [9001, 9002, 9003, 9004, 9005]
 
 def expand_path(path: Path) -> Path:
     return Path(path).expanduser().absolute()
@@ -433,7 +431,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             port_names = content.get('ports', [])
             configured_ports = pipeline.get('ports', [])
 
-            ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=DEFAULT_PIPELINE_PORTS)
+            ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=app.config.get('PREFERRED_PORTS', range(9001, 9011)))
             render_context['ports'] = dict(zip(port_names, ports))
 
         storage_path = Path(pipeline['storage_path'])
