@@ -6,7 +6,7 @@
 
 {% block content %}
 <p class="d-inline-flex gap-1">
-  <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
+  <button accesskey="n" class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
     {{pgettext('button', 'Add a new data source')}}
   </button>
 </p>
@@ -26,10 +26,10 @@
               <input type="hidden" name="type" value="local"/>
               <div class="mb-3">
                 <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
+                <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
               </div>
               <div class="mb-3">
-                <label for="url" class="form-label">{{pgettext('form_label', 'Path on the local filesystem')}}</label>
+                <label for="path" class="form-label">{{pgettext('form_label', 'Path on the local filesystem')}}</label>
                 <input class="form-control" name="path" required="required"
                        {% if is_windows %}
                        title="{{pgettext('tooltip', 'For example: %(path)s', example_local_path)}}"
@@ -55,11 +55,11 @@
               <input type="hidden" name="type" value="web"/>
               <div class="mb-3">
                 <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
+                <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
               </div>
               <div class="mb-3">
-                <label for="url" class="form-label">{{pgettext('form_label', 'Web page URL')}}</label>
-                <input class="form-control" name="path" required="required" title="{{pgettext('tooltip', 'For example: https://learn2rag.de/')}}">
+                <label for="path" class="form-label">{{pgettext('form_label', 'Web page URL')}}</label>
+                <input type="url" class="form-control" name="path" required="required" title="{{pgettext('tooltip', 'For example: https://learn2rag.de/')}}">
               </div>
               <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
             </form>

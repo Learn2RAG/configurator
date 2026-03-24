@@ -134,7 +134,7 @@ dependencies = [
     "pywin32 ; sys_platform == 'win32'",
     "pyxdg",
     "pyyaml (>=6.0.2,<7.0.0)",
-    "qdrant-client (>=1.14.3,<1.16.0)",
+    "qdrant-client (>=1.16.0,<1.18.0)",
     "RapidFuzz>=3.14.3,<4.0.0",
     "regex==2025.7.34",
     "requests>=2.32.5,<3.0.0",
@@ -196,7 +196,18 @@ version = "0.1.0"
 [build-system]
 build-backend = "setuptools.build_meta"
 requires = ["setuptools >= 77.0.3"]
+[tool.mypy]
+files = "learn2rag"
+exclude = "^learn2rag/pipeline/scripts/"
+strict = true
+[[tool.mypy.overrides]]
+module = [
+    "datasets.*",
+]
+ignore_missing_imports = true
 [tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "DEBUG"
 strict = true
 testpaths = "learn2rag"
 [tool.setuptools]

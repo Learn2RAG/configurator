@@ -7,14 +7,14 @@ from copy import deepcopy
 import time
 import pandas as pd
 
-from .qdrant import Qdrant
-from . import search
-from .config import user_config
+from ..qdrant import Qdrant
+from .. import search
+from ..config import user_config
 
 
 df = pd.read_csv('/home/usicwalter/l2r/learn2rag/pipeline/data/eval_samples_chatgpt.csv', sep=";")
-queries = df['query']
-labels = df["document_id"]
+queries = df['query'][:2]
+labels = df["document_id"][:2]
 
 BASE_CONFIG = {
     "chunk_size": 2000,
@@ -34,7 +34,7 @@ BASE_CONFIG = {
 
 
 PARAM_GRID = {
-    "search_mode": ["dense", "dense_sparse", "dense_sparse_colbert", "reranking_with_colbert", "reranking_with_flagreranker"],
+    "search_mode": ["multi_search"], #["dense", "dense_sparse", "dense_sparse_colbert", "reranking_with_colbert", "reranking_with_flagreranker"],
     "top_k": [4,10]
   }
 
@@ -47,6 +47,9 @@ def update_config(base, param_values):
 def write_config(config, filepath="config.json"):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
+
+def mmquery(query):
+    return {"content": query, "title": query, "summary": query, "source_path": query}
 
 def recall(search_results, labels, top_k):
     count = 0
@@ -80,7 +83,10 @@ def main():
             opt_config = json.load(file)
 
         start = time.time()
-        search_results = [[search.search(query, user_config, opt_config)] for query in queries]
+        if opt_config["search_mode"] == "multi_search":
+            search_results = [[search.search(mmquery(query), user_config, opt_config)] for query in queries]
+        else:
+            search_results = [[search.search(query, user_config, opt_config)] for query in queries]
         recall_value = recall(search_results, labels, opt_config['top_k'])
         end = time.time()
         duration = end - start
@@ -90,7 +96,7 @@ def main():
         del opt_config
         
     print(all_results)
-    with open("eval_csc_chatgpt_DBSF.json", "w") as f:
+    with open("eval_csc_chatgpt_mm.json", "w") as f:
         json.dump(all_results, f, indent=2)
     
 

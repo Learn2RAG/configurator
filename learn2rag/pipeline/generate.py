@@ -1,5 +1,11 @@
+from typing import Any, Generator
+import logging
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
+from qdrant_client.http.models import ScoredPoint
 from .llm import llm
+
+
+profilingLogger = logging.getLogger('profiling')
 
 context_template ="""
 -----
@@ -8,10 +14,10 @@ Content:
 {content}
 """
 
-def generate(query, search_results, opt_config) -> str:
+def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Any:
     if hasattr(search_results, "points"):
         search_results = search_results.points
-    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
+    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results]) # type: ignore[index]
     system_message = SystemMessagePromptTemplate.from_template(opt_config["prompt"])
     user_message = HumanMessagePromptTemplate.from_template("{question}")
     prompt = ChatPromptTemplate.from_messages([system_message, user_message])
@@ -20,10 +26,12 @@ def generate(query, search_results, opt_config) -> str:
     return answer.content
 
 
-def generate_stream(query, search_results, opt_config):
+def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], request_id: str | None=None) -> Generator[str, None, None]:
+    profilingLogger.info('start', extra={'activity': 'generate', 'request_id': request_id})
+
     if hasattr(search_results, "points"):
         search_results = search_results.points
-    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results])
+    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results]) # type: ignore[index]
     system_message = SystemMessagePromptTemplate.from_template(opt_config["prompt"])
     user_message = HumanMessagePromptTemplate.from_template("{question}")
     prompt = ChatPromptTemplate.from_messages([system_message, user_message])
@@ -34,3 +42,5 @@ def generate_stream(query, search_results, opt_config):
         text_chunk = chunk.text()
         if text_chunk:
             yield text_chunk
+
+    profilingLogger.info('end', extra={'activity': 'generate', 'request_id': request_id})

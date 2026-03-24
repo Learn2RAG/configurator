@@ -1,3 +1,4 @@
 #!/bin/sh
+set -eu
 # This file is replaced by a compiled executable and should not contain anything else
 PYTHONPATH="$LEARN2RAG_PATH" $LEARN2RAG_PATH/.venv/bin/python -m learn2rag "$@"

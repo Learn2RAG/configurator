@@ -2,7 +2,7 @@ import logging
 from typing import Set, List
 
 from azure.identity import ClientSecretCredential
-from msgraph import GraphServiceClient
+from msgraph import GraphServiceClient # type: ignore[attr-defined]
 from msgraph.generated.drives.item.drive_item_request_builder import DriveItemRequestBuilder
 from msgraph.generated.models.share_point_identity_set import SharePointIdentitySet
 
@@ -47,19 +47,23 @@ class SharepointAuthorizationFilter(AuthorizationFilter):
             tenant_id=tenant_id,
             client_id=client_id,
             client_secret=client_secret)
-        self.graph_client = GraphServiceClient(credential, scopes) # type: ignore
+        self.graph_client = GraphServiceClient(credential, scopes)
 
     def _get_drive(self) -> DriveItemRequestBuilder:
         """Get the SharePoint drive for the configured site."""
         return self.graph_client.drives.by_drive_id(self.document_library_id)
 
     async def _get_groups(self, user_id: str) -> List[str]:
-        groups = await self.graph_client.users.by_user_id(user_id).transitive_member_of.get()
-        return [group.id for group in list(groups.value)]
+        groups = await self.graph_client.users.by_user_id(user_id).transitive_member_of.get()   
+        if groups == None or groups.value == None:
+            return []
+        return [group.id for group in groups.value if group.id]
     
     async def _get_owned_groups(self, user_id: str) -> List[str]:
         groups = await self.graph_client.users.by_user_id(user_id).owned_objects.graph_group.get()
-        return [group.id for group in list(groups.value)]
+        if groups == None or groups.value == None:
+            return []
+        return [group.id for group in groups.value if group.id]
 
     @staticmethod
     def _is_owner_permission(permission: SharePointIdentitySet) -> bool:
@@ -101,20 +105,21 @@ class SharepointAuthorizationFilter(AuthorizationFilter):
             permissions = await item.permissions.get()
 
             # Check if the user has access through any permission
-            for permission in list(permissions.value):
-                v2 = permission.granted_to_v2
-                if v2 is None:
-                    continue
-                if v2.user is not None and v2.user.id == user_id:
-                    return True
-                if v2.group is not None:
-                    group = v2.group
-                    if SharepointAuthorizationFilter._is_owner_permission(v2):
-                        if owned_group_ids.__contains__(group.id):
-                            return True
-                    else:
-                        if group_ids.__contains__(group.id):
-                            return True
+            if permissions != None and permissions.value != None:
+                for permission in permissions.value:
+                    v2 = permission.granted_to_v2
+                    if v2 is None:
+                        continue
+                    if v2.user is not None and v2.user.id == user_id:
+                        return True
+                    if v2.group is not None:
+                        group = v2.group
+                        if SharepointAuthorizationFilter._is_owner_permission(v2):
+                            if owned_group_ids.__contains__(group.id):
+                                return True
+                        else:
+                            if group_ids.__contains__(group.id):
+                                return True
             return False
         except Exception:
             return False

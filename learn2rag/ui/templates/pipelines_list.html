@@ -6,21 +6,21 @@
 
 {% block content %}
 <p class="d-inline-flex gap-1">
-  <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
+  <button accesskey="n" class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
     {{pgettext('button', 'Add a new pipeline')}}
   </button>
 </p>
 <div class="collapse" id="collapseCreate">
   <div class="card card-body">
 
-    <form method="POST">
+    <form method="POST" id="addPipeline">
       <div class="mb-3">
         <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-        <input class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this pipeline')}}">
+        <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this pipeline')}}">
       </div>
       <div class="mb-3">
         <label for="url" class="form-label">{{pgettext('form_label', 'Storage directory path')}}</label>
-        <input class="form-control" name="storage_path" value="{{default_storage_prefix}}{{current_timestamp}}" data-default-prefix="{{default_storage_prefix}}"/>
+        <input required="required" class="form-control" name="storage_path" value="{{default_storage_prefix}}{{current_timestamp}}" data-default-prefix="{{default_storage_prefix}}"/>
       </div>
       <div class="mb-3">
         <label for="language_model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
@@ -82,100 +82,20 @@
   </div>
 </div>
 
-<table class="table" id="pipelines_list_table" hx-swap-oob="true" hx-get="" hx-trigger="every 15s" hx-swap="none">
-  <thead>
-    <tr>
-      <th scope="col">{{pgettext('column_heading', 'Label')}}</th>
-      <th scope="col">{{pgettext('column_heading', 'Storage directory path')}}</th>
-      <th scope="col">{{pgettext('column_heading', 'Language model')}}</th>
-      <th scope="col">{{pgettext('column_heading', 'Data sources')}}</th>
-      <th scope="col">{{pgettext('column_heading', 'Ports')}}</th>
-      <th scope="col"></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for name, pipeline in pipelines.items() %}
-    <tr>
-      <td title="{{ name }}">
-        {{ pipeline.label }}
-        {% if projects[name] and projects[name].running %}
-        <span class="badge text-bg-success">{{projects[name].content.get('label', gettext('running'))}}</span>
-        {% endif %}
-      </td>
-      <td>{{ pipeline.storage_path }}</td>
-      <td>
-        <span class="badge text-bg-secondary">{{ models[pipeline.language_model].label }}</span>
-      </td>
-      <td>
-        {% for source in pipeline.sources %}
-        <span class="badge text-bg-secondary">{{ sources[source].label }}</span>
-        {% endfor %}
-      </td>
-      <td>
-        {% for port in pipeline.ports %}
-        <span class="badge text-bg-secondary">{{ port }}</span>
-        {% endfor %}
-      </td>
-      <td>
-        <div class="dropdown">
-          <div class="btn-toolbar" role="toolbar">
-            <div class="btn-group" role="group">
-              {% if not (projects[name] and projects[name].running) %}
-              {% for project_name, project in compose_templates.items() %}
-              <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
-                <button class="btn btn-primary" type="submit" name="action" value="start:{{ project.name }}">{{project.label}}</button>
-              </form>
-              {% endfor %}
-              {% endif %}
-              {% if projects[name] and projects[name].running %}
-              {% if 'ui_url' in projects[name].content %}
-              <a
-                class="btn {% if projects[name].health %}btn-primary{% else %}btn-secondary{% endif %}"
-                {% if not projects[name].health %}style="cursor: not-allowed;"{% endif %}
-                href="{{ projects[name].content['ui_url'] }}"
-                role="button"
-                target="_blank"
-                >
-                {% if projects[name].health %}
-                {{pgettext('button', 'Open')}}
-                {% else %}
-                <div class="spinner-border spinner-border-sm"></div>
-                {% endif %}
-              </a>
-              {% endif %}
-              <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
-                <button type="submit" class="btn btn-warning" name="action" value="stop">
-                  {{pgettext('button', 'Stop')}}
-                </button>
-              </form>
-              {% else %}
-              <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this pipeline configuration and all stored data: %(label)s?', label=pipeline.label)}}">
-                <button type="submit" class="btn btn-danger" name="action" value="delete">
-                  {{pgettext('button', 'Remove')}}
-                </button>
-              </form>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% include '_pipelines_list_table.html' %}
 
 <script>
-  const labelInput = document.querySelector('input[name=label]');
-  const storageInput = document.querySelector('input[name=storage_path]');
-  console.log('wtf');
-  console.log(labelInput);
-  labelInput.addEventListener('change', () => {
-      if (storageInput.value.startsWith(storageInput.dataset['defaultPrefix'])) {
+  const labelInput = document.querySelector('#addPipeline input[name=label]');
+  const storageInput = document.querySelector('#addPipeline input[name=storage_path]');
+  const update = (event) => {
+      if (storageInput.value.startsWith(storageInput.dataset.defaultPrefix)) {
           const suffix = labelInput.value.replace(/[^A-Za-z0-9]/g, '_');
-          if (suffix.length > 0 && suffix.match(/[^_]/)) {
-              storageInput.value = storageInput.dataset['defaultPrefix'] + suffix;
+          if (/[^_]/.test(suffix)) {
+              storageInput.value = storageInput.dataset.defaultPrefix + suffix;
           }
       }
-  });
+  };
+  labelInput.addEventListener('change', update);
+  labelInput.addEventListener('input', update);
 </script>
 {% endblock %}
