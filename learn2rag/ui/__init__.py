@@ -444,7 +444,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         return redirect(url_for('pipelines_list'))
 
     @app.get('/pipelines/<name>/logs/<file>')
-    def pipeline_logs(name, file):
+    def pipeline_logs(name: str, file: str) -> 'str | werkzeug.wrappers.response.Response':
         pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
         if pipeline is None:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
@@ -508,7 +508,7 @@ def shutdown() -> None:
     os.kill(os.getpid(), signal.SIGTERM)
 
 
-def webbrowser_open(url):
+def webbrowser_open(url: str) -> None:
     try:
         if platform.system() == 'Windows':
             subprocess.Popen(['explorer', url])

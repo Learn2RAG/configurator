@@ -199,6 +199,11 @@ requires = ["setuptools >= 77.0.3"]
 files = "learn2rag"
 exclude = "^learn2rag/pipeline/scripts/"
 strict = true
+[[tool.mypy.overrides]]
+module = [
+    "datasets.*",
+]
+ignore_missing_imports = true
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "DEBUG"
