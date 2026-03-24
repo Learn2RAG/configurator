@@ -14,12 +14,14 @@ files:
         http_port: '{{ports.qdrant_http}}'
         host: '127.0.0.1'
       telemetry_disabled: true
+
   - path: '{{storage_path}}/importer_config.json'
     content: |
       {
           "loaders": [
               {% for name, source in sources.items() %}
               {
+                  "loader_id": "{{name}}",
                   "loader_type": "DirectoryLoader",
                   "path": "{{source.path | replace('\\', '\\\\')}}",
                   "recursive": "True"

@@ -25,6 +25,8 @@ files:
           "llm": "{{language_model.model}}"
       }
 
+  # importer_config.json should already be present
+
   - path: '{{storage_path}}/logging_config.yml'
     content: |
       version: 1

@@ -35,7 +35,6 @@ def validate_config_entry(entry: Dict[str, Any]) -> bool:
     
     if loader_type not in ALLOWED_LOADERS:
         raise ValueError(f"Unknown 'loader_type': {loader_type}")
-
     
     if loader_type == "DirectoryLoader":
         if not entry.get("path"):
@@ -51,6 +50,18 @@ def validate_config_entry(entry: Dict[str, Any]) -> bool:
     elif loader_type == "SharepointLoader":  
         if not entry.get("client_id") or not entry.get("client_secret") or not entry.get("tenant_id") or not entry.get("document_library_id"):
             raise ValueError("Missing required parameters for SharePointLoader: client_id, client_secret, tenant_id, document_library_id.")
+    elif loader_type == "DrupalLoader":
+        if not entry.get("base_url"):
+            raise ValueError("Missing 'base_url' for 'DrupalLoader' in configuration entry.")
+        if not entry.get("content_types"):
+            raise ValueError("Missing 'content_types' for 'DrupalLoader' in configuration entry.")
+        auth_type = entry.get("auth_type", "none")
+        if auth_type not in ("none", "basic", "token"):
+            raise ValueError(f"Invalid 'auth_type' for 'DrupalLoader': '{auth_type}'. Must be 'none', 'basic' or 'token'.")
+        if auth_type == "basic" and (not entry.get("username") or not entry.get("password")):
+            raise ValueError("Missing 'username' or 'password' for DrupalLoader with auth_type 'basic'.")
+        if auth_type == "token" and not entry.get("token"):
+            raise ValueError("Missing 'token' for DrupalLoader with auth_type 'token'.")
      
     else:
         raise ValueError(f"Unknown 'loader_type': {loader_type}")
