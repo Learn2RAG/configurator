@@ -13,7 +13,7 @@ from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
 
-from . import loaders
+from . import json_loader
 from .embeddings import create_embeddings
 
 
@@ -29,11 +29,12 @@ def get_chunks_metadata(chunks: list[Document], item: str) -> Iterator[str]:
         logging.warning('%d out of %d chunks are missing "%s" in metadata; using empty string', missing, len(chunks), item)
 
 
-def point_exists(qdrant: Qdrant, collection_name: str, path: str, chunk_hash:str) -> bool:
+def point_exists(qdrant: Qdrant, collection_name: str, loader_id: str, path: str, content_hash:str) -> bool:
     filter = Filter(
         must=[
+            FieldCondition(key="loader_id", match=MatchValue(value=loader_id)),
             FieldCondition(key="path", match=MatchValue(value=path)),
-            FieldCondition(key="content_hash", match=MatchValue(value=chunk_hash)),
+            FieldCondition(key="content_hash", match=MatchValue(value=content_hash)),
         ]
     )
     result, _ = qdrant.client.scroll(
@@ -96,7 +97,7 @@ def payload(sample: dict[str, Any]) -> dict[str, str]:
     return {
         "content": sample["page_content"],
         "path": sample["metadata"]["source"],
-        "content_hash": sample["chunk_hash"],
+        "content_hash": sample["metadata"]["content_hash"],
         "title": sample["metadata"].get("title",""),
         "uri": sample["metadata"].get("uri",""),
         "loader_id": sample["metadata"]["loader_id"],
@@ -104,19 +105,15 @@ def payload(sample: dict[str, Any]) -> dict[str, str]:
     }
 
 def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
-    # TODO: enable list of file paths in loader and adapt user_config
-    # Load the documents from pdf
-    # all_documents = loaders.sync_pdf_loader(user_config["file_path"])
-    # TODO: use ifdt loader to load pdf in json, then:
     logging.info('Loading documents')
-    all_documents = loaders.json_loader(user_config['imported_documents_file_path'])
+    all_documents = json_loader.json_loader(user_config['imported_documents_file_path'])
 
     # Split documents into chunks
     logging.info('Splitting documents into chunks')
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=opt_config["chunk_size"], chunk_overlap=opt_config["chunk_overlap"]
     )
-    chunks = text_splitter.split_documents(all_documents)
+    chunks = text_splitter.split_documents(all_documents)[:2]
 
     collection_name = user_config["collection_name"]
 
@@ -125,7 +122,6 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
         collection_name=collection_name,
         opt_config=opt_config
     )
-
 
     chunks_content = [chunk.page_content for chunk in chunks]
     if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
@@ -140,8 +136,6 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
             else:
                 raise TypeError(f"dense_vecs must be np.ndarray, got {type(dense_vecs)}")
                 
-    # TODO: hash if you want to monitore changes in metadata
-    chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]
     # Todo: handle different vector lengths for batch encoding when using sparse vectors
 
     logging.info('Creating embeddings...')
@@ -158,40 +152,38 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     if isinstance(embeddings, dict) and "dense_vecs" in embeddings:
         if opt_config["search_mode"] == "dense":
             chunks_with_embeddings = [
-                dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
-                for chunk, dense, c_hash in zip(chunks, embeddings["dense_vecs"], chunk_hash)
+                dict(chunk) | {"dense_vec": dense}
+                for chunk, dense in zip(chunks, embeddings["dense_vecs"])
             ]
         if opt_config["search_mode"] == "dense_sparse":
             chunks_with_embeddings = [
                 dict(chunk)
-                | {"dense_vec": dense, "lexical_weights": sparse, "chunk_hash": c_hash}
-                for chunk, dense, sparse, c_hash in zip(
+                | {"dense_vec": dense, "lexical_weights": sparse}
+                for chunk, dense, sparse in zip(
                     chunks,
                     list(embeddings["dense_vecs"]),
                     list(embeddings["lexical_weights"]),
-                    chunk_hash,
                 )
             ]
         if opt_config["search_mode"] == "dense_sparse_colbert":
             chunks_with_embeddings = [
                 dict(chunk)
-                | {"dense_vec": dense, "lexical_weights": sparse, "colbert_vecs": colbert, "chunk_hash": c_hash}
-                for chunk, dense, sparse, colbert, c_hash in zip(
+                | {"dense_vec": dense, "lexical_weights": sparse, "colbert_vecs": colbert}
+                for chunk, dense, sparse, colbert in zip(
                     chunks,
                     list(embeddings["dense_vecs"]),
                     list(embeddings["lexical_weights"]),
                     list(embeddings['colbert_vecs']),
-                    chunk_hash,
                 )
             ]
     else:
         chunks_with_embeddings = [
-            dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
-            for chunk, dense, c_hash in zip(chunks, embeddings, chunk_hash)
+            dict(chunk) | {"dense_vec": dense}
+            for chunk, dense in zip(chunks, embeddings)
         ]
 
     for sample in chunks_with_embeddings:
-        if not point_exists(qdrant, collection_name, sample['metadata']['source'], sample['chunk_hash']):
+        if not point_exists(qdrant, collection_name, sample['metadata']['loader_id'], sample['metadata']['source'], sample['metadata']['content_hash']):
             if opt_config["search_mode"] == "dense_sparse":
                 insert_dense_sparse(qdrant, collection_name, sample)
             elif opt_config["search_mode"] == "dense_sparse_colbert":
