@@ -177,6 +177,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             auth = request.authorization
             if not auth or not (auth.username == str(conf['username']) and auth.password == str(conf['password'])):
                 return werkzeug.wrappers.Response('login required', 401, {"WWW-Authenticate": f'Basic realm="Learn2RAG"'})
+        return None
 
     @app.context_processor
     def inject_info() -> dict[str, Any]:
