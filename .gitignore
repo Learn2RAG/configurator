@@ -3,6 +3,8 @@
 *.mo
 __pycache__
 /.venv/
+/.venv1/
+error.log
 /services/ollama/
 /services/qdrant/
 /learn2rag/evaluation/qdrant_data/
