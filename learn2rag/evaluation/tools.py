@@ -92,7 +92,7 @@ def basic_pipeline(dataset_name: str, question: str) -> dict[str, Any]:
         'llm': None,
     }
     documents = learn2rag.pipeline.search.search(question, user_config, opt_config)
-    answer = learn2rag.pipeline.generate.generate(question, documents, opt_config)
+    answer = learn2rag.pipeline.generate.generate(question, documents.points, opt_config)
     return {
         'documents': documents,
         'answer': answer,

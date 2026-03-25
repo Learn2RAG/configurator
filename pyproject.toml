@@ -18,7 +18,7 @@ dependencies = [
     "cachetools==5.5.2",
     "certifi==2025.8.3",
     "cffi==1.17.1",
-    "charset-normalizer==3.4.3",
+    "charset-normalizer>=3.4.4,<4.0.0",
     "click==8.2.1",
     "colorama==0.4.6",
     "coloredlogs==15.0.1",
@@ -30,7 +30,7 @@ dependencies = [
     "datasets (>=4.0.0,<5.0.0)",
     "Deprecated==1.2.18",
     "effdet==0.4.1",
-    "emoji==2.14.1",
+    "emoji>=2.15.0,<3.0.0",
     "fastapi (==0.115.11)",
     "filelock==3.18.0",
     "filetype==1.2.0",
@@ -124,7 +124,7 @@ dependencies = [
     "python-dateutil==2.9.0.post0",
     "python-docx==1.2.0",
     "python-dotenv==1.1.1",
-    "python-iso639==2025.2.18",
+    "python-iso639>=2026.1.31,<2027.0.0",
     "python-magic==0.4.27",
     "python-magic-bin==0.4.14; sys_platform == 'win32'",
     "python-multipart==0.0.20",
@@ -134,10 +134,10 @@ dependencies = [
     "pywin32 ; sys_platform == 'win32'",
     "pyxdg",
     "pyyaml (>=6.0.2,<7.0.0)",
-    "qdrant-client (>=1.14.3,<1.16.0)",
-    "RapidFuzz==3.13.0",
+    "qdrant-client (>=1.16.0,<1.18.0)",
+    "RapidFuzz>=3.14.3,<4.0.0",
     "regex==2025.7.34",
-    "requests==2.32.4",
+    "requests>=2.32.5,<3.0.0",
     "requests-toolbelt==1.0.0",
     "rsa==4.9.1",
     "safetensors==0.6.2",
@@ -155,20 +155,18 @@ dependencies = [
     "tokenizers==0.21.4",
     "torch==2.8.0",
     "torchvision==0.23.0",
-    "tqdm==4.67.1",
+    "tqdm>=4.67.3,<5.0.0",
     "transformers==4.55.0",
     "types-pyyaml (>=6.0.12.20250516,<7.0.0.0)",
-    "typing_extensions==4.14.1",
+    "typing_extensions>=4.15.0,<5.0.0",
     "typing-inspect==0.9.0",
     "typing-inspection==0.4.1",
     "tzdata==2025.2",
-    "unstructured[pptx] (>=0.18.27,<0.19.0)",
+    "unstructured[epub] (>=0.21.5,<0.22.0)",
     "unstructured-client==0.42.2",
     "unstructured[docx]",
     "unstructured-inference==1.1.6",
-    "unstructured[md]",
     "unstructured[odt]",
-    "unstructured[pdf]",
     "unstructured.pytesseract==0.3.15",
     "unstructured[rtf]",
     "unstructured[web]",
@@ -187,6 +185,9 @@ dependencies = [
     "types-pyxdg (>=0.28.0.20251115,<0.29.0.0)",
     "types-requests (>=2.32.4.20260107,<3.0.0.0)",
     "pandas-stubs (>=3.0.0.260204,<4.0.0.0)",
+    "python-pptx (>=1.0.2,<2.0.0)",
+    "msoffcrypto-tool (>=6.0.0,<7.0.0)",
+    "ebooklib (>=0.20,<0.21)",
 ]
 description = ""
 license = "MIT"
@@ -201,6 +202,15 @@ Issues = "https://github.com/Learn2RAG/configurator/issues"
 [build-system]
 build-backend = "setuptools.build_meta"
 requires = ["setuptools >= 77.0.3"]
+[tool.mypy]
+files = "learn2rag"
+exclude = "^learn2rag/pipeline/scripts/"
+strict = true
+[[tool.mypy.overrides]]
+module = [
+    "datasets.*",
+]
+ignore_missing_imports = true
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "DEBUG"

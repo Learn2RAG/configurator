@@ -2,27 +2,41 @@
     "loaders": [
         {
             "loader_type": "DirectoryLoader",
-            "loader-id": "directory-test",
-            "path": "C:\\Users\\km\\Downloads\\revisedmanuscriptfrontierspaper\\2",
-            "recursive": "True"
+            "loader_id": "local_docs",
+            "path": "C:\\path\\to\\your\\documents",
+            "recursive": "True",
+            "silent_errors": "True"
         },
         {
             "loader_type": "HTMLLoader",
-            "loader-id": "html-test",
-            "url": "https://learn2rag.de",
-            "depth": 0
+            "loader_id": "website",
+            "url": "https://your-website.example.com",
+            "depth": 1
         },
         {
             "loader_type": "SharepointLoader",
-            "loader_id": "sharepoint-test",
-            "client_id": "YourClientIDHere",
-            "client_secret": "YourClientSecretHere",
-            "tenant_id": "YourTenantIDHere",
-            "site_id": "YourSiteId",
-            "document_library_id": "YourDocumentLibraryIDHere",
+            "loader_id": "sharepoint_docs",
+            "client_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "client_secret": "your-client-secret",
+            "tenant_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "document_library_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "site_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "folder_path": "/General",
             "recursive": "True",
-            "auth_with_token": "True"
+            "auth_with_token": "False",
+            "reset_token": "False"
+        },
+        {
+            "loader_type": "DrupalLoader",
+            "loader_id": "drupal_main",
+            "base_url": "https://your-drupal-site.example.com",
+            "content_types": ["article", "page"],
+            "text_fields": ["title", "field_body", "body"],
+            "auth_type": "basic",
+            "username": "api-user",
+            "password": "secret",
+            "language": "en",
+            "page_size": 50
         }
-
     ]
 }

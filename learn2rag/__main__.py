@@ -2,24 +2,24 @@ import argparse
 import importlib
 import importlib.resources
 import logging
+import logging.config
 import os
 import pathlib
 import sys
-import os
-import logging
-from typing import Any
+from types import TracebackType
+from typing import Unpack
 
 import yaml
 
 
 class LauncherArgumentParser(argparse.ArgumentParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.add_argument('module', type=str, nargs='?', default='learn2rag.ui')
         self.add_argument('--logging-config', type=pathlib.Path)
 
 
-def excepthook(*exc_info: tuple) -> None:
+def excepthook(*exc_info: Unpack[tuple[type[BaseException], BaseException, TracebackType | None]]) -> None:
     os.environ['NO_COLOR'] = '1'
     logging.critical('Uncaught exception', exc_info=exc_info)
     sys.__excepthook__(*exc_info)

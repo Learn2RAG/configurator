@@ -1,45 +1,56 @@
-# Learn2RAG importer
+# Learn2RAG Importer
 
-This application is an importer for data that is to be used within the learn2rag pipeline application
+An importer for document sources used within the Learn2RAG pipeline. It reads a `config.json`, delegates loading to the appropriate loader, enriches documents with metadata, and writes results to `loaded_documents.json`.
 
-Author: IFDT, KM
-Version: 0.0.4
+**Author:** IFDT, KM  
+**Version:** 0.0.5
 
+---
 
 ## Installation
-    
-- to better determine filetypes, make sure all requirements are met
-- install dependencies
-```
+
+Install system dependencies required for file type detection and document parsing:
+
+**Linux**
+```bash
 apt install libgl1 libmagic1
 ```
-- install magic1.dll if you are using windows
 
-- install libmagic on MacOS (with Homebrew)
-```
+**Windows**  
+Install `magic1.dll` manually and add it to your PATH.
+
+**macOS**
+```bash
 brew install libmagic
 ```
+
+Install Python dependencies via Poetry:
+```bash
+poetry install
+```
+
+---
 
 ## Architecture
 
 ```mermaid
 graph TD
     A[config.json] --> B[Importer Main]
-    B --> C{Loader-Typ}
-    C -->|DirectoryLoader| D[Verzeichnis scannen]
-    C -->|CSVLoader| E[CSV-Datei parsen]
+    B --> C{Loader Type}
+    C -->|DirectoryLoader| D[Scan directory]
+    C -->|CSVLoader| E[Parse CSV file]
+    C -->|HTMLLoader| F[Fetch webpage]
+    C -->|SharepointLoader| G[Query SharePoint API]
+    C -->|DrupalLoader| H[Query Drupal JSON:API]
+    D --> I[Extract documents]
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    I --> J[Enrich metadata]
+    J --> K[loaded_documents.json]
+    K --> L[Pipeline input]
 
-    C -->|HTMLLoader| F[Webseite laden]
-    C -->|SharepointLoader| G[SharePoint API abfragen]
-    D --> H[Dokumente extrahieren]
-    E --> H
-    F --> H
-    G --> H
-    H --> I[Metadaten anreichern]
-    I --> J[loaded_documents.json]
-    J --> K[Output für Pipeline]
-
-    %% Styles: Lila Boxen mit schwarzem Rand, weißer Hintergrund (Standard)
     classDef purple fill:#9370db,stroke:#000000,stroke-width:2px
     A:::purple
     B:::purple
@@ -52,99 +63,295 @@ graph TD
     I:::purple
     J:::purple
     K:::purple
+    L:::purple
 ```
 
+---
+
+## Running the importer
+
+```bash
+python -m learn2rag.importer
+```
+
+---
 
 ## Configuration
-- change /config/config.json according to your needs. Add a entry for each loader that you want to configure (see examples)
-- Basic Structure for the config.json is  
 
-```
+Edit `config/config.json` to define one or more loaders. Each entry requires at minimum a `loader_type` and a `loader_id`. Multiple loaders of different types can be combined freely.
+
+```json
 {
     "loaders": [
         {
-            "loader_type": "[TYPE_OF_LOADER]",
-            [options_for the loader]
-        },
-        {
-            "loader_type": "[TYPE_OF_LOADER]",
-            [options_for the loader]
-        },
-        {
-            ...
+            "loader_type": "<LOADER_TYPE>",
+            "loader_id": "<UNIQUE_ID>",
+            ...loader-specific options...
         }
     ]
-}   
+}
 ```
 
-## Verfügbare Loader
-Der Importer unterstützt die folgenden Loader-Typen:
+> **Note:** `loader_id` is strongly recommended. It is added to the metadata of every document produced by that loader and makes it easy to trace documents back to their source configuration.
 
-- **DirectoryLoader**: Lädt Dokumente aus einem Verzeichnis, unterstützt verschiedene Dateiformate (.csv, .doc, .docx, .eml, .epub, .html, .json, .md, .odt, .pdf, .ppt, .pptx, .rst, .rtf, .txt, .tsv, .cls, .xlsx, .xml)
-- **CSVLoader**: Lädt Dokumente aus CSV-Dateien, jede Zeile wird als separates Dokument behandelt
-- **HTMLLoader**: Lädt Inhalte von Webseiten, kann rekursiv Links folgen
-- **SharepointLoader**: Lädt Dokumente aus SharePoint-Dokumentbibliotheken mit App-Only-Authentifizierung
+---
 
 ## Output
-- output will be produced as json in the main directory in loaded_documents.json
 
-### Example Config and Result for DirectoryLoader
-DirectoryLoader will parse configured directories for files that can be mapped to a text input. 
-Currently processed files are: .csv, doc, docx, .eml, epub, html, json, md, odt, .pdf, ppt, pptx, .rst, .rtf, .txt, .tsv, .cls, .xlsx, .xml
+Results are written to `loaded_documents.json` in the project root. Each document entry contains a `metadata` object and a `content` string:
 
-To config a directory, add to the config.json a section und "loaders" like
-
+```json
+[
+    {
+        "metadata": {
+            "source": "<origin URL or file path>",
+            "loader_id": "<your loader_id>",
+            "content_hash": "<sha256 of content>",
+            ...additional fields depending on loader...
+        },
+        "content": "The extracted plain text content of the document."
+    }
+]
 ```
- {
-   "loader_type": "DirectoryLoader",
-   "path": "C:\\Users\\foo",
-   "recursive": "True"
- },
+
+---
+
+## Available Loaders
+
+### DirectoryLoader
+
+Scans a local directory for supported files and extracts their text content.
+
+**Supported file types:** `.docx`, `.pptx`, `.xlsx`, `.pdf`, `.txt`, `.csv`, `.html`, `.md`, `.rtf`, `.odt`, `.epub`,
+
+> Pandoc is required for some file types - if not present user is informed and system will try to install interactivly
+
+**Configuration:**
+
+```json
+{
+    "loader_type": "DirectoryLoader",
+    "loader_id": "my_docs",
+    "path": "C:\\Users\\foo\\documents",
+    "recursive": "True",
+    "silent_errors": "True"
+}
 ```
 
-where 
-- "loader_type" is set to "DirectoryLoader" to specify the use of the DirectoryLoader
-- "path" is set to the Directory in the filesystem that is to be processed
-- "recursive" can be set to "True" or "False" and will specifiy whether to process all subdirectories of the given directory
+| Parameter | Required | Description |
+|---|---|---|
+| `path` | yes | Absolute path to the directory to scan |
+| `recursive` | yes | `"True"` to include subdirectories, `"False"` for top-level only |
+| `silent_errors` | no | `"True"` (default) skips unreadable files silently; `"False"` raises errors and will interupt loader|
 
-All results will be written to the the loaded_documents.json for each File in the path an entry like this will be generated 
+**Example output entry:**
 
-```
+```json
 {
     "metadata": {
-        "source": "C:C:\\Users\\foo\\Revised Manuscript_Text categorization approach.docx",
+        "source": "C:\\Users\\foo\\documents\\report.docx",
+        "loader_id": "my_docs",
         "content_hash": "e18e509d138cf86c22df0b0dfafc5ca5b8f1e266f5e3470de68190f3ebe495b0",
-        "source_path": "C:\\Users\\foo",
+        "source_path": "C:\\Users\\foo\\documents",
         "file_extension": "docx",
-        "process_date": "2025-07-28",
+        "process_date": "2026-03-17",
         "process_time": "14:42:02",
         "loader_type": "DirectoryLoader"
     },
-    "content": "A Corpus-based Real-time Text Classification and Tagging Approach for Social Data..."
-},
+    "content": "Executive Summary ..."
+}
 ```
 
-where
-- medatdata will contain metadata to the files processed
-- content will hold the actual text content of the file
+---
 
-### Example Config and Result for HTMLoader
-HTMLoader will parse configured URLs and extract text/metadata of the webpage
+### CSVLoader
 
-To config a URL, add to the config.json a section und "loaders" like
+Loads a CSV file where each row becomes a separate document.
 
+**Configuration:**
+
+```json
+{
+    "loader_type": "CSVLoader",
+    "loader_id": "product_catalog",
+    "path": "C:\\data\\products.csv"
+}
 ```
- {
-   "loader_type": "HTMLLoader",
-   "url": "https://learn2rag.de",
-   "depth": 0
- },
+
+| Parameter | Required | Description |
+|---|---|---|
+| `path` | yes | Absolute path to the CSV file |
+
+**Example output entry:**
+
+```json
+{
+    "metadata": {
+        "source": "C:\\data\\products.csv",
+        "loader_id": "product_catalog",
+        "loader_type": "CSVLoader",
+        "process_date": "2026-03-17",
+        "process_time": "09:00:00"
+    },
+    "content": "row: 1 | name: Widget A | price: 9.99 | ..."
+}
 ```
 
-where 
-- "loader_type" is set to "HTMLLoader" to specify the use of the HTMLLoader
-- "url" is set to the URL of where the webpage can be found
-- "depth" whether to process pages that are linked on the page to the depth of x. 0 means to do not process links, 1 will process all links directly found on the page, 2 will process links found in linked pages and so on. Each page is processed only once even if linked multiple times.
+---
+
+### HTMLLoader
+
+Fetches a web page and extracts its text content. Optionally follows links recursively.
+
+**Configuration:**
+
+```json
+{
+    "loader_type": "HTMLLoader",
+    "loader_id": "company_website",
+    "url": "https://www.example.com",
+    "depth": 1
+}
+```
+
+| Parameter | Required | Description |
+|---|---|---|
+| `url` | yes | The URL of the page to load |
+| `depth` | no | Link traversal depth (default `0`). `0` = only the given page, `1` = also follow all direct links, `2` = follow links on linked pages, etc. Each URL is only loaded once. |
+
+**Example output entry:**
+
+```json
+{
+    "metadata": {
+        "source": "https://www.example.com/about",
+        "loader_id": "company_website",
+        "content_hash": "a1b2c3...",
+        "process_date": "2026-03-17",
+        "process_time": "10:15:00"
+    },
+    "content": "About us – Example Company was founded in ..."
+}
+```
+
+---
+
+### SharepointLoader
+
+Loads documents from a SharePoint document library using App-Only authentication (client credentials).
+
+**Prerequisites:**
+1. Register an Azure AD app with `Sites.Read.All` permission (application permission, not delegated).
+2. Grant admin consent for the permission.
+3. Note down the `client_id`, `client_secret`, `tenant_id`, and `document_library_id`.
+
+**Configuration:**
+
+```json
+{
+    "loader_type": "SharepointLoader",
+    "loader_id": "sp_policies",
+    "client_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "client_secret": "your-client-secret",
+    "tenant_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "document_library_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "site_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "folder_path": "/General/Policies",
+    "recursive": "True",
+    "auth_with_token": "False",
+    "reset_token": "False"
+}
+```
+
+| Parameter | Required | Description |
+|---|---|---|
+| `client_id` | yes | Azure AD application client ID |
+| `client_secret` | yes | Azure AD application client secret |
+| `tenant_id` | yes | Azure AD tenant ID |
+| `document_library_id` | yes | SharePoint document library ID |
+| `site_id` | no | SharePoint site ID (required for site-specific access) |
+| `folder_path` | no | Relative path within the library to restrict loading |
+| `folder_id` | no | Folder ID (alternative to `folder_path`) |
+| `object_ids` | no | List of specific file object IDs to load |
+| `recursive` | no | `"True"` to include subfolders (default `"False"`) |
+| `auth_with_token` | no | Use cached token instead of client credentials (default `"False"`) |
+| `reset_token` | no | Force re-authentication and discard cached token (default `"False"`) |
+
+**Example output entry:**
+
+```json
+{
+    "metadata": {
+        "source": "https://contoso.sharepoint.com/sites/HR/Policies/leave-policy.pdf",
+        "loader_id": "sp_policies",
+        "content_hash": "d3f1a2...",
+        "file_name": "leave-policy.pdf",
+        "file_extension": "pdf"
+    },
+    "content": "Leave Policy 2026 – Section 1: Annual Leave ..."
+}
+```
+
+---
+
+### DrupalLoader
+
+Loads content nodes from a Drupal 8/9/10/11 site via the built-in JSON:API module. Endpoint URLs are auto-discovered from the JSON:API index, so language-prefixed paths (e.g. `/en/jsonapi/`) are handled automatically.
+
+**Prerequisites:**
+- The **JSON:API** core module must be enabled in Drupal (`Extend` → JSON:API).
+- The content types to be loaded must be accessible (check permissions under `People` → `Permissions` → JSON:API).
+
+**Configuration:**
+
+```json
+{
+    "loader_type": "DrupalLoader",
+    "loader_id": "drupal_main",
+    "base_url": "https://your-drupal-site.example.com",
+    "content_types": ["article", "page"],
+    "text_fields": ["title", "field_body", "body"],
+    "auth_type": "basic",
+    "username": "api-user",
+    "password": "secret",
+    "language": "en",
+    "page_size": 50
+}
+```
+
+| Parameter | Required | Description |
+|---|---|---|
+| `base_url` | yes | Base URL of the Drupal site (without trailing slash) |
+| `content_types` | yes | List of content type machine names to import, e.g. `["article", "page"]` |
+| `text_fields` | no | Fields to use as document text content. Defaults to `["title", "field_body", "body"]`. Run the importer once and check the log for `available non-null attribute fields` to find the correct field names for your installation. |
+| `auth_type` | no | Authentication: `"none"` (default), `"basic"` (username + password), or `"token"` (Bearer token) |
+| `username` | no | Username — required when `auth_type` is `"basic"` |
+| `password` | no | Password — required when `auth_type` is `"basic"` |
+| `token` | no | Bearer token — required when `auth_type` is `"token"` |
+| `language` | no | Language filter, e.g. `"en"` or `"de"`. Sets the `Accept-Language` request header. |
+| `page_size` | no | Number of nodes per API request (default `50`) |
+
+> **Tip:** If `content` only shows the title, the body field name differs from the default. Check the log output for the line `available non-null attribute fields for '<type>'` and add the correct field name to `text_fields`.
+
+**Example output entry:**
+
+```json
+{
+    "metadata": {
+        "source": "https://your-drupal-site.example.com/node/42",
+        "loader_id": "drupal_main",
+        "content_type": "article",
+        "node_id": "42",
+        "title": "Getting started with Drupal",
+        "created": "2026-03-15T10:39:51+00:00",
+        "changed": "2026-03-15T10:39:51+00:00",
+        "langcode": "en",
+        "status": true,
+        "content_hash": "c8f474..."
+    },
+    "content": "Getting started with Drupal\n\nDrupal is a flexible CMS ..."
+}
+```
 
 All results will be written to the the loaded_documents.json for each File in the path an entry like this will be generated 
 
@@ -177,116 +384,6 @@ where
     - mata_properties will hold all meta_tags set in the webpage itself
 - content will hold the actual text content of the page as text
 
-### Example Config and Result for CSVLoader
-CSVLoader lädt Dokumente aus CSV-Dateien und extrahiert den Inhalt jeder Zeile als separates Dokument.
-
-Um eine CSV-Datei zu konfigurieren, fügen Sie der config.json einen Abschnitt unter "loaders" hinzu:
-
-```
- {
-   "loader_type": "CSVLoader",
-   "path": "C:\\Users\\foo\\data.csv"
- },
-```
-
-wo
-- "loader_type" auf "CSVLoader" gesetzt ist, um die Verwendung des CSVLoaders anzugeben
-- "path" auf den Pfad zur CSV-Datei im Dateisystem gesetzt ist
-
-Alle Ergebnisse werden in die loaded_documents.json geschrieben. Für jede Zeile in der CSV-Datei wird ein Eintrag wie folgt generiert:
-
-```
-{
-    "metadata": {
-        "source": "C:\\Users\\foo\\data.csv",
-        "loader_type": "CSVLoader",
-        "file_name": "data.csv",
-        "file_extension": "csv",
-        "row": 1
-    },
-    "content": "Spalte1: Wert1, Spalte2: Wert2, ..."
-},
-```
-
-wo
-- metadata Metadaten zur Datei und Zeile enthält
-- content den extrahierten Textinhalt der Zeile hält
-
-### Example Config and Result for SharepointLoader
-SharepointLoader lädt Dokumente aus einer SharePoint-Dokumentbibliothek unter Verwendung von App-Only-Authentifizierung.
-
-Um SharePoint zu konfigurieren, fügen Sie der config.json einen Abschnitt unter "loaders" hinzu:
-
-```
- {
-   "loader_type": "SharepointLoader",
-   "client_id": "your-client-id",
-   "client_secret": "your-client-secret",
-   "tenant_id": "your-tenant-id",
-   "document_library_id": "your-document-library-id",
-   "folder_path": "/path/to/folder",
-   "recursive": true
- },
-```
-
-wo
-- "loader_type" auf "SharepointLoader" gesetzt ist
-- "client_id", "client_secret", "tenant_id" die Authentifizierungsdaten sind
-- "document_library_id" die ID der Dokumentbibliothek
-- "folder_path" der Pfad zum Ordner (optional)
-- "recursive" angibt, ob Unterordner durchsucht werden sollen
-
-Zusätzlich zu den erforderlichen Parametern unterstützt der SharepointLoader mehrere optionale Parameter:
-
-- "folder_id": Die ID eines spezifischen Ordners in der Dokumentbibliothek, von dem aus geladen werden soll (alternative zu folder_path)
-- "object_ids": Eine Liste von spezifischen Objekt-IDs, die geladen werden sollen (z. B. einzelne Dateien)
-- "recursive": Boolescher Wert (true/false), ob Unterordner rekursiv durchsucht werden sollen (Standard: false)
-- "auth_with_token": Boolescher Wert (true/false), ob ein gespeichertes Token für die Authentifizierung verwendet werden soll (Standard: true)
-- "reset_token": Boolescher Wert (true/false), ob das gespeicherte Token zurückgesetzt werden soll (z. B. bei Ablauf, Standard: false)
-- "tenant_id": Die Tenant-ID für die Authentifizierung (Standard: "common")
-- "site_id": Die ID einer spezifischen SharePoint-Site (optional, falls nicht die Root-Site verwendet wird)
-
-Alle Ergebnisse werden in die loaded_documents.json geschrieben. Für jede Datei wird ein Eintrag generiert, ähnlich wie bei DirectoryLoader.
-
-Beispiel-Output für SharepointLoader:
-
-```
-{
-    "metadata": {
-        "source": "https://mysharepointserver.sharepoint.com/sites/examples/_layouts/15/Doc.aspx?sourcedoc=%01XXXXBDTXXXX&file=Aufteilung%20Reisetypen.docx&action=default&mobileredirect=true",
-        "sharepoint_id": "01XXXXBDTXXXX",
-        "name": "Aufteilung Reisetypen.docx",
-        "created": "2024-09-26 09:13:40+02:00",
-        "modified": "2024-09-26 09:13:40+02:00",
-        "loader_type": "SharepointLoader"
-    },
-    "content": "Es fallen zu verschiedenen Zwecken Reisen an, die in 4 Typen gegliedert werden können. Diese werden im Folgenden erläutert:..."
-},
-```
-
-wo
-- metadata Metadaten zur SharePoint-Datei enthält, einschließlich ID, Name, Erstellungs- und Änderungsdatum
-- content den extrahierten Textinhalt der Datei hält
-
-### Sharepoint Loader Prerequisites
-
-Prerequisites
-
-    Register an application with the Microsoft identity platform instructions.
-    When registration finishes, the Azure portal displays the app registration’s Overview pane. You see the Application (client) ID. Also called the client ID, this value uniquely identifies your application in the Microsoft identity platform.
-    During the steps you will be following at item 1, you can set the redirect URI as https://login.microsoftonline.com/common/oauth2/nativeclient
-    During the steps you will be following at item 1, generate a new password (client_secret) under Application Secrets section.
-    Follow the instructions at this document to add the following SCOPES (offline_access and Sites.Read.All) to your application.
-    To retrieve files from your Document Library, you will need its ID. To obtain it, you will need values of Tenant Name, Collection ID, and Subsite ID.
-    To find your Tenant Name follow the instructions at this document. Once you got this, just remove .onmicrosoft.com from the value and hold the rest as your Tenant Name.
-    To obtain your Collection ID and Subsite ID, you will need your SharePoint site-name. Your SharePoint site URL has the following format https://<tenant-name>.sharepoint.com/sites/<site-name>. The last part of this URL is the site-name.
-    To Get the Site Collection ID, hit this URL in the browser: https://<tenant>.sharepoint.com/sites/<site-name>/_api/site/id and copy the value of the Edm.Guid property.
-    To get the Subsite ID (or web ID) use: https://<tenant>.sharepoint.com/sites/<site-name>/_api/web/id and copy the value of the Edm.Guid property.
-    The SharePoint site ID has the following format: <tenant-name>.sharepoint.com,<Collection ID>,<subsite ID>. You can hold that value to use in the next step.
-    Visit the Graph Explorer Playground to obtain your Document Library ID. The first step is to ensure you are logged in with the account associated with your SharePoint site. Then you need to make a request to https://graph.microsoft.com/v1.0/sites/<SharePoint site ID>/drive and the response will return a payload with a field id that holds the ID of your Document Library ID.
-
-  
-
 
 ## Changelog
 - v0.0.1
@@ -309,3 +406,7 @@ Prerequisites
   - added SharePoint Loader
 - v0.0.7
   - added type checks
+- v0.0.8
+  - added loader_id for all loaders
+  - improved error handling and dependency checking for directory loader
+  - added drupal_loader

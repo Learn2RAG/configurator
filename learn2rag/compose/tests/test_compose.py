@@ -9,14 +9,16 @@ data_dir = pathlib.Path(__file__).parent.resolve() / 'data'
 
 
 class ComposeTestCase(unittest.TestCase):
-    def setUp(self):
+    project: Project | None
+
+    def setUp(self) -> None:
         self.project = None
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         if self.project is not None:
             self.project.remove()
 
-    def test_zero_exitcode(self):
+    def test_zero_exitcode(self) -> None:
         name = 'test_zero_exitcode'
         self.project = Project.create(data_dir / 'zero_exitcode.yml', name)
         assert self.project is not None
@@ -29,7 +31,7 @@ class ComposeTestCase(unittest.TestCase):
         assert self.project.succeeded
         assert not self.project.failed
 
-    def test_nonzero_exitcode(self):
+    def test_nonzero_exitcode(self) -> None:
         name = 'test_nonzero_exitcode'
         self.project = Project.create(data_dir / 'nonzero_exitcode.yml', name)
         assert self.project is not None

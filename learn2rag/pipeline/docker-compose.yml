@@ -1,4 +1,3 @@
-version: '3.3'
 services:
   open-webui:
     # ghcr.io/open-webui/open-webui:main
@@ -28,7 +27,7 @@ services:
     volumes:
       - open-webui-pipelines:/app/pipelines
   qdrant:
-    image: qdrant/qdrant:v1.14.1
+    image: qdrant/qdrant:v1.17.0
     restart: always
     container_name: qdrant
     ports:
@@ -38,6 +37,8 @@ services:
       - 6336
       - 6334
       - 6335
+    environment:
+      - QDRANT__SERVICE__API_KEY=${QDRANT__SERVICE__API_KEY}
     configs:
       - source: qdrant_config
         target: /qdrant/config/production.yaml

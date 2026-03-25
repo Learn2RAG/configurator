@@ -6,9 +6,9 @@ This module handles loading documents from HTML sources.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.4
+Version: 0.0.5
 Creation Date: July 28, 2025
-Last Modified: February 20, 2026
+Last Modified: March 17, 2026
 """
 
 import hashlib
@@ -26,7 +26,7 @@ import requests
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
 
-def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = None) -> List[Document]:
+def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = None, loader_id: str = "N/A") -> List[Document]:
     """
     Load HTML content from a URL and optionally follow links recursively.
 
@@ -82,6 +82,7 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
             doc.metadata["process_time"] = datetime.now().strftime("%H:%M:%S")
             doc.metadata["loader_type"] = "HTMLLoader"
             doc.metadata["meta_properties"] = meta_tags  
+            doc.metadata["loader_id"] = loader_id
         documents.extend(page_documents)
 
         logger.info(f"Loaded content from {url}")

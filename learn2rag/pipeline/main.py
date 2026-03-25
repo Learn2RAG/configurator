@@ -17,22 +17,26 @@ if __name__ == "__main__":
 
     from .config import user_config, opt_config
 
-    ingestion.index(user_config, opt_config)
+    #ingestion.index(user_config, opt_config)
 
-    query = "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
-    if opt_config["search_mode"] == "multi_search":
-        query = {"content": "What is USM AI?", "title": "USM AI Documentation", "summary": "In this document the basic usage of USM AI is described.", "source_path":"USU/ITSM/"}
-    results = search.search(query, user_config, opt_config)
+    if opt_config["query_mode"] == "multi":
+        # in query_mode 'multi' different querys for each vector in the multi-vector are allowed
+        multi_query = {"content": "What is USM AI?", "title": "What is USM AI?", "summary": "What is USM AI?", "source_path":"USU/ITSM/"}
+        results = search.search_multi(multi_query, user_config, opt_config, request_id=None)
+        # modify the query for generation part
+        query = " ".join(f"{k}={v}" for k, v in multi_query.items())
+    else: 
+        query = "What is USM AI?" #"What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
+        results = search.search(query, user_config, opt_config, request_id=None)
 
-    if hasattr(results, "points"):
-        results = results.points
+    points = results.points
 
-    sources = "\n".join(set(result.payload['path'] for result in results))
+    sources = "\n".join(set(point.payload['path'] for point in points)) # type: ignore[index]
 
-    for result in results:
-        print(f"ID: {result.id}, Path: {result.payload['path']}, Score: {result.score}")
+    for point in points:
+        print(f"ID: {point.id}, Path: {point.payload['path']}, Score: {point.score}") # type: ignore[index]
 
-    answer = generate.generate(query, results, opt_config)
+    answer = generate.generate(query, points, opt_config)
 
     print(query)
     print(answer)

@@ -5,10 +5,10 @@ import logging
 import os
 import signal
 import sqlite3
+import ssl
 import subprocess
 import urllib.request
-import ssl
-from typing import Any
+from typing import Any, Optional
 
 import psutil
 import yaml
@@ -24,7 +24,7 @@ import signal
 exit_statuses = {}
 
 if hasattr(signal, "SIGCHLD"):
-    def handle_SIGCHLD(*args):
+    def handle_SIGCHLD(signum: int, frame: Optional[Any]) -> None:
         with contextlib.suppress(ChildProcessError):
             while True:
                 pid, status = os.waitpid(-1, os.WNOHANG)
