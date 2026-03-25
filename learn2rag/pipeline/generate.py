@@ -15,6 +15,7 @@ Content:
 """
 
 def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Any:
+    assert llm is not None
     if hasattr(search_results, "points"):
         search_results = search_results.points
     context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results]) # type: ignore[index]
@@ -28,6 +29,7 @@ def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str
 
 def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], request_id: str | None=None) -> Generator[str, None, None]:
     profilingLogger.info('start', extra={'activity': 'generate', 'request_id': request_id})
+    assert llm is not None
 
     if hasattr(search_results, "points"):
         search_results = search_results.points

@@ -1,46 +1,73 @@
 import logging
 import os
 from pydantic import SecretStr
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
-from typing import Callable, Any
 
 
-def ollama_client(*, url: str, token: str | None, model: str, proxy: str | None) -> ChatOllama:
-    return ChatOllama(
-        model=model,
-        temperature=0,
-        base_url=url,
-        client_kwargs={
-            'headers': {'Authorization': f'Bearer {token}'} if token else {},
-            'proxy': proxy,
-        },
-    )
+logger = logging.getLogger(__name__)
 
 
-def openai_client(*, url: str, token: SecretStr, model: str, proxy: str | None) -> ChatOpenAI:
-    return ChatOpenAI(
-        model=model,
-        temperature=0,
-        base_url=url,
-        api_key=token,
-    )
+class LLMClient():
+    # ID is used as a key to store in user data, should not be changed
+    ID: str
+    # LABEL is a display label for user interface
+    LABEL: str
+    chat_model: BaseChatModel
 
 
-# TODO: set up the right llm for user_config
+llms = {}
+def llm_client(cls: type[LLMClient]) -> type[LLMClient]:
+    llms[cls.ID] = cls; return cls
 
-llm_kwargs = {
-    'url': os.environ.get('LLM_API_URL'),
-    'token': os.environ.get('LLM_API_TOKEN') or None,
-    'model': os.environ.get('LLM_API_MODEL'),
-    'proxy': os.environ.get('LLM_API_PROXY') or None,
-}
-logging.info('LLM args: %s', llm_kwargs)
 
-# the keys are written by the configurator UI
-llms: dict[str, Callable[..., Any]] = {
-    'ChatOllama': ollama_client,
-    'ChatOpenAI': openai_client,
-}
+# First @llm_client would be the default in UI when adding an external model
+@llm_client
+class OpenAIClient(LLMClient):
+    ID = 'ChatOpenAI'
+    LABEL = 'OpenAI'
 
-llm = llms[os.environ.get('LLM_API_TYPE', 'ChatOllama')](**llm_kwargs)
+    def __init__(self, *, url: str, token: SecretStr, model: str, proxy: str | None) -> None:
+        self.chat_model = ChatOpenAI(
+            model=model,
+            temperature=0,
+            base_url=url,
+            api_key=token,
+        )
+
+
+@llm_client
+class OllamaClient(LLMClient):
+    ID = 'ChatOllama'
+    LABEL = 'Ollama'
+
+    def __init__(self, *, url: str, token: str | None, model: str, proxy: str | None) -> None:
+        self.chat_model = ChatOllama(
+            model=model,
+            temperature=0,
+            base_url=url,
+            client_kwargs={
+                'headers': {'Authorization': f'Bearer {token}'} if token else {},
+                'proxy': proxy,
+            },
+        )
+
+
+def chat_model_from_env() -> BaseChatModel:
+    default_llm = OpenAIClient
+    llm_id = os.environ.get('LLM_API_TYPE', default_llm.ID)
+    logger.debug('Using LLM: %s', llm_id)
+    llm_kwargs = {
+        'url': os.environ.get('LLM_API_URL'),
+        'token': os.environ.get('LLM_API_TOKEN') or None,
+        'model': os.environ.get('LLM_API_MODEL'),
+        'proxy': os.environ.get('LLM_API_PROXY') or None,
+    }
+    logger.debug('Using LLM args: %s', llm_kwargs)
+    return llms[llm_id](**llm_kwargs).chat_model
+
+
+llm = chat_model_from_env() if 'LLM_API_TYPE' in os.environ else None
+if not llm:
+    logger.warning('LLM is not configured')
