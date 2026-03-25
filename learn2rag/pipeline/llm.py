@@ -54,16 +54,20 @@ class OllamaClient(LLMClient):
         )
 
 
-default_llm = OpenAIClient
-llm_id = os.environ.get('LLM_API_TYPE', default_llm.ID)
-logger.debug('Using LLM: %s', llm_id)
+def chat_model_from_env() -> BaseChatModel:
+    default_llm = OpenAIClient
+    llm_id = os.environ.get('LLM_API_TYPE', default_llm.ID)
+    logger.debug('Using LLM: %s', llm_id)
+    llm_kwargs = {
+        'url': os.environ.get('LLM_API_URL'),
+        'token': os.environ.get('LLM_API_TOKEN') or None,
+        'model': os.environ.get('LLM_API_MODEL'),
+        'proxy': os.environ.get('LLM_API_PROXY') or None,
+    }
+    logger.debug('Using LLM args: %s', llm_kwargs)
+    return llms[llm_id](**llm_kwargs).chat_model
 
-llm_kwargs = {
-    'url': os.environ.get('LLM_API_URL'),
-    'token': os.environ.get('LLM_API_TOKEN') or None,
-    'model': os.environ.get('LLM_API_MODEL'),
-    'proxy': os.environ.get('LLM_API_PROXY') or None,
-}
-logger.debug('Using LLM args: %s', llm_kwargs)
 
-llm = llms[llm_id](**llm_kwargs).chat_model
+llm = chat_model_from_env() if 'LLM_API_TYPE' in os.environ else None
+if not llm:
+    logger.warning('LLM is not configured')
