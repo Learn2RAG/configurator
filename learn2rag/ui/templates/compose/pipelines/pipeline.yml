@@ -129,7 +129,9 @@ services:
       # https://docs.openwebui.com/getting-started/env-configuration/#webui_auth
       # "turning off authentication is only possible for fresh installations without any existing users"
       ENABLE_SIGNUP: 'True'
-      # TODO: WEBUI_AUTH: 'False'
+      #!!! {% if not config.get("SIMPLE_AUTH") %}
+      WEBUI_AUTH: 'False'
+      #!!! {% endif %}
       #!!! {% endif %}
       WEBUI_NAME: 'Learn2RAG'
       PUBLIC_URL: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
