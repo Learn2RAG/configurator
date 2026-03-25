@@ -4,14 +4,12 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5  # v2
         with:
           submodules: true
-      - run: pipx install poetry
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7
         with:
-          python-version: '3.13.5'
-          cache: 'poetry'
-      - run: poetry install --no-root
-      - run: poetry run mypy --no-incremental --warn-unused-configs
-      - run: poetry run pytest
+          enable-cache: true
+      - run: uv sync --locked --all-extras --dev
+      - run: uv run mypy --no-incremental --warn-unused-configs
+      - run: uv run pytest
