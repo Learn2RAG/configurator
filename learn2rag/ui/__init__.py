@@ -174,7 +174,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         # https://github.com/pallets/werkzeug/blob/main/examples/httpbasicauth.py
         if conf := app.config.get('SIMPLE_AUTH'):
             auth = request.authorization
-            if not auth or not (auth.username == conf['username'] and auth.password == conf['password']):
+            if not auth or not (auth.username == str(conf['username']) and auth.password == str(conf['password'])):
                 return werkzeug.wrappers.Response('login required', 401, {"WWW-Authenticate": f'Basic realm="Learn2RAG"'})
 
     @app.context_processor
