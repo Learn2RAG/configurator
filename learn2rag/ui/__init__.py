@@ -26,6 +26,7 @@ import yaml
 
 from learn2rag.compose import Project
 import learn2rag.data
+import learn2rag.pipeline.llm
 
 from datetime import datetime  # <-- ADD THIS
 
@@ -179,6 +180,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'firststeps_storage_path': app.instance_path + '/storage/example',
             'debug_logging': config.get('logging', {}).get('debug', False),
             'current_timestamp': math.floor(time.time()),
+            'llm': learn2rag.pipeline.llm,
         }
 
     @app.context_processor
@@ -243,7 +245,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         ok = True
         model = request.form['model']
         api = request.form['api']
-        if api == 'ollama_clientent':
+        if api == learn2rag.pipeline.llm.OllamaClient.ID:
             url = request.form.get('url') or 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
             # TODO setup tokens for locally running ollama
             token = request.form.get('token') or ''
@@ -252,7 +254,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     model += ':latest'
                 start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(), {'model': model})
                 return flask_redirect(url_for('model_pulling', model=model))
-        elif api == 'openai_clientent':
+        elif api == learn2rag.pipeline.llm.OpenAIClient.ID:
             url = request.form['url']
             token = request.form['token']
         else:
@@ -284,7 +286,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     'url': 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/',
                     'token': '',
                     'model': model,
-                    'api': 'ollama_clientent',
+                    'api': learn2rag.pipeline.llm.OllamaClient.ID,
                 })
                 flash(pgettext('flash', 'Downloaded a language model: %(model)s', model=model))
                 res = make_response(render_template('model_pulling_success.html'))

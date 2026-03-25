@@ -6,7 +6,7 @@ SUGGESTED_MODELS:
     link: https://ollama.com/library/gemma3
     ollama: pull
     config:
-      api: ollama_client
+      api: ChatOllama
       model: gemma3:27b
   llama3.3_70b:
     label: Meta Llama 3.3
@@ -15,7 +15,7 @@ SUGGESTED_MODELS:
     link: https://ollama.com/library/llama3.3
     ollama: pull
     config:
-      api: ollama_client
+      api: ChatOllama
       model: llama3.3:70b
   tinyllama:
     label: TinyLlama
@@ -23,5 +23,5 @@ SUGGESTED_MODELS:
     link: https://github.com/jzhang38/TinyLlama
     ollama: pull
     config:
-      api: ollama_client
+      api: ChatOllama
       model: tinyllama:latest

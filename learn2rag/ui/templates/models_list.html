@@ -30,8 +30,14 @@
               <div class="mb-3">
                 <label for="api" class="form-label">{{pgettext('form_label', 'API type')}}</label>
                 <select required="required" class="form-select" name="api">
-                  <option selected="selected">ChatOpenAI</option>
-                  <option>ChatOllama</option>
+                  {% for llm_client in llm.llms.values() %}
+                  <option
+                    value="{{ llm_client.ID }}"
+                    {% if loop.first %}
+                    selected="selected"
+                    {% endif %}
+                  >{{ llm_client.LABEL }}</option>
+                  {% endfor %}
                 </select>
               </div>
               <div class="mb-3">
@@ -103,7 +109,7 @@
                     <label for="model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
                     <input class="form-control" name="model" required="required" title="{{pgettext('tooltip', 'For example: %(model)s', model=firststeps_model.get('config', {}).get('model'))}}">
                   </div>
-                  <input type="hidden" name="api" value="ollama_clientent"/>
+                  <input type="hidden" name="api" value="{{ llm.OllamaClient.ID }}"/>
                   <input type="hidden" name="ollama" value="pull"/>
                   <button type="submit" class="btn btn-primary">Save</button>
                 </form>
@@ -140,7 +146,7 @@
                   {% endfor %}
                 </select>
               </div>
-              <input type="hidden" name="api" value="ollama_clientent"/>
+              <input type="hidden" name="api" value="{{ llm.OllamaClient.ID }}"/>
               <input type="hidden" name="ollama" value="use"/>
               <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
             </form>
@@ -168,7 +174,14 @@
     {% for name, model in models.items() %}
     <tr>
       <td title="{{ name }}">{{ model.label }}</td>
-      <td>{{ model.api }}</td>
+      <td>
+        {% if model.api in llm.llms %}
+        {{ llm.llms[model.api].LABEL }}
+        {% else %}
+        <code>{{ model.api }}</code>
+        <span title="{{pgettext('tooltip', 'Unknown value')}}" style="cursor: default;">⚠️</span>
+        {% endif %}
+      </td>
       <td>{{ model.url }}</td>
       <td>{{ model.token }}</td>
       <td>{{ model.model }}</td>
