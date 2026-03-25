@@ -243,13 +243,18 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         ok = True
         model = request.form['model']
         api = request.form['api']
-        if api == 'ollama_clientent':
+        logging.info("+++++++++++++++++++++++++++++++++++")
+        logging.info(f"model:{str(model)}, api:{str(api)} ")
+        if api == 'ollama_client':
             url = request.form.get('url') or 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
             # TODO setup tokens for locally running ollama
             token = request.form.get('token') or ''
+            logging.info(f"token {token} ")
             if request.form.get('ollama') == 'pull':
+                logging.info("pull")
                 if model.find(':') == -1:
                     model += ':latest'
+                logging.info("start project ")
                 start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(), {'model': model})
                 return flask_redirect(url_for('model_pulling', model=model))
         elif api == 'openai_clientent':
