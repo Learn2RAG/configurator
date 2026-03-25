@@ -243,8 +243,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         ok = True
         model = request.form['model']
         api = request.form['api']
-        logging.info("+++++++++++++++++++++++++++++++++++")
-        logging.info(f"model:{str(model)}, api:{str(api)} ")
         if api == 'ollama_client':
             url = request.form.get('url') or 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
             # TODO setup tokens for locally running ollama
