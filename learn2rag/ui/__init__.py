@@ -430,12 +430,12 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         try:
             project = start_project(name, template_file, storage_path, render_context)
             if project and project.running:
-                flash(pgettext('flash', 'Started the pipeline'))
+                flash(pgettext('flash', 'Started the pipeline: %(label)s', label=pipeline['label']))
             else:
-                flash(pgettext('flash', 'Failed to start the pipeline'), 'error')
+                flash(pgettext('flash', 'Failed to start the pipeline: %(label)s', label=pipeline['label']), 'error')
         except Exception as e:
             app.logger.exception(e)
-            app.logger.error('Could not start the pipeline')
+            app.logger.error('Could not start the pipeline: %s (%s)', pipeline['label'], name)
             flash(pgettext('flash', 'Could not start the pipeline: %(message)s', message=e), 'error')
 
         # TODO "load" the corresponding Ollama model
