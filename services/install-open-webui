@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eu
+set -eux
 
 #npm install
 #npm run build
@@ -10,26 +10,15 @@ set -eu
 #export NPM_CONFIG_CACHE="/opt/uv/npm_cache"
 #export PATH="/opt/uv/npm_local/bin:$PATH"
 
-echo ">>> Cleaning old files..."
 rm -rf dist build node_modules .venv 
-
-
-# 2. Build the frontend
-
-echo ">>> Installing dependencies..."
 npm install
-
-echo ">>> Building frontend..."
 npm run build
 
-
-echo ">>> Verifying build..."
 if [ -d "dist" ] && [ ! -d "build" ]; then
     echo "Creating symlink from dist to build..."
     ln -s dist build
 fi
 
-# 3. VERIFY the build directory exists before continuing
 if [ ! -d "build" ]; then
     echo "ERROR: npm run build did not create the 'build' directory!"
     # List files to see what WAS created (often it's 'dist' instead of 'build')
@@ -37,9 +26,5 @@ if [ ! -d "build" ]; then
     exit 1
 fi
 
-echo "install python packages"
-# 4. Now install the Python package
 uv venv .venv --python 3.11 --seed
 uv run .venv/bin/pip install .
-
-echo "Done! 3.11 Environment Ready!"
