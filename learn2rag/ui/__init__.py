@@ -254,13 +254,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         model = request.form['model']
         api = request.form['api']
 
-        cert_path = os.environ.get('LEARN2RAG_SSL_CERT')
-        key_path = os.environ.get('LEARN2RAG_SSL_KEY')
-        has_ssl = bool(cert_path and key_path and Path(cert_path).exists())
+        has_ssl = bool(app.config.get('TLS'))
         protocol = 'https' if has_ssl else 'http'
-
-        app.logger.info(f"cert_path: {cert_path} , has_ssl:{has_ssl} , protocol : {protocol}" )
-        app.logger.info(f"api {api} model {model}")
 
         if api == learn2rag.pipeline.llm.OllamaClient.ID:
             url = request.form.get('url') or 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
@@ -390,11 +385,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         return redirect(url_for('pipelines_list'))
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
-        cert_path = os.environ.get('LEARN2RAG_SSL_CERT', '')
-        key_path = os.environ.get('LEARN2RAG_SSL_KEY', '')
-
-        has_ssl = bool(cert_path and key_path and Path(cert_path).exists() and Path(key_path).exists())
-        print(f"DEBUG: has ssl is : {has_ssl} , cert_path:{cert_path}  ,key_path: {key_path}")
+        has_ssl = bool(app.config.get("TLS"))
 
         url = urllib.parse.urlparse(request.base_url)
         assert url.scheme
@@ -407,6 +398,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         language_model = learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model'])
         app.logger.info(f"Original LLM API URL: {language_model.get('url')}")
         if has_ssl and language_model.get('url') and language_model['url'].startswith('http://'):
+            # FIXME
             language_model['url'] = language_model['url'].replace('http://', 'https://', 1)
             app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
 
@@ -418,14 +410,9 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'sources': sources,
             'debug_logging': config.get('logging', {}).get('debug', False),
             'qdrant_api_key': secrets.token_hex(16),
-            'ssl_cert': cert_path if has_ssl else "",
-            'ssl_key': key_path if has_ssl else "",
-            'use_ssl': has_ssl,
+            # FIXME
             'learn2rag_scheme': 'https' if has_ssl else url.scheme
         }
-
-        print(f"DEBUG: Rendering Qdrant config with SSL={has_ssl}")
-        print(f"DEBUG: Cert path is {cert_path} key_path is {key_path}")
 
         assert pipeline_templates[template_name]
         template_file = pipelines_template_path / (template_name + '.yml')
@@ -567,13 +554,8 @@ def main(config: dict[str, Any]) -> None:
     port = config.get('port', '9000')
     host = config.get('host', '0.0.0.0')
 
-    ssl_key = config.get('ssl_keyfile')
-    ssl_cert = config.get('ssl_certfile')
-
-    if ssl_key:
-        os.environ['LEARN2RAG_SSL_KEY'] = ssl_key
-    if ssl_cert:
-        os.environ['LEARN2RAG_SSL_CERT'] = ssl_cert
+    ssl_key = config.get('TLS', {}).get('KEYFILE')
+    ssl_cert = config.get('TLS', {}).get('CERTFILE')
 
     use_https = False
     if ssl_key and ssl_cert:

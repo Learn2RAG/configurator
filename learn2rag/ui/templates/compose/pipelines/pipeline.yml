@@ -85,21 +85,16 @@ files:
   - path: '{{storage_path}}/logs/.keep'
     content: ''
 
-#      - '{{learn2rag_path}}/services/start-open-webui{% if is_windows %}.exe{% endif %}'
-#Bypass the bash wrapper and run Uvicorn natively ( TODO: remove if not work)
 services:
   open-webui:
     working_dir: '{{storage_path}}'
     command:
-      - 'sh'
-      - '-c'
-      - >
-        mkdir -p '{{storage_path}}/open-webui-data' &&
-        {% if use_ssl %}
-        exec {{learn2rag_path}}/services/open-webui/.venv/bin/uvicorn open_webui.main:app --host 0.0.0.0 --port {{ports.ui}} --forwarded-allow-ips '*' --ssl-certfile '{{ssl_cert}}' --ssl-keyfile '{{ssl_key}}'
-        {% else %}
-        exec {{learn2rag_path}}/services/open-webui/.venv/bin/uvicorn open_webui.main:app --host 0.0.0.0 --port {{ports.ui}} --forwarded-allow-ips '*'
-        {% endif %}
+      - '{{learn2rag_path}}/services/start-open-webui{% if is_windows %}.exe{% endif %}'
+      - 'serve'
+      - '--host'
+      - '0.0.0.0'
+      - '--port'
+      - '{{ports.ui}}'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       DATA_DIR: '{{storage_path}}/open-webui-data'
@@ -133,6 +128,10 @@ services:
       #!!! {% endif %}
       #!!! {% endif %}
       WEBUI_NAME: 'Learn2RAG'
+      #!!! {% if config.get("TLS") %}
+      UVICORN_SSL_CERTFILE: '{{ config["TLS"]["CERTFILE"] }}'
+      UVICORN_SSL_KEYFILE: '{{ config["TLS"]["KEYFILE"] }}'
+      #!!! {% endif %}
     healthcheck:
       # TODO: We only support ['CMD', 'curl', '-f', ...]
       test: ['CMD', 'curl', '-f', '{{learn2rag_scheme}}://localhost:{{ports.ui}}/health']
