@@ -40,6 +40,6 @@ fi
 echo "install python packages"
 # 4. Now install the Python package
 uv venv .venv --python 3.11 --seed
-uv pip install --python .venv -e .
+uv run .venv/bin/pip install .
 
 echo "Done! 3.11 Environment Ready!"
