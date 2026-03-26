@@ -1,30 +1,6 @@
 #!/bin/bash
 set -eux
-
-#npm install
-#npm run build
-#uv venv .venv
-#uv pip install .
-
-#export NPM_CONFIG_PREFIX="/opt/uv/npm_local"
-#export NPM_CONFIG_CACHE="/opt/uv/npm_cache"
-#export PATH="/opt/uv/npm_local/bin:$PATH"
-
-rm -rf dist build node_modules .venv 
 npm install
 npm run build
-
-if [ -d "dist" ] && [ ! -d "build" ]; then
-    echo "Creating symlink from dist to build..."
-    ln -s dist build
-fi
-
-if [ ! -d "build" ]; then
-    echo "ERROR: npm run build did not create the 'build' directory!"
-    # List files to see what WAS created (often it's 'dist' instead of 'build')
-    ls -F
-    exit 1
-fi
-
 uv venv .venv --python 3.11 --seed
 uv run .venv/bin/pip install .
