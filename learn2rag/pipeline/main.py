@@ -30,8 +30,8 @@ if __name__ == "__main__":
         query = "What is USM AI?" #"What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
 
         rewritten_query = rewrite.rewrite_query(query)
-        subqueries = rewrite.generate_subqueries(query, n=3) # TODO query or rewritten query?
-        keywords = rewrite.generate_keywords(query, n=3) # TODO query or rewritten query?
+        subqueries = rewrite.generate_subqueries(query, n=2) # TODO query or rewritten query?
+        keywords = rewrite.generate_keywords(query, n=2) # TODO query or rewritten query?
 
         results = search.search(query, user_config, opt_config, request_id=None)
 
@@ -45,26 +45,28 @@ if __name__ == "__main__":
         for sq in subqueries:
             results_subqueries.append(search.search(sq, user_config, opt_config_subqueries, request_id=None))
 
-        # opt_config_keywords = opt_config
+        opt_config_keywords = opt_config
         # opt_config_keywords["search_mode"] = "sparse"
-        # opt_config_keywords["top_k"] = 3
-        #
-        # keywords_concatenated = " ".join(keywords)
-        # results_keywords_concatenated = search.search(keywords_concatenated, user_config, opt_config_keywords, request_id=None)
-        #
-        # results_keywords_single = []
-        # for kw in keywords:
-        #     results_keywords_single.append(search.search(kw, user_config, opt_config_keywords, request_id=None))
+        opt_config_keywords["top_k"] = 3
+
+        keywords_concatenated = " ".join(keywords)
+        results_keywords_concatenated = search.search(keywords_concatenated, user_config, opt_config_keywords, request_id=None)
+
+        results_keywords_single = []
+        for kw in keywords:
+            results_keywords_single.append(search.search(kw, user_config, opt_config_keywords, request_id=None))
 
     points_all = []
     for point in results_rewritten_query.points:
         points_all.append(point)
-    for point in results_subqueries:
-        points_all.append(point)
+    for item in results_subqueries:
+        for point in item.points:
+            points_all.append(point)
+    for item in results_keywords_single: # alternative: results_keywords_concatenated
+        for point in item.points:
+            points_all.append(point)
 
-
-    # points = results.points
-    points = points_all
+    points = sorted(points_all, key=lambda p: p.score, reverse=True)
 
     sources = "\n".join(set(point.payload['path'] for point in points)) # type: ignore[index]
 
