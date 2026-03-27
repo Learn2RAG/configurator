@@ -1,3 +1,5 @@
 open-webui-pipelines/langgraph_stream_pipeline.py
+learn2rag/logging.yml
+learn2rag/logging-debug.yml
 learn2rag/pipeline/opt_config.json
 services/setup-open-webui
