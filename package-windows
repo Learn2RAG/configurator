@@ -7,8 +7,7 @@ set -eu
 # https://doc.rust-lang.org/rustc/platform-support.html#tier-1-with-host-tools
 CARGO_BUILD_TARGET=x86_64-pc-windows-gnu
 
-BUNDLE_DIR=dist
-BUNDLE_DIR=/data/dist
+BUNDLE_DIR=~/.cache/learn2rag-dist
 BUNDLE_NAME=learn2rag-windows
 BUNDLE=$BUNDLE_DIR/$BUNDLE_NAME
 

@@ -11,8 +11,7 @@ CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
 # https://github.com/cross-rs/cross/wiki/FAQ#glibc-version-error
 CARGO_TARGET_DIR=target/build/"${CARGO_BUILD_TARGET}"
 
-BUNDLE_DIR=dist
-BUNDLE_DIR=/data/dist
+BUNDLE_DIR=~/.cache/learn2rag-dist
 BUNDLE_NAME=learn2rag-linux
 BUNDLE=$BUNDLE_DIR/$BUNDLE_NAME
 
