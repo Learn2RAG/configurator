@@ -443,6 +443,16 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                 app.logger.exception(e)
                 app.logger.error('Could not stop the pipeline')
                 flash(pgettext('flash', 'Could not stop the pipeline: %(message)s', message=e), 'error')
+        elif request.form['action'] == 'clean':
+            try:
+                storage_path = expand_path(pipeline['storage_path'])
+                shutil.rmtree(storage_path)
+                flash(pgettext('flash', 'Successfully clean the pipeline storage: '), 'success')
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                app.logger.error('Failed to remove directory: %s, %s', storage_path, e)
+                flash(pgettext('flash', 'Could not clean the pipeline storage: %(message)s', message=e), 'error')
         return redirect(url_for('pipelines_list'))
 
     @app.get('/pipelines/<name>/logs/<file>')

@@ -102,6 +102,15 @@
                       </button>
                     </form>
                   </li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to clean this pipeline storage: %(label)s?', label=pipeline.label)}}">
+                      <input type="hidden" name="action" value="clean"/>
+                      <button type="submit" class="dropdown-item text-bg-danger">
+                        {{pgettext('button', 'Clean storage')}}
+                      </button>
+                    </form>
+                  </li>
                 </ul>
               </div>
               {% endif %}
