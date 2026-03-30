@@ -1,15 +1,15 @@
 # German translations for PROJECT.
-# Copyright (C) 2025 ORGANIZATION
+# Copyright (C) 2026 ORGANIZATION
 # This file is distributed under the same license as the PROJECT project.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-03-30 11:51+0200\n"
-"PO-Revision-Date: 2026-03-30 10:49+0200\n"
-"Last-Translator: \n"
+"POT-Creation-Date: 2026-03-30 12:48+0200\n"
+"PO-Revision-Date: 2026-03-30 12:48+0200\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: de\n"
 "Language-Team: de <LL@li.org>\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
@@ -18,36 +18,35 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: learn2rag/ui/__init__.py:274
+#: learn2rag/ui/__init__.py:276
 #, python-format
 msgid "API is not supported: %(api)s"
 msgstr "API wird nicht unterstützt: %(api)s"
 
-#: learn2rag/ui/__init__.py:284
+#: learn2rag/ui/__init__.py:286
 #, python-format
 msgctxt "flash"
 msgid "Added a new language model configuration: %(label)s"
 msgstr "Neue Modellkonfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:303
+#: learn2rag/ui/__init__.py:305
 #, python-format
 msgctxt "flash"
 msgid "Downloaded a language model: %(model)s"
 msgstr "Sprachmodell %(model)s heruntergeladen"
 
-#: learn2rag/ui/__init__.py:308
-#, fuzzy, python-format
+#: learn2rag/ui/__init__.py:310
+#, python-format
 msgctxt "flash"
 msgid "Failed to download a language model: %(model)s"
-msgstr "Sprachmodell %(model)s  heruntergeladen"
+msgstr "Das Herunterladen des Sprachmodells %(model)s ist fehlgeschlagenn"
 
-#: learn2rag/ui/__init__.py:322
-#, fuzzy
+#: learn2rag/ui/__init__.py:324
 msgctxt "flash"
 msgid "The requested language model configuration is not found"
 msgstr "Die gewünschte Pipeline konnte nicht gefunden werden"
 
-#: learn2rag/ui/__init__.py:326
+#: learn2rag/ui/__init__.py:328
 msgctxt "flash"
 msgid ""
 "Some configured pipelines use this language model configuration, remove "
@@ -56,25 +55,24 @@ msgstr ""
 "Einige konfigurierte Pipelines verwenden diese Sprachmodellkonfiguration,"
 " entfernen sie zuerst"
 
-#: learn2rag/ui/__init__.py:330
-#, fuzzy, python-format
+#: learn2rag/ui/__init__.py:332
+#, python-format
 msgctxt "flash"
 msgid "Removed language model configuration: %(label)s"
-msgstr "Neue Modellkonfiguration hinzugefügt: %(label)s"
+msgstr "Entfernen der Konfiguration: %(label)s"
 
-#: learn2rag/ui/__init__.py:344
+#: learn2rag/ui/__init__.py:346
 #, python-format
 msgctxt "flash"
 msgid "Added a new data source configuration: %(label)s"
 msgstr "Neue Datenquellenkonfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:351
-#, fuzzy
+#: learn2rag/ui/__init__.py:353
 msgctxt "flash"
 msgid "The requested data source configuration is not found"
-msgstr "Die gewünschte Pipeline konnte nicht gefunden werden"
+msgstr "Die gewünschte Datenquellenkonfiguration konnte nicht gefunden werden"
 
-#: learn2rag/ui/__init__.py:355
+#: learn2rag/ui/__init__.py:357
 msgctxt "flash"
 msgid ""
 "Some configured pipelines use this data source configuration, remove them"
@@ -83,65 +81,65 @@ msgstr ""
 "Einige konfigurierte Pipelines nutzen diese Datenquellenkonfiguration, "
 "entfernen sie zuerst"
 
-#: learn2rag/ui/__init__.py:358
-#, fuzzy, python-format
+#: learn2rag/ui/__init__.py:360
+#, python-format
 msgctxt "flash"
 msgid "Removed data source configuration: %(label)s"
-msgstr "Neue Datenquellenkonfiguration hinzugefügt: %(label)s"
+msgstr "Entfernen der Konfiguration: %(label)s"
 
-#: learn2rag/ui/__init__.py:380
+#: learn2rag/ui/__init__.py:382
 #, python-format
 msgctxt "flash"
 msgid "Added a new pipeline configuration: %(label)s"
 msgstr "Neue Pipeline-Konfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:433
-#, fuzzy, python-format
+#: learn2rag/ui/__init__.py:435
+#, python-format
 msgctxt "flash"
 msgid "Started the pipeline: %(label)s"
-msgstr "Neue Pipeline-Konfiguration hinzugefügt: %(label)s"
+msgstr "Pipeline gestartet: %(label)s"
 
-#: learn2rag/ui/__init__.py:435
-#, fuzzy, python-format
+#: learn2rag/ui/__init__.py:437
+#, python-format
 msgctxt "flash"
 msgid "Failed to start the pipeline: %(label)s"
-msgstr "Pipeline konnte nicht gestartet werden"
+msgstr "Pipeline konnte nicht gestartet werden: %(label)s"
 
-#: learn2rag/ui/__init__.py:439
+#: learn2rag/ui/__init__.py:441
 #, python-format
 msgctxt "flash"
 msgid "Could not start the pipeline: %(message)s"
 msgstr "Pipeline konnte nicht gestartet werden: %(message)s"
 
-#: learn2rag/ui/__init__.py:447 learn2rag/ui/__init__.py:478
+#: learn2rag/ui/__init__.py:449 learn2rag/ui/__init__.py:480
 msgctxt "flash"
 msgid "The requested pipeline is not found"
 msgstr "Die gewünschte Pipeline konnte nicht gefunden werden"
 
-#: learn2rag/ui/__init__.py:457
-#, fuzzy, python-format
+#: learn2rag/ui/__init__.py:459
+#, python-format
 msgctxt "flash"
 msgid "Failed to remove directory: %(path)s"
-msgstr "Speicherpfad"
+msgstr "Kann den Dateipfad nicht entfernen: %(path)s"
 
-#: learn2rag/ui/__init__.py:461
-#, fuzzy, python-format
+#: learn2rag/ui/__init__.py:463
+#, python-format
 msgctxt "flash"
 msgid "Removed pipeline: %(label)s"
-msgstr "Neue Pipeline-Konfiguration hinzugefügt: %(label)s"
+msgstr "Die Pipeline entfernt: %(label)s"
 
-#: learn2rag/ui/__init__.py:467
+#: learn2rag/ui/__init__.py:469
 msgctxt "flash"
 msgid "Stopped the pipeline"
 msgstr "Pipeline gestoppt"
 
-#: learn2rag/ui/__init__.py:471
+#: learn2rag/ui/__init__.py:473
 #, python-format
 msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
 msgstr "Pipeline konnte nicht gestoppt werden: %(message)s"
 
-#: learn2rag/ui/__init__.py:510
+#: learn2rag/ui/__init__.py:512
 msgctxt "shutdown"
 msgid "Bye!"
 msgstr ""
@@ -177,17 +175,17 @@ msgstr "Ports"
 #: learn2rag/ui/templates/_pipelines_list_table.html:9
 msgctxt "column_heading"
 msgid "Status"
-msgstr ""
+msgstr "Status"
 
 #: learn2rag/ui/templates/_pipelines_list_table.html:35
 msgctxt "tooltip"
 msgid "succeeded"
-msgstr ""
+msgstr "erfolgreich"
 
 #: learn2rag/ui/templates/_pipelines_list_table.html:36
 msgctxt "tooltip"
 msgid "failed"
-msgstr ""
+msgstr "fehlgeschlagen"
 
 #: learn2rag/ui/templates/_pipelines_list_table.html:39
 msgid "running"
@@ -204,7 +202,6 @@ msgid "Stop"
 msgstr "Stopp"
 
 #: learn2rag/ui/templates/_pipelines_list_table.html:81
-#, fuzzy
 msgctxt "button"
 msgid "More"
 msgstr "Mehr"
@@ -280,7 +277,7 @@ msgstr ""
 " aktiviert. Es könnte sensible Informationen erfassen."
 
 #: learn2rag/ui/templates/firststeps_models.html:16
-#, fuzzy, python-format
+#, python-format
 msgctxt "button"
 msgid "Download a suggested language model: %(model)s"
 msgstr "Empfohlenes Sprachmodell %(model)s herunterladen"
@@ -343,10 +340,9 @@ msgid "API URL"
 msgstr "API URL"
 
 #: learn2rag/ui/templates/models_list.html:45
-#, fuzzy
 msgctxt "tooltip"
 msgid "For example: https://example.com/api"
-msgstr "https://beispiel.de/api"
+msgstr "Zum Beispiel: https://example.com/api"
 
 #: learn2rag/ui/templates/models_list.html:48
 msgctxt "form_label"
@@ -378,7 +374,6 @@ msgid "Save"
 msgstr "Speichern"
 
 #: learn2rag/ui/templates/models_list.html:64
-#, fuzzy
 msgctxt "heading"
 msgid "Download a language model"
 msgstr "Neues Sprachmodell herunterladen"
@@ -394,9 +389,8 @@ msgid "Use this suggested language model"
 msgstr "Empfohlenes Sprachmodell verwenden"
 
 #: learn2rag/ui/templates/models_list.html:102
-#, fuzzy
 msgid "Another model"
-msgstr "Sprachmodell"
+msgstr "Ein weiteres Sprachmodell"
 
 #: learn2rag/ui/templates/models_list.html:103
 msgid "Download any model from Ollama library."
@@ -432,11 +426,13 @@ msgid "Unknown value"
 msgstr "Unbekannt"
 
 #: learn2rag/ui/templates/models_list.html:189
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Are you sure you want to remove this language model configuration: "
 "%(label)s?"
-msgstr "Neue Modellkonfiguration hinzugefügt: %(label)s"
+msgstr ""
+"Sind Sie sicher, dass Sie diese Sprachmodellkonfiguration entfernen "
+"möchten: %(label)s"
 
 #: learn2rag/ui/templates/pipelines_list.html:4
 msgctxt "title"
@@ -464,9 +460,8 @@ msgid "Data sources"
 msgstr "Datenquellen"
 
 #: learn2rag/ui/templates/pipelines_list.html:44
-#, fuzzy
 msgid "Advanced configuration"
-msgstr "%(num)d Sprachmodellkonfiguration"
+msgstr "Erweiterte Optionen"
 
 #: learn2rag/ui/templates/pipelines_list.html:48
 msgctxt "form_label"
@@ -564,9 +559,9 @@ msgid "Path"
 msgstr "Pfad"
 
 #: learn2rag/ui/templates/sources_list.html:88
-#, fuzzy, python-format
+#, python-format
 msgid "Are you sure you want to remove this data source configuration: %(label)s?"
-msgstr "Neue Datenquellenkonfiguration hinzugefügt: %(label)s"
+msgstr "Sind Sie sicher, dass Sie diese Konfiguration entfernen möchten: %(label)s"
 
 #: learn2rag/ui/templates/start.html:3 learn2rag/ui/templates/start.html:6
 msgctxt "title"

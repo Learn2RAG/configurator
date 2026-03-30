@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-03-30 11:51+0200\n"
+"POT-Creation-Date: 2026-03-30 12:48+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,124 +17,124 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: learn2rag/ui/__init__.py:274
+#: learn2rag/ui/__init__.py:276
 #, python-format
 msgid "API is not supported: %(api)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:284
+#: learn2rag/ui/__init__.py:286
 #, python-format
 msgctxt "flash"
 msgid "Added a new language model configuration: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:303
+#: learn2rag/ui/__init__.py:305
 #, python-format
 msgctxt "flash"
 msgid "Downloaded a language model: %(model)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:308
+#: learn2rag/ui/__init__.py:310
 #, python-format
 msgctxt "flash"
 msgid "Failed to download a language model: %(model)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:322
+#: learn2rag/ui/__init__.py:324
 msgctxt "flash"
 msgid "The requested language model configuration is not found"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:326
+#: learn2rag/ui/__init__.py:328
 msgctxt "flash"
 msgid ""
 "Some configured pipelines use this language model configuration, remove "
 "them first"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:330
+#: learn2rag/ui/__init__.py:332
 #, python-format
 msgctxt "flash"
 msgid "Removed language model configuration: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:344
+#: learn2rag/ui/__init__.py:346
 #, python-format
 msgctxt "flash"
 msgid "Added a new data source configuration: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:351
+#: learn2rag/ui/__init__.py:353
 msgctxt "flash"
 msgid "The requested data source configuration is not found"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:355
+#: learn2rag/ui/__init__.py:357
 msgctxt "flash"
 msgid ""
 "Some configured pipelines use this data source configuration, remove them"
 " first"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:358
+#: learn2rag/ui/__init__.py:360
 #, python-format
 msgctxt "flash"
 msgid "Removed data source configuration: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:380
+#: learn2rag/ui/__init__.py:382
 #, python-format
 msgctxt "flash"
 msgid "Added a new pipeline configuration: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:433
+#: learn2rag/ui/__init__.py:435
 #, python-format
 msgctxt "flash"
 msgid "Started the pipeline: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:435
+#: learn2rag/ui/__init__.py:437
 #, python-format
 msgctxt "flash"
 msgid "Failed to start the pipeline: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:439
+#: learn2rag/ui/__init__.py:441
 #, python-format
 msgctxt "flash"
 msgid "Could not start the pipeline: %(message)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:447 learn2rag/ui/__init__.py:478
+#: learn2rag/ui/__init__.py:449 learn2rag/ui/__init__.py:480
 msgctxt "flash"
 msgid "The requested pipeline is not found"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:457
+#: learn2rag/ui/__init__.py:459
 #, python-format
 msgctxt "flash"
 msgid "Failed to remove directory: %(path)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:461
+#: learn2rag/ui/__init__.py:463
 #, python-format
 msgctxt "flash"
 msgid "Removed pipeline: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:467
+#: learn2rag/ui/__init__.py:469
 msgctxt "flash"
 msgid "Stopped the pipeline"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:471
+#: learn2rag/ui/__init__.py:473
 #, python-format
 msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:510
+#: learn2rag/ui/__init__.py:512
 msgctxt "shutdown"
 msgid "Bye!"
 msgstr ""
