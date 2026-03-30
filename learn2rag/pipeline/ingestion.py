@@ -29,12 +29,13 @@ def get_chunks_metadata(chunks: list[Document], item: str) -> Iterator[str]:
         logging.warning('%d out of %d chunks are missing "%s" in metadata; using empty string', missing, len(chunks), item)
 
 
-def point_exists(qdrant: Qdrant, collection_name: str, loader_id: str, path: str, content_hash:str) -> bool:
+def point_exists(qdrant: Qdrant, collection_name: str, loader_id: str, path: str, content_hash: str, chunk_hash: str) -> bool:
     filter = Filter(
         must=[
             FieldCondition(key="loader_id", match=MatchValue(value=loader_id)),
             FieldCondition(key="path", match=MatchValue(value=path)),
             FieldCondition(key="content_hash", match=MatchValue(value=content_hash)),
+            FieldCondition(key="chunk_hash", match=MatchValue(value=chunk_hash)),
         ]
     )
     result, _ = qdrant.client.scroll(
@@ -98,6 +99,7 @@ def payload(sample: dict[str, Any]) -> dict[str, str]:
         "content": sample["page_content"],
         "path": sample["metadata"]["source"],
         "content_hash": sample["metadata"]["content_hash"],
+        "chunk_hash": sample["chunk_hash"],
         "title": sample["metadata"].get("title",""),
         "uri": sample["metadata"].get("uri",""),
         "loader_id": sample["metadata"]["loader_id"],
@@ -135,7 +137,8 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
                 assert dense_vecs.ndim == 2, dense_vecs.shape
             else:
                 raise TypeError(f"dense_vecs must be np.ndarray, got {type(dense_vecs)}")
-                
+
+    chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]            
     # Todo: handle different vector lengths for batch encoding when using sparse vectors
 
     logging.info('Creating embeddings...')
@@ -152,38 +155,40 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     if isinstance(embeddings, dict) and "dense_vecs" in embeddings:
         if opt_config["search_mode"] == "dense":
             chunks_with_embeddings = [
-                dict(chunk) | {"dense_vec": dense}
-                for chunk, dense in zip(chunks, embeddings["dense_vecs"])
+                dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
+                for chunk, dense, c_hash in zip(chunks, embeddings["dense_vecs"], chunk_hash)
             ]
         if opt_config["search_mode"] == "dense_sparse":
             chunks_with_embeddings = [
                 dict(chunk)
-                | {"dense_vec": dense, "lexical_weights": sparse}
-                for chunk, dense, sparse in zip(
+                | {"dense_vec": dense, "lexical_weights": sparse, "chunk_hash": c_hash}
+                for chunk, dense, sparse, c_hash in zip(
                     chunks,
                     list(embeddings["dense_vecs"]),
                     list(embeddings["lexical_weights"]),
+                    chunk_hash
                 )
             ]
         if opt_config["search_mode"] == "dense_sparse_colbert":
             chunks_with_embeddings = [
                 dict(chunk)
-                | {"dense_vec": dense, "lexical_weights": sparse, "colbert_vecs": colbert}
-                for chunk, dense, sparse, colbert in zip(
+                | {"dense_vec": dense, "lexical_weights": sparse, "colbert_vecs": colbert, "chunk_hash": c_hash}
+                for chunk, dense, sparse, colbert, c_hash in zip(
                     chunks,
                     list(embeddings["dense_vecs"]),
                     list(embeddings["lexical_weights"]),
                     list(embeddings['colbert_vecs']),
+                    chunk_hash
                 )
             ]
     else:
         chunks_with_embeddings = [
-            dict(chunk) | {"dense_vec": dense}
-            for chunk, dense in zip(chunks, embeddings)
+            dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
+            for chunk, dense, c_hash in zip(chunks, embeddings, chunk_hash)
         ]
 
     for sample in chunks_with_embeddings:
-        if not point_exists(qdrant, collection_name, sample['metadata']['loader_id'], sample['metadata']['source'], sample['metadata']['content_hash']):
+        if not point_exists(qdrant, collection_name, sample['metadata']['loader_id'], sample['metadata']['source'], sample['metadata']['content_hash'], sample['chunk_hash']):
             if opt_config["search_mode"] == "dense_sparse":
                 insert_dense_sparse(qdrant, collection_name, sample)
             elif opt_config["search_mode"] == "dense_sparse_colbert":
