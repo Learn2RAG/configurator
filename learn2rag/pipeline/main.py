@@ -27,11 +27,15 @@ if __name__ == "__main__":
         # modify the query for generation part
         query = " ".join(f"{k}={v}" for k, v in multi_query.items())
     else: 
-        query = "What is USM AI?" #"What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
+        query = "What si USM AI?" #"What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
 
         rewritten_query = rewrite.rewrite_query(query)
-        subqueries = rewrite.generate_subqueries(query, n=2) # TODO query or rewritten query?
-        keywords = rewrite.generate_keywords(query, n=2) # TODO query or rewritten query?
+        if rewritten_query in (None, ''):
+            q = query
+        else:
+            q = rewritten_query
+        subqueries = rewrite.generate_subqueries(q, n=5)
+        keywords = rewrite.generate_keywords(q, n=5)
 
         results = search.search(query, user_config, opt_config, request_id=None)
 
@@ -67,6 +71,7 @@ if __name__ == "__main__":
             points_all.append(point)
 
     points = sorted(points_all, key=lambda p: p.score, reverse=True)
+    # todo reranking
 
     sources = "\n".join(set(point.payload['path'] for point in points)) # type: ignore[index]
 
