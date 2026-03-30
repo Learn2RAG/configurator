@@ -115,7 +115,7 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=opt_config["chunk_size"], chunk_overlap=opt_config["chunk_overlap"]
     )
-    chunks = text_splitter.split_documents(all_documents)[:2]
+    chunks = text_splitter.split_documents(all_documents)
 
     collection_name = user_config["collection_name"]
 
