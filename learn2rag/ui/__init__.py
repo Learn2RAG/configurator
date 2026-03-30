@@ -23,6 +23,7 @@ import jinja2
 import ollama
 import uvicorn
 import yaml
+import werkzeug.wrappers
 
 from learn2rag.compose import Project
 import learn2rag.data
@@ -34,8 +35,6 @@ from datetime import datetime  # <-- ADD THIS
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
-# for now hardcode here , we can change it
-DEFAULT_PIPELINE_PORTS = [9001, 9002, 9003, 9004, 9005]
 
 def expand_path(path: Path) -> Path:
     return Path(path).expanduser().absolute()
@@ -171,6 +170,15 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     pipeline_templates = {str(item.stem): yaml.safe_load(item.open()) for item in pipelines_template_path.glob('*.yml')}
     app.logger.debug('Loaded %i pipeline_templates: %s', len(pipeline_templates), list(pipeline_templates.keys()))
 
+    @app.before_request
+    def simple_auth() -> 'werkzeug.wrappers.response.Response | None':
+        # https://github.com/pallets/werkzeug/blob/main/examples/httpbasicauth.py
+        if conf := app.config.get('SIMPLE_AUTH'):
+            auth = request.authorization
+            if not auth or not (auth.username == str(conf['username']) and auth.password == str(conf['password'])):
+                return werkzeug.wrappers.Response('login required', 401, {"WWW-Authenticate": f'Basic realm="Learn2RAG"'})
+        return None
+
     @app.context_processor
     def inject_info() -> dict[str, Any]:
         return {
@@ -245,6 +253,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         ok = True
         model = request.form['model']
         api = request.form['api']
+
+        has_ssl = bool(app.config.get('TLS'))
+        protocol = 'https' if has_ssl else 'http'
+
         if api == learn2rag.pipeline.llm.OllamaClient.ID:
             url = request.form.get('url') or 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
             # TODO setup tokens for locally running ollama
@@ -373,19 +385,33 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         return redirect(url_for('pipelines_list'))
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
+        has_ssl = bool(app.config.get("TLS"))
+
         url = urllib.parse.urlparse(request.base_url)
+        assert url.scheme
 
         sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
         for path_name, source in sources.items():
             source['path'] = str(expand_path(source['path']))
 
+        #  Fetch the language model configuration first let see if it works
+        language_model = learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model'])
+        app.logger.info(f"Original LLM API URL: {language_model.get('url')}")
+        if has_ssl and language_model.get('url') and language_model['url'].startswith('http://'):
+            # FIXME
+            language_model['url'] = language_model['url'].replace('http://', 'https://', 1)
+            app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
+
         render_context = {
+            'config': app.config,
             'learn2rag_hostname': url.hostname,
             'pipeline': pipeline,
-            'language_model': learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model']),
+            'language_model': language_model,
             'sources': sources,
             'debug_logging': config.get('logging', {}).get('debug', False),
             'qdrant_api_key': secrets.token_hex(16),
+            # FIXME
+            'learn2rag_scheme': 'https' if has_ssl else url.scheme
         }
 
         assert pipeline_templates[template_name]
@@ -396,7 +422,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             port_names = content.get('ports', [])
             configured_ports = pipeline.get('ports', [])
 
-            ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=DEFAULT_PIPELINE_PORTS)
+            ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=app.config.get('PREFERRED_PORTS', range(9001, 9011)))
             render_context['ports'] = dict(zip(port_names, ports))
 
         storage_path = Path(pipeline['storage_path'])
@@ -404,12 +430,12 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         try:
             project = start_project(name, template_file, storage_path, render_context)
             if project and project.running:
-                flash(pgettext('flash', 'Started the pipeline'))
+                flash(pgettext('flash', 'Started the pipeline: %(label)s', label=pipeline['label']))
             else:
-                flash(pgettext('flash', 'Failed to start the pipeline'), 'error')
+                flash(pgettext('flash', 'Failed to start the pipeline: %(label)s', label=pipeline['label']), 'error')
         except Exception as e:
             app.logger.exception(e)
-            app.logger.error('Could not start the pipeline')
+            app.logger.error('Could not start the pipeline: %s (%s)', pipeline['label'], name)
             flash(pgettext('flash', 'Could not start the pipeline: %(message)s', message=e), 'error')
 
         # TODO "load" the corresponding Ollama model
@@ -526,16 +552,39 @@ def main(config: dict[str, Any]) -> None:
     app = create_app(config=config)
 
     port = config.get('port', '9000')
+    host = config.get('host', '0.0.0.0')
 
-    url = 'http://localhost:' + port
+    ssl_key = config.get('TLS', {}).get('KEYFILE')
+    ssl_cert = config.get('TLS', {}).get('CERTFILE')
+
+    use_https = False
+    if ssl_key and ssl_cert:
+        if os.path.exists(ssl_key) and os.path.exists(ssl_cert):
+            logging.info(f" SSL files defined and found at {ssl_key} or {ssl_cert}")
+            use_https = True
+        else:
+            logging.error(f"Warning: SSL files defined but not found at {ssl_key} or {ssl_cert}")
+            raise FileNotFoundError(f"SSL files defined but not found at {ssl_key} or {ssl_cert}")
+    else:
+        logging.info(f"no SSL files provided then switch to HTTP mode")
+
+    protocol = 'https' if use_https else 'http'
+    url = f"{protocol}://localhost:{port}"
     webbrowser_open(url)
-    print('*' * 40)
-    print('Learn2RAG: ' + url)
-    print('*' * 40)
+    logging.info('*' * 40)
+    logging.info('Learn2RAG: ' + url)
+    logging.info('*' * 40)
 
-    uvicorn.run(
-        app,
-        interface='wsgi',
-        host=config.get('host', '0.0.0.0'),
-        port=int(port),
-    )
+    uvicorn_kwargs = {
+        "app": app,
+        "host": host,
+        "port": int(port),
+        "log_level": "info",
+        "interface": "wsgi",
+    }
+
+    if use_https:
+        uvicorn_kwargs["ssl_keyfile"] = ssl_key
+        uvicorn_kwargs["ssl_certfile"] = ssl_cert
+
+    uvicorn.run(**uvicorn_kwargs)

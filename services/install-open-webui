@@ -1,4 +1,6 @@
+#!/bin/bash
+set -eux
 npm install
 npm run build
-python3 -m venv .venv
-.venv/bin/pip install .
+uv venv .venv --python 3.11 --seed
+uv run .venv/bin/pip install .

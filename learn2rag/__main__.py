@@ -7,7 +7,7 @@ import os
 import pathlib
 import sys
 from types import TracebackType
-from typing import Any, Unpack
+from typing import Unpack
 
 import yaml
 
@@ -44,9 +44,10 @@ if __name__ == '__main__':
 
     config = {}
     try:
-        config = yaml.safe_load(open('config.yml'))
+        with open('config.yml', 'r') as f:
+            config = yaml.safe_load(f)
     except FileNotFoundError:
-        pass
+        print('No user config file (config.yml)')
 
     args, rest = LauncherArgumentParser().parse_known_args()
     module = importlib.import_module(args.module)

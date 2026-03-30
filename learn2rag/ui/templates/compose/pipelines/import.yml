@@ -10,8 +10,8 @@ files:
       log_level: INFO
       service:
         api_key: '{{qdrant_api_key}}'
-        grpc_port: null
-        http_port: '{{ports.qdrant_http}}'
+        grpc_port: null      
+        http_port: {{ports.qdrant_http}}
         host: '127.0.0.1'
       telemetry_disabled: true
 
@@ -110,6 +110,6 @@ services:
       LANGCHAIN_API_KEY: '1'
       LANGCHAIN_TRACING_V2: 'false'
       LLM_API_TYPE: '{{language_model.api}}'
-      LLM_API_URL: '{{language_model.url}}'
+      LLM_API_URL: '{{ language_model.url }}'
       LLM_API_TOKEN: '{{language_model.token}}'
       LLM_API_MODEL: '{{language_model.model}}'

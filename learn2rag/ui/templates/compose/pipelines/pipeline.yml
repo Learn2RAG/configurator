@@ -6,7 +6,7 @@ ports:
   - qdrant_http
   - pipeline
   - open_webui_pipelines
-ui_url: 'http://{{learn2rag_hostname}}:{{ports.ui}}/'
+ui_url: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |
@@ -104,7 +104,6 @@ services:
       OPENAI_API_KEY: '0p3n-w3bu!'
       ENABLE_OLLAMA_API: 'False'
       ENABLE_PERSISTENT_CONFIG: 'False'
-      ENABLE_SIGNUP: 'True'
       ENABLE_TITLE_GENERATION: 'False'
       GLOBAL_LOG_LEVEL: 'WARNING'
       OFFLINE_MODE: 'True'
@@ -113,21 +112,40 @@ services:
       USER_PERMISSIONS_FEATURES_CODE_INTERPRETER: 'False'
       USER_PERMISSIONS_FEATURES_IMAGE_GENERATION: 'False'
       USER_PERMISSIONS_FEATURES_WEB_SEARCH: 'False'
+      #!!! {% if False and config.get("SIMPLE_AUTH") %}
+      # TODO: Upgrade openwebui and use this (WEBUI_ADMIN_EMAIL etc)
+      ENABLE_SIGNUP: 'False'
+      WEBUI_AUTH: 'True'
+      WEBUI_ADMIN_EMAIL: '{{config["SIMPLE_AUTH"].get("username", "")}}'
+      WEBUI_ADMIN_NAME: '{{config["SIMPLE_AUTH"].get("username", "")}}'
+      WEBUI_ADMIN_PASSWORD:  '{{config["SIMPLE_AUTH"].get("password", "")}}'
+      #!!! {% else %}
       # https://docs.openwebui.com/getting-started/env-configuration/#webui_auth
       # "turning off authentication is only possible for fresh installations without any existing users"
+      ENABLE_SIGNUP: 'True'
+      #!!! {% if not config.get("SIMPLE_AUTH") %}
       WEBUI_AUTH: 'False'
+      #!!! {% endif %}
+      #!!! {% endif %}
       WEBUI_NAME: 'Learn2RAG'
+      #!!! {% if config.get("TLS") %}
+      UVICORN_SSL_CERTFILE: '{{ config["TLS"]["CERTFILE"] }}'
+      UVICORN_SSL_KEYFILE: '{{ config["TLS"]["KEYFILE"] }}'
+      #!!! {% endif %}
     healthcheck:
       # TODO: We only support ['CMD', 'curl', '-f', ...]
-      test: ['CMD', 'curl', '-f', 'http://localhost:{{ports.ui}}/health']
+      test: ['CMD', 'curl', '-f', '{{learn2rag_scheme}}://localhost:{{ports.ui}}/health']
   # # Only needed if WEBUI_AUTH is True for open-webui
-  # open-webui-setup:
-  #   working_dir: '{{storage_path}}'
-  #   command: ['bash', '-eu', '{{learn2rag_path}}/services/setup-open-webui']
-  #   environment:
-  #     WEBUI_URL: 'http://localhost:{{ports.ui}}/'
-  #     ADMIN_USER_EMAIL: 'user@learn2rag.de'
-  #     ADMIN_USER_PASSWORD: 'learn2rag'
+  #!!! {% if config.get("SIMPLE_AUTH") %}
+  # TODO: Upgrade openwebui and remove this completely
+  open-webui-setup:
+    working_dir: '{{storage_path}}'
+    command: ['bash', '-eu', '{{learn2rag_path}}/services/setup-open-webui']
+    environment:
+      WEBUI_URL: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
+      ADMIN_USER_EMAIL: '{{config["SIMPLE_AUTH"].get("username", "")}}'
+      ADMIN_USER_PASSWORD: '{{config["SIMPLE_AUTH"].get("password", "")}}'
+  #!!! {% endif %}
   openwebui-pipelines:
     working_dir: 'services/open-webui-pipelines'
     command: ['{{learn2rag_path}}/services/start-open-webui-pipelines{% if is_windows %}.exe{% endif %}']

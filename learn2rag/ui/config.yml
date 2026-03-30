@@ -1,3 +1,6 @@
+# This file is not seen or supposed to be changed by users.
+# The user-provided configuration file extends this one.
+# (config.yml next to the project root or executable)
 SUGGESTED_MODELS:
   gemma3_27b:
     label: Google Gemma 3 (27B)

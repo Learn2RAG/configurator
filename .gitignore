@@ -1,6 +1,8 @@
 /dist
 *.egg-info
+*.key
 *.mo
+*.pem
 __pycache__
 /.venv/
 /services/ollama/
@@ -21,6 +23,7 @@ compose.yml
 /learn2rag/pipeline/data/loaded_documents_kcenter.json
 /.env
 /.local.envrc
+/.idea
 *.pdf
 .vscode/launch.json
 learn2rag/pipeline/.env

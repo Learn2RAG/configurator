@@ -5,6 +5,7 @@ import logging
 import os
 import signal
 import sqlite3
+import ssl
 import subprocess
 import urllib.request
 from typing import Any, Optional
@@ -82,11 +83,15 @@ def process_running(pid: int) -> bool:
 
 
 def healthy(value: list[str]) -> bool:
+    print(f"len(value) is {len(value)} and value is : {' '.join(value)}")
     assert len(value) == 4
     assert value[0:3] == ['CMD', 'curl' ,'-f']
     url = value[3]
     try:
-        with urllib.request.urlopen(url, timeout=1):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(url, timeout=1, context=ctx):
             return True
     except Exception:
         return False

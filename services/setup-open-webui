@@ -9,6 +9,6 @@ curl \
   -H "Accept: application/json" \
   -H "Content-Type: application/json" \
   -d "{ \"email\": \"${ADMIN_USER_EMAIL}\", \"password\": \"${ADMIN_USER_PASSWORD}\", \"name\": \"Admin\" }"
-
+echo
 echo "Done setting up open-webui"
 while :; do sleep 86400; done
