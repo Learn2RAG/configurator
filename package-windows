@@ -3,6 +3,8 @@ set -eu
 
 ./build-python
 
+VERSION=$(uv version --short)
+
 # 64-bit MinGW (Windows 10+, Windows Server 2016+)
 # https://doc.rust-lang.org/rustc/platform-support.html#tier-1-with-host-tools
 CARGO_BUILD_TARGET=x86_64-pc-windows-gnu
@@ -18,8 +20,8 @@ PYAPP_DISTRIBUTION_EMBED=true
 PYAPP_FULL_ISOLATION=true
 PYAPP_EXPOSE_ALL_COMMANDS=true
 
-cp dist/learn2rag-0.1.0.tar.gz pyapp
-(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=learn2rag PYAPP_PROJECT_PATH=learn2rag-0.1.0.tar.gz cross build --release --target $CARGO_BUILD_TARGET)
+cp dist/learn2rag-$VERSION.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=learn2rag PYAPP_PROJECT_PATH=learn2rag-$VERSION.tar.gz cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/configurator.exe
 
 cp services/start-import.windows.bat $BUNDLE/services/start-import.bat
