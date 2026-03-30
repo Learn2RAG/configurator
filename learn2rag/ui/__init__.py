@@ -155,9 +155,11 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     babel = Babel(app)
 
     def get_locale() -> str:
-        translations = map(str, babel.list_translations())
+        translations = list(map(str, babel.list_translations()))
         default_translation = 'de'  # FIXME
-        return request.accept_languages.best_match(translations) or default_translation
+        translation = request.accept_languages.best_match(translations) or default_translation
+        # app.logger.debug('Available translations: %s; accept languages: %s; chosen translation: %s', translations, request.accept_languages, translation)
+        return translation
     babel.init_app(app, locale_selector=get_locale)
 
     app.logger.info('create_app')
