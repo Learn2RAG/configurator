@@ -146,16 +146,6 @@ services:
       ADMIN_USER_EMAIL: '{{config["SIMPLE_AUTH"].get("username", "")}}'
       ADMIN_USER_PASSWORD: '{{config["SIMPLE_AUTH"].get("password", "")}}'
   #!!! {% endif %}
-  openwebui-pipelines:
-    working_dir: 'services/open-webui-pipelines'
-    command: ['{{learn2rag_path}}/services/start-open-webui-pipelines{% if is_windows %}.exe{% endif %}']
-    environment:
-      LEARN2RAG_PATH: '{{learn2rag_path}}'
-      GLOBAL_LOG_LEVEL: 'WARNING'
-      PIPELINE_STREAM_URL: 'http://127.0.0.1:{{ports.pipeline}}/stream'
-      PIPELINES_DIR: '{{learn2rag_path}}/open-webui-pipelines'
-      HOST: '127.0.0.1'
-      PORT: '{{ports.open_webui_pipelines}}'
   qdrant:
     working_dir: '{{storage_path}}'
     command:
