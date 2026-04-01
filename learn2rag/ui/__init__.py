@@ -16,6 +16,7 @@ import time
 from typing import Any
 import urllib
 
+from babel import negotiate_locale
 from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
 from flask_babel import Babel, gettext, ngettext, pgettext  # type: ignore[import-untyped]
 import flask.logging
@@ -157,7 +158,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def get_locale() -> str:
         translations = list(map(str, babel.list_translations()))
         default_translation = 'de'  # FIXME
-        translation = request.accept_languages.best_match(translations) or default_translation
+        translation = negotiate_locale((x.replace('-', '_') for x in request.accept_languages.values()), translations) or default_translation
         # app.logger.debug('Available translations: %s; accept languages: %s; chosen translation: %s', translations, request.accept_languages, translation)
         return translation
     babel.init_app(app, locale_selector=get_locale)
