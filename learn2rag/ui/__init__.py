@@ -334,7 +334,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/sources')
     def sources_list() -> 'str | werkzeug.wrappers.response.Response':
-        return render_template('sources_list.html', example_local_path=example_local_path)
+        return render_template('sources_page.html', example_local_path=example_local_path)
 
     @app.post('/sources')
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
