@@ -2,9 +2,7 @@
 set -eu
 
 ./build-python
-
 VERSION=$(uv version --short)
-
 # 64-bit Linux (kernel 3.2+, glibc 2.17+)
 # https://doc.rust-lang.org/rustc/platform-support.html#tier-1-with-host-tools
 # https://github.com/cross-rs/cross#supported-targets
@@ -17,25 +15,52 @@ BUNDLE_DIR=~/.cache/learn2rag-dist
 BUNDLE_NAME=learn2rag-linux
 BUNDLE=$BUNDLE_DIR/$BUNDLE_NAME
 
+rm -rf $BUNDLE
 mkdir -p $BUNDLE
 mkdir -p $BUNDLE/services
 
-PYAPP_DISTRIBUTION_EMBED=true
-PYAPP_FULL_ISOLATION=true
-PYAPP_EXPOSE_ALL_COMMANDS=true
+export PYAPP_DISTRIBUTION_EMBED=true
+export PYAPP_FULL_ISOLATION=false
+export PYAPP_EXPOSE_ALL_COMMANDS=true
 
-cp dist/learn2rag-$VERSION.tar.gz pyapp
-(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=learn2rag PYAPP_PROJECT_PATH=learn2rag-$VERSION.tar.gz cross build --release --target $CARGO_BUILD_TARGET)
+echo "Clearing Cargo cache..."
+(cd pyapp && cross clean)
+
+# Bake the relative offline path directly into the binaries
+OFFLINE_ARGS="--no-index --find-links=./services/wheels"
+
+# Build Learn2RAG
+cp dist/learn2rag-$VERSION-py3-none-any.whl pyapp
+(cd pyapp; \
+    PYAPP_PYTHON_VERSION=3.13 \
+    PYAPP_PROJECT_NAME=learn2rag \
+    PYAPP_PROJECT_PATH=learn2rag-$VERSION-py3-none-any.whl \
+    PYAPP_PIP_EXTRA_ARGS="$OFFLINE_ARGS" \
+    cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/configurator
 
 cp services/start-import.linux $BUNDLE/services/start-import
 
-cp services/open-webui/dist/open_webui-0.6.15.tar.gz pyapp
-(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui PYAPP_PROJECT_PATH=open_webui-0.6.15.tar.gz PYAPP_EXEC_SPEC=open_webui:app cross build --release --target $CARGO_BUILD_TARGET)
+# Build Open WebUI
+cp services/open-webui/dist/open_webui-0.6.15-py3-none-any.whl pyapp
+(cd pyapp; \
+    PYAPP_PYTHON_VERSION=3.11 \
+    PYAPP_PROJECT_NAME=open-webui \
+    PYAPP_PROJECT_PATH=open_webui-0.6.15-py3-none-any.whl \
+    PYAPP_EXEC_SPEC=open_webui:app \
+    PYAPP_PIP_EXTRA_ARGS="$OFFLINE_ARGS" \
+    cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/services/start-open-webui
 
-cp services/open-webui-pipelines/dist/open_webui_pipelines-0.1.0.tar.gz pyapp
-(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui-pipelines PYAPP_PROJECT_PATH=open_webui_pipelines-0.1.0.tar.gz PYAPP_EXEC_MODULE=start cross build --release --target $CARGO_BUILD_TARGET)
+# Build Open WebUI Pipelines
+cp services/open-webui-pipelines/dist/open_webui_pipelines-0.1.0-py3-none-any.whl pyapp
+(cd pyapp; \
+    PYAPP_PYTHON_VERSION=3.11 \
+    PYAPP_PROJECT_NAME=open-webui-pipelines \
+    PYAPP_PROJECT_PATH=open_webui_pipelines-0.1.0-py3-none-any.whl \
+    PYAPP_EXEC_MODULE=start \
+    PYAPP_PIP_EXTRA_ARGS="$OFFLINE_ARGS" \
+    cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/services/start-open-webui-pipelines
 
 while read -u 100 file; do
@@ -50,6 +75,20 @@ tar -C $BUNDLE/services/ollama -xzvf $BUNDLE_DIR/ollama-linux.tgz
 wget --continue -O $BUNDLE_DIR/qdrant-linux.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.15.4/qdrant-x86_64-unknown-linux-musl.tar.gz
 mkdir -p $BUNDLE/services/qdrant
 tar -C $BUNDLE/services/qdrant -xzvf $BUNDLE_DIR/qdrant-linux.tar.gz
+
+WHEELS_DIR=$BUNDLE/services/wheels
+mkdir -p $WHEELS_DIR
+
+echo "Downloading offline dependencies..."
+rm -rf $BUNDLE_DIR/venv313 $BUNDLE_DIR/venv311
+uv venv --seed --python 3.13 $BUNDLE_DIR/venv313
+uv venv --seed --python 3.11 $BUNDLE_DIR/venv311
+$BUNDLE_DIR/venv311/bin/python -m pip download wheel setuptools -d $WHEELS_DIR
+$BUNDLE_DIR/venv313/bin/python -m pip download dist/learn2rag-$VERSION-py3-none-any.whl -d $WHEELS_DIR
+$BUNDLE_DIR/venv311/bin/python -m pip download services/open-webui/dist/open_webui-0.6.15-py3-none-any.whl -d $WHEELS_DIR
+$BUNDLE_DIR/venv311/bin/python -m pip download services/open-webui-pipelines/dist/open_webui_pipelines-0.1.0-py3-none-any.whl -d $WHEELS_DIR
+
+rm -rf $BUNDLE_DIR/venv313 $BUNDLE_DIR/venv311
 
 cp start.linux $BUNDLE/start
 cp uninstall.linux $BUNDLE/uninstall
