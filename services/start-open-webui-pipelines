@@ -1,3 +1,0 @@
-#!/bin/sh
-# This file is replaced by a compiled executable and should not contain anything else
-exec "$LEARN2RAG_PATH"/services/open-webui-pipelines/.venv/bin/python "$LEARN2RAG_PATH"/services/open-webui-pipelines/start.py
