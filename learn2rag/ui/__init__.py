@@ -13,6 +13,7 @@ import socket
 import subprocess
 import threading
 import time
+import tomllib
 from typing import Any
 import urllib
 
@@ -217,6 +218,27 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     except Exception as e:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
+
+    @app.context_processor
+    def inject_version():
+        return {
+            "app_version": get_version(),
+            "git_hash": get_git_hash()
+        }
+
+    def get_version():
+        try:
+            with open("pyproject.toml", "rb") as f:
+                data = tomllib.load(f)
+                return data.get("project", {}).get("version", "0.0.0")
+        except Exception:
+            return "0.0.0"
+
+    def get_git_hash():
+        try:
+            return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+        except Exception:
+            return "unknown"
 
     @app.get('/')
     def start() -> 'str | werkzeug.wrappers.response.Response':
