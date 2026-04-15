@@ -204,7 +204,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'sources': learn2rag.data.get_all(app.instance_path, 'sources'),
             'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
         }
-
+# TODO : check if we dont need this delete
     @app.context_processor
     def inject_current_year() -> dict[str, Any]:
         return {'current_year': datetime.now().year}
@@ -219,26 +219,16 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
 
+
+    cached_version = get_version()
+    cached_hash = get_git_hash()
+
     @app.context_processor
     def inject_version():
         return {
-            "app_version": get_version(),
-            "git_hash": get_git_hash()
+            "app_version": cached_version,
+            "git_hash": cached_hash
         }
-
-    def get_version():
-        try:
-            with open("pyproject.toml", "rb") as f:
-                data = tomllib.load(f)
-                return data.get("project", {}).get("version", "0.0.0")
-        except Exception:
-            return "0.0.0"
-
-    def get_git_hash():
-        try:
-            return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
-        except Exception:
-            return "unknown"
 
     @app.get('/')
     def start() -> 'str | werkzeug.wrappers.response.Response':
@@ -536,6 +526,19 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     app.logger.info('App creation complete')
     return app
 
+def get_version():
+    try:
+        with open("pyproject.toml", "rb") as f:
+            data = tomllib.load(f)
+            return data.get("project", {}).get("version", "0.0.0")
+    except Exception:
+        return "0.0.0"
+
+def get_git_hash():
+    try:
+        return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+    except Exception:
+        return "unknown"
 
 def atexit_handler() -> None:
     logging.debug('Exit handler')
