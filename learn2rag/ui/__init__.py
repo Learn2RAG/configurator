@@ -224,7 +224,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     cached_hash = get_git_hash()
 
     @app.context_processor
-    def inject_version():
+    def inject_version() -> dict[str, str]:
         return {
             "app_version": cached_version,
             "git_hash": cached_hash
@@ -530,7 +530,7 @@ def get_version() -> str:
     try:
         with open("pyproject.toml", "rb") as f:
             data = tomllib.load(f)
-            return data.get("project", {}).get("version", "0.0.0")
+            return str(data.get("project", {}).get("version", "0.0.0"))
     except Exception:
         return "0.0.0"
 
