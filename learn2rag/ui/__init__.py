@@ -526,7 +526,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     app.logger.info('App creation complete')
     return app
 
-def get_version():
+def get_version() -> str:
     try:
         with open("pyproject.toml", "rb") as f:
             data = tomllib.load(f)
@@ -534,7 +534,7 @@ def get_version():
     except Exception:
         return "0.0.0"
 
-def get_git_hash():
+def get_git_hash() -> str:
     try:
         return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
     except Exception:
