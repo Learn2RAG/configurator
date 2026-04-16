@@ -204,10 +204,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'sources': learn2rag.data.get_all(app.instance_path, 'sources'),
             'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
         }
-# TODO : check if we dont need this delete
-    @app.context_processor
-    def inject_current_year() -> dict[str, Any]:
-        return {'current_year': datetime.now().year}
 
     atexit.register(atexit_handler)
 
