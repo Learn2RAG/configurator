@@ -219,6 +219,21 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
 
+    def remove_pipeline_storage_directory(storage_path: Path) -> bool:
+        try:
+            storage_path = expand_path(storage_path)
+            shutil.rmtree(storage_path)
+            flash(pgettext('flash', 'Directory removed: %(path)s', path=storage_path))
+        except FileNotFoundError:
+            # storage directory may be not created yet
+            app.logger.info('Directory was not removed since it does not exist: %s', storage_path)
+            pass
+        except Exception as e:
+            app.logger.error('Failed to remove directory: %s, %s', storage_path, e)
+            flash(pgettext('flash', 'Failed to remove directory: %(path)s: %(message)s', path=storage_path, message=e), 'error')
+            return False
+        return True
+
     @app.get('/')
     def start() -> 'str | werkzeug.wrappers.response.Response':
         pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
@@ -448,17 +463,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
         if pipeline is None:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+        elif request.form['action'] == 'clean':
+            remove_pipeline_storage_directory(pipeline['storage_path'])
         elif request.form['action'] == 'delete':
-            ok = True
-            try:
-                storage_path = expand_path(pipeline['storage_path'])
-                shutil.rmtree(storage_path)
-            except FileNotFoundError:
-                pass
-            except Exception as e:
-                app.logger.error('Failed to remove directory: %s, %s', storage_path, e)
-                flash(pgettext('flash', 'Failed to remove directory: %(path)s', path=storage_path), 'error')
-                ok = False
+            ok = remove_pipeline_storage_directory(pipeline['storage_path'])
             if ok:
                 learn2rag.data.delete_entry(app.instance_path, 'pipelines', name)
                 flash(pgettext('flash', 'Removed pipeline: %(label)s', label=pipeline['label']))
