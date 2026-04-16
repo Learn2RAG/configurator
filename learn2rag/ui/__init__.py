@@ -339,10 +339,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     @app.post('/sources')
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
-        learn2rag.data.create_entry(app.instance_path, 'sources', {
-            'label': label,
-            'path': request.form['path'],
-        })
+        data = request.form.to_dict()
+        learn2rag.data.create_entry(app.instance_path, 'sources', data)
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
 
@@ -394,7 +392,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
         sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
         for path_name, source in sources.items():
-            source['path'] = str(expand_path(source['path']))
+            if 'path' in source:
+                source['path'] = str(expand_path(source['path']))
 
         #  Fetch the language model configuration first let see if it works
         language_model = learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model'])
@@ -404,12 +403,22 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             language_model['url'] = language_model['url'].replace('http://', 'https://', 1)
             app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
 
+        # Format the import config
+        import_config = {
+            'loaders': [{
+                'loader_id': name,
+                'loader_type': 'DirectoryLoader',
+                'recursive': 'True',  # DirectoryLoader
+                **{key: value for key, value in source.items() if key not in ['label', 'type']},
+            } for name, source in sources.items()],
+        }
+
         render_context = {
             'config': app.config,
             'learn2rag_hostname': url.hostname,
             'pipeline': pipeline,
             'language_model': language_model,
-            'sources': sources,
+            'import_config': import_config,
             'debug_logging': config.get('logging', {}).get('debug', False),
             'qdrant_api_key': secrets.token_hex(16),
             # FIXME
