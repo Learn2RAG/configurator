@@ -101,6 +101,11 @@
       };
       document.body.addEventListener('htmx:sendError', errorHandler);
       document.body.addEventListener('htmx:responseError', errorHandler);
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        const tooltipList = [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
+      });
     </script>
   </body>
 </html>

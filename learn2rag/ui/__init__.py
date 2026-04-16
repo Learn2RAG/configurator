@@ -13,6 +13,7 @@ import socket
 import subprocess
 import threading
 import time
+import tomllib
 from typing import Any
 import urllib
 
@@ -205,10 +206,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
         }
 
-    @app.context_processor
-    def inject_current_year() -> dict[str, Any]:
-        return {'current_year': datetime.now().year}
-
     atexit.register(atexit_handler)
 
     # TODO: let the user configure the directory for ollama data before starting it?
@@ -218,6 +215,17 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     except Exception as e:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
+
+
+    cached_version = get_version()
+    cached_hash = get_git_hash()
+
+    @app.context_processor
+    def inject_version() -> dict[str, str]:
+        return {
+            "app_version": cached_version,
+            "git_hash": cached_hash
+        }
 
     @app.get('/')
     def start() -> 'str | werkzeug.wrappers.response.Response':
@@ -515,6 +523,19 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     app.logger.info('App creation complete')
     return app
 
+def get_version() -> str:
+    try:
+        with open("pyproject.toml", "rb") as f:
+            data = tomllib.load(f)
+            return str(data.get("project", {}).get("version", "0.0.0"))
+    except Exception:
+        return "0.0.0"
+
+def get_git_hash() -> str:
+    try:
+        return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+    except Exception:
+        return "unknown"
 
 def atexit_handler() -> None:
     logging.debug('Exit handler')
