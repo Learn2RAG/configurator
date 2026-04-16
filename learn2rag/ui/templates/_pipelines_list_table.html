@@ -95,19 +95,18 @@
                   </li>
                   <li><hr class="dropdown-divider"></li>
                   <li>
-                    <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this pipeline configuration and all stored data: %(label)s?', label=pipeline.label)}}">
-                      <input type="hidden" name="action" value="delete"/>
+                    <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove all data stored for this pipeline: %(label)s?', label=pipeline.label)}}">
+                      <input type="hidden" name="action" value="clean"/>
                       <button type="submit" class="dropdown-item text-bg-danger">
-                        {{pgettext('button', 'Remove')}}
+                        {{pgettext('button', 'Remove the stored data')}}
                       </button>
                     </form>
                   </li>
-                  <li><hr class="dropdown-divider"></li>
                   <li>
-                    <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to clean this pipeline storage: %(label)s?', label=pipeline.label)}}">
-                      <input type="hidden" name="action" value="clean"/>
+                    <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this pipeline configuration and all its stored data: %(label)s?', label=pipeline.label)}}">
+                      <input type="hidden" name="action" value="delete"/>
                       <button type="submit" class="dropdown-item text-bg-danger">
-                        {{pgettext('button', 'Clean storage')}}
+                        {{pgettext('button', 'Remove the stored data and the pipeline')}}
                       </button>
                     </form>
                   </li>
