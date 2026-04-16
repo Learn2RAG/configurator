@@ -343,7 +343,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     @app.post('/sources')
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
-        data = request.form.to_dict()
+        data: dict[str, Any] = request.form.to_dict()
         if 'content_types' in data:
             data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
         if 'depth' in data:
