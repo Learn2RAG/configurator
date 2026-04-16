@@ -1,0 +1,39 @@
+<form method="POST">
+  <input type="hidden" name="type" value="drupal"/>
+  <div class="mb-3">
+    <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
+    <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label">{{pgettext('form_label', 'Base URL')}}</label>
+    <input class="form-control" name="base_url" required="required" title="{{pgettext('tooltip', 'For example: %(example)s', example='')}}"/>
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label">{{pgettext('form_label', 'Content types')}}</label>
+    <input class="form-control" name="content_types" required="required" value="{{example_drupal_content_types}}"/>
+  </div>
+  <div class="mb-3">
+    <label for="auth_type" class="form-label">{{pgettext('form_label', 'Authentication')}}</label>
+    <select required="required" class="form-select" name="auth_type">
+      <option value="none">{{pgettext('form_auth_option', 'None')}}</option>
+      <option value="basic">{{pgettext('form_auth_option', 'Username and password')}}</option>
+      <option value="token">{{pgettext('form_auth_option', 'Access token')}}</option>
+    </select>
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label">{{pgettext('form_label', 'Username')}}</label>
+    <input class="form-control" name="username"/>
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label">{{pgettext('form_label', 'Password')}}</label>
+    <input type="password" class="form-control" name="password"/>
+    <div class="alert alert-warning">
+      {{gettext('This password would be saved in plain text in the configuration.')}}
+    </div>
+  </div>
+  <div class="mb-3">
+    <label for="token" class="form-label">{{pgettext('form_label', 'Access token')}}</label>
+    <input class="form-control" name="token"/>
+  </div>
+  <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
+</form>

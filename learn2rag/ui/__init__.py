@@ -334,12 +334,18 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/sources')
     def sources_list() -> 'str | werkzeug.wrappers.response.Response':
-        return render_template('sources_page.html', example_local_path=example_local_path)
+        return render_template(
+            'sources_page.html',
+            example_local_path=example_local_path,
+            example_drupal_content_types='article, page, recipe',
+        )
 
     @app.post('/sources')
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
         data = request.form.to_dict()
+        if 'content_types' in data:
+            data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
         if 'depth' in data:
             data['depth'] = int(data['depth'])
         learn2rag.data.create_entry(app.instance_path, 'sources', data)
@@ -413,6 +419,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     # FIXME
                     'local': 'DirectoryLoader',
                     'web': 'HTMLLoader',
+                    'drupal': 'DrupalLoader',
                 }.get(source.get('type', 'local')),
                 'recursive': 'True',  # DirectoryLoader
                 **{key: value for key, value in source.items() if key not in ['label', 'type']},
