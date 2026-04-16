@@ -5,8 +5,10 @@
     <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
   </div>
   <div class="mb-3">
-    <label for="path" class="form-label">{{pgettext('form_label', 'Web page URL')}}</label>
-    <input type="url" class="form-control" name="path" required="required" title="{{pgettext('tooltip', 'For example: https://learn2rag.de/')}}">
+    <input type="hidden" name="type" value="web"/>
+    <label for="url" class="form-label">{{pgettext('form_label', 'Web page URL')}}</label>
+    <input type="url" class="form-control" name="url" required="required" title="{{pgettext('tooltip', 'For example: https://learn2rag.de/')}}">
+    <input type="hidden" name="depth" value="0"/>
   </div>
   <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
 </form>

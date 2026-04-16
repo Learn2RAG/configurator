@@ -20,7 +20,7 @@
     {% for name, source in sources.items() %}
     <div class="form-check">
       <input class="form-check-input" type="checkbox" name="sources" value="{{name}}" id="source-{{loop.index}}" checked="checked">
-      <label class="form-check-label" for="source-{{loop.index}}">{{source.label}} ({{source.path}})</label>
+      <label class="form-check-label" for="source-{{loop.index}}">{{source.label}} ({{source.path or source.url}})</label>
     </div>
     {% endfor %}
   </div>

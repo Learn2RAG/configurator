@@ -5,6 +5,7 @@
     <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
   </div>
   <div class="mb-3">
+    <input type="hidden" name="type" value="local"/>
     <label for="path" class="form-label">{{pgettext('form_label', 'Path on the local filesystem')}}</label>
     <input class="form-control" name="path" required="required"
            {% if is_windows %}

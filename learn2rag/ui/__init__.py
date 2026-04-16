@@ -340,6 +340,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
         data = request.form.to_dict()
+        if 'depth' in data:
+            data['depth'] = int(data['depth'])
         learn2rag.data.create_entry(app.instance_path, 'sources', data)
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
@@ -407,7 +409,11 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         import_config = {
             'loaders': [{
                 'loader_id': name,
-                'loader_type': 'DirectoryLoader',
+                'loader_type': {
+                    # FIXME
+                    'local': 'DirectoryLoader',
+                    'web': 'HTMLLoader',
+                }.get(source.get('type', 'local')),
                 'recursive': 'True',  # DirectoryLoader
                 **{key: value for key, value in source.items() if key not in ['label', 'type']},
             } for name, source in sources.items()],
