@@ -365,7 +365,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         context = {
             'projects': Project.get_all(),
         }
-        template = '_pipelines_list_table.html' if request.headers.get('HX-Request') else 'pipelines_list.html'
+        template = 'pipelines_list.html' if request.headers.get('HX-Request') else 'pipelines_page.html'
         return render_template(template, **context)
 
     @app.post('/pipelines')
