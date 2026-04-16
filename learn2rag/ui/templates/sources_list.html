@@ -1,81 +1,9 @@
-{% extends 'base.html' %}
-
-{% block header %}
-  <h1>{% block title %}{{pgettext('title', 'Data sources')}}{% endblock %}</h1>
-{% endblock %}
-
-{% block content %}
-<p class="d-inline-flex gap-1">
-  <button accesskey="n" class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
-    {{pgettext('button', 'Add a new data source')}}
-  </button>
-</p>
-<div class="collapse" id="collapseCreate">
-  <div class="card card-body">
-
-    <div class="accordion" id="accordionCreate">
-      <div class="accordion-item">
-        <h2 class="accordion-header">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateLocal" aria-expanded="false" aria-controls="collapseCreateLocal">
-            {{pgettext('heading', 'Local file or directory')}}
-          </button>
-        </h2>
-        <div id="collapseCreateLocal" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
-          <div class="accordion-body">
-            <form method="POST">
-              <input type="hidden" name="type" value="local"/>
-              <div class="mb-3">
-                <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
-              </div>
-              <div class="mb-3">
-                <label for="path" class="form-label">{{pgettext('form_label', 'Path on the local filesystem')}}</label>
-                <input class="form-control" name="path" required="required"
-                       {% if is_windows %}
-                       title="{{pgettext('tooltip', 'For example: %(path)s', example_local_path)}}"
-                       {% else %}
-                       title="{{pgettext('tooltip', 'For example: /home/user/Documents')}}"
-                       {% endif %}
-                       >
-              </div>
-              <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
-            </form>
-          </div>
-        </div>
-      </div>
-      <div class="accordion-item">
-        <h2 class="accordion-header">
-          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateWeb" aria-expanded="false" aria-controls="collapseCreateWeb">
-            {{pgettext('heading', 'Web page')}}
-          </button>
-        </h2>
-        <div id="collapseCreateWeb" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
-          <div class="accordion-body">
-            <form method="POST">
-              <input type="hidden" name="type" value="web"/>
-              <div class="mb-3">
-                <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-                <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
-              </div>
-              <div class="mb-3">
-                <label for="path" class="form-label">{{pgettext('form_label', 'Web page URL')}}</label>
-                <input type="url" class="form-control" name="path" required="required" title="{{pgettext('tooltip', 'For example: https://learn2rag.de/')}}">
-              </div>
-              <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
 <table class="table">
   <thead>
     <tr>
       <th scope="col">{{pgettext('column_heading', 'Label')}}</th>
-      <th scope="col">{{pgettext('column_heading', 'Path')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Data source type')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Details')}}</th>
       <th scope="col"></th>
     </tr>
   </thead>
@@ -83,7 +11,8 @@
     {% for name, item in sources.items() %}
     <tr>
       <td title="{{ name }}">{{ item.label }}</td>
-      <td>{{ item.path }}</td>
+      <td>{{ item.type }}</td>
+      <td>{{ item.path or item.url or item.base_url }}</td>
       <td>
         <form method="POST" action="{{ url_for('source_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this data source configuration: %(label)s?', label=item.label)}}">
           <div class="btn-group" role="group">
@@ -95,4 +24,3 @@
     {% endfor %}
   </tbody>
 </table>
-{% endblock %}

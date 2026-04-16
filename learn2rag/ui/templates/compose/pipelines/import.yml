@@ -16,22 +16,7 @@ files:
       telemetry_disabled: true
 
   - path: '{{storage_path}}/importer_config.json'
-    content: |
-      {
-          "loaders": [
-              {% for name, source in sources.items() %}
-              {
-                  "loader_id": "{{name}}",
-                  "loader_type": "DirectoryLoader",
-                  "path": "{{source.path | replace('\\', '\\\\')}}",
-                  "recursive": "True"
-              }
-              {% if not loop.last %}
-              ,
-              {% endif %}
-              {% endfor %}
-          ]
-      }
+    content: '{{import_config | tojson}}'
 
   - path: '{{storage_path}}/basic_user_config.json'
     content: |

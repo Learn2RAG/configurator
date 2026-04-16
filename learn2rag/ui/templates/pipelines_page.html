@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}{{pgettext('title', 'Pipelines')}}{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<p class="d-inline-flex gap-1">
+  <button accesskey="n" class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
+    {{pgettext('button', 'Add a new pipeline')}}
+  </button>
+</p>
+<div class="collapse" id="collapseCreate">
+  <div class="card card-body">
+    {% include 'pipelines_add.html' %}
+  </div>
+</div>
+
+{% include 'pipelines_list.html' %}
+{% endblock %}
