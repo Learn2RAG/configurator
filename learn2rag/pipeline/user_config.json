@@ -1,6 +1,6 @@
 {
   "file_path": "data/pdfs/repliqa_4",
   "collection_name": "l2r",
-  "imported_documents_file_path": "learn2rag/importer/loaded_documents.json",
+  "imported_documents_file_path": "learn2rag/pipeline/loaded_documents.json",
   "llm": ""
 }

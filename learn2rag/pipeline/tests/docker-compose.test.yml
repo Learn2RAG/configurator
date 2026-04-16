@@ -1,0 +1,26 @@
+services:
+  qdrant-test:
+    image: qdrant/qdrant:v1.17.0
+    restart: always
+    container_name: qdrant-test
+    ports:
+      - 6337:6333
+      - 6335:6334
+    expose:
+      - 6337
+      - 6335
+      - 6338
+    environment:
+      - QDRANT__SERVICE__API_KEY=${QDRANT__SERVICE__API_KEY}
+    configs:
+      - source: qdrant_config
+        target: /qdrant/config/production.yaml
+    volumes:
+      - ./qdrant_data_test:/qdrant/storage
+volumes:
+  qdrant_data_test:
+configs:
+  qdrant_config:
+    content: |
+      log_level: INFO
+      telemetry_disabled: true

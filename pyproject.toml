@@ -216,6 +216,9 @@ log_cli = true
 log_cli_level = "DEBUG"
 strict = true
 testpaths = "learn2rag"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
 [tool.setuptools]
 include-package-data = true
 [tool.setuptools.package-data]
@@ -227,5 +230,6 @@ where = ["."]
 
 [dependency-groups]
 dev = [
-    "pandas-stubs (>=3.0.0.260204,<4.0.0.0)"
+    "pandas-stubs (>=3.0.0.260204,<4.0.0.0)",
+    "pytest>=9.0.2",
 ]
