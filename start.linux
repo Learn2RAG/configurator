@@ -3,9 +3,6 @@ set -eu
 
 cd "$(dirname "$0")"
 
-echo "Clearing runtime cache for a fresh offline install..."
-rm -rf ~/.local/share/pyapp
-
 echo "Starting Learn2RAG..."
 echo "Initializing, please wait..."
 echo "========================================"
