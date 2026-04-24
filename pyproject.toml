@@ -188,6 +188,10 @@ dependencies = [
     "python-pptx (>=1.0.2,<2.0.0)",
     "msoffcrypto-tool (>=6.0.0,<7.0.0)",
     "ebooklib (>=0.20,<0.21)",
+    "bert-score==0.3.13",
+    "ConfigSpace==1.2.2",
+    "scikit-learn==1.8.0",
+    "smac (>=2.3.1)"
 ]
 description = ""
 license = "MIT"
