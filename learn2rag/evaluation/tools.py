@@ -80,6 +80,7 @@ def ingest_dataset_documents(dataset_name: str) -> None:
 def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
     logging.debug(f'{dataset_name=}')
     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
+    dataset_work_dir = dataset_work_dir.resolve()
     dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
     return dataset_dict[split] if split is not None else dataset_dict
 
