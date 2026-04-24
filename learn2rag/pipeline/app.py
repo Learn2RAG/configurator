@@ -171,14 +171,6 @@ async def search(
     return await search_authorized(user=input.user, question=input.question)
 
 
-
-
-@app.post("/ingest")
-async def ingest() -> None:
-    ingestion.index(user_config, opt_config)
-
-
-
 @app.get("/test")
 async def test() -> TestResponse:
     return TestResponse(message="Hello World")

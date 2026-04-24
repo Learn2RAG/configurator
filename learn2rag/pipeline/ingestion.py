@@ -12,8 +12,6 @@ from langchain_core.documents.base import Document
 from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
-
-from . import json_loader
 from .embeddings import create_embeddings
 
 
@@ -106,9 +104,8 @@ def payload(sample: dict[str, Any]) -> dict[str, str]:
         "document_id": sample["metadata"].get("document_id", "")
     }
 
-def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
-    logging.info('Loading documents')
-    all_documents = json_loader.json_loader(user_config['imported_documents_file_path'])
+def index(documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
+    all_documents = documents
 
     # Split documents into chunks
     logging.info('Splitting documents into chunks')
@@ -197,14 +194,3 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
                 insert_multi(qdrant, collection_name, sample)
             else:
                 insert(qdrant, collection_name, sample)
-
-
-def main() -> None:
-    logging.basicConfig(level=logging.INFO)
-    from .config import user_config, opt_config
-    index(user_config, opt_config)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    main()
