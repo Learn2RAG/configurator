@@ -272,9 +272,7 @@ msgstr "Learn2RAG Webseite"
 msgid ""
 "Debug logging is enabled in config file <code>%(file)s</code>. It might "
 "capture sensitive information."
-msgstr ""
-"Debug-Protokollierung ist in der Konfigurationsdatei <code>%(file)</code>"
-" aktiviert. Es könnte sensible Informationen erfassen."
+msgstr "Debug-Protokollierung ist in der Konfigurationsdatei <code>%(file)s</code> aktiviert. Es könnte sensible Informationen erfassen."
 
 #: learn2rag/ui/templates/firststeps_models.html:16
 #, python-format

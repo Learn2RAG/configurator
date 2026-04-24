@@ -16,6 +16,7 @@ import time
 from typing import Any
 import urllib
 
+from babel import negotiate_locale
 from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
 from flask_babel import Babel, gettext, ngettext, pgettext  # type: ignore[import-untyped]
 import flask.logging
@@ -157,7 +158,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def get_locale() -> str:
         translations = list(map(str, babel.list_translations()))
         default_translation = 'de'  # FIXME
-        translation = request.accept_languages.best_match(translations) or default_translation
+        translation = negotiate_locale((x.replace('-', '_') for x in request.accept_languages.values()), translations) or default_translation
         # app.logger.debug('Available translations: %s; accept languages: %s; chosen translation: %s', translations, request.accept_languages, translation)
         return translation
     babel.init_app(app, locale_selector=get_locale)
@@ -217,6 +218,21 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     except Exception as e:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
+
+    def remove_pipeline_storage_directory(storage_path: Path) -> bool:
+        try:
+            storage_path = expand_path(storage_path)
+            shutil.rmtree(storage_path)
+            flash(pgettext('flash', 'Directory removed: %(path)s', path=storage_path))
+        except FileNotFoundError:
+            # storage directory may be not created yet
+            app.logger.info('Directory was not removed since it does not exist: %s', storage_path)
+            pass
+        except Exception as e:
+            app.logger.error('Failed to remove directory: %s, %s', storage_path, e)
+            flash(pgettext('flash', 'Failed to remove directory: %(path)s: %(message)s', path=storage_path, message=e), 'error')
+            return False
+        return True
 
     @app.get('/')
     def start() -> 'str | werkzeug.wrappers.response.Response':
@@ -334,15 +350,21 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/sources')
     def sources_list() -> 'str | werkzeug.wrappers.response.Response':
-        return render_template('sources_list.html', example_local_path=example_local_path)
+        return render_template(
+            'sources_page.html',
+            example_local_path=example_local_path,
+            example_drupal_content_types='article, page, recipe',
+        )
 
     @app.post('/sources')
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
-        learn2rag.data.create_entry(app.instance_path, 'sources', {
-            'label': label,
-            'path': request.form['path'],
-        })
+        data: dict[str, Any] = request.form.to_dict()
+        if 'content_types' in data:
+            data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
+        if 'depth' in data:
+            data['depth'] = int(data['depth'])
+        learn2rag.data.create_entry(app.instance_path, 'sources', data)
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
 
@@ -365,7 +387,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         context = {
             'projects': Project.get_all(),
         }
-        template = '_pipelines_list_table.html' if request.headers.get('HX-Request') else 'pipelines_list.html'
+        template = 'pipelines_list.html' if request.headers.get('HX-Request') else 'pipelines_page.html'
         return render_template(template, **context)
 
     @app.post('/pipelines')
@@ -394,7 +416,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
         sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
         for path_name, source in sources.items():
-            source['path'] = str(expand_path(source['path']))
+            if 'path' in source:
+                source['path'] = str(expand_path(source['path']))
 
         #  Fetch the language model configuration first let see if it works
         language_model = learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model'])
@@ -404,12 +427,27 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             language_model['url'] = language_model['url'].replace('http://', 'https://', 1)
             app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
 
+        # Format the import config
+        import_config = {
+            'loaders': [{
+                'loader_id': name,
+                'loader_type': {
+                    # FIXME
+                    'local': 'DirectoryLoader',
+                    'web': 'HTMLLoader',
+                    'drupal': 'DrupalLoader',
+                }.get(source.get('type', 'local')),
+                'recursive': 'True',  # DirectoryLoader
+                **{key: value for key, value in source.items() if key not in ['label', 'type']},
+            } for name, source in sources.items()],
+        }
+
         render_context = {
             'config': app.config,
             'learn2rag_hostname': url.hostname,
             'pipeline': pipeline,
             'language_model': language_model,
-            'sources': sources,
+            'import_config': import_config,
             'debug_logging': config.get('logging', {}).get('debug', False),
             'qdrant_api_key': secrets.token_hex(16),
             # FIXME
@@ -447,17 +485,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
         if pipeline is None:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+        elif request.form['action'] == 'clean':
+            remove_pipeline_storage_directory(pipeline['storage_path'])
         elif request.form['action'] == 'delete':
-            ok = True
-            try:
-                storage_path = expand_path(pipeline['storage_path'])
-                shutil.rmtree(storage_path)
-            except FileNotFoundError:
-                pass
-            except Exception as e:
-                app.logger.error('Failed to remove directory: %s, %s', storage_path, e)
-                flash(pgettext('flash', 'Failed to remove directory: %(path)s', path=storage_path), 'error')
-                ok = False
+            ok = remove_pipeline_storage_directory(pipeline['storage_path'])
             if ok:
                 learn2rag.data.delete_entry(app.instance_path, 'pipelines', name)
                 flash(pgettext('flash', 'Removed pipeline: %(label)s', label=pipeline['label']))
