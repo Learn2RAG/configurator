@@ -12,6 +12,8 @@ except FileNotFoundError:
     synonym_list = ''
 
 def rewrite_query(user_query: str) -> str:
+    if llm is None:
+        return ''
     system_message_rewrite_query = """
     You are a query rewriter for a RAG pipeline.
     
@@ -28,7 +30,10 @@ def rewrite_query(user_query: str) -> str:
         HumanMessage(content=user_query),
     ])
 
-    return response.content.strip()
+    content = response.content
+    if not isinstance(content, str):
+        return ''
+    return content.strip()
 
 
 def generate_subqueries(user_query: str, n: int=3) -> list[str]:
@@ -50,6 +55,10 @@ def generate_subqueries(user_query: str, n: int=3) -> list[str]:
         SystemMessage(content=system_message_generate_subqueries),
         HumanMessage(content=user_query),
     ])
+
+    content = response.content
+    if not isinstance(content, str):
+        return []
 
     try:
         result = ast.literal_eval(response.content.strip())
@@ -82,6 +91,10 @@ def generate_keywords(user_query: str, n: int=3) -> list[str]:
         SystemMessage(content=system_message_generate_keywords),
         HumanMessage(content=user_query),
     ])
+
+    content = response.content
+    if not isinstance(content, str):
+        return []
 
     try:
         result = ast.literal_eval(response.content.strip())
