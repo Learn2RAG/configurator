@@ -38,6 +38,12 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
     if opt_config["embedding_model"] == "BAAI/bge-m3":
         if opt_config["search_mode"] == "dense":
             query_embedding = create_embeddings([query], opt_config["embedding_model"], embedding_mode="dense")["dense_vecs"][0]
+        if opt_config["search_mode"] == "sparse":
+            query_embedding = (
+                lambda x: {
+                    "lexical_weights": x["lexical_weights"][0],
+                }
+            )(create_embeddings([query], opt_config["embedding_model"], embedding_mode="sparse"))
         if opt_config["search_mode"] == "dense_sparse":
             query_embedding = (
                 lambda x: {
@@ -69,7 +75,15 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
             using="dense",
             limit=opt_config["top_k"],
         )
-
+    elif opt_config["search_mode"] == "sparse":
+        indices = [int(k) for k in query_embedding["lexical_weights"].keys()]  # type: ignore[union-attr]
+        values = [float(v) for v in query_embedding["lexical_weights"].values()]  # type: ignore[union-attr]
+        results = qdrant.client.query_points(
+            collection_name=collection_name,
+            query=models.SparseVector(indices=indices, values=values),
+            using="sparse",
+            limit=opt_config["top_k"],
+        )
     elif opt_config["search_mode"] == "dense_sparse":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()] # type: ignore[union-attr]
         values = [float(v) for v in query_embedding["lexical_weights"].values()] # type: ignore[union-attr]
