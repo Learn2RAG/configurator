@@ -1,5 +1,5 @@
 from operator import itemgetter
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from ..prov import Prov
 from .base import BaseOperator
@@ -13,6 +13,7 @@ Inputs = TypedDict('Inputs', {
 
 Outputs = TypedDict('Outputs', {
     'answer': str,
+    'documents': Any,
 }, total=True)
 
 
@@ -34,4 +35,5 @@ class BasicPipeline(BaseOperator):
         ))
         return {
             'answer': answer,
+            'documents': documents,
         }
