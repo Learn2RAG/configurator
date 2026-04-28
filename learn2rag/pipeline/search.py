@@ -15,13 +15,8 @@ from .embeddings import create_embeddings
 from .qdrant import Qdrant
 
 
-
-profilingLogger = logging.getLogger('profiling')
-
-
 # similarity search
-def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], *, request_id: str | None=None) -> QueryResponse:
-    profilingLogger.info('start', extra={'activity': 'search', 'request_id': request_id})
+def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
     collection_name = user_config["collection_name"]
 
     if opt_config["fusion_mode"] == "RRF":
@@ -188,7 +183,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
         results.points = points
     return results
  
-def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_config: dict[str, Any], request_id: str | None=None) -> QueryResponse:
+def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
     collection_name = user_config["collection_name"]
 
     # Init vector store
@@ -219,10 +214,9 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
         using="multi",
         limit=opt_config["top_k"],
     )
-    profilingLogger.info('end', extra={'activity': 'search', 'request_id': request_id})
     return results
 
-async def search_authorized(question: str, user: str, *, request_id: str|None=None) -> List[ScoredPoint]:
-    query_response = search(question, user_config, opt_config, request_id=request_id)
+async def search_authorized(question: str, user: str) -> List[ScoredPoint]:
+    query_response = search(question, user_config, opt_config)
     authorized_points = await filter_authorized(user, query_response)
     return authorized_points
