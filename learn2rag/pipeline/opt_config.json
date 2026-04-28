@@ -8,6 +8,8 @@
   },
   "search_mode": "dense",
   "fusion_mode": "DBSF",
+  "rewrite": "True",
+  "rewrite_mode": "subqueries_keywords",
   "prefetch_limit_dense": 25,
   "prefetch_limit_sparse": 25,
   "prefetch_limit_colbert": 25,
