@@ -6,20 +6,24 @@ This module processes configuration entries and delegates loading to specific lo
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.5
+Version: 0.0.6
 Creation Date: June 10, 2025
-Last Modified: March 17, 2026
+Last Modified: April 24, 2026
 """
 
+import hashlib
 import logging
-from typing import List, Dict, Any
+from typing import Callable, Dict, List, Any, TYPE_CHECKING
+if TYPE_CHECKING:
+    from learn2rag.pipeline.qdrant import Qdrant
+    from learn2rag.importer.utils.import_state import ImportState
 from ..globals import stop_loading
 from langchain_core.documents import Document
 from .directory_loader import load_from_directory
 from .csv_loader import load_from_csv
 from .html_loader import load_html_content
-from .sharepoint_loader import load_from_sharepoint
-from .drupal_loader import load_from_drupal
+from .sharepoint_loader import load_from_sharepoint, get_all_sharepoint_document_ids
+from .drupal_loader import load_from_drupal, get_all_drupal_document_ids
 
 #
 # initialize logger
@@ -60,10 +64,15 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
                 documents = load_from_directory(path, recursive=recursive, silent_errors=silent_errors, loader_id=loader_id)
                 logger.info(f"Loaded {len(documents)} documents from {path} using {loader_type} for configuration entry with loader_id: {loader_id}.")
             elif loader_type == "CSVLoader":
+                path = entry.get("path")
                 if not path:
                     logger.error("Missing 'path' for 'CSVLoader' in configuration entry.")
                     continue
                 documents = load_from_csv(path)
+                # CSVLoader does not set loader_id or content_hash — populate them here
+                for doc in documents:
+                    doc.metadata["loader_id"] = loader_id
+                    doc.metadata["content_hash"] = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
                 logger.info(f"Loaded {len(documents)} documents from {path} using {loader_type}.")
             elif loader_type == "HTMLLoader":
                 url = entry.get("url")
@@ -152,3 +161,312 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
             logger.error(f"Error processing entry {entry}: {e}")
 
     return all_documents
+
+
+def process_delta_imports(
+    config_entries: List[Dict[str, Any]],
+    qdrant: "Qdrant",
+    user_config: Dict[str, Any],
+    opt_config: Dict[str, Any],
+    import_state: "ImportState",
+) -> None:
+    """
+    Perform a delta import for all configured loaders.
+
+    Dispatches between two strategies:
+
+    - **Intelligent loaders** (DrupalLoader, SharepointLoader): 2-pass approach —
+      fetch all current document IDs to detect deletions, then load only changed
+      documents using a server-side timestamp filter.
+    - **Normal loaders** (DirectoryLoader, HTMLLoader, CSVLoader): full load followed
+      by content-hash comparison to detect additions, changes, and deletions.
+
+    The import timestamp is only persisted on successful completion, so a failed run
+    will be retried in full on the next call.
+
+    Args:
+        config_entries (List[Dict[str, Any]]): Loader configuration entries from the
+                                               importer config file.
+        qdrant (Qdrant): Authenticated Qdrant wrapper instance
+                         (``learn2rag.pipeline.qdrant.Qdrant``).
+        user_config (Dict[str, Any]): User configuration dict (must contain
+                                      ``collection_name``).
+        opt_config (Dict[str, Any]): Optimisation configuration dict.
+        import_state (ImportState): ImportState instance for timestamp management.
+    """
+    from datetime import datetime, timezone
+    from learn2rag.pipeline.ingestion import (
+        get_documents_by_loader_id,
+        delete_chunks_by_document,
+        ingest_batch,
+    )
+
+    collection_name = user_config.get("collection_name", opt_config.get("collection_name", ""))
+
+    for entry in config_entries:
+        if stop_loading:
+            logger.info("Delta import stopped by user.")
+            break
+
+        loader_type = entry.get("loader_type")
+        loader_id = entry.get("loader_id") or ""
+
+        if not loader_type or not loader_id:
+            logger.error(f"process_delta_imports: entry missing loader_type or loader_id: {entry}")
+            continue
+
+        try:
+            last_import_time = import_state.get_last_import_time(loader_id)
+            import_start = datetime.now(timezone.utc)
+            import_state.record_import_start(loader_id, import_start)
+
+            # Retrieve existing Qdrant documents for this loader: {source_path: content_hash}
+            existing_docs: Dict[str, str] = get_documents_by_loader_id(qdrant, collection_name, loader_id)
+            is_initial = len(existing_docs) == 0
+
+            logger.info(
+                f"Delta import '{loader_id}': is_initial={is_initial}, "
+                f"last_import_time={last_import_time}, existing_docs={len(existing_docs)}"
+            )
+
+            # ----------------------------------------------------------------
+            # INTELLIGENT LOADERS: Drupal / SharePoint
+            # 2-pass: (1) fetch all current IDs → detect deletions,
+            #          (2) load only changed documents via timestamp filter
+            # ----------------------------------------------------------------
+            if loader_type == "DrupalLoader":
+                base_url = entry.get("base_url")
+                if not base_url:
+                    logger.error(f"DrupalLoader '{loader_id}': missing 'base_url'")
+                    continue
+                base_url = str(base_url)
+                content_types = entry.get("content_types", [])
+                auth_type = str(entry.get("auth_type", "none"))
+                username = str(entry.get("username", ""))
+                password = str(entry.get("password", ""))
+                token = str(entry.get("token", ""))
+                text_fields = entry.get("text_fields")
+                page_size = int(entry.get("page_size", 50))
+                language = str(entry.get("language", ""))
+
+                if is_initial or last_import_time is None:
+                    # No prior state: fall back to full load + hash comparison
+                    logger.info(f"Drupal '{loader_id}': full load (initial={is_initial})")
+                    all_docs = load_from_drupal(
+                        base_url=base_url, content_types=content_types, loader_id=loader_id,
+                        auth_type=auth_type, username=username, password=password, token=token,
+                        text_fields=text_fields, page_size=page_size, language=language,
+                    )
+                    if is_initial:
+                        ingest_batch(all_docs, qdrant, user_config, opt_config)
+                    else:
+                        # Hash comparison: replace changed, remove deleted
+                        _delta_by_hash(all_docs, existing_docs, qdrant, collection_name, loader_id, user_config, opt_config, delete_chunks_by_document, ingest_batch)
+                else:
+                    # 2-pass delta
+                    logger.info(f"Drupal '{loader_id}': 2-pass delta since {last_import_time.isoformat()}")
+                    # Pass 1: fetch all current IDs to detect deleted documents
+                    current_ids = set(get_all_drupal_document_ids(
+                        base_url=base_url, content_types=content_types,
+                        auth_type=auth_type, username=username, password=password, token=token,
+                        page_size=page_size, language=language,
+                    ))
+                    deleted_paths = [p for p in existing_docs if p not in current_ids]
+                    for path in deleted_paths:
+                        logger.info(f"Drupal '{loader_id}': deleting removed document {path}")
+                        delete_chunks_by_document(qdrant, collection_name, loader_id, path)
+
+                    # Pass 2: load and index changed documents
+                    changed_docs = load_from_drupal(
+                        base_url=base_url, content_types=content_types, loader_id=loader_id,
+                        auth_type=auth_type, username=username, password=password, token=token,
+                        text_fields=text_fields, page_size=page_size, language=language,
+                        since=last_import_time,
+                    )
+                    for doc in changed_docs:
+                        source = doc.metadata.get("source", "")
+                        delete_chunks_by_document(qdrant, collection_name, loader_id, source)
+                    ingest_batch(changed_docs, qdrant, user_config, opt_config)
+                    logger.info(f"Drupal '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
+
+            elif loader_type == "SharepointLoader":
+                client_id = entry.get("client_id", "")
+                client_secret = entry.get("client_secret", "")
+                document_library_id = entry.get("document_library_id", "")
+                folder_path = entry.get("folder_path")
+                folder_id = entry.get("folder_id")
+                recursive = entry.get("recursive", False)
+                auth_with_token = entry.get("auth_with_token", True)
+                reset_token = entry.get("reset_token", False)
+                tenant_id = entry.get("tenant_id", "common")
+                site_id = entry.get("site_id")
+
+                if is_initial or last_import_time is None:
+                    logger.info(f"SharePoint '{loader_id}': full load (initial={is_initial})")
+                    all_docs = load_from_sharepoint(
+                        client_id=client_id, client_secret=client_secret,
+                        document_library_id=document_library_id, folder_path=folder_path,
+                        folder_id=folder_id, recursive=recursive, auth_with_token=auth_with_token,
+                        reset_token=reset_token, tenant_id=tenant_id, site_id=site_id,
+                        loader_id=loader_id,
+                    )
+                    if is_initial:
+                        ingest_batch(all_docs, qdrant, user_config, opt_config)
+                    else:
+                        _delta_by_hash(all_docs, existing_docs, qdrant, collection_name, loader_id, user_config, opt_config, delete_chunks_by_document, ingest_batch)
+                else:
+                    logger.info(f"SharePoint '{loader_id}': 2-pass delta since {last_import_time.isoformat()}")
+                    # Pass 1: fetch all current URLs to detect deleted documents
+                    current_ids = set(get_all_sharepoint_document_ids(
+                        client_id=client_id, client_secret=client_secret,
+                        document_library_id=document_library_id, folder_path=folder_path,
+                        folder_id=folder_id, recursive=recursive, auth_with_token=auth_with_token,
+                        reset_token=reset_token, tenant_id=tenant_id, site_id=site_id,
+                    ))
+                    deleted_paths = [p for p in existing_docs if p not in current_ids]
+                    for path in deleted_paths:
+                        logger.info(f"SharePoint '{loader_id}': deleting removed document {path}")
+                        delete_chunks_by_document(qdrant, collection_name, loader_id, path)
+
+                    # Pass 2: load and index changed documents
+                    changed_docs = load_from_sharepoint(
+                        client_id=client_id, client_secret=client_secret,
+                        document_library_id=document_library_id, folder_path=folder_path,
+                        folder_id=folder_id, recursive=recursive, auth_with_token=auth_with_token,
+                        reset_token=reset_token, tenant_id=tenant_id, site_id=site_id,
+                        loader_id=loader_id, since=last_import_time,
+                    )
+                    for doc in changed_docs:
+                        source = doc.metadata.get("source", "")
+                        delete_chunks_by_document(qdrant, collection_name, loader_id, source)
+                    ingest_batch(changed_docs, qdrant, user_config, opt_config)
+                    logger.info(f"SharePoint '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
+
+            # ----------------------------------------------------------------
+            # NORMAL LOADERS: Directory / HTML / CSV — hash comparison
+            # ----------------------------------------------------------------
+            elif loader_type == "DirectoryLoader":
+                path = entry.get("path")
+                if not path:
+                    logger.error(f"DirectoryLoader '{loader_id}': missing 'path'")
+                    continue
+                all_docs = load_from_directory(
+                    path,
+                    recursive=entry.get("recursive", False),
+                    silent_errors=entry.get("silent_errors", True),
+                    loader_id=loader_id,
+                )
+                if is_initial:
+                    ingest_batch(all_docs, qdrant, user_config, opt_config)
+                else:
+                    _delta_by_hash(all_docs, existing_docs, qdrant, collection_name, loader_id, user_config, opt_config, delete_chunks_by_document, ingest_batch)
+
+            elif loader_type == "HTMLLoader":
+                url = entry.get("url")
+                depth = entry.get("depth", 0)
+                if not url:
+                    logger.error(f"HTMLLoader '{loader_id}': missing 'url'")
+                    continue
+                all_docs = load_html_content(url, depth=depth, loader_id=loader_id)
+                if is_initial:
+                    ingest_batch(all_docs, qdrant, user_config, opt_config)
+                else:
+                    _delta_by_hash(all_docs, existing_docs, qdrant, collection_name, loader_id, user_config, opt_config, delete_chunks_by_document, ingest_batch)
+
+            elif loader_type == "CSVLoader":
+                path = entry.get("path")
+                if not path:
+                    logger.error(f"CSVLoader '{loader_id}': missing 'path'")
+                    continue
+                all_docs = load_from_csv(path)
+                for doc in all_docs:
+                    doc.metadata["loader_id"] = loader_id
+                    doc.metadata["content_hash"] = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
+                if is_initial:
+                    ingest_batch(all_docs, qdrant, user_config, opt_config)
+                else:
+                    _delta_by_hash(all_docs, existing_docs, qdrant, collection_name, loader_id, user_config, opt_config, delete_chunks_by_document, ingest_batch)
+
+            else:
+                logger.error(f"process_delta_imports: unknown loader_type '{loader_type}' for loader_id '{loader_id}'")
+                continue
+
+            import_state.save_success(loader_id)
+            logger.info(f"Delta import '{loader_id}': completed successfully.")
+
+        except Exception as e:
+            logger.error(f"process_delta_imports: error processing loader '{loader_id}': {e}", exc_info=True)
+
+
+def _delta_by_hash(
+    all_docs: List[Document],
+    existing_docs: Dict[str, str],
+    qdrant: "Qdrant",
+    collection_name: str,
+    loader_id: str,
+    user_config: Dict[str, Any],
+    opt_config: Dict[str, Any],
+    delete_chunks_by_document: Callable[..., None],
+    ingest_batch: Callable[..., None],
+) -> None:
+    """
+    Hash-based delta import for normal loaders (DirectoryLoader, HTMLLoader, CSVLoader).
+
+    Groups freshly loaded documents by ``source`` URL, computes a combined content hash
+    per source, and then:
+
+    - Deletes Qdrant chunks for sources that no longer exist in the new load.
+    - Re-indexes sources whose combined hash has changed (delete old + ingest new).
+    - Leaves unchanged sources untouched.
+
+    Args:
+        all_docs (List[Document]): All documents returned by the loader for this run.
+        existing_docs (Dict[str, str]): Mapping of ``{source_url: content_hash}`` as
+                                         stored in Qdrant (from ``get_documents_by_loader_id``).
+        qdrant (Qdrant): Authenticated Qdrant wrapper instance.
+        collection_name (str): Target Qdrant collection name.
+        loader_id (str): Unique loader identifier.
+        user_config (Dict[str, Any]): User configuration dict.
+        opt_config (Dict[str, Any]): Optimisation configuration dict.
+        delete_chunks_by_document (Callable): Function with signature
+                                              ``(qdrant, collection, loader_id, path) -> None``.
+        ingest_batch (Callable): Function with signature
+                                 ``(docs, qdrant, user_config, opt_config) -> None``.
+    """
+    # Group freshly loaded documents by source URL (1 source = N chunks)
+    # Comparison is performed at source level using the combined content hash
+    new_docs_by_source: Dict[str, List[Document]] = {}
+    for doc in all_docs:
+        source = doc.metadata.get("source", "")
+        new_docs_by_source.setdefault(source, []).append(doc)
+
+    # Compute a combined content hash per source by concatenating all chunk hashes
+    new_hash_by_source: Dict[str, str] = {}
+    for source, docs in new_docs_by_source.items():
+        combined = "".join(d.metadata.get("content_hash", d.page_content) for d in docs)
+        new_hash_by_source[source] = hashlib.sha256(combined.encode("utf-8")).hexdigest()
+
+    # Remove documents that are no longer present in the fresh load
+    deleted_count = 0
+    for source in list(existing_docs.keys()):
+        if source not in new_docs_by_source:
+            delete_chunks_by_document(qdrant, collection_name, loader_id, source)
+            deleted_count += 1
+
+    # Re-index changed and new documents
+    changed_docs: List[Document] = []
+    for source, docs in new_docs_by_source.items():
+        existing_hash = existing_docs.get(source)
+        if existing_hash != new_hash_by_source[source]:
+            if existing_hash is not None:
+                delete_chunks_by_document(qdrant, collection_name, loader_id, source)
+            changed_docs.extend(docs)
+
+    if changed_docs:
+        ingest_batch(changed_docs, qdrant, user_config, opt_config)
+
+    logger.info(
+        f"_delta_by_hash '{loader_id}': {deleted_count} deleted, "
+        f"{len(changed_docs)} chunks re-indexed from "
+        f"{len(set(d.metadata.get('source','') for d in changed_docs))} changed sources"
+    )
