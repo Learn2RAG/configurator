@@ -90,7 +90,57 @@ def get_documents(loader_id: str, user_config: dict[str, Any], opt_config: dict[
                 break
         return [point.payload for point in points if point.payload is not None]
     return None
-    
+
+
+def get_document_hashes(loader_id: str, user_config: dict[str, Any], opt_config: dict[str, Any]) -> dict[str, str]:
+    """
+    Retrieve a path-to-content_hash mapping for all documents belonging to a loader.
+
+    Scrolls the Qdrant collection and deduplicates by source path, keeping the last
+    seen content hash per path. Used by the delta-import orchestration to determine
+    which documents are new, changed, or deleted.
+
+    Args:
+        loader_id (str): Unique loader identifier to filter by.
+        user_config (dict[str, Any]): User configuration dict (must contain
+                                      ``collection_name``).
+        opt_config (dict[str, Any]): Optimisation configuration dict.
+
+    Returns:
+        dict[str, str]: Mapping of ``{source_path: content_hash}`` for every document
+                        belonging to this loader. Returns an empty dict when the
+                        collection does not exist.
+    """
+    qdrant = Qdrant(user_config["collection_name"], opt_config)
+    collection_name = user_config["collection_name"]
+    if not qdrant.client.collection_exists(collection_name):
+        return {}
+    logging.info('Retrieving document hashes for loader_id: %s', loader_id)
+    scroll_filter = Filter(
+        must=[FieldCondition(key="loader_id", match=MatchValue(value=loader_id))]
+    )
+    result: dict[str, str] = {}
+    offset = None
+    while True:
+        points, offset = qdrant.client.scroll(
+            collection_name=collection_name,
+            scroll_filter=scroll_filter,
+            limit=100,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        for point in points:
+            if point.payload:
+                path = point.payload.get("path", "")
+                content_hash = point.payload.get("content_hash", "")
+                if path:
+                    result[path] = content_hash
+        if offset is None:
+            break
+    return result
+
+
 def update_documents(loader_id: str, documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     qdrant = Qdrant(user_config["collection_name"], opt_config)
     if qdrant.client.collection_exists(user_config["collection_name"]):

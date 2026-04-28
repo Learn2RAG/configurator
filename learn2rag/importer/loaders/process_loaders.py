@@ -13,10 +13,11 @@ Last Modified: April 24, 2026
 
 import hashlib
 import logging
-from typing import Callable, Dict, List, Any, TYPE_CHECKING
+from typing import Dict, List, Any, TYPE_CHECKING
 if TYPE_CHECKING:
-    from learn2rag.pipeline.qdrant import Qdrant
     from learn2rag.importer.utils.import_state import ImportState
+from learn2rag.pipeline.ingestion import index
+from learn2rag.pipeline.store import get_document_hashes, delete_documents
 from ..globals import stop_loading
 from langchain_core.documents import Document
 from .directory_loader import load_from_directory
@@ -165,7 +166,6 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
 
 def process_delta_imports(
     config_entries: List[Dict[str, Any]],
-    qdrant: "Qdrant",
     user_config: Dict[str, Any],
     opt_config: Dict[str, Any],
     import_state: "ImportState",
@@ -187,21 +187,12 @@ def process_delta_imports(
     Args:
         config_entries (List[Dict[str, Any]]): Loader configuration entries from the
                                                importer config file.
-        qdrant (Qdrant): Authenticated Qdrant wrapper instance
-                         (``learn2rag.pipeline.qdrant.Qdrant``).
         user_config (Dict[str, Any]): User configuration dict (must contain
                                       ``collection_name``).
         opt_config (Dict[str, Any]): Optimisation configuration dict.
         import_state (ImportState): ImportState instance for timestamp management.
     """
     from datetime import datetime, timezone
-    from learn2rag.pipeline.ingestion import (
-        get_documents_by_loader_id,
-        delete_chunks_by_document,
-        ingest_batch,
-    )
-
-    collection_name = user_config.get("collection_name", opt_config.get("collection_name", ""))
 
     for entry in config_entries:
         if stop_loading:
@@ -221,7 +212,7 @@ def process_delta_imports(
             import_state.record_import_start(loader_id, import_start)
 
             # Retrieve existing Qdrant documents for this loader: {source_path: content_hash}
-            existing_docs: Dict[str, str] = get_documents_by_loader_id(qdrant, collection_name, loader_id)
+            existing_docs: Dict[str, str] = get_document_hashes(loader_id, user_config, opt_config)
             is_initial = len(existing_docs) == 0
 
             logger.info(
@@ -258,10 +249,10 @@ def process_delta_imports(
                         text_fields=text_fields, page_size=page_size, language=language,
                     )
                     if is_initial:
-                        ingest_batch(all_docs, qdrant, user_config, opt_config)
+                        index(all_docs, user_config, opt_config)
                     else:
                         # Hash comparison: replace changed, remove deleted
-                        _delta_by_hash(all_docs, existing_docs, qdrant, collection_name, loader_id, user_config, opt_config, delete_chunks_by_document, ingest_batch)
+                        _delta_by_hash(all_docs, existing_docs, loader_id, user_config, opt_config)
                 else:
                     # 2-pass delta
                     logger.info(f"Drupal '{loader_id}': 2-pass delta since {last_import_time.isoformat()}")
@@ -274,7 +265,7 @@ def process_delta_imports(
                     deleted_paths = [p for p in existing_docs if p not in current_ids]
                     for path in deleted_paths:
                         logger.info(f"Drupal '{loader_id}': deleting removed document {path}")
-                        delete_chunks_by_document(qdrant, collection_name, loader_id, path)
+                        delete_documents(loader_id, [path], user_config, opt_config)
 
                     # Pass 2: load and index changed documents
                     changed_docs = load_from_drupal(
@@ -285,8 +276,8 @@ def process_delta_imports(
                     )
                     for doc in changed_docs:
                         source = doc.metadata.get("source", "")
-                        delete_chunks_by_document(qdrant, collection_name, loader_id, source)
-                    ingest_batch(changed_docs, qdrant, user_config, opt_config)
+                        delete_documents(loader_id, [source], user_config, opt_config)
+                    index(changed_docs, user_config, opt_config)
                     logger.info(f"Drupal '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
 
             elif loader_type == "SharepointLoader":
@@ -311,9 +302,9 @@ def process_delta_imports(
                         loader_id=loader_id,
                     )
                     if is_initial:
-                        ingest_batch(all_docs, qdrant, user_config, opt_config)
+                        index(all_docs, user_config, opt_config)
                     else:
-                        _delta_by_hash(all_docs, existing_docs, qdrant, collection_name, loader_id, user_config, opt_config, delete_chunks_by_document, ingest_batch)
+                        _delta_by_hash(all_docs, existing_docs, loader_id, user_config, opt_config)
                 else:
                     logger.info(f"SharePoint '{loader_id}': 2-pass delta since {last_import_time.isoformat()}")
                     # Pass 1: fetch all current URLs to detect deleted documents
@@ -326,7 +317,7 @@ def process_delta_imports(
                     deleted_paths = [p for p in existing_docs if p not in current_ids]
                     for path in deleted_paths:
                         logger.info(f"SharePoint '{loader_id}': deleting removed document {path}")
-                        delete_chunks_by_document(qdrant, collection_name, loader_id, path)
+                        delete_documents(loader_id, [path], user_config, opt_config)
 
                     # Pass 2: load and index changed documents
                     changed_docs = load_from_sharepoint(
@@ -338,8 +329,8 @@ def process_delta_imports(
                     )
                     for doc in changed_docs:
                         source = doc.metadata.get("source", "")
-                        delete_chunks_by_document(qdrant, collection_name, loader_id, source)
-                    ingest_batch(changed_docs, qdrant, user_config, opt_config)
+                        delete_documents(loader_id, [source], user_config, opt_config)
+                    index(changed_docs, user_config, opt_config)
                     logger.info(f"SharePoint '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
 
             # ----------------------------------------------------------------
@@ -357,9 +348,9 @@ def process_delta_imports(
                     loader_id=loader_id,
                 )
                 if is_initial:
-                    ingest_batch(all_docs, qdrant, user_config, opt_config)
+                    index(all_docs, user_config, opt_config)
                 else:
-                    _delta_by_hash(all_docs, existing_docs, qdrant, collection_name, loader_id, user_config, opt_config, delete_chunks_by_document, ingest_batch)
+                    _delta_by_hash(all_docs, existing_docs, loader_id, user_config, opt_config)
 
             elif loader_type == "HTMLLoader":
                 url = entry.get("url")
@@ -369,9 +360,9 @@ def process_delta_imports(
                     continue
                 all_docs = load_html_content(url, depth=depth, loader_id=loader_id)
                 if is_initial:
-                    ingest_batch(all_docs, qdrant, user_config, opt_config)
+                    index(all_docs, user_config, opt_config)
                 else:
-                    _delta_by_hash(all_docs, existing_docs, qdrant, collection_name, loader_id, user_config, opt_config, delete_chunks_by_document, ingest_batch)
+                    _delta_by_hash(all_docs, existing_docs, loader_id, user_config, opt_config)
 
             elif loader_type == "CSVLoader":
                 path = entry.get("path")
@@ -383,9 +374,9 @@ def process_delta_imports(
                     doc.metadata["loader_id"] = loader_id
                     doc.metadata["content_hash"] = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
                 if is_initial:
-                    ingest_batch(all_docs, qdrant, user_config, opt_config)
+                    index(all_docs, user_config, opt_config)
                 else:
-                    _delta_by_hash(all_docs, existing_docs, qdrant, collection_name, loader_id, user_config, opt_config, delete_chunks_by_document, ingest_batch)
+                    _delta_by_hash(all_docs, existing_docs, loader_id, user_config, opt_config)
 
             else:
                 logger.error(f"process_delta_imports: unknown loader_type '{loader_type}' for loader_id '{loader_id}'")
@@ -401,13 +392,9 @@ def process_delta_imports(
 def _delta_by_hash(
     all_docs: List[Document],
     existing_docs: Dict[str, str],
-    qdrant: "Qdrant",
-    collection_name: str,
     loader_id: str,
     user_config: Dict[str, Any],
     opt_config: Dict[str, Any],
-    delete_chunks_by_document: Callable[..., None],
-    ingest_batch: Callable[..., None],
 ) -> None:
     """
     Hash-based delta import for normal loaders (DirectoryLoader, HTMLLoader, CSVLoader).
@@ -422,16 +409,11 @@ def _delta_by_hash(
     Args:
         all_docs (List[Document]): All documents returned by the loader for this run.
         existing_docs (Dict[str, str]): Mapping of ``{source_url: content_hash}`` as
-                                         stored in Qdrant (from ``get_documents_by_loader_id``).
-        qdrant (Qdrant): Authenticated Qdrant wrapper instance.
-        collection_name (str): Target Qdrant collection name.
+                                         stored in Qdrant (from ``get_document_hashes``).
         loader_id (str): Unique loader identifier.
-        user_config (Dict[str, Any]): User configuration dict.
+        user_config (Dict[str, Any]): User configuration dict (must contain
+                                      ``collection_name``).
         opt_config (Dict[str, Any]): Optimisation configuration dict.
-        delete_chunks_by_document (Callable): Function with signature
-                                              ``(qdrant, collection, loader_id, path) -> None``.
-        ingest_batch (Callable): Function with signature
-                                 ``(docs, qdrant, user_config, opt_config) -> None``.
     """
     # Group freshly loaded documents by source URL (1 source = N chunks)
     # Comparison is performed at source level using the combined content hash
@@ -450,7 +432,7 @@ def _delta_by_hash(
     deleted_count = 0
     for source in list(existing_docs.keys()):
         if source not in new_docs_by_source:
-            delete_chunks_by_document(qdrant, collection_name, loader_id, source)
+            delete_documents(loader_id, [source], user_config, opt_config)
             deleted_count += 1
 
     # Re-index changed and new documents
@@ -459,11 +441,11 @@ def _delta_by_hash(
         existing_hash = existing_docs.get(source)
         if existing_hash != new_hash_by_source[source]:
             if existing_hash is not None:
-                delete_chunks_by_document(qdrant, collection_name, loader_id, source)
+                delete_documents(loader_id, [source], user_config, opt_config)
             changed_docs.extend(docs)
 
     if changed_docs:
-        ingest_batch(changed_docs, qdrant, user_config, opt_config)
+        index(changed_docs, user_config, opt_config)
 
     logger.info(
         f"_delta_by_hash '{loader_id}': {deleted_count} deleted, "

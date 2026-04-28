@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents.base import Document
 from .qdrant import Qdrant
-from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance, FilterSelector
+from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
 from .embeddings import create_embeddings
 
@@ -103,101 +103,6 @@ def payload(sample: dict[str, Any]) -> dict[str, str]:
         "loader_id": sample["metadata"]["loader_id"],
         "document_id": sample["metadata"].get("document_id", "")
     }
-
-def get_documents_by_loader_id(qdrant: Qdrant, collection_name: str, loader_id: str) -> dict[str, str]:
-    """
-    Scroll all Qdrant points for a given loader and return their path-to-hash mapping.
-
-    Args:
-        qdrant (Qdrant): Authenticated Qdrant wrapper instance.
-        collection_name (str): Target collection name.
-        loader_id (str): Unique loader identifier to filter by.
-
-    Returns:
-        dict[str, str]: Mapping of ``{source_path: content_hash}`` for every point
-                        belonging to this loader. Returns an empty dict when the
-                        collection does not exist.
-    """
-    if not qdrant.client.collection_exists(collection_name):
-        return {}
-    scroll_filter = Filter(
-        must=[FieldCondition(key="loader_id", match=MatchValue(value=loader_id))]
-    )
-    result: dict[str, str] = {}
-    offset = None
-    while True:
-        points, offset = qdrant.client.scroll(
-            collection_name=collection_name,
-            scroll_filter=scroll_filter,
-            limit=100,
-            offset=offset,
-            with_payload=True,
-            with_vectors=False,
-        )
-        for point in points:
-            if point.payload:
-                path = point.payload.get("path", "")
-                content_hash = point.payload.get("content_hash", "")
-                if path:
-                    result[path] = content_hash
-        if offset is None:
-            break
-    return result
-
-
-def delete_chunks_by_document(qdrant: Qdrant, collection_name: str, loader_id: str, path: str) -> None:
-    """
-    Delete all Qdrant chunks that belong to a specific document.
-
-    Matches on the combined filter ``loader_id == X AND path == Y``.
-
-    Args:
-        qdrant (Qdrant): Authenticated Qdrant wrapper instance.
-        collection_name (str): Target collection name.
-        loader_id (str): Unique loader identifier.
-        path (str): Source path / URL of the document whose chunks should be deleted.
-    """
-    if not qdrant.client.collection_exists(collection_name):
-        return
-    logging.info('Deleting chunks for loader_id=%s path=%s', loader_id, path)
-    qdrant.client.delete(
-        collection_name=collection_name,
-        points_selector=FilterSelector(
-            filter=Filter(
-                must=[
-                    FieldCondition(key="loader_id", match=MatchValue(value=loader_id)),
-                    FieldCondition(key="path", match=MatchValue(value=path)),
-                ]
-            )
-        ),
-    )
-
-
-def delete_all_chunks_by_loader_id(qdrant: Qdrant, collection_name: str, loader_id: str) -> None:
-    """
-    Delete all Qdrant chunks that belong to a specific loader.
-
-    Use this when a data source is removed from a pipeline to clean up all
-    associated vectors.
-
-    Args:
-        qdrant (Qdrant): Authenticated Qdrant wrapper instance.
-        collection_name (str): Target collection name.
-        loader_id (str): Unique loader identifier whose chunks should be deleted.
-    """
-    if not qdrant.client.collection_exists(collection_name):
-        return
-    logging.info('Deleting all chunks for loader_id=%s', loader_id)
-    qdrant.client.delete(
-        collection_name=collection_name,
-        points_selector=FilterSelector(
-            filter=Filter(
-                must=[
-                    FieldCondition(key="loader_id", match=MatchValue(value=loader_id)),
-                ]
-            )
-        ),
-    )
 
 
 def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
