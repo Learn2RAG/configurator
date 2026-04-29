@@ -29,7 +29,7 @@ import werkzeug.wrappers
 from learn2rag.compose import Project
 import learn2rag.data
 import learn2rag.pipeline.llm
-from learn2rag.pipeline.config import refresh_configs
+
 from datetime import datetime
 
 
@@ -410,7 +410,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
         has_ssl = bool(app.config.get("TLS"))
-        refresh_configs()
         url = urllib.parse.urlparse(request.base_url)
         assert url.scheme
 
