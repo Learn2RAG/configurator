@@ -8,17 +8,33 @@ from typing import Any
 
 opt_config: dict[str, Any] = {}
 
-with open(os.environ.get("PIPELINE_USER_CONFIG", "learn2rag/pipeline/user_config.json"), "r") as file:
-    user_config = json.load(file)
+user_config_path = os.environ.get("PIPELINE_USER_CONFIG", "learn2rag/pipeline/user_config.json")
+try:
+    with open(user_config_path , "r") as file:
+        user_config = json.load(file)
+except:
+    logging.error(f"User Config file not found at {user_config_path}. Using default settings.")
+    user_config = {}
 
-with open(os.environ.get("IMPORTER_CONFIG", "learn2rag/importer/config/config.json"), "r") as file:
-    importer_config = json.load(file)
+
+importer_config_path = os.environ.get("IMPORTER_CONFIG", "learn2rag/importer/config/config.json")
+try:
+    with open(importer_config_path, "r") as file:
+        importer_config = json.load(file)
+except:
+    logging.error(f"Importer Config file not found at {importer_config_path}. Using default settings.")
+    importer_config = {}
 
 def refresh_configs():
     global opt_config
     logging.info(f"Refreshing configs...")
-    with open(os.environ.get("PIPELINE_OPT_CONFIG", "learn2rag/pipeline/opt_config.json"), "r") as file:
-        base_data = json.load(file)
+    pipeline_config_path = os.environ.get("PIPELINE_OPT_CONFIG", "learn2rag/pipeline/opt_config.json")
+    try:
+        with open(pipeline_config_path, "r") as file:
+            base_data = json.load(file)
+    except:
+        logging.error(f"Pipeline Config file not found at {pipeline_config_path}. Using default settings.")
+        base_data = {}
 
     final_data = base_data
 
