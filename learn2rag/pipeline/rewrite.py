@@ -63,7 +63,7 @@ def generate_subqueries(user_query: str, n: int=3) -> list[str]:
         return []
 
     try:
-        result = ast.literal_eval(response.content.strip())
+        result = ast.literal_eval(content.strip())
         if isinstance(result, list):
             return [str(x).strip() for x in result if str(x).strip()]
     except Exception:
@@ -101,7 +101,7 @@ def generate_keywords(user_query: str, n: int=3) -> list[str]:
         return []
 
     try:
-        result = ast.literal_eval(response.content.strip())
+        result = ast.literal_eval(content.strip())
         if isinstance(result, list):
             return [str(x).strip() for x in result if str(x).strip()]
     except Exception:
