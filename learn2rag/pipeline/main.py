@@ -9,13 +9,13 @@ from . import generate
 
 if __name__ == "__main__":
     try:
-        logging.config.dictConfig(yaml.safe_load(open("logging.yaml").read()))
+        logging.config.dictConfig(yaml.safe_load(open("./learn2rag/pipeline/logging.yaml").read()))
     except FileNotFoundError:
         logging.basicConfig()
 
     from .config import user_config, opt_config
 
-    # ingestion.index(user_config, opt_config)
+    ingestion.index(user_config, opt_config)
     if opt_config["query_mode"] == "multi":
         # in query_mode 'multi' different querys for each vector in the multi-vector are allowed
         multi_query = {"content": "What is USM AI?", "title": "What is USM AI?", "summary": "What is USM AI?", "source_path":"USU/ITSM/"}

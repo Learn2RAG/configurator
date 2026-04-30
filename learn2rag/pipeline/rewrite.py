@@ -31,12 +31,14 @@ def rewrite_query(user_query: str) -> str:
     ])
 
     content = response.content
-    if not isinstance(content, str):
-        return ''
-    return content.strip()
+    if isinstance(content, str):
+        return content.strip()
+    return ''
 
 
 def generate_subqueries(user_query: str, n: int=3) -> list[str]:
+    if llm is None:
+        return []
     system_message_generate_subqueries = f"""
     You are a query rewriter for a RAG pipeline.
     
@@ -71,6 +73,8 @@ def generate_subqueries(user_query: str, n: int=3) -> list[str]:
 
 
 def generate_keywords(user_query: str, n: int=3) -> list[str]:
+    if llm is None:
+        return []
     system_message_generate_keywords = f"""
     You are a keyword extractor for a RAG pipeline.
     
