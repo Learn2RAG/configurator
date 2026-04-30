@@ -1,8 +1,7 @@
-import logging
 import warnings
-import itertools
 from typing import List, Any, cast
 import logging
+import copy
 
 import numpy as np
 from FlagEmbedding import FlagReranker # type: ignore[import-untyped]
@@ -13,10 +12,70 @@ from .authorization import filter_authorized
 from .config import opt_config, user_config
 from .embeddings import create_embeddings
 from .qdrant import Qdrant
-
+from . import rewrite
 
 
 profilingLogger = logging.getLogger('profiling')
+
+
+def _sort_and_deduplicate(points: list[ScoredPoint]) -> list[ScoredPoint]:
+    best_by_path: dict[str, ScoredPoint] = {}
+    fallback_points: list[ScoredPoint] = []
+
+    for p in points:
+        payload = p.payload or {}
+        path = payload.get("path")
+
+        # if path is missing/non-string, keep as fallback
+        if not isinstance(path, str):
+            fallback_points.append(p)
+            continue
+
+        current = best_by_path.get(path)
+        if current is None or p.score > current.score:
+            best_by_path[path] = p
+
+    merged = list(best_by_path.values()) + fallback_points
+    return sorted(merged, key=lambda p: p.score, reverse=True)
+
+
+def _collect_query_points(
+    query: str,
+    user_config: dict[str, Any],
+    opt_config: dict[str, Any],
+    *,
+    request_id: str | None = None,
+) -> list[ScoredPoint]:
+
+    points_all: list[ScoredPoint] = []
+
+    # Base query
+    base_results = search(query, user_config, opt_config, request_id=request_id)
+    points_all.extend(base_results.points)
+
+    if opt_config.get("rewrite") == "True":
+        opt_config_rewriting = copy.deepcopy(opt_config)
+        opt_config_rewriting["top_k"] = 3
+
+        rewrite_mode = opt_config.get("rewrite_mode")
+
+        if rewrite_mode in ["subqueries", "subqueries_keywords"]:
+            subqueries = rewrite.generate_subqueries(query, n=2)
+            for sq in subqueries:
+                sq_results = search(sq, user_config, opt_config_rewriting, request_id=request_id)
+                points_all.extend(sq_results.points)
+
+        if rewrite_mode in ["keywords", "subqueries_keywords"]:
+            opt_config_keywords = copy.deepcopy(opt_config_rewriting)
+            opt_config_keywords["search_mode"] = "sparse"
+
+            keywords = rewrite.generate_keywords(query, n=3)
+            for kw in keywords:
+                kw_results = search(kw, user_config, opt_config_keywords, request_id=request_id)
+                points_all.extend(kw_results.points)
+
+        # todo: reranking? clipping? (scores across different search modes might not be comparable)
+    return _sort_and_deduplicate(points_all)
 
 
 # similarity search
@@ -236,7 +295,9 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
     profilingLogger.info('end', extra={'activity': 'search', 'request_id': request_id})
     return results
 
-async def search_authorized(question: str, user: str, *, request_id: str|None=None) -> List[ScoredPoint]:
-    query_response = search(question, user_config, opt_config, request_id=request_id)
+async def search_authorized(question: str, user: str, *, request_id: str | None = None) -> List[ScoredPoint]:
+    points = _collect_query_points(question, user_config, opt_config, request_id=request_id)
+    query_response = QueryResponse(points=points)
     authorized_points = await filter_authorized(user, query_response)
-    return authorized_points
+    # keep deterministic order after auth filter
+    return _sort_and_deduplicate(list(authorized_points))
