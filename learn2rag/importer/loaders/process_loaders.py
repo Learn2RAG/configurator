@@ -6,9 +6,9 @@ This module processes configuration entries and delegates loading to specific lo
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.6
+Version: 0.0.7
 Creation Date: June 10, 2025
-Last Modified: April 24, 2026
+Last Modified: May 4, 2026
 """
 
 import hashlib
@@ -17,7 +17,7 @@ from typing import Dict, List, Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from learn2rag.importer.utils.import_state import ImportState
 from learn2rag.pipeline.ingestion import index
-from learn2rag.pipeline.store import get_document_hashes, delete_documents
+from learn2rag.pipeline.store import get_documents, delete_documents, update_documents
 from ..globals import stop_loading
 from langchain_core.documents import Document
 from .directory_loader import load_from_directory
@@ -70,9 +70,10 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
                     logger.error("Missing 'path' for 'CSVLoader' in configuration entry.")
                     continue
                 documents = load_from_csv(path)
-                # CSVLoader does not set loader_id or content_hash — populate them here
+                # CSVLoader does not set loader_id, source or content_hash — populate them here
                 for doc in documents:
                     doc.metadata["loader_id"] = loader_id
+                    doc.metadata["source"] = path
                     doc.metadata["content_hash"] = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
                 logger.info(f"Loaded {len(documents)} documents from {path} using {loader_type}.")
             elif loader_type == "HTMLLoader":
@@ -211,13 +212,14 @@ def process_delta_imports(
             import_start = datetime.now(timezone.utc)
             import_state.record_import_start(loader_id, import_start)
 
-            # Retrieve existing Qdrant documents for this loader: {source_path: content_hash}
-            existing_docs: Dict[str, str] = get_document_hashes(loader_id, user_config, opt_config)
-            is_initial = len(existing_docs) == 0
+            # Retrieve existing Qdrant documents for this loader and build {source: combined_hash} map
+            payloads: List[Dict[str, Any]] = get_documents(loader_id, user_config, opt_config) or []
+            existing_map: Dict[str, str] = _build_existing_map(payloads)
+            is_initial = len(existing_map) == 0
 
             logger.info(
                 f"Delta import '{loader_id}': is_initial={is_initial}, "
-                f"last_import_time={last_import_time}, existing_docs={len(existing_docs)}"
+                f"last_import_time={last_import_time}, existing_docs={len(existing_map)}"
             )
 
             # ----------------------------------------------------------------
@@ -252,7 +254,7 @@ def process_delta_imports(
                         index(all_docs, user_config, opt_config)
                     else:
                         # Hash comparison: replace changed, remove deleted
-                        _delta_by_hash(all_docs, existing_docs, loader_id, user_config, opt_config)
+                        _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
                 else:
                     # 2-pass delta
                     logger.info(f"Drupal '{loader_id}': 2-pass delta since {last_import_time.isoformat()}")
@@ -262,10 +264,10 @@ def process_delta_imports(
                         auth_type=auth_type, username=username, password=password, token=token,
                         page_size=page_size, language=language,
                     ))
-                    deleted_paths = [p for p in existing_docs if p not in current_ids]
-                    for path in deleted_paths:
-                        logger.info(f"Drupal '{loader_id}': deleting removed document {path}")
-                        delete_documents(loader_id, [path], user_config, opt_config)
+                    deleted_paths = [p for p in existing_map if p not in current_ids]
+                    if deleted_paths:
+                        logger.info(f"Drupal '{loader_id}': deleting {len(deleted_paths)} removed documents")
+                        delete_documents(loader_id, deleted_paths, user_config, opt_config)
 
                     # Pass 2: load and index changed documents
                     changed_docs = load_from_drupal(
@@ -274,9 +276,9 @@ def process_delta_imports(
                         text_fields=text_fields, page_size=page_size, language=language,
                         since=last_import_time,
                     )
-                    for doc in changed_docs:
-                        source = doc.metadata.get("source", "")
-                        delete_documents(loader_id, [source], user_config, opt_config)
+                    sources_to_delete = [doc.metadata.get("source", "") for doc in changed_docs]
+                    if sources_to_delete:
+                        delete_documents(loader_id, sources_to_delete, user_config, opt_config)
                     index(changed_docs, user_config, opt_config)
                     logger.info(f"Drupal '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
 
@@ -304,7 +306,7 @@ def process_delta_imports(
                     if is_initial:
                         index(all_docs, user_config, opt_config)
                     else:
-                        _delta_by_hash(all_docs, existing_docs, loader_id, user_config, opt_config)
+                        _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
                 else:
                     logger.info(f"SharePoint '{loader_id}': 2-pass delta since {last_import_time.isoformat()}")
                     # Pass 1: fetch all current URLs to detect deleted documents
@@ -314,10 +316,10 @@ def process_delta_imports(
                         folder_id=folder_id, recursive=recursive, auth_with_token=auth_with_token,
                         reset_token=reset_token, tenant_id=tenant_id, site_id=site_id,
                     ))
-                    deleted_paths = [p for p in existing_docs if p not in current_ids]
-                    for path in deleted_paths:
-                        logger.info(f"SharePoint '{loader_id}': deleting removed document {path}")
-                        delete_documents(loader_id, [path], user_config, opt_config)
+                    deleted_paths = [p for p in existing_map if p not in current_ids]
+                    if deleted_paths:
+                        logger.info(f"SharePoint '{loader_id}': deleting {len(deleted_paths)} removed documents")
+                        delete_documents(loader_id, deleted_paths, user_config, opt_config)
 
                     # Pass 2: load and index changed documents
                     changed_docs = load_from_sharepoint(
@@ -327,9 +329,9 @@ def process_delta_imports(
                         reset_token=reset_token, tenant_id=tenant_id, site_id=site_id,
                         loader_id=loader_id, since=last_import_time,
                     )
-                    for doc in changed_docs:
-                        source = doc.metadata.get("source", "")
-                        delete_documents(loader_id, [source], user_config, opt_config)
+                    sources_to_delete = [doc.metadata.get("source", "") for doc in changed_docs]
+                    if sources_to_delete:
+                        delete_documents(loader_id, sources_to_delete, user_config, opt_config)
                     index(changed_docs, user_config, opt_config)
                     logger.info(f"SharePoint '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
 
@@ -350,7 +352,7 @@ def process_delta_imports(
                 if is_initial:
                     index(all_docs, user_config, opt_config)
                 else:
-                    _delta_by_hash(all_docs, existing_docs, loader_id, user_config, opt_config)
+                    _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
 
             elif loader_type == "HTMLLoader":
                 url = entry.get("url")
@@ -362,7 +364,7 @@ def process_delta_imports(
                 if is_initial:
                     index(all_docs, user_config, opt_config)
                 else:
-                    _delta_by_hash(all_docs, existing_docs, loader_id, user_config, opt_config)
+                    _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
 
             elif loader_type == "CSVLoader":
                 path = entry.get("path")
@@ -372,11 +374,12 @@ def process_delta_imports(
                 all_docs = load_from_csv(path)
                 for doc in all_docs:
                     doc.metadata["loader_id"] = loader_id
+                    doc.metadata["source"] = path
                     doc.metadata["content_hash"] = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
                 if is_initial:
                     index(all_docs, user_config, opt_config)
                 else:
-                    _delta_by_hash(all_docs, existing_docs, loader_id, user_config, opt_config)
+                    _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
 
             else:
                 logger.error(f"process_delta_imports: unknown loader_type '{loader_type}' for loader_id '{loader_id}'")
@@ -389,9 +392,39 @@ def process_delta_imports(
             logger.error(f"process_delta_imports: error processing loader '{loader_id}': {e}", exc_info=True)
 
 
-def _delta_by_hash(
+def _build_existing_map(payloads: List[Dict[str, Any]]) -> Dict[str, str]:
+    """
+    Build a ``{source: combined_content_hash}`` mapping from Qdrant payloads.
+
+    Groups payloads by ``source`` field and computes a combined hash per source
+    from the sorted individual ``content_hash`` values. This makes the comparison
+    stable regardless of chunk order.
+
+    Args:
+        payloads (List[Dict[str, Any]]): Raw Qdrant payloads as returned by
+                                          ``get_documents()``.
+
+    Returns:
+        Dict[str, str]: Mapping of ``{source: combined_hash}``.
+    """
+    # Use a set to deduplicate content_hash values: all chunks of one document
+    # share the same content_hash, so duplicates must be collapsed before combining.
+    chunks_by_source: Dict[str, set] = {}
+    for payload in payloads:
+        source = payload.get("source", "")
+        content_hash = payload.get("content_hash", "")
+        if source:
+            chunks_by_source.setdefault(source, set()).add(content_hash)
+    result: Dict[str, str] = {}
+    for source, hashes in chunks_by_source.items():
+        combined = "".join(sorted(hashes))
+        result[source] = hashlib.sha256(combined.encode("utf-8")).hexdigest()
+    return result
+
+
+def _delta_by_source(
     all_docs: List[Document],
-    existing_docs: Dict[str, str],
+    existing_map: Dict[str, str],
     loader_id: str,
     user_config: Dict[str, Any],
     opt_config: Dict[str, Any],
@@ -399,56 +432,52 @@ def _delta_by_hash(
     """
     Hash-based delta import for normal loaders (DirectoryLoader, HTMLLoader, CSVLoader).
 
-    Groups freshly loaded documents by ``source`` URL, computes a combined content hash
+    Groups freshly loaded documents by ``source``, computes a combined content hash
     per source, and then:
 
-    - Deletes Qdrant chunks for sources that no longer exist in the new load.
-    - Re-indexes sources whose combined hash has changed (delete old + ingest new).
+    - Deletes Qdrant chunks (bulk) for sources that no longer exist in the new load.
+    - Calls ``update_documents`` for sources whose combined hash has changed or that
+      are entirely new (update_documents handles delete-then-reindex internally).
     - Leaves unchanged sources untouched.
 
     Args:
         all_docs (List[Document]): All documents returned by the loader for this run.
-        existing_docs (Dict[str, str]): Mapping of ``{source_url: content_hash}`` as
-                                         stored in Qdrant (from ``get_document_hashes``).
+        existing_map (Dict[str, str]): Mapping of ``{source: combined_hash}`` as
+                                        built by ``_build_existing_map()``.
         loader_id (str): Unique loader identifier.
         user_config (Dict[str, Any]): User configuration dict (must contain
                                       ``collection_name``).
         opt_config (Dict[str, Any]): Optimisation configuration dict.
     """
-    # Group freshly loaded documents by source URL (1 source = N chunks)
-    # Comparison is performed at source level using the combined content hash
+    # Group freshly loaded documents by source (1 source = N chunks)
     new_docs_by_source: Dict[str, List[Document]] = {}
     for doc in all_docs:
-        source = doc.metadata.get("source", "")
+        source: str = doc.metadata.get("source", "")
         new_docs_by_source.setdefault(source, []).append(doc)
 
-    # Compute a combined content hash per source by concatenating all chunk hashes
+    # Compute combined hash per source from sorted individual content_hashes
     new_hash_by_source: Dict[str, str] = {}
     for source, docs in new_docs_by_source.items():
-        combined = "".join(d.metadata.get("content_hash", d.page_content) for d in docs)
+        hashes = sorted(d.metadata.get("content_hash", d.page_content) for d in docs)
+        combined = "".join(hashes)
         new_hash_by_source[source] = hashlib.sha256(combined.encode("utf-8")).hexdigest()
 
-    # Remove documents that are no longer present in the fresh load
-    deleted_count = 0
-    for source in list(existing_docs.keys()):
-        if source not in new_docs_by_source:
-            delete_documents(loader_id, [source], user_config, opt_config)
-            deleted_count += 1
+    # Bulk-delete sources that are no longer present in the fresh load
+    deleted_sources: List[str] = [s for s in existing_map if s not in new_docs_by_source]
+    if deleted_sources:
+        delete_documents(loader_id, deleted_sources, user_config, opt_config)
 
-    # Re-index changed and new documents
+    # Update changed and new sources via update_documents (delete-then-reindex)
     changed_docs: List[Document] = []
     for source, docs in new_docs_by_source.items():
-        existing_hash = existing_docs.get(source)
-        if existing_hash != new_hash_by_source[source]:
-            if existing_hash is not None:
-                delete_documents(loader_id, [source], user_config, opt_config)
+        if existing_map.get(source) != new_hash_by_source[source]:
             changed_docs.extend(docs)
 
     if changed_docs:
-        index(changed_docs, user_config, opt_config)
+        update_documents(loader_id, changed_docs, user_config, opt_config)
 
+    changed_source_count = len(set(d.metadata.get("source", "") for d in changed_docs))
     logger.info(
-        f"_delta_by_hash '{loader_id}': {deleted_count} deleted, "
-        f"{len(changed_docs)} chunks re-indexed from "
-        f"{len(set(d.metadata.get('source','') for d in changed_docs))} changed sources"
+        f"_delta_by_source '{loader_id}': {len(deleted_sources)} deleted, "
+        f"{len(changed_docs)} chunks re-indexed from {changed_source_count} changed sources"
     )

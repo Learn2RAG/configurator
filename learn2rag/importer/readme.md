@@ -404,9 +404,14 @@ where
 - v0.0.6
   - removed permission information from metadata in directory loader
   - added SharePoint Loader
-- v0.0.7
+- v0.0.7 
   - added type checks
 - v0.0.8
   - added loader_id for all loaders
   - improved error handling and dependency checking for directory loader
   - added drupal_loader
+- v0.0.9
+  - unified `source` field as document identifier across all loaders in metadata (directory: file path, HTML: URL, SharePoint: web URL, Drupal: node URL, CSV: file path)
+  - delta import now uses `get_documents` from the pipeline
+  - hash comparison now uses sorted chunk hashes per source for stable results
+  - **Breaking change:** Qdrant payload field renamed from `path` → `source`; existing collections must be deleted and re-imported
