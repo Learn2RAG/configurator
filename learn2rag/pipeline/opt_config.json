@@ -7,6 +7,9 @@
     "BAAI/bge-m3": 1024
   },
   "search_mode": "dense",
+  "reranking": "False",
+  "reranking_mode": "reranking_with_sentence_transformers",
+  "top_k_reranker": 5,
   "fusion_mode": "DBSF",
   "rewrite": "False",
   "rewrite_mode": "subqueries_keywords",
