@@ -39,6 +39,14 @@ def create_embeddings(input_sample: List[str], model_name: str = "BAAI/bge-m3", 
                 return_sparse=True,
                 return_colbert_vecs=True,
             )
+        elif embedding_mode == "colbert":
+            return model.encode( # type: ignore[no-any-return]
+                input_sample,
+                batch_size=512,
+                return_dense=False,
+                return_sparse=False,
+                return_colbert_vecs=True,
+            )
         else:
             warnings.warn(
                 f"Embedding mode unknown or not provided. Using dense embeddings"
