@@ -57,7 +57,7 @@ def _rerank_points_with_flagreranker(
     if not valid_points:
         return []
 
-    pairs = [[query, cast(str, p.payload["content"])] for p in valid_points]
+    pairs = [[query, cast(str, p.payload["content"])] for p in valid_points if p.payload is not None]
     scores = reranker.compute_score(pairs)
 
     for p, score in zip(valid_points, scores):
@@ -88,7 +88,7 @@ def _rerank_points_with_sentence_transformers(
         return []
 
     # CrossEncoder expects list of (query, text) pairs
-    pairs = [[query, cast(str, p.payload["content"])] for p in valid_points]
+    pairs = [[query, cast(str, p.payload["content"])] for p in valid_points if p.payload is not None]
     scores = model.predict(pairs)
 
     # Attach scores to payload
@@ -124,7 +124,7 @@ def _rerank_points_with_colbert(
                 models.HasIdCondition(has_id=candidate_ids)
             ]
         ),
-        query=colbert_query,
+        query=colbert_query,  # type: ignore[arg-type]
         using="colbert",
         limit=top_k,
     )
@@ -401,7 +401,7 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
 
     results = qdrant.client.query_points(
         collection_name=collection_name,
-        query=query_embedding,
+        query=query_embedding, # type: ignore[arg-type, unused-ignore]
         using="multi",
         limit=opt_config["top_k"],
     )
