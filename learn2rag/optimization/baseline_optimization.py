@@ -1,5 +1,5 @@
 """
-RAG Pipeline Optimization with BERTScore evaluation. 
+RAG Pipeline Optimization with BERTScore evaluation.
 """
 
 import argparse
@@ -8,6 +8,7 @@ import logging
 import pathlib
 import time
 import copy
+import os
 
 import numpy as np
 from bert_score import score as bert_score
@@ -19,60 +20,19 @@ from learn2rag.pipeline.config import opt_config
 import learn2rag.pipeline.search
 import learn2rag.pipeline.generate
 
+def load_registry(registry_path: pathlib.Path):
+    if not registry_path.exists():
+        logging.warning("no registry found !")
+        return {"datasets": {}, "prompts": {"default": "Context: {context}\nQ: {question}"}}
+    return json.loads(registry_path.read_text())
 
-DATASET_CONFIG = {
-    "WikiEval": {
-        "subdirectory": "",
-        "split": "train",
-        "question_field": "question",
-        "answer_field": "answer",
-        "id_field": "id",
-    },
-    "rag-mini-bioasq": {
-        "subdirectory": "question-answer-passages",
-        "split": "test",
-        "question_field": "question",
-        "answer_field": "answer",
-        "id_field": "id",
-    },
-    "hotpot_qa": {      # Not being used
-        "subdirectory": "distractor",
-        "split": "validation",
-        "question_field": "question",
-        "answer_field": "answer",
-        "id_field": "id",
-    },
-    "repliqa": {        # Not being used
-        "subdirectory": "repliqa_4",
-        "split": None,
-        "question_field": "question",
-        "answer_field": "long_answer",
-        "id_field": "question_id",
-    },
-}
-
-PROMPT_MAP = {
-    "default": (
-        "# Role and Objective\nYou will act as a smart AI chatbot that answers "
-        "questions only by using the content from the provided information list.\n\n"
-        "# Instructions\n- Respond in the language of the question.\n"
-        "- Answer clear and concise.\n- Only use the provided information.\n"
-        "- NEVER use your general knowledge.\n\n"
-        "# Information:\n{context}"
-    ),
-    "concise": (
-        "Answer the question using ONLY the provided information. "
-        "Be concise and direct. If the information does not contain the answer, say so.\n\n"
-        "Information:\n{context}"
-    ),
-    "detailed": (
-        "You are a knowledgeable assistant. Using ONLY the provided information below, "
-        "answer the question thoroughly. Cite your sources. "
-        "If the information is insufficient, state that clearly.\n\n"
-        "Information:\n{context}"
-    ),
-}
-
+def get_base_user_config():
+    """Loads the base config provided by the orchestrator env var."""
+    path = os.environ.get("PIPELINE_USER_CONFIG")
+    if path and pathlib.Path(path).exists():
+        return json.loads(pathlib.Path(path).read_text())
+    logging.warning("no user config found !")
+    return {}
 
 def run_pipeline(question, user_config, working_config):
     t0 = time.time()
@@ -92,20 +52,21 @@ def run_pipeline(question, user_config, working_config):
         ])
     return answer, context[:3000], search_time, gen_time
 
-
-def objective(config, seed, questions, dataset_name, state, answers_dir):
+#I removed seed because there are no use for it
+# removed dataset_name becuase it just use in yser config and now we inject it
+def objective(config, questions, state, answers_dir, prompts_repo, base_user_cfg):
     state["trial_count"] += 1
     tid = state["trial_count"]
     cfg = dict(config)
     logging.info(f"Trial {tid}: {cfg}")
 
-    wcfg = copy.deepcopy(opt_config)
-    wcfg["top_k"] = cfg["top_k"]
-    wcfg["chunk_size"] = cfg["chunk_size"]
-    wcfg["chunk_overlap"] = cfg["chunk_overlap"]
-    wcfg["prompt"] = PROMPT_MAP[cfg["prompt_template"]]
-    ucfg = {"file_path": None, "collection_name": dataset_name,
-            "imported_documents_file_path": None, "llm": None}
+    working_cfg = copy.deepcopy(opt_config)
+    working_cfg.update({
+        "top_k": cfg["top_k"],
+        "chunk_size": cfg["chunk_size"],
+        "chunk_overlap": cfg["chunk_overlap"],
+        "prompt": prompts_repo.get(cfg["prompt_template"], prompts_repo["default"])
+    })
 
     predictions, goldens = [], []
     qa_pairs = []
@@ -116,7 +77,7 @@ def objective(config, seed, questions, dataset_name, state, answers_dir):
         if not q["question"]:
             continue
         try:
-            answer, context, st, gt = run_pipeline(q["question"], ucfg, wcfg)
+            answer, context, st, gt = run_pipeline(q["question"], base_user_cfg, working_cfg)
             t_search += st
             t_gen += gt
             predictions.append(answer)
@@ -130,6 +91,7 @@ def objective(config, seed, questions, dataset_name, state, answers_dir):
             })
         except Exception as e:
             logging.warning(f"Trial {tid}, q{idx} failed: {e}")
+            # do we need to add this :/
             predictions.append("")
             goldens.append(q["ground_truth"])
             qa_pairs.append({
@@ -207,7 +169,7 @@ def param_importance(smac, output_path):
     return result
 
 
-def run(dataset_name, max_questions, n_trials, output_dir):
+def run(dataset_name: str, max_questions: int, n_trials, output_dir: int):
     if dataset_name not in DATASET_CONFIG:
         raise ValueError(
             f"Unknown dataset: {dataset_name}. "
