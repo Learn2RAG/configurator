@@ -193,7 +193,7 @@ description = ""
 license = "MIT"
 name = "learn2rag"
 requires-python = "==3.13.5"
-version = "0.1.0"
+version = "0.2.0"
 [project.urls]
 Homepage = "https://learn2rag.de/"
 Documentation = "https://docs.learn2rag.de/"

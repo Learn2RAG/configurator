@@ -1,0 +1,8 @@
+version: '3.3'
+services:
+  drupal:
+    image: docker.io/library/drupal:11.3.5
+    # add --host=0.0.0.0 for remote access
+    command: 'php -d memory_limit=256M web/core/scripts/drupal quick-start --password=test --port=80 --suppress-login --no-interaction demo_umami'
+    ports:
+      - 3470:80

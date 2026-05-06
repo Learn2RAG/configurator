@@ -1,101 +1,123 @@
-{% extends 'base.html' %}
-
-{% block header %}
-  <h1>{% block title %}{{pgettext('title', 'Pipelines')}}{% endblock %}</h1>
-{% endblock %}
-
-{% block content %}
-<p class="d-inline-flex gap-1">
-  <button accesskey="n" class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
-    {{pgettext('button', 'Add a new pipeline')}}
-  </button>
-</p>
-<div class="collapse" id="collapseCreate">
-  <div class="card card-body">
-
-    <form method="POST" id="addPipeline">
-      <div class="mb-3">
-        <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-        <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this pipeline')}}">
-      </div>
-      <div class="mb-3">
-        <label for="url" class="form-label">{{pgettext('form_label', 'Storage directory path')}}</label>
-        <input required="required" class="form-control" name="storage_path" value="{{default_storage_prefix}}{{current_timestamp}}" data-default-prefix="{{default_storage_prefix}}"/>
-      </div>
-      <div class="mb-3">
-        <label for="language_model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
-        <select class="form-select" name="language_model">
-          {% for name, language_model in models.items() %}
-          <option value="{{ name }}">{{ language_model.label }} ({{ language_model.model }})</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="mb-3">
-        {{pgettext('form_label', 'Data sources')}}
-          {% for name, source in sources.items() %}
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="sources" value="{{name}}" id="source-{{loop.index}}" checked="checked">
-            <label class="form-check-label" for="source-{{loop.index}}">{{source.label}} ({{source.path}})</label>
+<table class="table" id="pipelines_list_table" hx-swap-oob="true" hx-get="" hx-trigger="every 15s" hx-swap="none">
+  <thead>
+    <tr>
+      <th scope="col">{{pgettext('column_heading', 'Label')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Storage directory path')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Language model')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Data sources')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Ports')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Status')}}</th>
+      <th scope="col"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for name, pipeline in pipelines.items() %}
+    <tr>
+      <td title="{{ name }}">
+        {{ pipeline.label }}
+      </td>
+      <td>{{ pipeline.storage_path }}</td>
+      <td>
+        <span class="badge text-bg-secondary">{{ models[pipeline.language_model].label }}</span>
+      </td>
+      <td>
+        {% for source in pipeline.sources %}
+        <span class="badge text-bg-secondary">{{ sources[source].label }}</span>
+        {% endfor %}
+      </td>
+      <td>
+        {% for port in pipeline.ports %}
+        <span class="badge text-bg-secondary">{{ port }}</span>
+        {% endfor %}
+      </td>
+      <td>
+        {% if projects[name] and not projects[name].running %}
+        {% if projects[name].succeeded %}<span title="{{pgettext('tooltip', 'succeeded')}}" style="cursor: default;">✔️</span>{% endif %}
+        {% if projects[name].failed %}<span title="{{pgettext('tooltip', 'failed')}}" style="cursor: default;">❌</span>{% endif %}
+        {% endif %}
+        {% if projects[name] and projects[name].running %}
+        <span class="badge text-bg-success">{{projects[name].content.get('label', gettext('running'))}}</span>
+        {% endif %}
+      </td>
+      <td>
+        <div class="dropdown">
+          <div class="btn-toolbar" role="toolbar">
+            <div class="btn-group" role="group">
+              {% if not (projects[name] and projects[name].running) %}
+              {% for project_name, project in compose_templates.items() %}
+              <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
+                <button class="btn btn-primary" type="submit" name="action" value="start:{{ project.name }}">{{project.label}}</button>
+              </form>
+              {% endfor %}
+              {% endif %}
+              {% if projects[name] and projects[name].running %}
+              {% if 'ui_url' in projects[name].content %}
+              <a
+                class="btn {% if projects[name].health %}btn-primary{% else %}btn-secondary{% endif %}"
+                {% if not projects[name].health %}style="cursor: not-allowed;"{% endif %}
+                href="{{ projects[name].content['ui_url'] }}"
+                role="button"
+                target="_blank"
+                >
+                {% if projects[name].health %}
+                {{pgettext('button', 'Open')}}
+                {% else %}
+                <div class="spinner-border spinner-border-sm"></div>
+                {% endif %}
+              </a>
+              {% else %}
+              <a class="btn btn-secondary">
+                <div class="spinner-border spinner-border-sm"></div>
+              </a>
+              {% endif %}
+              <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
+                <button type="submit" class="btn btn-warning" name="action" value="stop">
+                  {{pgettext('button', 'Stop')}}
+                </button>
+              </form>
+              {% else %}
+              <div class="dropdown">
+                <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  {{pgettext('button', 'More')}}
+                </button>
+                <ul class="dropdown-menu">
+                  {% if debug_logging %}
+                  <li>
+                    <a href="{{ url_for('pipeline_logs', name=name, file='debug.log') }}" class="dropdown-item">
+                      {{pgettext('button', 'Show debug log')}}
+                    </a>
+                  </li>
+                  {% endif %}
+                  <li>
+                    <a href="{{ url_for('pipeline_logs', name=name, file='error.log') }}" class="dropdown-item">
+                      {{pgettext('button', 'Show error log')}}
+                    </a>
+                  </li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove all data stored for this pipeline: %(label)s?', label=pipeline.label)}}">
+                      <input type="hidden" name="action" value="clean"/>
+                      <button type="submit" class="dropdown-item text-bg-danger">
+                        {{pgettext('button', 'Remove the stored data')}}
+                      </button>
+                    </form>
+                  </li>
+                  <li>
+                    <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this pipeline configuration and all its stored data: %(label)s?', label=pipeline.label)}}">
+                      <input type="hidden" name="action" value="delete"/>
+                      <button type="submit" class="dropdown-item text-bg-danger">
+                        {{pgettext('button', 'Remove the stored data and the pipeline')}}
+                      </button>
+                    </form>
+                  </li>
+                </ul>
+              </div>
+              {% endif %}
+            </div>
           </div>
-          {% endfor %}
-      </div>
-      <div class="mb-3">
-        <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target=".advanced-configuration">
-          {{gettext('Advanced configuration')}}
-        </button>
-      </div>
-      <div class="mb-3 collapse advanced-configuration">
-        <label for="ports" class="form-label">{{pgettext('form_label', 'Ports')}}</label>
-        <small class="text-body-secondary">{{gettext('Optional')}}</small>
-        <div>
         </div>
-        {# TODO: labels in the interface currently assume a specific port order in all corresponding .yml files #}
-        <div class="form-floating mb-3">
-          <input class="form-control" name="ports" type="number" min="1" max="65535">
-          <label for="ports" class="form-label">{{pgettext('form_label', 'User interface')}}</label>
-        </div>
-        <div class="form-floating mb-3">
-          <input class="form-control" name="ports" type="number" min="1" max="65535">
-          <label for="ports">{{pgettext('form_label', 'Internal RAG service')}}</label>
-        </div>
-        <div class="form-floating mb-3">
-          <input class="form-control" name="ports" type="number" min="1" max="65535">
-          <label for="ports">{{pgettext('form_label', 'Internal vector store')}}</label>
-        </div>
-        <div class="form-floating mb-3">
-          <input class="form-control" name="ports" type="number" min="1" max="65535">
-          <label for="ports">{{pgettext('form_label', 'Additional internal port')}}</label>
-        </div>
-      </div>
-      <div class="mb-3 collapse advanced-configuration">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="yes" id="import" name="import" checked>
-          <label class="form-check-label" for="import">
-            {{pgettext('form_label', 'Immediately do the data import')}}
-          </label>
-        </div>
-        <small class="text-body-secondary">{{gettext('You can always do the data import later.')}}</small>
-      </div>
-      <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
-    </form>
-
-  </div>
-</div>
-
-{% include '_pipelines_list_table.html' %}
-
-<script>
-  const labelInput = document.querySelector('#addPipeline input[name=label]');
-  const storageInput = document.querySelector('#addPipeline input[name=storage_path]');
-  const update = (event) => {
-      if (storageInput.value.startsWith(storageInput.dataset.defaultPrefix)) {
-          const suffix = labelInput.value.replace(/[^A-Za-z0-9]/g, '_');
-          if (/[^_]/.test(suffix)) {
-              storageInput.value = storageInput.dataset.defaultPrefix + suffix;
-          }
-      }
-  };
-  labelInput.addEventListener('change', update);
-  labelInput.addEventListener('input', update);
-</script>
-{% endblock %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
