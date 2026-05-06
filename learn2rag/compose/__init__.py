@@ -65,7 +65,7 @@ def init_db(con: sqlite3.Connection) -> None:
         try:
             cur.execute(sql)
         except sqlite3.OperationalError as e:
-            logger.warning('Database initialization: %s', e)
+            logger.debug('Database initialization: %s', e)
 
 
 def process_running(pid: int) -> bool:
@@ -83,7 +83,6 @@ def process_running(pid: int) -> bool:
 
 
 def healthy(value: list[str]) -> bool:
-    print(f"len(value) is {len(value)} and value is : {' '.join(value)}")
     assert len(value) == 4
     assert value[0:3] == ['CMD', 'curl' ,'-f']
     url = value[3]
