@@ -392,14 +392,11 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     @app.post('/pipelines')
     def pipeline_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
-        ports = [int(port) for port in request.form.getlist("ports") if port]
-        name = learn2rag.data.create_entry(app.instance_path, 'pipelines', {
-            'label': label,
-            'storage_path': request.form['storage_path'],
-            'language_model': request.form['language_model'],
-            'sources': request.form.getlist('sources'),
-            'ports': ports,
-        })
+        data: dict[str, Any] = request.form.to_dict()
+        data.pop('import', None)
+        data['ports'] = [int(port) for port in request.form.getlist("ports") if port]
+        data['sources'] = request.form.getlist('sources')
+        name = learn2rag.data.create_entry(app.instance_path, 'pipelines', data)
         flash(pgettext('flash', 'Added a new pipeline configuration: %(label)s', label=label))
         if request.form.get('import'):
             pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)

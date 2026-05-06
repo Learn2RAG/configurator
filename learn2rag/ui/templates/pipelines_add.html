@@ -30,6 +30,10 @@
     </button>
   </div>
   <div class="mb-3 collapse advanced-configuration">
+    <div class="form-floating mb-3">
+      <input class="form-control" name="chat_proxy_url" type="url">
+      <label for="ports" class="form-label">{{pgettext('form_label', 'Chat proxy URL')}}</label>
+    </div>
     <label for="ports" class="form-label">{{pgettext('form_label', 'Ports')}}</label>
     <small class="text-body-secondary">{{gettext('Optional')}}</small>
     <div>
