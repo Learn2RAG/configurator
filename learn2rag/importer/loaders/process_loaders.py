@@ -455,10 +455,15 @@ def _delta_by_source(
         source: str = doc.metadata.get("source", "")
         new_docs_by_source.setdefault(source, []).append(doc)
 
-    # Compute combined hash per source from sorted individual content_hashes
+    # Compute combined hash per source from sorted, deduplicated content_hashes.
+    # Deduplication is required because a loader may return multiple Document objects
+    # for the same source (e.g. PyPDFLoader per page, UnstructuredHTMLLoader per
+    # section), all carrying the same file/page hash after our loader fixes.
+    # _build_existing_map deduplicates via set on the Qdrant side — we must match
+    # that behaviour here to keep both sides comparable.
     new_hash_by_source: Dict[str, str] = {}
     for source, docs in new_docs_by_source.items():
-        hashes = sorted(d.metadata.get("content_hash", d.page_content) for d in docs)
+        hashes = sorted(set(d.metadata.get("content_hash", d.page_content) for d in docs))
         combined = "".join(hashes)
         new_hash_by_source[source] = hashlib.sha256(combined.encode("utf-8")).hexdigest()
 

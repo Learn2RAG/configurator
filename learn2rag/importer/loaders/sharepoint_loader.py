@@ -33,6 +33,9 @@ def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> 
     Parses file using the robust UnstructuredFileLoader.
     """
     docs: List[Document] = []
+    # One hash for the entire file so all chunks share the same value,
+    # enabling unambiguous deduplication by source URL in get_documents_by_loader_id.
+    file_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
     
     # Check file extension (lowercase)
     suffix = file_path.suffix.lower()
@@ -73,7 +76,16 @@ def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> 
         elif suffix == ".pdf":
             logger.info(f"Detected PDF file: {file_path.name} - using PyPDFLoader")
             loader = PyPDFLoader(str(file_path))
-            docs = loader.load()
+            _pages = loader.load()
+            # Merge all pages into one Document so delta-import deduplication works on
+            # a 1:1 source→document basis (same as all other loaders).
+            _merged_pdf = Document(
+                page_content="\n\n".join(p.page_content for p in _pages),
+                metadata={**(_pages[0].metadata if _pages else {}), "total_pages": len(_pages)},
+            )
+            _merged_pdf.metadata.pop("page", None)
+            _merged_pdf.metadata.pop("page_label", None)
+            docs = [_merged_pdf]
 
         # SPECIAL HANDLING FOR IMAGES (Skip due to broken OCR environment)
         elif suffix in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]:
@@ -108,7 +120,7 @@ def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> 
                 "modified": str(original_item.modified),
                 "loader": "SharePointLoader",
                 "loader_id": loader_id,
-                "content_hash": hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest(),
+                "content_hash": file_hash,
             })
         return docs
 
@@ -146,7 +158,7 @@ def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> 
                 "modified": str(original_item.modified),
                 "loader": "SharePointLoader",
                 "loader_id": loader_id,
-                "content_hash": hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest(),
+                "content_hash": file_hash,
             })
         
         return docs

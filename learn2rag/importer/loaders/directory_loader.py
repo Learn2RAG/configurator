@@ -5,10 +5,10 @@ Description:
 This module handles loading documents from directories.
 
 Author: Kyrill Meyer
-Version: 0.0.4
+Version: 0.0.6
 Institution: IFDT
 Creation Date: June 10, 2025
-Last Modified: March 17, 2026
+Last Modified: Mai 05, 2026
 """
 import hashlib
 import logging
@@ -16,7 +16,7 @@ import os
 from datetime import datetime
 from typing import List, Union
 from ..globals import stop_loading
-from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.document_loaders import DirectoryLoader, PyPDFDirectoryLoader
 from langchain_core.documents import Document
 
 # supress pdfminer-Warnings
@@ -74,7 +74,6 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
             "*.docx",
             "*.pptx",
             "*.xlsx",
-            "*.pdf",
             "*.txt",
             "*.csv",
             "*.html",
@@ -83,6 +82,11 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
             "*.odt",
             "*.epub",
         ]
+    )
+    pdf_loader = PyPDFDirectoryLoader(
+        path,
+        recursive=recursive,
+        silent_errors=silent_errors,
     )
    
     #loader = DirectoryLoader(path, show_progress=True, loader_kwargs=text_loader_kwargs, recursive=recursive, glob=["*.csv", "*.docx", "*.eml", "*.epub", "*.html", "*.json", "*.md", "*.odt", "*.pdf", "*.ppt", "*.pptx", "*.rst", "*.rtf", "*.txt", "*.tsv", "*.cls", "*.xlsx", "*.xml"])
@@ -93,7 +97,25 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
 
     #loader = DirectoryLoader(path, show_progress=True, silent_errors=True, recursive=False)
     try:
-        loaded_documents = loader.load()
+        other_docs = loader.load()
+        # Merge PDF pages: PyPDFDirectoryLoader returns one Document per page.
+        # We combine all pages of the same file into one Document so that delta-import
+        # deduplication works on a 1:1 source→document basis (same as all other loaders).
+        from collections import defaultdict as _defaultdict
+        pdf_pages = pdf_loader.load()
+        pdf_by_file: dict = _defaultdict(list)
+        for _p in pdf_pages:
+            pdf_by_file[_p.metadata["source"]].append(_p)
+        pdf_docs = []
+        for _src, _pages in pdf_by_file.items():
+            _merged = Document(
+                page_content="\n\n".join(p.page_content for p in _pages),
+                metadata={**_pages[0].metadata, "total_pages": len(_pages)},
+            )
+            _merged.metadata.pop("page", None)
+            _merged.metadata.pop("page_label", None)
+            pdf_docs.append(_merged)
+        loaded_documents = other_docs + pdf_docs
     except Exception as e:
         logger.error(f"Error loading documents from directory: {e}")
         return []
@@ -103,9 +125,14 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
             logger.info("Loading process stopped by user.")
             break
         try:
-            # generate a unique hash for the document content
             if isinstance(doc, Document):
-                content_hash = hashlib.sha256(doc.page_content.encode('utf-8')).hexdigest()
+                # Hash raw file bytes so all chunks of the same file share one stable hash.
+                # Required for correct deduplication in _build_existing_map / _delta_by_source.
+                try:
+                    with open(doc.metadata["source"], "rb") as _f:
+                        content_hash = hashlib.sha256(_f.read()).hexdigest()
+                except OSError:
+                    content_hash = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
                 doc.metadata["content_hash"] = content_hash
 
                 # get file metadata
@@ -155,6 +182,3 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
     else:
         logger.warning(f"No documents found in directory: {path}")
     return documents
-
-
-

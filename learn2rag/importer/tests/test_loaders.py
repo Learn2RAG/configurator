@@ -1,11 +1,14 @@
+import json
 import pathlib
 import unittest
+from unittest.mock import patch, MagicMock
 
-from ..loaders.html_loader import load_html_content
+from ..loaders.directory_loader import load_from_directory
+from ..loaders.html_loader import load_html_content, _is_same_site
 
 class ImporterLoadersTestCase(unittest.TestCase):
     def test_remote_url(self) -> None:
-        docs = load_html_content('https://dice-research.org')
+        docs = load_html_content('https://learn2rag.de')
         assert len(docs) == 1
         doc, = docs
         assert 'source' in doc.metadata
@@ -25,3 +28,208 @@ class ImporterLoadersTestCase(unittest.TestCase):
     #     assert doc.page_content == 'Data URI content'
 
     # TODO: actual tests
+
+    def test_import_directory(self) -> None:
+        """Loads files from C:\\tmp\\importtest, prints metadata incl. content_hash,
+        and verifies that all chunks of the same file share one stable hash.
+
+        Intentionally Qdrant-free: only the loader and hash consistency are tested.
+        Set env var SKIP_HASH_ASSERT=1 to print-only without assertions (debugging).
+        """
+        import os
+        from collections import defaultdict
+
+        path = r"C:\tmp\importtest"
+        if not pathlib.Path(path).is_dir():
+            self.skipTest(f"Test directory not found: {path}")
+
+        skip_assert = os.environ.get("SKIP_HASH_ASSERT", "0") == "1"
+
+        docs = load_from_directory(path, recursive=False, loader_id="test_import")
+
+        def _safe(text: str, limit: int = 500) -> str:
+            """Truncate and replace unencodable characters for safe terminal output."""
+            return text[:limit].encode("cp1252", errors="replace").decode("cp1252")
+
+        print(f"\n=== {len(docs)} document(s) loaded ===")
+
+        # Group by source to detect per-file hash consistency
+        by_source: dict = defaultdict(list)
+        for doc in docs:
+            by_source[doc.metadata.get("source", "?")].append(doc)
+
+        for i, doc in enumerate(docs, start=1):
+            print(f"\n--- Document {i} ---")
+            print(f"Metadata: {json.dumps(doc.metadata, indent=2, default=str)}")
+            print(f"page_content (first 500 characters):\n{_safe(doc.page_content)}")
+
+        print(f"\n=== Hash consistency per source ===")
+        for source, source_docs in sorted(by_source.items()):
+            hashes = {d.metadata.get("content_hash", "MISSING") for d in source_docs}
+            status = "OK" if len(hashes) == 1 else "MISMATCH"
+            print(f"[{status}] {source}  ({len(source_docs)} chunk(s))  hashes={hashes}")
+
+        self.assertTrue(len(docs) > 0, "No documents found in: " + path)
+
+        if not skip_assert:
+            # All chunks of the same file must share one hash
+            for source, source_docs in by_source.items():
+                hashes = {d.metadata.get("content_hash") for d in source_docs}
+                self.assertEqual(len(hashes), 1,
+                    f"Hash mismatch for '{source}': {hashes}")
+        else:
+            print("\n[SKIP_HASH_ASSERT=1] Hash assertion skipped.")
+
+
+class HtmlLoaderLearn2RagFullCrawlTestCase(unittest.TestCase):
+    """Integration test: full site crawl of https://learn2rag.de with depth=-1."""
+
+    def test_full_site_crawl(self) -> None:
+        """Crawls the entire learn2rag.de domain and prints all discovered pages."""
+        root_url = "https://learn2rag.de"
+        skipped: set = set()
+        docs = load_html_content(root_url, depth=-1, loader_id="learn2rag_full", skipped=skipped)
+
+        from collections import defaultdict
+        by_url: dict = defaultdict(list)
+        for doc in docs:
+            by_url[doc.metadata.get("source", "?")].append(doc)
+
+        visited_urls = set(by_url.keys())
+        for i, doc in enumerate(docs, start=1):
+            print(f"\n--- Document {i}: {doc.metadata.get('source')} ---")
+            print(f"page_content (first 300 characters):\n{doc.page_content[:300]}")
+
+        print(f"\n{'=' * 60}")
+        print(f"SUMMARY")
+        print(f"{'=' * 60}")
+        print(f"  Integrated (unique pages loaded): {len(visited_urls)}")
+        print(f"  Skipped (off-site links):         {len(skipped)}")
+        print(f"  Total documents (incl. duplicates): {len(docs)}")
+        print(f"\n  Documents per URL:")
+        for url in sorted(visited_urls):
+            count = len(by_url[url])
+            print(f"    [{count} doc(s)] {url}")
+        print(f"\n  Skipped URLs (sample, max 20):")
+        for url in sorted(skipped)[:20]:
+            print(f"    [--] {url}")
+        if len(skipped) > 20:
+            print(f"         ... and {len(skipped) - 20} more")
+        print(f"{'=' * 60}")
+
+        # At least the root page must have been loaded
+        self.assertTrue(len(docs) >= 1, "No documents found")
+        # All documents must stay on the learn2rag.de domain
+        for url in visited_urls:
+            self.assertIn("learn2rag.de", url, f"External URL found: {url}")
+        # Metadata must be complete
+        for doc in docs:
+            self.assertIn("loader_id", doc.metadata)
+            self.assertIn("content_hash", doc.metadata)
+            self.assertEqual(doc.metadata["loader_id"], "learn2rag_full")
+
+
+class IsSameSiteTestCase(unittest.TestCase):
+    """Unit tests for _is_same_site — no network access."""
+
+    def test_same_domain_no_path(self) -> None:
+        self.assertTrue(_is_same_site("https://example.com/page", "https://example.com"))
+
+    def test_same_domain_with_path_prefix(self) -> None:
+        self.assertTrue(_is_same_site("https://example.com/docs/guide", "https://example.com/docs/"))
+
+    def test_different_path_prefix(self) -> None:
+        self.assertFalse(_is_same_site("https://example.com/blog/post", "https://example.com/docs/"))
+
+    def test_different_domain(self) -> None:
+        self.assertFalse(_is_same_site("https://other.com/docs/page", "https://example.com/docs/"))
+
+    def test_non_http_scheme(self) -> None:
+        self.assertFalse(_is_same_site("mailto:info@example.com", "https://example.com"))
+
+    def test_anchor_link(self) -> None:
+        # Fragment-only links resolve to the same page and remain on-site
+        self.assertTrue(_is_same_site("https://example.com/docs/page#section", "https://example.com/docs/"))
+
+
+def _make_response(text: str, status_code: int = 200) -> MagicMock:
+    """Helper: creates a fake requests.Response."""
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.text = text
+    resp.raise_for_status = MagicMock()
+    return resp
+
+
+ROOT_HTML = """
+<html><head><title>Root</title></head><body>
+  <p>Root page</p>
+  <a href="/docs/page1">Page 1</a>
+  <a href="/docs/page2">Page 2</a>
+  <a href="/blog/post">Blog (other subtree)</a>
+  <a href="https://external.com/">External</a>
+</body></html>
+"""
+
+PAGE1_HTML = """
+<html><head><title>Page 1</title></head><body>
+  <p>Page 1 content</p>
+  <a href="/docs/page2">Page 2 (already visited)</a>
+</body></html>
+"""
+
+PAGE2_HTML = """
+<html><head><title>Page 2</title></head><body>
+  <p>Page 2 content</p>
+</body></html>
+"""
+
+
+class HtmlLoaderDepthMinusOneTestCase(unittest.TestCase):
+    """Tests for depth=-1 (full site crawl) using mocked HTTP requests."""
+
+    def _fake_get(self, url: str, **kwargs) -> MagicMock:
+        pages = {
+            "https://example.com/docs/": ROOT_HTML,
+            "https://example.com/docs/page1": PAGE1_HTML,
+            "https://example.com/docs/page2": PAGE2_HTML,
+        }
+        return _make_response(pages.get(url, "<html><body>Not found</body></html>"))
+
+    @patch("learn2rag.importer.loaders.html_loader.requests.get")
+    def test_crawls_same_subtree(self, mock_get: MagicMock) -> None:
+        """depth=-1 should only visit URLs under /docs/, not /blog/ or external.com."""
+        mock_get.side_effect = self._fake_get
+        docs = load_html_content("https://example.com/docs/", depth=-1, loader_id="test")
+
+        visited_urls = {doc.metadata["source"] for doc in docs}
+        print(f"\nVisited URLs: {visited_urls}")
+
+        # Expected: root + page1 + page2
+        self.assertIn("https://example.com/docs/", visited_urls)
+        self.assertIn("https://example.com/docs/page1", visited_urls)
+        self.assertIn("https://example.com/docs/page2", visited_urls)
+
+        # Not expected: different subtree and external domain
+        self.assertNotIn("https://example.com/blog/post", visited_urls)
+        self.assertNotIn("https://external.com/", visited_urls)
+
+    @patch("learn2rag.importer.loaders.html_loader.requests.get")
+    def test_no_duplicate_visits(self, mock_get: MagicMock) -> None:
+        """Each URL is loaded only once (page2 is linked from both root and page1)."""
+        mock_get.side_effect = self._fake_get
+        docs = load_html_content("https://example.com/docs/", depth=-1, loader_id="test")
+
+        sources = [doc.metadata["source"] for doc in docs]
+        self.assertEqual(len(sources), len(set(sources)), "Duplicate URLs found")
+
+    @patch("learn2rag.importer.loaders.html_loader.requests.get")
+    def test_metadata_set_correctly(self, mock_get: MagicMock) -> None:
+        """All documents have loader_id, content_hash and loader_type set."""
+        mock_get.side_effect = self._fake_get
+        docs = load_html_content("https://example.com/docs/", depth=-1, loader_id="test_meta")
+
+        for doc in docs:
+            self.assertEqual(doc.metadata.get("loader_id"), "test_meta")
+            self.assertIn("content_hash", doc.metadata)
+            self.assertEqual(doc.metadata.get("loader_type"), "HTMLLoader")
