@@ -1,6 +1,7 @@
 import json
 import pathlib
 import unittest
+from typing import Any
 from unittest.mock import patch, MagicMock
 
 from ..loaders.directory_loader import load_from_directory
@@ -47,7 +48,7 @@ class HtmlLoaderLearn2RagFullCrawlTestCase(unittest.TestCase):
     def test_full_site_crawl(self) -> None:
         """Crawls the entire learn2rag.de domain and prints all discovered pages."""
         root_url = "https://learn2rag.de"
-        skipped: set = set()
+        skipped: set[str] = set()
         docs = load_html_content(root_url, depth=-1, loader_id="learn2rag_full", skipped=skipped)
 
         visited_urls = {doc.metadata["source"] for doc in docs}
@@ -142,7 +143,7 @@ PAGE2_HTML = """
 class HtmlLoaderDepthMinusOneTestCase(unittest.TestCase):
     """Tests for depth=-1 (full site crawl) using mocked HTTP requests."""
 
-    def _fake_get(self, url: str, **kwargs) -> MagicMock:
+    def _fake_get(self, url: str, **kwargs: Any) -> MagicMock:
         pages = {
             "https://example.com/docs/": ROOT_HTML,
             "https://example.com/docs/page1": PAGE1_HTML,
