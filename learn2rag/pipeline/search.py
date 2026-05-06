@@ -334,7 +334,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
                     limit=opt_config["prefetch_limit_dense"],
                 )
             ],
-            query=models.FusionQuery(fusion=models.Fusion.RRF),
+            query=models.FusionQuery(fusion=fusion_mode),
             limit=opt_config["top_k"],
         )
     
