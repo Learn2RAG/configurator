@@ -16,7 +16,7 @@ import os
 from datetime import datetime
 from typing import List, Union
 from ..globals import stop_loading
-from langchain_community.document_loaders import DirectoryLoader, PyPDFDirectoryLoader
+from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain_core.documents import Document
 
 # supress pdfminer-Warnings
@@ -63,7 +63,7 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
         recursive = recursive.lower() == "true"
 
 
-    text_loader_kwargs = {"autodetect_encoding": True, "detect_language_per_element": False}
+    text_loader_kwargs = {"autodetect_encoding": True, "detect_language_per_element": False, "mode": "single"}
     loader = DirectoryLoader(
         path,
         show_progress=True,
@@ -83,13 +83,15 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
             "*.epub",
         ]
     )
-    pdf_loader = PyPDFDirectoryLoader(
+    # use pypdf instead of unstructured[pdf] for better performance and stability, especially with large PDFs
+    pdf_loader = DirectoryLoader(
         path,
+        glob="*.pdf",
+        loader_cls=PyPDFLoader,
+        loader_kwargs={"mode": "single"},
         recursive=recursive,
         silent_errors=silent_errors,
     )
-   
-    #loader = DirectoryLoader(path, show_progress=True, loader_kwargs=text_loader_kwargs, recursive=recursive, glob=["*.csv", "*.docx", "*.eml", "*.epub", "*.html", "*.json", "*.md", "*.odt", "*.pdf", "*.ppt", "*.pptx", "*.rst", "*.rtf", "*.txt", "*.tsv", "*.cls", "*.xlsx", "*.xml"])
    
     #external dependencies 
     # doc - requires libreoffice
@@ -98,23 +100,7 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
     #loader = DirectoryLoader(path, show_progress=True, silent_errors=True, recursive=False)
     try:
         other_docs = loader.load()
-        # Merge PDF pages: PyPDFDirectoryLoader returns one Document per page.
-        # We combine all pages of the same file into one Document so that delta-import
-        # deduplication works on a 1:1 source→document basis (same as all other loaders).
-        from collections import defaultdict as _defaultdict
-        pdf_pages = pdf_loader.load()
-        pdf_by_file: dict = _defaultdict(list)
-        for _p in pdf_pages:
-            pdf_by_file[_p.metadata["source"]].append(_p)
-        pdf_docs = []
-        for _src, _pages in pdf_by_file.items():
-            _merged = Document(
-                page_content="\n\n".join(p.page_content for p in _pages),
-                metadata={**_pages[0].metadata, "total_pages": len(_pages)},
-            )
-            _merged.metadata.pop("page", None)
-            _merged.metadata.pop("page_label", None)
-            pdf_docs.append(_merged)
+        pdf_docs = pdf_loader.load()
         loaded_documents = other_docs + pdf_docs
     except Exception as e:
         logger.error(f"Error loading documents from directory: {e}")
