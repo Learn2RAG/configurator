@@ -113,7 +113,6 @@ services:
       USER_PERMISSIONS_FEATURES_IMAGE_GENERATION: 'False'
       USER_PERMISSIONS_FEATURES_WEB_SEARCH: 'False'
       #!!! {% if config.get("SIMPLE_AUTH") %}
-      # TODO: Upgrade openwebui and use this (WEBUI_ADMIN_EMAIL etc)
       ENABLE_SIGNUP: 'False'
       WEBUI_AUTH: 'True'
       WEBUI_ADMIN_EMAIL: '{{config["SIMPLE_AUTH"].get("username", "")}}'
