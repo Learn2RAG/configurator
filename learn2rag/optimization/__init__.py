@@ -14,6 +14,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run RAG baseline optimization.")
     parser.add_argument("task", help="Module task name (e.g., learn2rag.optimization)")
     parser.add_argument("--logging-config", type=str, help="Path to logging config yml")
+    parser.add_argument("--registry-path", type=str, help="Path to registry.json")
     parser.add_argument("--dataset", type=str, default="WikiEval")
     parser.add_argument("--questions", type=int, default=10)
     parser.add_argument("--trials", type=int, default=10)
@@ -34,7 +35,7 @@ def main() -> None:
     output_dir = pathlib.Path("./optimization/output/")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    baseline_optimization.run(args.dataset,args.questions,args.trials,output_dir)
+    baseline_optimization.run(args.dataset,args.questions,args.trials,output_dir,args.registry_path)
     logging.info("optimization is done")
     results_path = output_dir /args.dataset/ "optimization_results.json"
     logging.info(f"save optimized results here : {results_path}")

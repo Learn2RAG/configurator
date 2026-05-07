@@ -9,10 +9,11 @@ import pathlib
 import time
 import copy
 import os
+from typing import Dict, Any, List, Union, Tuple
 
 import numpy as np
 from bert_score import score as bert_score
-from ConfigSpace import ConfigurationSpace, Integer, Categorical, ForbiddenGreaterThanRelation
+from ConfigSpace import ConfigurationSpace, Integer, Categorical, ForbiddenGreaterThanRelation, Configuration
 from smac import HyperparameterOptimizationFacade, Scenario
 
 from learn2rag.evaluation.tools import read_dataset_qa
@@ -20,21 +21,14 @@ from learn2rag.pipeline.config import opt_config
 import learn2rag.pipeline.search
 import learn2rag.pipeline.generate
 
-def load_registry(registry_path: pathlib.Path):
-    if not registry_path.exists():
-        logging.warning("no registry found !")
-        return {"datasets": {}, "prompts": {"default": "Context: {context}\nQ: {question}"}}
-    return json.loads(registry_path.read_text())
+def load_registry(path: str = "registry.json") -> dict:
+    p = pathlib.Path(path)
+    if not p.is_file():
+       logging.error("registry file not found")
+    with p.open() as f:
+        return json.load(f)
 
-def get_base_user_config():
-    """Loads the base config provided by the orchestrator env var."""
-    path = os.environ.get("PIPELINE_USER_CONFIG")
-    if path and pathlib.Path(path).exists():
-        return json.loads(pathlib.Path(path).read_text())
-    logging.warning("no user config found !")
-    return {}
-
-def run_pipeline(question, user_config, working_config):
+def run_pipeline(question: str, user_config: Dict[str, Any], working_config: Dict[str, Any]) -> Tuple[str, str, float, float]:
     t0 = time.time()
     docs = learn2rag.pipeline.search.search(question, user_config, working_config)
     search_time = time.time() - t0
@@ -54,7 +48,13 @@ def run_pipeline(question, user_config, working_config):
 
 #I removed seed because there are no use for it
 # removed dataset_name becuase it just use in yser config and now we inject it
-def objective(config, questions, state, answers_dir, prompts_repo, base_user_cfg):
+def objective(config: Configuration,
+    questions: List[Dict[str, Any]],
+    dataset_name: str,
+    state: Dict[str, Any],
+    answers_dir: pathlib.Path
+    ,prompt_map
+) -> float:
     state["trial_count"] += 1
     tid = state["trial_count"]
     cfg = dict(config)
@@ -65,42 +65,41 @@ def objective(config, questions, state, answers_dir, prompts_repo, base_user_cfg
         "top_k": cfg["top_k"],
         "chunk_size": cfg["chunk_size"],
         "chunk_overlap": cfg["chunk_overlap"],
-        "prompt": prompts_repo.get(cfg["prompt_template"], prompts_repo["default"])
+        "prompt": prompt_map[cfg["prompt_template"]],
     })
+
+    ucfg = {
+        "file_path": None,
+        "collection_name": dataset_name,
+        "imported_documents_file_path": None,
+        "llm": None,
+    }
+    env_user_cfg = os.environ.get("PIPELINE_USER_CONFIG")
+    if env_user_cfg and pathlib.Path(env_user_cfg).exists():
+        ucfg.update(json.loads(pathlib.Path(env_user_cfg).read_text()))
 
     predictions, goldens = [], []
     qa_pairs = []
     t_start = time.time()
     t_search, t_gen = 0.0, 0.0
 
-    for idx, q in enumerate(questions):
-        if not q["question"]:
+    for q in questions:
+        # Preserve the original “skip empty question” guard
+        if not q.get("question"):
             continue
         try:
-            answer, context, st, gt = run_pipeline(q["question"], base_user_cfg, working_cfg)
-            t_search += st
-            t_gen += gt
+            answer, context, t_s, t_g = run_pipeline(q["question"], ucfg, working_cfg)
+            t_search += t_s
+            t_gen += t_g
             predictions.append(answer)
             goldens.append(q["ground_truth"])
-            qa_pairs.append({
-                "id": q["id"],
-                "question": q["question"],
-                "golden_answer": q["ground_truth"],
-                "generated_answer": answer,
-                "retrieved_context": context,
-            })
+            qa_pairs.append({**q, "generated_answer": answer, "retrieved_context": context})
         except Exception as e:
-            logging.warning(f"Trial {tid}, q{idx} failed: {e}")
-            # do we need to add this :/
+            # Same behaviour as the old version: record a blank answer. TODO : check if we need this
+            logging.warning(f"Trial {tid}, q{q.get('id','?')} failed: {e}")
             predictions.append("")
             goldens.append(q["ground_truth"])
-            qa_pairs.append({
-                "id": q["id"],
-                "question": q["question"],
-                "golden_answer": q["ground_truth"],
-                "generated_answer": "",
-                "retrieved_context": "",
-            })
+            qa_pairs.append({**q, "generated_answer": "", "retrieved_context": ""})
 
     if not predictions:
         return 1.0
@@ -143,7 +142,7 @@ def objective(config, questions, state, answers_dir, prompts_repo, base_user_cfg
     return float(cost)
 
 
-def param_importance(smac, output_path):
+def param_importance(smac: HyperparameterOptimizationFacade, output_path: pathlib.Path) -> Dict[str, Any]:
     params = list(smac.scenario.configspace.keys())
     configs, costs = [], []
     for key, val in smac.runhistory.items():
@@ -169,17 +168,17 @@ def param_importance(smac, output_path):
     return result
 
 
-def run(dataset_name: str, max_questions: int, n_trials, output_dir: int):
-    if dataset_name not in DATASET_CONFIG:
-        raise ValueError(
-            f"Unknown dataset: {dataset_name}. "
-            f"Available: {list(DATASET_CONFIG.keys())}"
-        )
+def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[str, pathlib.Path],registry_path:str) -> Tuple[
+        Dict[str, Any], List[Any], Dict[str, Any]]:
+    registry = load_registry(registry_path)
+    datasets = registry["datasets"]
+    if dataset_name not in datasets:
+        raise ValueError(f"Unknown dataset: {dataset_name}. Available: {list(datasets.keys())}")
+    dcfg = datasets[dataset_name]
+    fields = dcfg["fields"]
 
-    dcfg = DATASET_CONFIG[dataset_name]
     out = pathlib.Path(output_dir) / dataset_name
     out.mkdir(parents=True, exist_ok=True)
-
     answers_dir = out / "trial_answers"
     answers_dir.mkdir(parents=True, exist_ok=True)
 
@@ -187,73 +186,79 @@ def run(dataset_name: str, max_questions: int, n_trials, output_dir: int):
     if max_questions:
         qa = qa.select(range(min(max_questions, len(qa))))
 
-    questions = []
-    for i, r in enumerate(qa):
-        questions.append({
-            "question": r.get(dcfg["question_field"], ""),
-            "ground_truth": r.get(dcfg["answer_field"], ""),
-            "id": r.get(dcfg["id_field"], str(i)),
-        })
-    logging.info(f"Loaded {len(questions)} questions from {dataset_name}")
+    questions = [
+        {
+            "question": r[fields["q"]],
+            "ground_truth": r[fields["a"]],
+            "id": r.get(fields["id"], str(i)),
+        }
+        for i, r in enumerate(qa)
+    ]
+    prompt_map = registry["prompts"]
 
     cs = ConfigurationSpace(seed=42)
-    cs.add([Integer("top_k", (1, 20), default=4),
-            Integer("chunk_size", (200, 4000), default=2000),
-            Integer("chunk_overlap", (0, 500), default=200),
-            Categorical("prompt_template", ["default", "concise", "detailed"], default="default")])
+    cs.add([
+        Integer("top_k", (1, 20), default=4),
+        Integer("chunk_size", (200, 4000), default=2000),
+        Integer("chunk_overlap", (0, 500), default=200),
+        Categorical("prompt_template", list(prompt_map.keys()), default="default"),
+    ])
     cs.add(ForbiddenGreaterThanRelation(cs["chunk_overlap"], cs["chunk_size"]))
+    scenario = Scenario(
+        cs,
+        deterministic=True,
+        n_trials=n_trials,
+        walltime_limit=7200,
+        seed=42,
+        output_directory=out / "smac_output",
+    )
+    state: Dict[str, Any] = {"trial_count": 0, "best_cost": 1.0, "convergence": [], "history": []}
 
-    scenario = Scenario(configspace=cs, deterministic=True, n_trials=n_trials,
-                        walltime_limit=7200, seed=42, output_directory=out / "smac_output")
-
-    state = {"trial_count": 0, "best_cost": 1.0, "convergence": [], "history": []}
     smac = HyperparameterOptimizationFacade(
         scenario=scenario,
-        target_function=lambda config, seed=0: objective(
-            config, seed, questions, dataset_name, state, answers_dir
-        ),
+        target_function=lambda config, seed=0: objective(config, questions, dataset_name, state, answers_dir,prompt_map)
     )
-
     t0 = time.time()
     incumbent = smac.optimize()
-    total_time = time.time() - t0
-
     importance = param_importance(smac, out)
+    total_time = time.time() - t0
+    best_cfg = incumbent.get_dictionary()
+    results_path = out / "optimization_results.json"
+    results_path.write_text(json.dumps({
+        "best_config": best_cfg,
+        "run_history": state["history"],
+        "convergence": state["convergence"],
+        "parameter_importance": importance,
+        "total_time_s": round(total_time, 2),
+        "dataset": dataset_name,
+        "metric": "bertscore_golden",
+        "answers_dir":str(answers_dir),
+    }, indent=2, default = str))
 
-    with open(out / "optimization_results.json", "w") as f:
-        json.dump({
-            "best_config": dict(incumbent),
-            "run_history": state["history"],
-            "convergence": state["convergence"],
-            "parameter_importance": importance,
-            "total_time_s": round(total_time, 2),
-            "dataset": dataset_name,
-            "metric": "bertscore_golden",
-            "answers_dir": str(answers_dir),
-        }, f, indent=2, default=str)
-
-    logging.info(f"Done in {total_time:.0f}s")
-    logging.info(f"Trial answers saved to {answers_dir}")
-    return incumbent, state["history"], importance
-
+    return best_cfg, state["history"], importance
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, default="WikiEval",
-                        choices=list(DATASET_CONFIG.keys()))
+    parser.add_argument("task", nargs='?', default="learn2rag.optimization")
+    parser.add_argument("--dataset", type=str, default="WikiEval")
     parser.add_argument("--max_questions", type=int, default=50)
     parser.add_argument("--n_trials", type=int, default=10)
+    parser.add_argument("--logging-config", type=str)
+    parser.add_argument("--registry", type=str, default="registry.json")
     parser.add_argument("--output_dir", type=str, default="optimization_results_baseline")
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-        force=True,
-    )
-    incumbent, history, importance = run(
-        args.dataset, args.max_questions, args.n_trials, args.output_dir,
-    )
+    final_output_dir = pathlib.Path(args.output_dir)
+
+    env_out = os.environ.get("PIPELINE_OPT_CONFIG")
+    if not final_output_dir.exists() and env_out:
+        final_output_dir = pathlib.Path(env_out).parent
+
+    incumbent, history, importance = run(args.dataset, args.max_questions, args.n_trials, final_output_dir, args.registry)
+
+    # incumbent, history, importance = run(
+    #     args.dataset, args.max_questions, args.n_trials, args.output_dir,
+    # )
 
     best = min(history, key=lambda x: x["cost"])
     print(f"\nBest config: {dict(incumbent)}")
