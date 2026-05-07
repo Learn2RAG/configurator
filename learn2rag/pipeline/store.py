@@ -56,9 +56,10 @@ def delete_documents(loader_id: str, paths: list[str], user_config: dict[str, An
                 ),
             )
 
-def get_documents(loader_id: str, user_config: dict[str, Any], opt_config: dict[str, Any]) -> list[dict[str, Any]]|None:
-    """Retrieve documents from the vector store based on loader_id."""
+def get_documents(loader_id: str, user_config: dict[str, Any], opt_config: dict[str, Any]) -> dict[str, str]:
+    """Retrieve documents from the vector store and return a {source: content_hash} mapping."""
     qdrant = Qdrant(user_config["collection_name"], opt_config)
+    path_hash_dict: dict[str, str] = {}
     if qdrant.client.collection_exists(user_config["collection_name"]):
         logging.info('Scrolling through collection to retrieve documents with loader_id: %s', loader_id)
         filter = Filter(
@@ -78,7 +79,7 @@ def get_documents(loader_id: str, user_config: dict[str, Any], opt_config: dict[
                 scroll_filter=filter,
                 limit=100,
                 offset=offset,
-                with_payload=True,
+                with_payload=["source", "content_hash"],
                 with_vectors=False,
             )
 
@@ -87,8 +88,16 @@ def get_documents(loader_id: str, user_config: dict[str, Any], opt_config: dict[
 
             if offset is None:
                 break
-        return [point.payload for point in points if point.payload is not None]
-    return None
+
+        for point in points:
+            if point.payload:
+                source = point.payload.get("source", "")
+                content_hash = point.payload.get("content_hash", "")
+                if source and source not in path_hash_dict:
+                    path_hash_dict[source] = content_hash
+
+    return path_hash_dict
+
 
 
 def update_documents(loader_id: str, documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:

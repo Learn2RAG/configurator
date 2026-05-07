@@ -212,9 +212,8 @@ def process_delta_imports(
             import_start = datetime.now(timezone.utc)
             import_state.record_import_start(loader_id, import_start)
 
-            # Retrieve existing Qdrant documents for this loader and build {source: combined_hash} map
-            payloads: List[Dict[str, Any]] = get_documents(loader_id, user_config, opt_config) or []
-            existing_map: Dict[str, str] = _build_existing_map(payloads)
+            # Retrieve existing Qdrant documents for this loader as {source: content_hash} map
+            existing_map: Dict[str, str] = get_documents(loader_id, user_config, opt_config)
             is_initial = len(existing_map) == 0
 
             logger.info(
@@ -392,36 +391,6 @@ def process_delta_imports(
             logger.error(f"process_delta_imports: error processing loader '{loader_id}': {e}", exc_info=True)
 
 
-def _build_existing_map(payloads: List[Dict[str, Any]]) -> Dict[str, str]:
-    """
-    Build a ``{source: combined_content_hash}`` mapping from Qdrant payloads.
-
-    Groups payloads by ``source`` field and computes a combined hash per source
-    from the sorted individual ``content_hash`` values. This makes the comparison
-    stable regardless of chunk order.
-
-    Args:
-        payloads (List[Dict[str, Any]]): Raw Qdrant payloads as returned by
-                                          ``get_documents()``.
-
-    Returns:
-        Dict[str, str]: Mapping of ``{source: combined_hash}``.
-    """
-    # Use a set to deduplicate content_hash values: all chunks of one document
-    # share the same content_hash, so duplicates must be collapsed before combining.
-    chunks_by_source: Dict[str, set] = {}
-    for payload in payloads:
-        source = payload.get("source", "")
-        content_hash = payload.get("content_hash", "")
-        if source:
-            chunks_by_source.setdefault(source, set()).add(content_hash)
-    result: Dict[str, str] = {}
-    for source, hashes in chunks_by_source.items():
-        combined = "".join(sorted(hashes))
-        result[source] = hashlib.sha256(combined.encode("utf-8")).hexdigest()
-    return result
-
-
 def _delta_by_source(
     all_docs: List[Document],
     existing_map: Dict[str, str],
@@ -442,8 +411,7 @@ def _delta_by_source(
 
     Args:
         all_docs (List[Document]): All documents returned by the loader for this run.
-        existing_map (Dict[str, str]): Mapping of ``{source: combined_hash}`` as
-                                        built by ``_build_existing_map()``.
+        existing_map (Dict[str, str]): Mapping of ``{source: content_hash}``.
         loader_id (str): Unique loader identifier.
         user_config (Dict[str, Any]): User configuration dict (must contain
                                       ``collection_name``).
@@ -454,7 +422,7 @@ def _delta_by_source(
     for doc in all_docs:
         source: str = doc.metadata.get("source", "")
         new_docs_by_source.setdefault(source, []).append(doc)
-
+    # TODO: make sure that only one document is returned per source from the loader (what about docx, pptx?) with this combinded hashes are not required
     # Compute combined hash per source from sorted, deduplicated content_hashes.
     # Deduplication is required because a loader may return multiple Document objects
     # for the same source (e.g. PyPDFLoader per page, UnstructuredHTMLLoader per
