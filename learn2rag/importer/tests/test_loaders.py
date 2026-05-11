@@ -1,6 +1,6 @@
 import json
-import pathlib
 import unittest
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch, MagicMock
 
@@ -15,13 +15,6 @@ class ImporterLoadersTestCase(unittest.TestCase):
         assert 'source' in doc.metadata
         assert 'The DICE group at Paderborn University' in doc.page_content
 
-    # def test_local_file(self):
-    #     path = pathlib.Path(__file__).parent.resolve() / 'html'
-    #     docs = load_html_content((path / 'local_file.html').as_uri())
-    #     assert len(docs) == 1
-    #     doc, = docs
-    #     assert doc.page_content == 'Local file content'
-
     # def test_data_uri(self):
     #     docs = load_html_content('data:text/html;charset=utf-8,%3Cbody%3E%3Cp%3EData%20URI%20content%3C%2Fp%3E%3C%2Fbody%3E')
     #     assert len(docs) == 1
@@ -31,15 +24,15 @@ class ImporterLoadersTestCase(unittest.TestCase):
     # TODO: actual tests
 
     def test_import_directory(self) -> None:
-        """Loads files from C:\\tmp\\importtest and prints what would be passed to Qdrant."""
-        path = r"C:\tmp\importtest"
-        docs = load_from_directory(path, recursive=False, loader_id="test_import")
+        """Loads files from ./data and prints what would be passed to Qdrant."""
+        path = Path(__file__).parent.resolve() / 'data'
+        docs = load_from_directory(str(path), recursive=True, loader_id="test_import")
         print(f"\n=== {len(docs)} document(s) loaded ===")
         for i, doc in enumerate(docs, start=1):
             print(f"\n--- Document {i} ---")
             print(f"Metadata: {json.dumps(doc.metadata, indent=2, default=str)}")
             print(f"page_content (first 500 characters):\n{doc.page_content[:500]}")
-        self.assertTrue(len(docs) > 0, "No documents found in: " + path)
+        self.assertTrue(len(docs) > 0, f"No documents found in: {path}")
 
 
 class HtmlLoaderLearn2RagFullCrawlTestCase(unittest.TestCase):
