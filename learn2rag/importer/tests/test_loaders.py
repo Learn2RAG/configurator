@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 from collections import defaultdict
-from typing import ClassVar, DefaultDict, List, Optional, Set
+from typing import Any, ClassVar, DefaultDict, List, Optional, Set
 from unittest.mock import patch, MagicMock
 
 from langchain_core.documents import Document
@@ -211,7 +211,7 @@ PAGE2_HTML = """
 class HtmlLoaderDepthMinusOneTestCase(unittest.TestCase):
     """Tests for depth=-1 (full site crawl) using mocked HTTP requests."""
 
-    def _fake_get(self, url: str, **kwargs) -> MagicMock:
+    def _fake_get(self, url: str, **kwargs: Any) -> MagicMock:
         pages = {
             "https://example.com/docs/": ROOT_HTML,
             "https://example.com/docs/page1": PAGE1_HTML,

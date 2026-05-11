@@ -87,7 +87,7 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
     pdf_loader = DirectoryLoader(
         path,
         glob="*.pdf",
-        loader_cls=PyPDFLoader,
+        loader_cls=PyPDFLoader,  # type: ignore[arg-type]
         loader_kwargs={"mode": "single"},
         recursive=recursive,
         silent_errors=silent_errors,
@@ -112,8 +112,8 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
             break
         try:
             if isinstance(doc, Document):
-                # Hash raw file bytes so all chunks of the same file share one stable hash.
-                # Required for correct deduplication in _build_existing_map / _delta_by_source.
+                # Hash raw file bytes so the Document carries a stable, source-level hash
+                # directly comparable to the value stored in Qdrant by get_documents().
                 try:
                     with open(doc.metadata["source"], "rb") as _f:
                         content_hash = hashlib.sha256(_f.read()).hexdigest()

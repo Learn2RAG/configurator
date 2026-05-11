@@ -401,11 +401,12 @@ def _delta_by_source(
     """
     Hash-based delta import for normal loaders (DirectoryLoader, HTMLLoader, CSVLoader).
 
-    Groups freshly loaded documents by ``source``, computes a combined content hash
-    per source, and then:
+    Each loader guarantees exactly one Document per source (PDF pages merged, HTML
+    elements merged), so ``content_hash`` on that Document is the raw-file hash and
+    directly comparable to the value stored in Qdrant by ``get_documents()``.
 
     - Deletes Qdrant chunks (bulk) for sources that no longer exist in the new load.
-    - Calls ``update_documents`` for sources whose combined hash has changed or that
+    - Calls ``update_documents`` for sources whose content_hash has changed or that
       are entirely new (update_documents handles delete-then-reindex internally).
     - Leaves unchanged sources untouched.
 
