@@ -13,7 +13,7 @@ class ImporterLoadersTestCase(unittest.TestCase):
         assert len(docs) == 1
         doc, = docs
         assert 'source' in doc.metadata
-        assert 'The DICE group at Paderborn University' in doc.page_content
+        assert 'wird das Projekt von einem Konsortium führender wissenschaftlicher Institutionen und Softwareentwickler durchgeführt und durch weitreichende Unternehmensnetzwerke unterstützt' in doc.page_content
 
     # def test_data_uri(self):
     #     docs = load_html_content('data:text/html;charset=utf-8,%3Cbody%3E%3Cp%3EData%20URI%20content%3C%2Fp%3E%3C%2Fbody%3E')
