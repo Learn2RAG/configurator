@@ -580,7 +580,11 @@ def main(config: dict[str, Any]) -> None:
     app = create_app(config=config)
 
     port = config.get('port', '9000')
-    host = config.get('host', '0.0.0.0')
+    host = '127.0.0.1'
+    if 'host' in config:
+        host = config['host']
+    else:
+        logging.warning('By default, interface is only accessible from the same machine')
 
     ssl_key = config.get('TLS', {}).get('KEYFILE')
     ssl_cert = config.get('TLS', {}).get('CERTFILE')
@@ -602,7 +606,7 @@ def main(config: dict[str, Any]) -> None:
     logging.info('Learn2RAG: ' + url)
     logging.info('*' * 40)
 
-    uvicorn_kwargs = {
+    uvicorn_kwargs: dict[str, Any] = {
         "app": app,
         "host": host,
         "port": int(port),
