@@ -1,97 +1,120 @@
 import json
+import os
 import pathlib
+import shutil
+import sys
+import tempfile
 import unittest
+from collections import defaultdict
+from typing import ClassVar, DefaultDict, List, Optional, Set
 from unittest.mock import patch, MagicMock
 
+from langchain_core.documents import Document
 from ..loaders.directory_loader import load_from_directory
 from ..loaders.html_loader import load_html_content, _is_same_site
 
+# Set RUN_INTEGRATION_TESTS=1 to run tests that require network access.
+_RUN_INTEGRATION: bool = os.environ.get("RUN_INTEGRATION_TESTS", "0") == "1"
+
+
 class ImporterLoadersTestCase(unittest.TestCase):
+    """Tests for directory and HTML loaders. Runs fully offline without Qdrant."""
+
+    test_path: ClassVar[str]
+    _temp_dir: ClassVar[Optional[str]]
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        env_path = os.environ.get("TEST_IMPORT_PATH", "")
+        if env_path and pathlib.Path(env_path).is_dir():
+            cls.test_path = env_path
+            cls._temp_dir = None
+        else:
+            cls._temp_dir = tempfile.mkdtemp(prefix="learn2rag_test_")
+            cls.test_path = cls._temp_dir
+            (pathlib.Path(cls._temp_dir) / "sample.txt").write_text(
+                "This is a test document.\nIt has multiple lines of content.\nLine three.",
+                encoding="utf-8",
+            )
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if cls._temp_dir:
+            shutil.rmtree(cls._temp_dir, ignore_errors=True)
+
+    @unittest.skipUnless(_RUN_INTEGRATION, "Set RUN_INTEGRATION_TESTS=1 to run")
     def test_remote_url(self) -> None:
-        docs = load_html_content('https://learn2rag.de')
+        docs = load_html_content("https://learn2rag.de")
         assert len(docs) == 1
         doc, = docs
-        assert 'source' in doc.metadata
-        assert 'The DICE group at Paderborn University' in doc.page_content
-
-    # def test_local_file(self):
-    #     path = pathlib.Path(__file__).parent.resolve() / 'html'
-    #     docs = load_html_content((path / 'local_file.html').as_uri())
-    #     assert len(docs) == 1
-    #     doc, = docs
-    #     assert doc.page_content == 'Local file content'
-
-    # def test_data_uri(self):
-    #     docs = load_html_content('data:text/html;charset=utf-8,%3Cbody%3E%3Cp%3EData%20URI%20content%3C%2Fp%3E%3C%2Fbody%3E')
-    #     assert len(docs) == 1
-    #     doc, = docs
-    #     assert doc.page_content == 'Data URI content'
-
-    # TODO: actual tests
+        assert "source" in doc.metadata
+        assert "The DICE group at Paderborn University" in doc.page_content
 
     def test_import_directory(self) -> None:
-        """Loads files from C:\\tmp\\importtest, prints metadata incl. content_hash,
-        and verifies that all chunks of the same file share one stable hash.
+        """Loads files from test_path, prints metadata incl. content_hash, and
+        verifies that each source yields exactly one Document with a stable hash.
 
         Intentionally Qdrant-free: only the loader and hash consistency are tested.
         Set env var SKIP_HASH_ASSERT=1 to print-only without assertions (debugging).
         """
-        import os
-        from collections import defaultdict
-
-        path = r"C:\tmp\importtest"
-        if not pathlib.Path(path).is_dir():
-            self.skipTest(f"Test directory not found: {path}")
-
         skip_assert = os.environ.get("SKIP_HASH_ASSERT", "0") == "1"
 
-        docs = load_from_directory(path, recursive=False, loader_id="test_import")
+        docs: List[Document] = load_from_directory(
+            self.test_path, recursive=False, loader_id="test_import"
+        )
 
         def _safe(text: str, limit: int = 500) -> str:
             """Truncate and replace unencodable characters for safe terminal output."""
-            return text[:limit].encode("cp1252", errors="replace").decode("cp1252")
+            encoding = sys.stdout.encoding or "utf-8"
+            return text[:limit].encode(encoding, errors="replace").decode(encoding)
 
-        print(f"\n=== {len(docs)} document(s) loaded ===")
+        print(f"\n=== {len(docs)} document(s) loaded from '{self.test_path}' ===")
 
-        # Group by source to detect per-file hash consistency
-        by_source: dict = defaultdict(list)
+        by_source: DefaultDict[str, List[Document]] = defaultdict(list)
         for doc in docs:
             by_source[doc.metadata.get("source", "?")].append(doc)
 
         for i, doc in enumerate(docs, start=1):
             print(f"\n--- Document {i} ---")
             print(f"Metadata: {json.dumps(doc.metadata, indent=2, default=str)}")
-            print(f"page_content (first 500 characters):\n{_safe(doc.page_content)}")
+            print(f"page_content (first 500 chars):\n{_safe(doc.page_content)}")
 
-        print(f"\n=== Hash consistency per source ===")
+        print("\n=== Hash consistency per source ===")
         for source, source_docs in sorted(by_source.items()):
-            hashes = {d.metadata.get("content_hash", "MISSING") for d in source_docs}
+            hashes: Set[Optional[str]] = {
+                d.metadata.get("content_hash", "MISSING") for d in source_docs
+            }
             status = "OK" if len(hashes) == 1 else "MISMATCH"
-            print(f"[{status}] {source}  ({len(source_docs)} chunk(s))  hashes={hashes}")
+            print(f"[{status}] {source}  ({len(source_docs)} doc(s))  hashes={hashes}")
 
-        self.assertTrue(len(docs) > 0, "No documents found in: " + path)
+        self.assertGreater(len(docs), 0, f"No documents found in: {self.test_path}")
 
         if not skip_assert:
-            # All chunks of the same file must share one hash
             for source, source_docs in by_source.items():
-                hashes = {d.metadata.get("content_hash") for d in source_docs}
-                self.assertEqual(len(hashes), 1,
-                    f"Hash mismatch for '{source}': {hashes}")
+                hashes2: Set[Optional[str]] = {d.metadata.get("content_hash") for d in source_docs}
+                self.assertEqual(
+                    len(hashes2), 1, f"Hash mismatch for '{source}': {hashes2}"
+                )
+                self.assertEqual(
+                    len(source_docs),
+                    1,
+                    f"Expected 1 Document per source, got {len(source_docs)} for '{source}'",
+                )
         else:
             print("\n[SKIP_HASH_ASSERT=1] Hash assertion skipped.")
 
 
+@unittest.skipUnless(_RUN_INTEGRATION, "Set RUN_INTEGRATION_TESTS=1 to run")
 class HtmlLoaderLearn2RagFullCrawlTestCase(unittest.TestCase):
     """Integration test: full site crawl of https://learn2rag.de with depth=-1."""
 
     def test_full_site_crawl(self) -> None:
         """Crawls the entire learn2rag.de domain and prints all discovered pages."""
         root_url = "https://learn2rag.de"
-        skipped: set = set()
+        skipped: Set[str] = set()
         docs = load_html_content(root_url, depth=-1, loader_id="learn2rag_full", skipped=skipped)
 
-        from collections import defaultdict
-        by_url: dict = defaultdict(list)
+        by_url: DefaultDict[str, List[Document]] = defaultdict(list)
         for doc in docs:
             by_url[doc.metadata.get("source", "?")].append(doc)
 

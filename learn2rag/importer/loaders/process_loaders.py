@@ -417,23 +417,19 @@ def _delta_by_source(
                                       ``collection_name``).
         opt_config (Dict[str, Any]): Optimisation configuration dict.
     """
-    # Group freshly loaded documents by source (1 source = N chunks)
+    # Group freshly loaded documents by source (1 source = 1 Document after loader merging)
     new_docs_by_source: Dict[str, List[Document]] = {}
     for doc in all_docs:
         source: str = doc.metadata.get("source", "")
         new_docs_by_source.setdefault(source, []).append(doc)
-    # TODO: make sure that only one document is returned per source from the loader (what about docx, pptx?) with this combinded hashes are not required
-    # Compute combined hash per source from sorted, deduplicated content_hashes.
-    # Deduplication is required because a loader may return multiple Document objects
-    # for the same source (e.g. PyPDFLoader per page, UnstructuredHTMLLoader per
-    # section), all carrying the same file/page hash after our loader fixes.
-    # _build_existing_map deduplicates via set on the Qdrant side — we must match
-    # that behaviour here to keep both sides comparable.
-    new_hash_by_source: Dict[str, str] = {}
-    for source, docs in new_docs_by_source.items():
-        hashes = sorted(set(d.metadata.get("content_hash", d.page_content) for d in docs))
-        combined = "".join(hashes)
-        new_hash_by_source[source] = hashlib.sha256(combined.encode("utf-8")).hexdigest()
+
+    # All loaders guarantee exactly one Document per source (PDF pages merged,
+    # HTML elements merged), so content_hash on docs[0] is directly comparable
+    # to the value returned by get_documents() from Qdrant.
+    new_hash_by_source: Dict[str, str] = {
+        source: docs[0].metadata.get("content_hash", "")
+        for source, docs in new_docs_by_source.items()
+    }
 
     # Bulk-delete sources that are no longer present in the fresh load
     deleted_sources: List[str] = [s for s in existing_map if s not in new_docs_by_source]
