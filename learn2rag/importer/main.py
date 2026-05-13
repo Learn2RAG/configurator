@@ -93,9 +93,11 @@ def main(args: argparse.Namespace) -> None:
             logger.info('Documents saved to: %s', output_path)
         else:
             logger.error("Configuration validation failed. No documents were processed.")
+            sys.exit(1)
 
     except Exception as e:
         logger.error(f"Error loading configuration: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
