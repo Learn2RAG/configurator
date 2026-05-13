@@ -49,8 +49,9 @@ if __name__ == '__main__':
         with open('config.yml', 'r') as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
-        print('You can create config.yml for more configuration options')
-        print('https://docs.learn2rag.de/en/basic/administrator/#advanced-configuration')
+        if len(sys.argv) == 1:
+            print('You can create config.yml for more configuration options')
+            print('https://docs.learn2rag.de/en/basic/administrator/#advanced-configuration')
 
     args, rest = LauncherArgumentParser().parse_known_args()
     module = importlib.import_module(args.module)
