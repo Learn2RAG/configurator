@@ -7,7 +7,7 @@ import os
 import pathlib
 import sys
 from types import TracebackType
-from typing import Unpack
+from typing import Any, Unpack
 
 import yaml
 
@@ -44,10 +44,10 @@ def configure_logging(config_path: pathlib.Path, debug: bool) -> None:
 if __name__ == '__main__':
     sys.excepthook = excepthook
 
-    config = {}
+    config: dict[str, Any] = {}
     try:
         with open('config.yml', 'r') as f:
-            config = yaml.safe_load(f)
+            config = yaml.safe_load(f) or {}
     except FileNotFoundError:
         if len(sys.argv) == 1:
             print('You can create config.yml for more configuration options')
