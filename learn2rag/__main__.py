@@ -54,9 +54,9 @@ if __name__ == '__main__':
             print('https://docs.learn2rag.de/en/basic/administrator/#advanced-configuration')
 
     args, rest = LauncherArgumentParser().parse_known_args()
-    module = importlib.import_module(args.module)
     configure_logging(args.logging_config, config.get('logging', {}).get('debug', False))
     logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
+    module = importlib.import_module(args.module)
     # TODO
     if args.module == 'learn2rag.ollama_tool':
         # FIXME default config values
