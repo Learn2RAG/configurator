@@ -22,6 +22,8 @@ class LauncherArgumentParser(argparse.ArgumentParser):
 def excepthook(*exc_info: Unpack[tuple[type[BaseException], BaseException, TracebackType | None]]) -> None:
     os.environ['NO_COLOR'] = '1'
     logging.critical('Uncaught exception', exc_info=exc_info)
+    # also print it since logging might be not configured properly
+    print(f'Uncaught exception: {exc_info}')
     sys.__excepthook__(*exc_info)
 
 
