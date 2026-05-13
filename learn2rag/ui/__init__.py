@@ -431,6 +431,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     # FIXME
                     'local': 'DirectoryLoader',
                     'web': 'HTMLLoader',
+                    'sharepoint': 'SharepointLoader',
                     'drupal': 'DrupalLoader',
                 }.get(source.get(
                     'type',
