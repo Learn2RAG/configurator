@@ -393,16 +393,16 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def pipeline_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
         data: dict[str, Any] = request.form.to_dict()
-        data.pop('import', None)
+        data.pop('now', None)
         data['ports'] = [int(port) for port in request.form.getlist("ports") if port]
         data['sources'] = request.form.getlist('sources')
         data['import_schedule_interval_hours'] = float(data['import_schedule_interval_hours'])
         name = learn2rag.data.create_entry(app.instance_path, 'pipelines', data)
         flash(pgettext('flash', 'Added a new pipeline configuration: %(label)s', label=label))
-        if request.form.get('import'):
+        if request.form.get('now'):
             pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
             assert pipeline is not None
-            start_pipeline(name, pipeline, 'import')
+            start_pipeline(name, pipeline, 'continuous')
         return redirect(url_for('pipelines_list'))
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
