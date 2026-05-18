@@ -7,14 +7,14 @@ It includes robust handling for App-Only Authentication (Client Credentials)
 and Site-Specific contexts.
 
 Author: Kyrill Meyer
-Version: 0.0.6
+Version: 0.0.7
 Institution: IFDT
 Creation Date: January 14, 2026
-Last Modified Date: April 24, 2026
+Last Modified Date: May 18, 2026
 """
+
 import hashlib
 import logging
-import os
 import tempfile
 import shutil
 from datetime import datetime, timezone
