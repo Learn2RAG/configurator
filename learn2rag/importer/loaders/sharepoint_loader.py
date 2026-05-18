@@ -75,17 +75,8 @@ def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> 
         # SPECIAL HANDLING FOR PDF (using PyPDFLoader to avoid unstructured dependencies)
         elif suffix == ".pdf":
             logger.info(f"Detected PDF file: {file_path.name} - using PyPDFLoader")
-            loader = PyPDFLoader(str(file_path))
-            _pages = loader.load()
-            # Merge all pages into one Document so delta-import deduplication works on
-            # a 1:1 source→document basis (same as all other loaders).
-            _merged_pdf = Document(
-                page_content="\n\n".join(p.page_content for p in _pages),
-                metadata={**(_pages[0].metadata if _pages else {}), "total_pages": len(_pages)},
-            )
-            _merged_pdf.metadata.pop("page", None)
-            _merged_pdf.metadata.pop("page_label", None)
-            docs = [_merged_pdf]
+            loader = PyPDFLoader(str(file_path), mode="single")
+            docs = loader.load()
 
         # SPECIAL HANDLING FOR IMAGES (Skip due to broken OCR environment)
         elif suffix in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]:
