@@ -6,10 +6,14 @@ import logging.config
 import os
 import pathlib
 import sys
+from datetime import datetime, timedelta
 from types import TracebackType
 from typing import Unpack
 
 import yaml
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from pydantic import TypeAdapter
 
 
 class LauncherArgumentParser(argparse.ArgumentParser):
@@ -17,6 +21,7 @@ class LauncherArgumentParser(argparse.ArgumentParser):
         super().__init__()
         self.add_argument('module', type=str, nargs='?', default='learn2rag.ui')
         self.add_argument('--logging-config', type=pathlib.Path)
+        self.add_argument('--schedule-interval', type=TypeAdapter(timedelta).validate_python)
 
 
 def excepthook(*exc_info: Unpack[tuple[type[BaseException], BaseException, TracebackType | None]]) -> None:
@@ -75,4 +80,17 @@ if __name__ == '__main__':
             config,
         )
 
-    module.main(*module_args, **module_kwargs)
+    if args.schedule_interval:
+        scheduler = BlockingScheduler()
+        trigger = IntervalTrigger(seconds=args.schedule_interval.total_seconds())
+        scheduler.add_job(
+            module.main,
+            trigger,
+            next_run_time=datetime.utcnow(),
+            max_instances=1,
+            args=module_args,
+            kwargs=module_kwargs,
+        )
+        scheduler.start()
+    else:
+        module.main(*module_args, **module_kwargs)

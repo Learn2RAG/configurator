@@ -188,6 +188,7 @@ dependencies = [
     "python-pptx (>=1.0.2,<2.0.0)",
     "msoffcrypto-tool (>=6.0.0,<7.0.0)",
     "ebooklib (>=0.20,<0.21)",
+    "apscheduler==3.11.2",
 ]
 description = ""
 license = "MIT"
