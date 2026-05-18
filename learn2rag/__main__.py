@@ -58,12 +58,21 @@ if __name__ == '__main__':
     logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
     module = importlib.import_module(args.module)
     # TODO
+    module_args = tuple()
+    module_kwargs = {}
     if args.module == 'learn2rag.ollama_tool':
         # FIXME default config values
-        module.main(rest, config=config.get('OLLAMA', {'port': 11434}))
+        module_args = (
+            rest,
+        )
+        module_kwargs = {'config': config.get('OLLAMA', {'port': 11434})}
     elif args.module == 'learn2rag.importer':
-        module.main(module.ImporterArgumentParser().parse_args(rest))
+        module_args = (
+            module.ImporterArgumentParser().parse_args(rest),
+        )
     elif args.module == 'learn2rag.ui':
-        module.main(config)
-    else:
-        module.main()
+        module_args = (
+            config,
+        )
+
+    module.main(*module_args, **module_kwargs)
