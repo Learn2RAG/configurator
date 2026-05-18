@@ -1,0 +1,142 @@
+<div class="accordion" id="accordionCreate">
+  <div class="accordion-item">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateConnect" aria-expanded="false" aria-controls="collapseCreateConnect">
+        {{pgettext('heading', 'Connect an external language model')}}
+      </button>
+    </h2>
+    <div id="collapseCreateConnect" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
+      <div class="accordion-body">
+        <form method="POST" action="{{ url_for('model_create') }}">
+          <div class="mb-3">
+            <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
+            <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this language model')}}">
+          </div>
+          <div class="mb-3">
+            <label for="api" class="form-label">{{pgettext('form_label', 'API type')}}</label>
+            <select required="required" class="form-select" name="api">
+              {% for llm_client in llm.llms.values() %}
+              <option
+                value="{{ llm_client.ID }}"
+                {% if loop.first %}
+                selected="selected"
+                {% endif %}
+                >{{ llm_client.LABEL }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="url" class="form-label">{{pgettext('form_label', 'API URL')}}</label>
+            <input required="required" type="url" class="form-control" name="url" title="{{pgettext('tooltip', 'For example: https://example.com/api')}}">
+          </div>
+          <div class="mb-3">
+            <label for="token" class="form-label">{{pgettext('form_label', 'Access token')}}</label>
+            <input class="form-control" name="token">
+          </div>
+          <div class="mb-3">
+            <label for="model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
+            <input required="required" class="form-control" name="model" title="{{pgettext('tooltip', 'For example: %(model)s', model=firststeps_model.get('config', {}).get('model'))}}">
+          </div>
+          <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% if suggested_models %}
+  <div class="accordion-item">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateSuggested" aria-expanded="false" aria-controls="collapseCreateSuggested">
+        {{pgettext('heading', 'Download a language model')}}
+      </button>
+    </h2>
+    <div id="collapseCreateSuggested" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
+      <div class="accordion-body">
+        {% for name, suggested_model in suggested_models.items() %}
+        <div class="card m-3" style="width: 24rem;">
+          {% if suggested_model.image %}
+          <img src="{{url_for('static', filename=suggested_model.image)}}" class="card-img-top" alt="">
+          {% endif %}
+          <div class="card-body">
+            <h5 class="card-title">{{ suggested_model.label }}</h5>
+            {% if suggested_model.description %}
+            <p class="card-text">{{ suggested_model.description }}</p>
+            {% endif %}
+          </div>
+          {% if suggested_model.link %}
+          <div class="card-body">
+            <a href="{{ suggested_model.link }}" class="card-link">{{pgettext('link', 'Website')}}</a>
+          </div>
+          {% endif %}
+          <div class="card-footer text-body-secondary">
+            <form method="POST" action="{{ url_for('model_create') }}" hx-boost="true" hx-target="#main">
+              {% if suggested_model.ollama %}
+              <input type="hidden" name="ollama" value="{{ suggested_model.ollama }}"/>
+              {% endif %}
+              <input type="hidden" name="label" value="{{ suggested_model.label }}"/>
+              <input type="hidden" name="api" value="{{ suggested_model.config.api }}"/>
+              <input type="hidden" name="url" value="{{ suggested_model.config.url }}"/>
+              <input type="hidden" name="model" value="{{ suggested_model.config.model }}"/>
+              <input type="hidden" name="token" value="{{ suggested_model.config.token }}"/>
+              <button type="submit" class="btn btn-primary">{{ pgettext('button', 'Use this suggested language model') }}</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+        <div class="card m-3" style="width: 24rem;">
+          <div class="card-body">
+            <h5 class="card-title">{{gettext('Another model')}}</h5>
+            <p class="card-text">{{gettext('Download any model from Ollama library.')}}</p>
+          </div>
+          <div class="card-footer text-body-secondary">
+            {% if ollama_available %}
+            <form method="POST" hx-boost="true" hx-target="#main">
+              <div class="mb-3">
+                <label for="model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
+                <input class="form-control" name="model" required="required" title="{{pgettext('tooltip', 'For example: %(model)s', model=firststeps_model.get('config', {}).get('model'))}}">
+              </div>
+              <input type="hidden" name="api" value="{{ llm.OllamaClient.ID }}"/>
+              <input type="hidden" name="ollama" value="pull"/>
+              <button type="submit" class="btn btn-primary">Save</button>
+            </form>
+            {% else %}
+            <div class="alert alert-warning" role="alert">
+              {{gettext('Ollama is not running. Please restart the Learn2RAG configurator.')}}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% if ollama_models %}
+  <div class="accordion-item">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateOllamaSelect" aria-expanded="false" aria-controls="collapseCreateOllamaSelect">
+        {{pgettext('heading', 'Use previously downloaded model')}}
+      </button>
+    </h2>
+    <div id="collapseCreateOllamaSelect" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
+      <div class="accordion-body">
+        <form method="POST">
+          <div class="mb-3">
+            <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
+            <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this language model')}}">
+          </div>
+          <div class="mb-3">
+            <label for="ollama_list" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
+            <select class="form-select" name="model">
+              {% for ollama_model in ollama_models %}
+              <option value="{{ ollama_model.model }}">{{ ollama_model.model }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <input type="hidden" name="api" value="{{ llm.OllamaClient.ID }}"/>
+          <input type="hidden" name="ollama" value="use"/>
+          <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>

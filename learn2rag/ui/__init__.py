@@ -261,7 +261,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     @app.get('/models')
     def models_list() -> 'str | werkzeug.wrappers.response.Response':
         return render_template(
-            'models_list.html',
+            'models_page.html',
             ollama_models=list_ollama_models(),
         )
 
