@@ -86,7 +86,7 @@ if __name__ == '__main__':
         scheduler.add_job(
             module.main,
             trigger,
-            next_run_time=datetime.utcnow(),
+            next_run_time=datetime.now(),
             max_instances=1,
             args=module_args,
             kwargs=module_kwargs,
