@@ -6,7 +6,7 @@ ports:
   - qdrant_http
   - pipeline
   - open_webui_pipelines
-ui_url: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
+ui_url: '{{ pipeline.chat_proxy_url or learn2rag_scheme ~ "://" ~ learn2rag_hostname ~ ":" ~ ports.ui ~ "/" }}'
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |
@@ -112,8 +112,7 @@ services:
       USER_PERMISSIONS_FEATURES_CODE_INTERPRETER: 'False'
       USER_PERMISSIONS_FEATURES_IMAGE_GENERATION: 'False'
       USER_PERMISSIONS_FEATURES_WEB_SEARCH: 'False'
-      #!!! {% if False and config.get("SIMPLE_AUTH") %}
-      # TODO: Upgrade openwebui and use this (WEBUI_ADMIN_EMAIL etc)
+      #!!! {% if config.get("SIMPLE_AUTH") %}
       ENABLE_SIGNUP: 'False'
       WEBUI_AUTH: 'True'
       WEBUI_ADMIN_EMAIL: '{{config["SIMPLE_AUTH"].get("username", "")}}'
@@ -123,9 +122,7 @@ services:
       # https://docs.openwebui.com/getting-started/env-configuration/#webui_auth
       # "turning off authentication is only possible for fresh installations without any existing users"
       ENABLE_SIGNUP: 'True'
-      #!!! {% if not config.get("SIMPLE_AUTH") %}
       WEBUI_AUTH: 'False'
-      #!!! {% endif %}
       #!!! {% endif %}
       WEBUI_NAME: 'Learn2RAG'
       #!!! {% if config.get("TLS") %}
@@ -135,17 +132,6 @@ services:
     healthcheck:
       # TODO: We only support ['CMD', 'curl', '-f', ...]
       test: ['CMD', 'curl', '-f', '{{learn2rag_scheme}}://localhost:{{ports.ui}}/health']
-  # # Only needed if WEBUI_AUTH is True for open-webui
-  #!!! {% if config.get("SIMPLE_AUTH") %}
-  # TODO: Upgrade openwebui and remove this completely
-  open-webui-setup:
-    working_dir: '{{storage_path}}'
-    command: ['bash', '-eu', '{{learn2rag_path}}/services/setup-open-webui']
-    environment:
-      WEBUI_URL: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
-      ADMIN_USER_EMAIL: '{{config["SIMPLE_AUTH"].get("username", "")}}'
-      ADMIN_USER_PASSWORD: '{{config["SIMPLE_AUTH"].get("password", "")}}'
-  #!!! {% endif %}
   qdrant:
     working_dir: '{{storage_path}}'
     command:

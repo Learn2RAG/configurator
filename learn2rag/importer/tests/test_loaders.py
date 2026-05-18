@@ -16,7 +16,6 @@ from ..loaders.html_loader import load_html_content, _is_same_site
 # Set RUN_INTEGRATION_TESTS=1 to run tests that require network access.
 _RUN_INTEGRATION: bool = os.environ.get("RUN_INTEGRATION_TESTS", "0") == "1"
 
-
 class ImporterLoadersTestCase(unittest.TestCase):
     """Tests for directory and HTML loaders. Runs fully offline without Qdrant."""
 
@@ -44,11 +43,11 @@ class ImporterLoadersTestCase(unittest.TestCase):
 
     @unittest.skipUnless(_RUN_INTEGRATION, "Set RUN_INTEGRATION_TESTS=1 to run")
     def test_remote_url(self) -> None:
-        docs = load_html_content("https://learn2rag.de")
+        docs = load_html_content('https://learn2rag.de')
         assert len(docs) == 1
         doc, = docs
-        assert "source" in doc.metadata
-        assert "The DICE group at Paderborn University" in doc.page_content
+        assert 'source' in doc.metadata
+        assert 'wird das Projekt von einem Konsortium führender wissenschaftlicher Institutionen und Softwareentwickler durchgeführt und durch weitreichende Unternehmensnetzwerke unterstützt' in doc.page_content
 
     def test_import_directory(self) -> None:
         """Loads files from test_path, prints metadata incl. content_hash, and

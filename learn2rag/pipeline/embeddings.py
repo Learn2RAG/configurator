@@ -15,6 +15,14 @@ def create_embeddings(input_sample: List[str], model_name: str = "BAAI/bge-m3", 
                 return_sparse=False,
                 return_colbert_vecs=False,
             )
+        elif embedding_mode == "sparse":
+            return model.encode(  # type: ignore[no-any-return]
+                input_sample,
+                batch_size=512,
+                return_dense=False,
+                return_sparse=True,
+                return_colbert_vecs=False,
+            )
         elif embedding_mode == "dense_sparse":
             return model.encode( # type: ignore[no-any-return]
                 input_sample,
@@ -29,6 +37,14 @@ def create_embeddings(input_sample: List[str], model_name: str = "BAAI/bge-m3", 
                 batch_size=512,
                 return_dense=True,
                 return_sparse=True,
+                return_colbert_vecs=True,
+            )
+        elif embedding_mode == "colbert":
+            return model.encode( # type: ignore[no-any-return]
+                input_sample,
+                batch_size=512,
+                return_dense=False,
+                return_sparse=False,
                 return_colbert_vecs=True,
             )
         else:

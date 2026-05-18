@@ -79,7 +79,7 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
             elif loader_type == "HTMLLoader":
                 url = entry.get("url")
                 depth = entry.get("depth", 0)
-                if not url or not isinstance(depth, int) or depth < 0:
+                if not url or not isinstance(depth, int) or depth < -1:
                     logger.error(f"Invalid configuration for HTMLLoader: {entry}")
                     continue
                 documents = load_html_content(url, depth=depth, loader_id=loader_id)

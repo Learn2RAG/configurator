@@ -163,7 +163,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         return translation
     babel.init_app(app, locale_selector=get_locale)
 
-    app.logger.info('create_app')
     app.logger.debug('cwd: %s', os.getcwd())
     app.logger.debug('root_path: %s', app.root_path)
     assert app.template_folder is not None
@@ -393,14 +392,11 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     @app.post('/pipelines')
     def pipeline_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
-        ports = [int(port) for port in request.form.getlist("ports") if port]
-        name = learn2rag.data.create_entry(app.instance_path, 'pipelines', {
-            'label': label,
-            'storage_path': request.form['storage_path'],
-            'language_model': request.form['language_model'],
-            'sources': request.form.getlist('sources'),
-            'ports': ports,
-        })
+        data: dict[str, Any] = request.form.to_dict()
+        data.pop('import', None)
+        data['ports'] = [int(port) for port in request.form.getlist("ports") if port]
+        data['sources'] = request.form.getlist('sources')
+        name = learn2rag.data.create_entry(app.instance_path, 'pipelines', data)
         flash(pgettext('flash', 'Added a new pipeline configuration: %(label)s', label=label))
         if request.form.get('import'):
             pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
@@ -542,7 +538,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         threading.Thread(target=shutdown).start()
         return pgettext('shutdown', 'Bye!')  # type: ignore[no-any-return]
 
-    app.logger.info('App creation complete')
     return app
 
 
@@ -593,13 +588,12 @@ def main(config: dict[str, Any]) -> None:
     use_https = False
     if ssl_key and ssl_cert:
         if os.path.exists(ssl_key) and os.path.exists(ssl_cert):
-            logging.info(f" SSL files defined and found at {ssl_key} or {ssl_cert}")
+            logging.debug('TLS enabled')
             use_https = True
         else:
-            logging.error(f"Warning: SSL files defined but not found at {ssl_key} or {ssl_cert}")
-            raise FileNotFoundError(f"SSL files defined but not found at {ssl_key} or {ssl_cert}")
+            raise FileNotFoundError(f'The configured TLS files are not found: {ssl_key}, {ssl_cert}')
     else:
-        logging.info(f"no SSL files provided then switch to HTTP mode")
+        logging.debug('TLS disabled')
 
     protocol = 'https' if use_https else 'http'
     url = f"{protocol}://localhost:{port}"
