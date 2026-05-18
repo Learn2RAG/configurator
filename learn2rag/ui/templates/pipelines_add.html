@@ -31,6 +31,13 @@
   </div>
   <div class="mb-3 collapse advanced-configuration">
     <div class="mb-3">
+      <label for="import_schedule_interval_hours" class="form-label">{{pgettext('form_label', 'Automatically import data with interval (hours)')}}</label>
+      <input class="form-control" name="import_schedule_interval_hours"
+             type="number" min="0" step="any"
+             value="12"
+             />
+    </div>
+    <div class="mb-3">
       <label for="ports" class="form-label">{{pgettext('form_label', 'Chat proxy URL')}}</label>
       <input class="form-control" name="chat_proxy_url" type="url">
     </div>

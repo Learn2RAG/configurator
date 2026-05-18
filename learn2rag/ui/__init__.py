@@ -396,6 +396,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         data.pop('import', None)
         data['ports'] = [int(port) for port in request.form.getlist("ports") if port]
         data['sources'] = request.form.getlist('sources')
+        data['import_schedule_interval_hours'] = float(data['import_schedule_interval_hours'])
         name = learn2rag.data.create_entry(app.instance_path, 'pipelines', data)
         flash(pgettext('flash', 'Added a new pipeline configuration: %(label)s', label=label))
         if request.form.get('import'):

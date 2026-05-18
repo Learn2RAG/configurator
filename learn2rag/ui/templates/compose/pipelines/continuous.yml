@@ -136,7 +136,7 @@ services:
       - '--logging-config'
       - '{{storage_path}}/logging_config.yml'
       - '--schedule-interval'
-      - 'PT5M'
+      - 'PT{{ (pipeline.import_schedule_interval_hours * 60) | round | int }}M'
       - 'learn2rag.importer'
       - '--config'
       - '{{storage_path}}/importer_config.json'
