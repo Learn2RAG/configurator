@@ -31,13 +31,13 @@ def delete_collection(loader_id: str|None, user_config: dict[str, Any], opt_conf
                 ),
             )
 
-def delete_documents(loader_id: str, paths: list[str], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
-    """Delete documents from the vector store based on loader_id and paths."""
+def delete_documents(loader_id: str, docs: list[str], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
+    """Delete documents from the vector store based on loader_id and their source. A source is the path to and the identification of one document."""
     qdrant = Qdrant(user_config["collection_name"], opt_config)
     if qdrant.client.collection_exists(user_config["collection_name"]):
-        logging.info('Deleting documents with loader_id: %s and paths: %s', loader_id, paths)
+        logging.info('Deleting documents with loader_id: %s and paths: %s', loader_id, docs)
         # Delete points with the specified loader_id and paths
-        for path in paths:
+        for path in docs:
             qdrant.client.delete(
                 collection_name=user_config["collection_name"],
                 points_selector=FilterSelector(
@@ -101,8 +101,9 @@ def get_documents(loader_id: str, user_config: dict[str, Any], opt_config: dict[
 
 
 def update_documents(loader_id: str, documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
+    """Update documents in the vector store. This is done by deleting all chunks of the existing document based on source and loader_id, and then re-indexing the new document."""
     qdrant = Qdrant(user_config["collection_name"], opt_config)
     if qdrant.client.collection_exists(user_config["collection_name"]):
         logging.info('Updating documents with loader_id: %s', loader_id)
-        delete_documents(loader_id, paths=[doc.metadata["source"] for doc in documents], user_config=user_config, opt_config=opt_config)
+        delete_documents(loader_id, docs=[doc.metadata["source"] for doc in documents], user_config=user_config, opt_config=opt_config)
         index(documents, user_config, opt_config)
