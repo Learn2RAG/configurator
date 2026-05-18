@@ -8,11 +8,13 @@ import pathlib
 import sys
 from datetime import datetime, timedelta
 from types import TracebackType
-from typing import Unpack
+from typing import Any, Unpack
 
 import yaml
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+# TODO: apscheduler 4.x would come with py.typed
+# https://github.com/agronholm/apscheduler/issues/648#issuecomment-1195304357
+from apscheduler.schedulers.blocking import BlockingScheduler  # type: ignore[import-untyped]
+from apscheduler.triggers.interval import IntervalTrigger  # type: ignore[import-untyped]
 from pydantic import TypeAdapter
 
 
@@ -63,7 +65,7 @@ if __name__ == '__main__':
     logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
     module = importlib.import_module(args.module)
     # TODO
-    module_args = tuple()
+    module_args: tuple[Any, ...] = ()
     module_kwargs = {}
     if args.module == 'learn2rag.ollama_tool':
         # FIXME default config values
