@@ -27,6 +27,9 @@
           </div>
           <div class="mb-3">
             <label for="url" class="form-label">{{pgettext('form_label', 'API URL')}}</label>
+            <div class="alert alert-warning">
+              {{gettext('If you use a model from an external provider, they will see your data.')}}
+            </div>
             <input required="required" type="url" class="form-control" name="url" title="{{pgettext('tooltip', 'For example: https://example.com/api')}}">
           </div>
           <div class="mb-3">
