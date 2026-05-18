@@ -1,5 +1,5 @@
 name: continuous
-label: Continuous
+label: Start
 ports:
   # TODO: labels in the interface currently assume a specific port order
   - ui

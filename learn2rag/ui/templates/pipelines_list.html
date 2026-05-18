@@ -1,3 +1,9 @@
+{% macro pipeline_start(name, project, cls) %}
+<form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
+  <button class="{{ cls }}" type="submit" name="action" value="start:{{ project.name }}">{{project.label}}</button>
+</form>
+{% endmacro %}
+
 <table class="table" id="pipelines_list_table" hx-swap-oob="true" hx-get="" hx-trigger="every 15s" hx-swap="none">
   <thead>
     <tr>
@@ -44,11 +50,7 @@
           <div class="btn-toolbar" role="toolbar">
             <div class="btn-group" role="group">
               {% if not (projects[name] and projects[name].running) %}
-              {% for project_name, project in compose_templates.items() %}
-              <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
-                <button class="btn btn-primary" type="submit" name="action" value="start:{{ project.name }}">{{project.label}}</button>
-              </form>
-              {% endfor %}
+              {{ pipeline_start(name, compose_templates['continuous'], 'btn btn-primary') }}
               {% endif %}
               {% if projects[name] and projects[name].running %}
               {% if 'ui_url' in projects[name].content %}
@@ -81,6 +83,16 @@
                   {{pgettext('button', 'More')}}
                 </button>
                 <ul class="dropdown-menu">
+                  {% if not (projects[name] and projects[name].running) %}
+                  {% for project_name, project in compose_templates.items() %}
+                  {% if project_name not in ['continuous'] %}
+                  <li>
+                    {{ pipeline_start(name, project, 'dropdown-item text-bg-primary') }}
+                  </li>
+                  {% endif %}
+                  {% endfor %}
+                  {% endif %}
+                  <li><hr class="dropdown-divider"></li>
                   {% if debug_logging %}
                   <li>
                     <a href="{{ url_for('pipeline_logs', name=name, file='debug.log') }}" class="dropdown-item">

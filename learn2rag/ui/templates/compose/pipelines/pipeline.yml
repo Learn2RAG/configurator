@@ -1,5 +1,5 @@
 name: pipeline
-label: RAG
+label: Start only the chat
 ports:
   # TODO: labels in the interface currently assume a specific port order
   - ui
