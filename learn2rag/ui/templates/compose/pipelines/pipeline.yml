@@ -92,7 +92,7 @@ services:
       - '{{learn2rag_path}}/services/start-open-webui{% if is_windows %}.exe{% endif %}'
       - 'serve'
       - '--host'
-      - '0.0.0.0'
+      - '{{config.get("CHAT", {}).get("host") or config.get("UI", {}).get("host") or "127.0.0.1"}}'
       - '--port'
       - '{{ports.ui}}'
     environment:

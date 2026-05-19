@@ -579,10 +579,11 @@ def webbrowser_open(url: str) -> None:
 def main(config: dict[str, Any]) -> None:
     app = create_app(config=config)
 
-    port = config.get('port', '9000')
+    ui_config = config.get('UI', {})
+    port = ui_config.get('port', '9000')
     host = '127.0.0.1'
-    if 'host' in config:
-        host = config['host']
+    if 'host' in ui_config:
+        host = ui_config['host']
     else:
         logging.warning('By default, interface is only accessible from the same machine')
 
