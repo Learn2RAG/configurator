@@ -217,7 +217,25 @@ Fetches a web page and extracts its text content. Optionally follows links recur
 | Parameter | Required | Description |
 |---|---|---|
 | `url` | yes | The URL of the page to load |
-| `depth` | no | Link traversal depth (default `0`). `0` = only the given page, `1` = also follow all direct links, `2` = follow links on linked pages, etc. Each URL is only loaded once. |
+| `depth` | no | Link traversal depth (default `0`). `0` = only the given page, `1` = also follow all direct links, `2` = follow links on linked pages, etc. Use `-1` to crawl the entire site (see below). Each URL is only loaded once. |
+
+#### depth = -1 — Entire site crawl
+
+Setting `depth` to `-1` enables a full site crawl. The loader follows **all links** it finds, with two restrictions:
+
+1. **Same domain** — only URLs whose host matches the root URL are followed (external links are skipped).
+2. **Same path prefix** — only URLs whose path starts with the path of the root URL are followed. This means you can restrict crawling to a subtree, e.g. starting at `https://example.com/docs/` will not follow links to `https://example.com/blog/`.
+
+Duplicate URLs are automatically skipped via a `visited` set, so there are no infinite loops.
+
+```json
+{
+    "loader_type": "HTMLLoader",
+    "loader_id": "full_docs",
+    "url": "https://www.example.com/docs/",
+    "depth": -1
+}
+```
 
 **Example output entry:**
 

@@ -52,17 +52,6 @@ cp services/open-webui/dist/open_webui-0.6.15-py3-none-any.whl pyapp
     cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/services/start-open-webui
 
-# Build Open WebUI Pipelines
-cp services/open-webui-pipelines/dist/open_webui_pipelines-0.1.0-py3-none-any.whl pyapp
-(cd pyapp; \
-    PYAPP_PYTHON_VERSION=3.11 \
-    PYAPP_PROJECT_NAME=open-webui-pipelines \
-    PYAPP_PROJECT_PATH=open_webui_pipelines-0.1.0-py3-none-any.whl \
-    PYAPP_EXEC_MODULE=start \
-    PYAPP_PIP_EXTRA_ARGS="$OFFLINE_ARGS" \
-    cross build --release --target $CARGO_BUILD_TARGET)
-cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/services/start-open-webui-pipelines
-
 while read -u 100 file; do
     mkdir -p $BUNDLE/$(dirname $file)
     cp -r $file $BUNDLE/$file
@@ -86,7 +75,6 @@ uv venv --seed --python 3.11 $BUNDLE_DIR/venv311
 $BUNDLE_DIR/venv311/bin/python -m pip download wheel setuptools -d $WHEELS_DIR
 $BUNDLE_DIR/venv313/bin/python -m pip download dist/learn2rag-$VERSION-py3-none-any.whl -d $WHEELS_DIR
 $BUNDLE_DIR/venv311/bin/python -m pip download services/open-webui/dist/open_webui-0.6.15-py3-none-any.whl -d $WHEELS_DIR
-$BUNDLE_DIR/venv311/bin/python -m pip download services/open-webui-pipelines/dist/open_webui_pipelines-0.1.0-py3-none-any.whl -d $WHEELS_DIR
 
 rm -rf $BUNDLE_DIR/venv313 $BUNDLE_DIR/venv311
 

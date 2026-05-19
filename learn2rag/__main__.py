@@ -22,6 +22,8 @@ class LauncherArgumentParser(argparse.ArgumentParser):
 def excepthook(*exc_info: Unpack[tuple[type[BaseException], BaseException, TracebackType | None]]) -> None:
     os.environ['NO_COLOR'] = '1'
     logging.critical('Uncaught exception', exc_info=exc_info)
+    # also print it since logging might be not configured properly
+    print(f'Uncaught exception: {exc_info}')
     sys.__excepthook__(*exc_info)
 
 
@@ -47,12 +49,14 @@ if __name__ == '__main__':
         with open('config.yml', 'r') as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
-        print('No user config file (config.yml)')
+        if len(sys.argv) == 1:
+            print('You can create config.yml for more configuration options')
+            print('https://docs.learn2rag.de/en/basic/administrator/#advanced-configuration')
 
     args, rest = LauncherArgumentParser().parse_known_args()
-    module = importlib.import_module(args.module)
     configure_logging(args.logging_config, config.get('logging', {}).get('debug', False))
     logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
+    module = importlib.import_module(args.module)
     # TODO
     if args.module == 'learn2rag.ollama_tool':
         # FIXME default config values

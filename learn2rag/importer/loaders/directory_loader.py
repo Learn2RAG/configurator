@@ -5,10 +5,10 @@ Description:
 This module handles loading documents from directories.
 
 Author: Kyrill Meyer
-Version: 0.0.4
+Version: 0.0.5
 Institution: IFDT
 Creation Date: June 10, 2025
-Last Modified: March 17, 2026
+Last Modified: Mai 05, 2026
 """
 import hashlib
 import logging
@@ -16,7 +16,7 @@ import os
 from datetime import datetime
 from typing import List, Union
 from ..globals import stop_loading
-from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.document_loaders import DirectoryLoader, PyPDFDirectoryLoader
 from langchain_core.documents import Document
 
 # supress pdfminer-Warnings
@@ -74,7 +74,6 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
             "*.docx",
             "*.pptx",
             "*.xlsx",
-            "*.pdf",
             "*.txt",
             "*.csv",
             "*.html",
@@ -83,6 +82,11 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
             "*.odt",
             "*.epub",
         ]
+    )
+    pdf_loader = PyPDFDirectoryLoader(
+        path,
+        recursive=recursive,
+        silent_errors=silent_errors,
     )
    
     #loader = DirectoryLoader(path, show_progress=True, loader_kwargs=text_loader_kwargs, recursive=recursive, glob=["*.csv", "*.docx", "*.eml", "*.epub", "*.html", "*.json", "*.md", "*.odt", "*.pdf", "*.ppt", "*.pptx", "*.rst", "*.rtf", "*.txt", "*.tsv", "*.cls", "*.xlsx", "*.xml"])
@@ -93,7 +97,7 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
 
     #loader = DirectoryLoader(path, show_progress=True, silent_errors=True, recursive=False)
     try:
-        loaded_documents = loader.load()
+        loaded_documents = loader.load() + pdf_loader.load()
     except Exception as e:
         logger.error(f"Error loading documents from directory: {e}")
         return []

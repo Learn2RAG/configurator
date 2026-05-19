@@ -163,7 +163,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         return translation
     babel.init_app(app, locale_selector=get_locale)
 
-    app.logger.info('create_app')
     app.logger.debug('cwd: %s', os.getcwd())
     app.logger.debug('root_path: %s', app.root_path)
     assert app.template_folder is not None
@@ -218,6 +217,21 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     except Exception as e:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
+
+    def remove_pipeline_storage_directory(storage_path: Path) -> bool:
+        try:
+            storage_path = expand_path(storage_path)
+            shutil.rmtree(storage_path)
+            flash(pgettext('flash', 'Directory removed: %(path)s', path=storage_path))
+        except FileNotFoundError:
+            # storage directory may be not created yet
+            app.logger.info('Directory was not removed since it does not exist: %s', storage_path)
+            pass
+        except Exception as e:
+            app.logger.error('Failed to remove directory: %s, %s', storage_path, e)
+            flash(pgettext('flash', 'Failed to remove directory: %(path)s: %(message)s', path=storage_path, message=e), 'error')
+            return False
+        return True
 
     @app.get('/')
     def start() -> 'str | werkzeug.wrappers.response.Response':
@@ -335,15 +349,21 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/sources')
     def sources_list() -> 'str | werkzeug.wrappers.response.Response':
-        return render_template('sources_list.html', example_local_path=example_local_path)
+        return render_template(
+            'sources_page.html',
+            example_local_path=example_local_path,
+            example_drupal_content_types='article, page, recipe',
+        )
 
     @app.post('/sources')
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
-        learn2rag.data.create_entry(app.instance_path, 'sources', {
-            'label': label,
-            'path': request.form['path'],
-        })
+        data: dict[str, Any] = request.form.to_dict()
+        if 'content_types' in data:
+            data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
+        if 'depth' in data:
+            data['depth'] = int(data['depth'])
+        learn2rag.data.create_entry(app.instance_path, 'sources', data)
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
 
@@ -366,20 +386,17 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         context = {
             'projects': Project.get_all(),
         }
-        template = '_pipelines_list_table.html' if request.headers.get('HX-Request') else 'pipelines_list.html'
+        template = 'pipelines_list.html' if request.headers.get('HX-Request') else 'pipelines_page.html'
         return render_template(template, **context)
 
     @app.post('/pipelines')
     def pipeline_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
-        ports = [int(port) for port in request.form.getlist("ports") if port]
-        name = learn2rag.data.create_entry(app.instance_path, 'pipelines', {
-            'label': label,
-            'storage_path': request.form['storage_path'],
-            'language_model': request.form['language_model'],
-            'sources': request.form.getlist('sources'),
-            'ports': ports,
-        })
+        data: dict[str, Any] = request.form.to_dict()
+        data.pop('import', None)
+        data['ports'] = [int(port) for port in request.form.getlist("ports") if port]
+        data['sources'] = request.form.getlist('sources')
+        name = learn2rag.data.create_entry(app.instance_path, 'pipelines', data)
         flash(pgettext('flash', 'Added a new pipeline configuration: %(label)s', label=label))
         if request.form.get('import'):
             pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
@@ -395,7 +412,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
         sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
         for path_name, source in sources.items():
-            source['path'] = str(expand_path(source['path']))
+            if 'path' in source:
+                source['path'] = str(expand_path(source['path']))
 
         #  Fetch the language model configuration first let see if it works
         language_model = learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model'])
@@ -405,12 +423,27 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             language_model['url'] = language_model['url'].replace('http://', 'https://', 1)
             app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
 
+        # Format the import config
+        import_config = {
+            'loaders': [{
+                'loader_id': name,
+                'loader_type': {
+                    # FIXME
+                    'local': 'DirectoryLoader',
+                    'web': 'HTMLLoader',
+                    'drupal': 'DrupalLoader',
+                }.get(source.get('type', 'local')),
+                'recursive': 'True',  # DirectoryLoader
+                **{key: value for key, value in source.items() if key not in ['label', 'type']},
+            } for name, source in sources.items()],
+        }
+
         render_context = {
             'config': app.config,
             'learn2rag_hostname': url.hostname,
             'pipeline': pipeline,
             'language_model': language_model,
-            'sources': sources,
+            'import_config': import_config,
             'debug_logging': config.get('logging', {}).get('debug', False),
             'qdrant_api_key': secrets.token_hex(16),
             # FIXME
@@ -448,17 +481,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
         if pipeline is None:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+        elif request.form['action'] == 'clean':
+            remove_pipeline_storage_directory(pipeline['storage_path'])
         elif request.form['action'] == 'delete':
-            ok = True
-            try:
-                storage_path = expand_path(pipeline['storage_path'])
-                shutil.rmtree(storage_path)
-            except FileNotFoundError:
-                pass
-            except Exception as e:
-                app.logger.error('Failed to remove directory: %s, %s', storage_path, e)
-                flash(pgettext('flash', 'Failed to remove directory: %(path)s', path=storage_path), 'error')
-                ok = False
+            ok = remove_pipeline_storage_directory(pipeline['storage_path'])
             if ok:
                 learn2rag.data.delete_entry(app.instance_path, 'pipelines', name)
                 flash(pgettext('flash', 'Removed pipeline: %(label)s', label=pipeline['label']))
@@ -512,7 +538,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         threading.Thread(target=shutdown).start()
         return pgettext('shutdown', 'Bye!')  # type: ignore[no-any-return]
 
-    app.logger.info('App creation complete')
     return app
 
 
@@ -563,13 +588,12 @@ def main(config: dict[str, Any]) -> None:
     use_https = False
     if ssl_key and ssl_cert:
         if os.path.exists(ssl_key) and os.path.exists(ssl_cert):
-            logging.info(f" SSL files defined and found at {ssl_key} or {ssl_cert}")
+            logging.debug('TLS enabled')
             use_https = True
         else:
-            logging.error(f"Warning: SSL files defined but not found at {ssl_key} or {ssl_cert}")
-            raise FileNotFoundError(f"SSL files defined but not found at {ssl_key} or {ssl_cert}")
+            raise FileNotFoundError(f'The configured TLS files are not found: {ssl_key}, {ssl_cert}')
     else:
-        logging.info(f"no SSL files provided then switch to HTTP mode")
+        logging.debug('TLS disabled')
 
     protocol = 'https' if use_https else 'http'
     url = f"{protocol}://localhost:{port}"

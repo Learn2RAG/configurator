@@ -67,14 +67,14 @@ def main(args: argparse.Namespace) -> None:
     # Load JSON configuration
     try:
         config = load_json_config(args.config)
-        logger.info("Configuration loaded successfully, starting validation...")
+        logger.debug("Configuration loaded successfully, starting validation...")
 
         # Validate each entry in the configuration
         validation_errors = False
         for index, entry in enumerate(config.get("loaders", []), start=1): 
             try:
                 loader_type = entry.get("loader_type", "Unknown")
-                logger.info(f"Validated configuration entry {index}: {loader_type}")
+                logger.debug(f"Validated configuration entry {index}: {loader_type}")
                 validate_config_entry(entry)
             except ValueError as e:
                 logger.error(f"Validation error in configuration entry {index}: {e}")
@@ -83,19 +83,21 @@ def main(args: argparse.Namespace) -> None:
         # Process configuration entries and load documents
         if not validation_errors:
             all_documents = process_configuration_entries(config.get("loaders", []))
-            logger.info(f"Total documents loaded: {len(all_documents)}")
+            logger.debug(f"Total documents loaded: {len(all_documents)}")
 
             # Optional: Speichern der Dokumente in einer Datei
             output_path = "loaded_documents.json"
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump([{"metadata": doc.metadata, "content": doc.page_content} for doc in all_documents], f, ensure_ascii=False, indent=4)
 
-            print(f"Loaded documents saved to {output_path}")
+            logger.info('Documents saved to: %s', output_path)
         else:
             logger.error("Configuration validation failed. No documents were processed.")
+            sys.exit(1)
 
     except Exception as e:
         logger.error(f"Error loading configuration: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
