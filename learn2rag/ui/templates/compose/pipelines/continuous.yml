@@ -33,6 +33,9 @@ files:
     content: |
       version: 1
       formatters:
+        status:
+          format: "%(message)s %(asctime)s"
+          datefmt: "%Y-%m-%d %H:%M"
         simple:
           format: "%(asctime)s %(levelname)-8s %(name)s %(message)s"
         colored:
@@ -61,6 +64,13 @@ files:
           formatter: simple
           filename: '{{storage_path}}/logs/error.log'
           encoding: utf-8
+        status_file:
+          class: logging.FileHandler
+          level: INFO
+          formatter: status
+          filename: '{{storage_path}}/logs/status.log'
+          mode: 'w'
+          encoding: utf-8
         {% if debug_logging %}
         debug_file:
           class: logging.FileHandler
@@ -74,6 +84,10 @@ files:
           handlers:
             - profiling_display
             - profiling_file
+          propagate: no
+        status:
+          handlers:
+            - status_file
           propagate: no
       root:
         level: DEBUG

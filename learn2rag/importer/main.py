@@ -26,6 +26,7 @@ from .loaders.process_loaders import process_configuration_entries
 
 
 logger = logging.getLogger("Learn2RAGImporter")
+statusLogger = logging.getLogger('status')
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="magic") # Suppress SyntaxWarnings from the 'magic' module
 
 
@@ -64,6 +65,7 @@ def init(args: argparse.Namespace) -> None:
 
 #main function to run the application
 def main(args: argparse.Namespace) -> None:
+    statusLogger.info('Import started')
     # Load JSON configuration
     try:
         config = load_json_config(args.config)
@@ -91,12 +93,15 @@ def main(args: argparse.Namespace) -> None:
                 json.dump([{"metadata": doc.metadata, "content": doc.page_content} for doc in all_documents], f, ensure_ascii=False, indent=4)
 
             logger.info('Documents saved to: %s', output_path)
+            statusLogger.info('Import finished')
         else:
             logger.error("Configuration validation failed. No documents were processed.")
+            statusLogger.error('Import failed')
             sys.exit(1)
 
     except Exception as e:
         logger.error(f"Error loading configuration: {e}")
+        statusLogger.error('Import failed')
         sys.exit(1)
 
 
