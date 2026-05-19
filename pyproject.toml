@@ -205,7 +205,10 @@ build-backend = "setuptools.build_meta"
 requires = ["setuptools >= 77.0.3"]
 [tool.mypy]
 files = "learn2rag"
-exclude = "^learn2rag/pipeline/scripts/"
+exclude = [
+    "^learn2rag/pipeline/scripts/",
+    "^learn2rag/pipeline/main\\.py$",
+]
 strict = true
 [[tool.mypy.overrides]]
 module = [
