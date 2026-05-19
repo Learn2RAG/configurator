@@ -46,7 +46,7 @@
         {% endif %}
       </td>
       <td>
-        <div class="dropdown">
+        <div>
           <div class="btn-toolbar" role="toolbar">
             <div class="btn-group" role="group">
               {% if not (projects[name] and projects[name].running) %}
@@ -127,6 +127,9 @@
               {% endif %}
             </div>
           </div>
+        </div>
+        <div>
+          {{ pipeline.status_message }}
         </div>
       </td>
     </tr>

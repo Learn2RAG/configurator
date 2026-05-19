@@ -383,7 +383,14 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/pipelines')
     def pipelines_list() -> 'str | werkzeug.wrappers.response.Response':
+        pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
+        for pipeline in pipelines.values():
+            try:
+                pipeline['status_message'] = (Path(pipeline['storage_path']) / 'logs' / 'status.log').read_text().splitlines()[-1]
+            except (FileNotFoundError, IndexError):
+                pipeline['status_message'] = ''
         context = {
+            'pipelines': pipelines,
             'projects': Project.get_all(),
         }
         template = 'pipelines_list.html' if request.headers.get('HX-Request') else 'pipelines_page.html'
