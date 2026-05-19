@@ -38,12 +38,23 @@ files:
         colored:
           class: colorlog.ColoredFormatter
           format: "%(log_color)s%(asctime)s %(levelname)-8s %(name)s %(message)s"
+        profiling:
+          format: "%(created)f %(request_id)s %(activity)s %(message)s"
       handlers:
         display:
           class: logging.StreamHandler
           level: INFO
           formatter: colored
           stream: ext://sys.stderr
+        profiling_display:
+          class: logging.StreamHandler
+          formatter: profiling
+          stream: ext://sys.stderr
+        profiling_file:
+          class: logging.FileHandler
+          formatter: profiling
+          filename: '{{storage_path}}/logs/profiling.log'
+          encoding: utf-8
         errors_file:
           class: logging.FileHandler
           level: ERROR
@@ -58,6 +69,12 @@ files:
           filename: '{{storage_path}}/logs/debug.log'
           encoding: utf-8
         {% endif %}
+      loggers:
+        profiling:
+          handlers:
+            - profiling_display
+            - profiling_file
+          propagate: no
       root:
         level: DEBUG
         handlers:
