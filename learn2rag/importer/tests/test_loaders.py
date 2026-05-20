@@ -255,3 +255,147 @@ class HtmlLoaderDepthMinusOneTestCase(unittest.TestCase):
             self.assertEqual(doc.metadata.get("loader_id"), "test_meta")
             self.assertIn("content_hash", doc.metadata)
             self.assertEqual(doc.metadata.get("loader_type"), "HTMLLoader")
+
+
+# ---------------------------------------------------------------------------
+# Helper
+# ---------------------------------------------------------------------------
+
+def _doc(source: str, content_hash: str) -> Document:
+    """Create a minimal Document with source and content_hash metadata."""
+    return Document(
+        page_content="content",
+        metadata={"source": source, "content_hash": content_hash},
+    )
+
+
+_USER_CONFIG: dict[str, str] = {"collection_name": "test_collection"}
+_OPT_CONFIG: dict[str, Any] = {}
+
+# ---------------------------------------------------------------------------
+# _delta_by_source unit tests (no Qdrant required)
+# ---------------------------------------------------------------------------
+
+class DeltaBySourceTestCase(unittest.TestCase):
+    """Unit tests for _delta_by_source.
+
+    All Qdrant calls (delete_documents, update_documents) are mocked so no
+    running Qdrant instance is required.
+    """
+
+    def setUp(self) -> None:
+        from ..loaders.process_loaders import _delta_by_source  # local import to avoid top-level side effects
+        self._delta_by_source = _delta_by_source
+        self._patch_delete = patch("learn2rag.importer.loaders.process_loaders.delete_documents")
+        self._patch_update = patch("learn2rag.importer.loaders.process_loaders.update_documents")
+        self.mock_delete = self._patch_delete.start()
+        self.mock_update = self._patch_update.start()
+
+    def tearDown(self) -> None:
+        self._patch_delete.stop()
+        self._patch_update.stop()
+
+    # -- no changes --------------------------------------------------------
+
+    def test_no_changes_no_qdrant_calls(self) -> None:
+        """When nothing changed, neither delete nor update should be called."""
+        existing_map = {"a.txt": "hash_a", "b.txt": "hash_b"}
+        all_docs = [_doc("a.txt", "hash_a"), _doc("b.txt", "hash_b")]
+
+        self._delta_by_source(all_docs, existing_map, "loader1", _USER_CONFIG, _OPT_CONFIG)
+
+        self.mock_delete.assert_not_called()
+        self.mock_update.assert_not_called()
+
+    # -- new document ------------------------------------------------------
+
+    def test_new_document_is_updated(self) -> None:
+        """A source that does not exist in Qdrant yet must be passed to update_documents."""
+        existing_map = {"a.txt": "hash_a"}
+        all_docs = [_doc("a.txt", "hash_a"), _doc("new.txt", "hash_new")]
+
+        self._delta_by_source(all_docs, existing_map, "loader1", _USER_CONFIG, _OPT_CONFIG)
+
+        self.mock_delete.assert_not_called()
+        updated_sources = {d.metadata["source"] for d in self.mock_update.call_args[0][1]}
+        self.assertIn("new.txt", updated_sources)
+        self.assertNotIn("a.txt", updated_sources)
+
+    # -- changed document --------------------------------------------------
+
+    def test_changed_document_is_updated(self) -> None:
+        """A source whose hash differs from the stored one must be re-indexed."""
+        existing_map = {"a.txt": "hash_a_old"}
+        all_docs = [_doc("a.txt", "hash_a_new")]
+
+        self._delta_by_source(all_docs, existing_map, "loader1", _USER_CONFIG, _OPT_CONFIG)
+
+        self.mock_delete.assert_not_called()
+        updated_sources = {d.metadata["source"] for d in self.mock_update.call_args[0][1]}
+        self.assertIn("a.txt", updated_sources)
+
+    # -- deleted document --------------------------------------------------
+
+    def test_deleted_document_is_removed(self) -> None:
+        """A source present in Qdrant but absent from the fresh load must be deleted."""
+        existing_map = {"a.txt": "hash_a", "gone.txt": "hash_gone"}
+        all_docs = [_doc("a.txt", "hash_a")]
+
+        self._delta_by_source(all_docs, existing_map, "loader1", _USER_CONFIG, _OPT_CONFIG)
+
+        deleted = self.mock_delete.call_args[0][1]
+        self.assertIn("gone.txt", deleted)
+        self.mock_update.assert_not_called()
+
+    # -- mixed scenario ----------------------------------------------------
+
+    def test_mixed_new_changed_deleted_unchanged(self) -> None:
+        """Combined scenario: new, changed, deleted and unchanged in one call."""
+        existing_map = {
+            "unchanged.txt": "hash_u",
+            "changed.txt": "hash_c_old",
+            "deleted.txt": "hash_d",
+        }
+        all_docs = [
+            _doc("unchanged.txt", "hash_u"),     # unchanged — must not be touched
+            _doc("changed.txt", "hash_c_new"),   # changed   — must be re-indexed
+            _doc("new.txt", "hash_n"),            # new       — must be indexed
+            # deleted.txt is absent              # deleted   — must be removed
+        ]
+
+        self._delta_by_source(all_docs, existing_map, "loader1", _USER_CONFIG, _OPT_CONFIG)
+
+        deleted = self.mock_delete.call_args[0][1]
+        self.assertIn("deleted.txt", deleted)
+        self.assertNotIn("unchanged.txt", deleted)
+
+        updated_sources = {d.metadata["source"] for d in self.mock_update.call_args[0][1]}
+        self.assertIn("changed.txt", updated_sources)
+        self.assertIn("new.txt", updated_sources)
+        self.assertNotIn("unchanged.txt", updated_sources)
+
+    # -- empty existing map (initial run) ----------------------------------
+
+    def test_initial_run_all_documents_indexed(self) -> None:
+        """On the first run (empty Qdrant) every document must be passed to update_documents."""
+        existing_map: dict[str, str] = {}
+        all_docs = [_doc("a.txt", "hash_a"), _doc("b.txt", "hash_b")]
+
+        self._delta_by_source(all_docs, existing_map, "loader1", _USER_CONFIG, _OPT_CONFIG)
+
+        self.mock_delete.assert_not_called()
+        updated_sources = {d.metadata["source"] for d in self.mock_update.call_args[0][1]}
+        self.assertEqual(updated_sources, {"a.txt", "b.txt"})
+
+    # -- empty fresh load (all documents removed) --------------------------
+
+    def test_all_documents_removed(self) -> None:
+        """If the loader returns nothing, all existing sources must be deleted."""
+        existing_map = {"a.txt": "hash_a", "b.txt": "hash_b"}
+        all_docs: list[Document] = []
+
+        self._delta_by_source(all_docs, existing_map, "loader1", _USER_CONFIG, _OPT_CONFIG)
+
+        deleted = self.mock_delete.call_args[0][1]
+        self.assertCountEqual(deleted, ["a.txt", "b.txt"])
+        self.mock_update.assert_not_called()

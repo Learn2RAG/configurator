@@ -1,9 +1,9 @@
 # Learn2RAG Importer
 
-An importer for document sources used within the Learn2RAG pipeline. It reads a `config.json`, delegates loading to the appropriate loader, enriches documents with metadata, and writes results to `loaded_documents.json`.
+An importer for document sources used within the Learn2RAG pipeline. It reads a `config.json`, delegates loading to the appropriate loader, enriches documents with metadata, and ingests them directly into Qdrant.
 
 **Author:** IFDT, KM  
-**Version:** 0.0.5
+**Version:** 0.0.9
 
 ---
 
@@ -48,8 +48,8 @@ graph TD
     G --> I
     H --> I
     I --> J[Enrich metadata]
-    J --> K[loaded_documents.json]
-    K --> L[Pipeline input]
+    J --> L[Qdrant]
+    J -.->|--save-documents| K[loaded_documents.json]
 
     classDef purple fill:#9370db,stroke:#000000,stroke-width:2px
     A:::purple
@@ -71,8 +71,56 @@ graph TD
 ## Running the importer
 
 ```bash
-python -m learn2rag.importer
+python -m learn2rag.importer [OPTIONS]
 ```
+
+### CLI options
+
+| Option | Default | Description |
+|---|---|---|
+| `--config PATH` | bundled `config.json` | Path to the importer config JSON file |
+| `--state-file PATH` | `import_state.json` next to `--config` | Path to the import-state JSON file that persists per-loader timestamps across runs |
+| `--delta` | off | Run a delta import instead of a full import (see [Delta import](#delta-import)) |
+| `--save-documents` | off | Write all loaded documents to `loaded_documents.json` in the working directory (debug / backwards compatibility) |
+
+### Environment variables
+
+The importer reads the pipeline configuration directly from environment variables. These must be set (or the default paths must exist) before running.
+
+| Variable | Default | Description |
+|---|---|---|
+| `PIPELINE_USER_CONFIG` | `learn2rag/pipeline/user_config.json` | Path to the pipeline `user_config.json` |
+| `PIPELINE_OPT_CONFIG` | `learn2rag/pipeline/opt_config.json` | Path to the pipeline `opt_config.json` |
+
+### Examples
+
+**Full import** — loads all documents and ingests them into Qdrant:
+```bash
+python -m learn2rag.importer --config /data/config.json
+```
+
+**Delta import** — only processes new or changed documents:
+```bash
+python -m learn2rag.importer --config /data/config.json --delta
+```
+
+**Full import with debug output:**
+```bash
+python -m learn2rag.importer --config /data/config.json --save-documents
+```
+
+---
+
+## Delta import
+
+With `--delta` the importer uses a loader-specific strategy to minimise the number of documents re-processed:
+
+- **Intelligent loaders** (DrupalLoader, SharepointLoader): 2-pass approach — fetch all current document IDs to detect deletions, then load only documents changed since the last successful run via a server-side timestamp filter.
+- **Plain loaders** (DirectoryLoader, HTMLLoader, CSVLoader): full load followed by SHA-256 content-hash comparison against the existing Qdrant index to detect additions, changes, and deletions.
+
+The import timestamp for each loader is only persisted after a **successful** run. A failed run will therefore be retried in full on the next call.
+
+On the **very first run** (empty state file or empty Qdrant collection) a full import is performed automatically regardless of the `--delta` flag.
 
 ---
 
@@ -98,7 +146,9 @@ Edit `config/config.json` to define one or more loaders. Each entry requires at 
 
 ## Output
 
-Results are written to `loaded_documents.json` in the project root. Each document entry contains a `metadata` object and a `content` string:
+By default, documents are ingested **directly into Qdrant** without writing any local file. The `loaded_documents.json` file is only written when `--save-documents` is passed (useful for debugging or backwards compatibility).
+
+Each document entry contains a `metadata` object and a `content` string:
 
 ```json
 [
@@ -433,3 +483,10 @@ where
   - delta import now uses `get_documents` from the pipeline
   - hash comparison now uses sorted chunk hashes per source for stable results
   - **Breaking change:** Qdrant payload field renamed from `path` → `source`; existing collections must be deleted and re-imported
+- v0.1.0
+  - documents are now ingested directly into Qdrant instead of being written to `loaded_documents.json`
+  - added `--delta` flag to run a delta import (hash/timestamp comparison, direct Qdrant update)
+  - added `--state-file` flag to override the path of the per-loader import-state JSON
+  - added `--save-documents` flag to optionally write `loaded_documents.json` for debugging / backwards compatibility
+  - pipeline configuration (`user_config`, `opt_config`) is now read from `PIPELINE_USER_CONFIG` / `PIPELINE_OPT_CONFIG` environment variables
+  - loop variable `index` renamed to `entry_idx` to avoid shadowing the `index()` import from `learn2rag.pipeline.ingestion`

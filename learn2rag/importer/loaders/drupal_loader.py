@@ -78,7 +78,7 @@ def _build_session(auth_type: str, username: str, password: str, token: str) -> 
 def _html_to_text(html: str) -> str:
     """Strip HTML tags and return plain text."""
     soup = BeautifulSoup(html, "html.parser")
-    return soup.get_text(separator="\n", strip=True)
+    return str(soup.get_text(separator="\n", strip=True))
 
 
 def _extract_page_content(attributes: Dict[str, Any], text_fields: List[str]) -> str:
