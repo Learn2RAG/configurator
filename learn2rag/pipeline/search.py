@@ -141,22 +141,22 @@ def _collect_query_points(
 
 
     profilingLogger.info(
-        "collect_query_points_start query=%r rewrite=%s rewrite_mode=%s request_id=%s",
+        "collect_query_points_start query=%r rewrite=%s rewrite_mode=%s",
         query,
         opt_config.get("rewrite"),
         opt_config.get("rewrite_mode"),
-        request_id,
+        extra={'activity': '_collect_query_points', 'request_id': request_id},
     )
 
     points_all: list[ScoredPoint] = []
 
     # Base query
     profilingLogger.info(
-        "base_search_start query=%r search_mode=%s top_k=%s request_id=%s",
+        "base_search_start query=%r search_mode=%s top_k=%s",
         query,
         opt_config.get("search_mode"),
         opt_config.get("top_k"),
-        request_id,
+        extra={'activity': '_collect_query_points', 'request_id': request_id},
     )
     base_results = search(query, user_config, opt_config, request_id=request_id)
     points_all.extend(base_results.points)
@@ -165,10 +165,10 @@ def _collect_query_points(
         rewrite_mode = opt_config.get("rewrite_mode")
 
         profilingLogger.info(
-            "rewrite_enabled query=%r rewrite_mode=%s request_id=%s",
+            "rewrite_enabled query=%r rewrite_mode=%s",
             query,
             rewrite_mode,
-            request_id,
+            extra={'activity': '_collect_query_points', 'request_id': request_id},
         )
 
         if rewrite_mode in ["subqueries", "subqueries_keywords"]:
@@ -177,12 +177,12 @@ def _collect_query_points(
 
             subqueries = rewrite.generate_subqueries(query, n=opt_config["n_subqueries"])
             profilingLogger.info(
-                "subqueries_generated query=%r subqueries=%r n_subqueries=%d top_k_subqueries=%s request_id=%s",
+                "subqueries_generated query=%r subqueries=%r n_subqueries=%d top_k_subqueries=%s",
                 query,
                 subqueries,
                 len(subqueries),
                 opt_config_subqueries["top_k"],
-                request_id,
+                extra={'activity': '_collect_query_points', 'request_id': request_id},
             )
 
             for sq in subqueries:
@@ -196,13 +196,13 @@ def _collect_query_points(
 
             keywords = rewrite.generate_keywords(query, n=opt_config["n_keywords"])
             profilingLogger.info(
-                "keywords_generated query=%r keywords=%r n_keywords=%d top_k_keywords=%s search_mode=%s request_id=%s",
+                "keywords_generated query=%r keywords=%r n_keywords=%d top_k_keywords=%s search_mode=%s",
                 query,
                 keywords,
                 len(keywords),
                 opt_config_keywords["top_k"],
                 opt_config_keywords["search_mode"],
-                request_id,
+                extra={'activity': '_collect_query_points', 'request_id': request_id},
             )
 
             for kw in keywords:
@@ -214,10 +214,10 @@ def _collect_query_points(
     if opt_config["reranking"] == "True":
         reranking_mode = opt_config["reranking_mode"]
         profilingLogger.info(
-            "reranking_enabled query=%r reranking_mode=%s request_id=%s",
+            "reranking_enabled query=%r reranking_mode=%s",
             query,
             reranking_mode,
-            request_id,
+            extra={'activity': '_collect_query_points', 'request_id': request_id},
         )
 
         if reranking_mode == "reranking_with_flagreranker":
@@ -249,11 +249,11 @@ def _collect_query_points(
 def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], *, request_id: str | None=None) -> QueryResponse:
     profilingLogger.info('start', extra={'activity': 'search', 'request_id': request_id})
     profilingLogger.info(
-        "search_called query=%r search_mode=%s collection_name=%s request_id=%s",
+        "search_called query=%r search_mode=%s collection_name=%s",
         query,
         opt_config.get("search_mode"),
         user_config.get("collection_name"),
-        request_id,
+        extra={'activity': '_collect_query_points', 'request_id': request_id},
     )
     collection_name = user_config["collection_name"]
 

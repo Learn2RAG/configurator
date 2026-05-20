@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import secrets
+from collections.abc import Coroutine
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, AsyncGenerator, Generator, List, Optional
 
@@ -30,7 +31,7 @@ class Message(BaseModel):
 class ChatState(BaseModel):
     messages: List[Message]
     stream: Optional[bool] = False
-    user: str | None = 'anonymous'  # FIXME use https://developers.openai.com/api/docs/guides/safety-best-practices#safety-identifiers
+    user: str = 'anonymous'  # FIXME use https://developers.openai.com/api/docs/guides/safety-best-practices#safety-identifiers
 
 class TestResponse(BaseModel):
     message: str
@@ -85,38 +86,52 @@ async def get_models() -> JSONResponse: return JSONResponse([{"id": "Learn2RAG"}
 
 
 @app.post("/stream")
-@app.post("/chat/completions")  # OpenAI API for Open WebUI
 async def stream(
         inputs: ChatState = Body(
             ...,
             example=example_messages
         )
 ) -> StreamingResponse:
+    return streaming_response(inputs)
+
+
+@app.post("/chat/completions", response_model=None)  # OpenAI API for Open WebUI
+async def chat_completions(
+        inputs: ChatState = Body(
+            ...,
+            example=example_messages
+        )
+) -> JSONResponse | StreamingResponse:
     if inputs.stream:
         return streaming_response(inputs)
     else:
-        raise NotImplementedError()
+        return await simple_response(inputs)
+
+
+async def pipeline(inputs: ChatState) -> list[str]:
+    request_id = secrets.token_hex()
+    question = inputs.messages[-1].content
+
+    results = await search_authorized(user=inputs.user, question=question, request_id=request_id)
+    # sources = "\n".join(set(result.payload['path'] for result in results))
+
+    executor = ThreadPoolExecutor()
+    loop = asyncio.get_event_loop()
+
+    def sync_gen() -> Generator[str, Any, None]:
+        for chunk in generate.generate_stream(question, results, opt_config, request_id=request_id):
+            yield chunk
+
+    chunks = await loop.run_in_executor(executor, lambda: list(sync_gen()))
+    return chunks
 
 
 async def event_stream(inputs: ChatState) -> AsyncGenerator[Any, Any]:
-    request_id = secrets.token_hex()
     try:
-        question = inputs.messages[-1].content
-
         if not inputs.user:
             raise ValueError("User Missing")
 
-        results = await search_authorized(user=inputs.user, question=question, request_id=request_id)
-        # sources = "\n".join(set(result.payload['path'] for result in results))
-
-        executor = ThreadPoolExecutor()
-        loop = asyncio.get_event_loop()
-
-        def sync_gen() -> Generator[str, Any, None]:
-            for chunk in generate.generate_stream(question, results, opt_config, request_id=request_id):
-                yield chunk
-
-        chunks = await loop.run_in_executor(executor, lambda: list(sync_gen()))
+        chunks = await pipeline(inputs)
 
         yield f"data: {json.dumps({'choices': [{'delta': {}, 'finish_reason': None}]})}\n\n"
 
@@ -148,6 +163,22 @@ async def event_stream(inputs: ChatState) -> AsyncGenerator[Any, Any]:
         content = 'There is a problem with Learn2RAG configuration. Please contact your administrator.'  # FIXME
         delta = {'content': content}
         yield f"data: {json.dumps({'choices': [{'delta': delta, 'finish_reason': 'stop'}]})}\n\n"
+
+
+async def simple_response(inputs: ChatState) -> JSONResponse:
+    if not inputs.user:
+        raise ValueError("User Missing")
+
+    return JSONResponse({
+        'choices': [
+            {
+                'message': {
+                    'content': ''.join(await pipeline(inputs)),
+                },
+                'finish_reason': 'stop',
+            },
+        ],
+    })
 
 
 def streaming_response(inputs: ChatState) -> StreamingResponse:

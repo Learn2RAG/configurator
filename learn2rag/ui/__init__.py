@@ -261,7 +261,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     @app.get('/models')
     def models_list() -> 'str | werkzeug.wrappers.response.Response':
         return render_template(
-            'models_list.html',
+            'models_page.html',
             ollama_models=list_ollama_models(),
         )
 
@@ -579,8 +579,13 @@ def webbrowser_open(url: str) -> None:
 def main(config: dict[str, Any]) -> None:
     app = create_app(config=config)
 
-    port = config.get('port', '9000')
-    host = config.get('host', '0.0.0.0')
+    ui_config = config.get('UI', {})
+    port = ui_config.get('port', '9000')
+    host = '127.0.0.1'
+    if 'host' in ui_config:
+        host = ui_config['host']
+    else:
+        logging.warning('By default, interface is only accessible from the same machine')
 
     ssl_key = config.get('TLS', {}).get('KEYFILE')
     ssl_cert = config.get('TLS', {}).get('CERTFILE')
@@ -602,7 +607,7 @@ def main(config: dict[str, Any]) -> None:
     logging.info('Learn2RAG: ' + url)
     logging.info('*' * 40)
 
-    uvicorn_kwargs = {
+    uvicorn_kwargs: dict[str, Any] = {
         "app": app,
         "host": host,
         "port": int(port),
