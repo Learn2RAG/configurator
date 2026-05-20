@@ -15,8 +15,9 @@ import urllib
 from itertools import islice
 
 from babel import negotiate_locale
-from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
+from flask import Flask, Response, flash, redirect as flask_redirect, render_template, request, make_response, url_for
 from flask_babel import Babel, gettext, ngettext, pgettext  # type: ignore[import-untyped]
+from pygtail import Pygtail
 import flask.logging
 import ollama
 import uvicorn
@@ -560,15 +561,25 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         elif file in ['debug.log', 'error.log']:
             storage_path = normalize_path(pipeline['storage_path'])
             log_file = storage_path / 'logs' / file
-            try:
-                content = log_file.read_text()
-            except FileNotFoundError:
-                content = ''
-            return render_template(
-                'logs.html',
-                content=content,
-                file=file,
-            )
+            if request.accept_mimetypes.accept_html:
+                try:
+                    content = log_file.read_text()
+                except FileNotFoundError:
+                    content = ''
+                return render_template(
+                    'logs.html',
+                    name=name,
+                    content=content,
+                    file=file,
+                )
+            else:  # text/event-stream
+                def as_sse(data: str) -> str:
+                    return '\n'.join(map(lambda line: 'data: ' + line, data.split('\n'))) + '\n\n'
+                def stream():
+                    tail = Pygtail(str(log_file))
+                    for line in tail:
+                        yield line
+                return Response(map(as_sse, stream()), mimetype='text/event-stream')
         return redirect(url_for('pipelines_list'))
 
     @app.get('/ps')

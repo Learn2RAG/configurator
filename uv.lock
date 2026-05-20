@@ -1824,6 +1824,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-core" },
     { name = "pydantic-settings" },
+    { name = "pygtail" },
     { name = "pypandoc" },
     { name = "pyparsing" },
     { name = "pypdf" },
@@ -2016,6 +2017,7 @@ requires-dist = [
     { name = "pydantic", specifier = "==2.11.7" },
     { name = "pydantic-core", specifier = "==2.33.2" },
     { name = "pydantic-settings", specifier = "==2.10.1" },
+    { name = "pygtail", specifier = "==0.6.1" },
     { name = "pypandoc", specifier = "==1.15" },
     { name = "pyparsing", specifier = "==3.2.3" },
     { name = "pypdf", specifier = "==5.9.0" },
@@ -3553,6 +3555,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151, upload-time = "2026-03-29T13:29:30.038Z" },
 ]
+
+[[package]]
+name = "pygtail"
+version = "0.6.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/32/31/21057f7f488cff3ef2069c7529e129cd452bb810c04fb226714dbdae5bf5/pygtail-0.6.1.tar.gz", hash = "sha256:4d71af37337bc96c6c0cbb4218aadde5c0d3120e642ca7f943784cb2878f516c", size = 5087, upload-time = "2015-11-06T04:17:05.35Z" }
 
 [[package]]
 name = "pyjwt"

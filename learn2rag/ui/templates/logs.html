@@ -1,9 +1,24 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}{{file}}{% endblock %}</h1>
+<h1>{% block title %}{{file}}{% endblock %}</h1>
 {% endblock %}
 
 {% block content %}
-<pre>{{content}}</pre>
+<pre hx-ext="sse" sse-connect="{{ url_for('pipeline_logs', name=name, file=file) }}" sse-swap="message" hx-swap="beforeend">{{content}}</pre>
+<script>
+  let shouldScroll = true;
+  document.body.addEventListener('htmx:sseBeforeMessage', () => {
+      shouldScroll = document.documentElement.scrollHeight - document.documentElement.offsetHeight - document.documentElement.scrollTop < 1;
+  });
+  document.body.addEventListener('htmx:sseMessage', () => {
+      if (shouldScroll) {
+          document.documentElement.scrollTo({
+              left: 0,
+              top: document.documentElement.scrollHeight,
+              behavior: 'instant',
+          });
+      }
+  });
+</script>
 {% endblock %}
