@@ -85,8 +85,17 @@ async def get_models() -> JSONResponse: return JSONResponse([{"id": "Learn2RAG"}
 
 
 @app.post("/stream")
-@app.post("/chat/completions")  # OpenAI API for Open WebUI
 async def stream(
+        inputs: ChatState = Body(
+            ...,
+            example=example_messages
+        )
+) -> StreamingResponse:
+    return streaming_response(inputs)
+
+
+@app.post("/chat/completions")  # OpenAI API for Open WebUI
+async def chat_completions(
         inputs: ChatState = Body(
             ...,
             example=example_messages
