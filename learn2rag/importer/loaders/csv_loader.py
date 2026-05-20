@@ -11,7 +11,7 @@ Creation Date: June 10, 2025
 Last Modified: February 20, 2026
 """
 from datetime import datetime
-from typing import List
+from typing import List, cast
 from langchain_community.document_loaders import CSVLoader
 from langchain_core.documents import Document
 
@@ -27,7 +27,7 @@ def load_from_csv(path: str) -> List[Document]:
     """
 
     loader = CSVLoader(file_path=path)
-    documents = loader.load()
+    documents = cast(List[Document], loader.load())
     if not documents:
         raise ValueError(f"No document found in CSV file: {path}")
 

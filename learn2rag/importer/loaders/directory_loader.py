@@ -87,7 +87,7 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
     pdf_loader = DirectoryLoader(
         path,
         glob="*.pdf",
-        loader_cls=PyPDFLoader,  # type: ignore[arg-type]
+        loader_cls=PyPDFLoader,
         loader_kwargs={"mode": "single"},
         recursive=recursive,
         silent_errors=silent_errors,

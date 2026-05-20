@@ -5,13 +5,15 @@ import shutil
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from collections import defaultdict
-from typing import Any, ClassVar, DefaultDict, List, Optional, Set
+from typing import Any, ClassVar, DefaultDict, Dict, List, Optional, Set
 from unittest.mock import patch, MagicMock
 
 from langchain_core.documents import Document
 from ..loaders.directory_loader import load_from_directory
 from ..loaders.html_loader import load_html_content, _is_same_site
+from ..loaders.jira_loader import load_from_jira, get_all_jira_document_ids
 
 # Set RUN_INTEGRATION_TESTS=1 to run tests that require network access.
 _RUN_INTEGRATION: bool = os.environ.get("RUN_INTEGRATION_TESTS", "0") == "1"
@@ -183,6 +185,15 @@ def _make_response(text: str, status_code: int = 200) -> MagicMock:
     return resp
 
 
+def _make_json_response(payload: Dict[str, Any], status_code: int = 200) -> MagicMock:
+    """Helper: creates a fake JSON response."""
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.raise_for_status = MagicMock()
+    resp.json = MagicMock(return_value=payload)
+    return resp
+
+
 ROOT_HTML = """
 <html><head><title>Root</title></head><body>
   <p>Root page</p>
@@ -255,3 +266,146 @@ class HtmlLoaderDepthMinusOneTestCase(unittest.TestCase):
             self.assertEqual(doc.metadata.get("loader_id"), "test_meta")
             self.assertIn("content_hash", doc.metadata)
             self.assertEqual(doc.metadata.get("loader_type"), "HTMLLoader")
+
+
+class JiraLoaderUnitTestCase(unittest.TestCase):
+    """Unit tests for Jira loader with mocked HTTP session."""
+
+    @patch("learn2rag.importer.loaders.jira_loader.requests.Session")
+    def test_load_from_jira_maps_issue_to_document(self, mock_session_cls: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        issue_payload = {
+            "issues": [
+                {
+                    "id": "10001",
+                    "key": "DEMO-1",
+                    "fields": {
+                        "summary": "Demo issue",
+                        "description": {
+                            "type": "doc",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Description text"}],
+                                }
+                            ],
+                        },
+                        "status": {"name": "In Progress"},
+                        "assignee": {"displayName": "Alice"},
+                        "labels": ["backend", "priority-high"],
+                        "updated": "2026-05-18T10:00:00.000+0000",
+                        "created": "2026-05-17T09:00:00.000+0000",
+                        "project": {"key": "DEMO", "name": "Demo Project"},
+                        "comment": {
+                            "comments": [
+                                {
+                                    "author": {"displayName": "Bob"},
+                                    "body": {
+                                        "type": "doc",
+                                        "content": [
+                                            {
+                                                "type": "paragraph",
+                                                "content": [{"type": "text", "text": "Looks good"}],
+                                            }
+                                        ],
+                                    },
+                                }
+                            ]
+                        },
+                    },
+                }
+            ],
+            "total": 1,
+            "startAt": 0,
+            "maxResults": 50,
+        }
+
+        mock_session.get.return_value = _make_json_response(issue_payload)
+
+        docs = load_from_jira(
+            base_url="https://jira.example.com",
+            loader_id="jira_test",
+            auth_type="basic",
+            username="user@example.com",
+            password="token123",
+            jql="project = DEMO ORDER BY updated DESC",
+            include_comments=True,
+        )
+
+        self.assertEqual(len(docs), 1)
+        doc = docs[0]
+        self.assertEqual(doc.metadata.get("loader_id"), "jira_test")
+        self.assertEqual(doc.metadata.get("loader"), "JiraLoader")
+        self.assertEqual(doc.metadata.get("issue_key"), "DEMO-1")
+        self.assertEqual(doc.metadata.get("source"), "https://jira.example.com/browse/DEMO-1")
+        self.assertIn("content_hash", doc.metadata)
+        self.assertIn("Description text", doc.page_content)
+        self.assertIn("Bob: Looks good", doc.page_content)
+
+    @patch("learn2rag.importer.loaders.jira_loader.requests.Session")
+    def test_get_all_jira_document_ids_pages_results(self, mock_session_cls: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        first_page = _make_json_response(
+            {
+                "issues": [{"id": "10001", "key": "DEMO-1"}],
+                "total": 2,
+                "startAt": 0,
+                "maxResults": 1,
+            }
+        )
+        second_page = _make_json_response(
+            {
+                "issues": [{"id": "10002", "key": "DEMO-2"}],
+                "total": 2,
+                "startAt": 1,
+                "maxResults": 1,
+            }
+        )
+        mock_session.get.side_effect = [first_page, second_page]
+
+        ids = get_all_jira_document_ids(
+            base_url="https://jira.example.com",
+            auth_type="token",
+            token="abc",
+            projects=["DEMO"],
+            page_size=1,
+        )
+
+        self.assertEqual(
+            ids,
+            [
+                "https://jira.example.com/browse/DEMO-1",
+                "https://jira.example.com/browse/DEMO-2",
+            ],
+        )
+
+    @patch("learn2rag.importer.loaders.jira_loader.requests.Session")
+    def test_load_from_jira_applies_since_filter_to_jql(self, mock_session_cls: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_session.get.return_value = _make_json_response(
+            {
+                "issues": [],
+                "total": 0,
+                "startAt": 0,
+                "maxResults": 50,
+            }
+        )
+
+        since = datetime(2026, 5, 18, 8, 30, tzinfo=timezone.utc)
+        load_from_jira(
+            base_url="https://jira.example.com",
+            auth_type="none",
+            jql="project = DEMO",
+            since=since,
+        )
+
+        self.assertTrue(mock_session.get.called)
+        _, kwargs = mock_session.get.call_args
+        params = kwargs.get("params", {})
+        jql_query = params.get("jql", "")
+        self.assertIn("updated >= \"2026-05-18 08:30\"", jql_query)

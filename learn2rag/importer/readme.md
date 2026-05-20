@@ -3,7 +3,7 @@
 An importer for document sources used within the Learn2RAG pipeline. It reads a `config.json`, delegates loading to the appropriate loader, enriches documents with metadata, and writes results to `loaded_documents.json`.
 
 **Author:** IFDT, KM  
-**Version:** 0.0.5
+**Version:** 0.0.10
 
 ---
 
@@ -42,11 +42,13 @@ graph TD
     C -->|HTMLLoader| F[Fetch webpage]
     C -->|SharepointLoader| G[Query SharePoint API]
     C -->|DrupalLoader| H[Query Drupal JSON:API]
+    C -->|JiraLoader| M[Query Jira REST API]
     D --> I[Extract documents]
     E --> I
     F --> I
     G --> I
     H --> I
+    M --> I
     I --> J[Enrich metadata]
     J --> K[loaded_documents.json]
     K --> L[Pipeline input]
@@ -93,6 +95,8 @@ Edit `config/config.json` to define one or more loaders. Each entry requires at 
 ```
 
 > **Note:** `loader_id` is strongly recommended. It is added to the metadata of every document produced by that loader and makes it easy to trace documents back to their source configuration.
+
+For a complete multi-loader example, see `config/config.example.json`.
 
 ---
 
@@ -371,6 +375,136 @@ Loads content nodes from a Drupal 8/9/10/11 site via the built-in JSON:API modul
 }
 ```
 
+---
+
+### JiraLoader
+
+Loads issues from Jira via the Jira REST API and maps one issue to one document.
+
+**Supported authentication modes:**
+- `basic` (recommended for Jira Cloud: email + API token)
+- `token` (Bearer token)
+- `none` (only for publicly accessible Jira instances)
+
+**Configuration:**
+
+```json
+{
+    "loader_type": "JiraLoader",
+    "loader_id": "jira_main",
+    "base_url": "https://your-company.atlassian.net",
+    "auth_type": "basic",
+    "username": "jira-user@example.com",
+    "password": "your-jira-api-token",
+    "jql": "project = DOCS ORDER BY updated DESC",
+    "issue_types": ["Task", "Story", "Bug"],
+    "include_comments": true,
+    "page_size": 50
+}
+```
+
+| Parameter | Required | Description |
+|---|---|---|
+| `base_url` | yes | Jira base URL, e.g. `https://your-company.atlassian.net` |
+| `auth_type` | no | `"basic"` (default), `"token"`, or `"none"` |
+| `username` | no | Required for `auth_type = "basic"` |
+| `password` | no | Required for `auth_type = "basic"` (Jira API token for cloud) |
+| `token` | no | Required for `auth_type = "token"` |
+| `jql` | no* | JQL filter for issues to import |
+| `projects` | no* | Alternative to `jql`, e.g. `["DOCS", "HELP"]` |
+| `issue_types` | no | Optional issue type filter list |
+| `include_comments` | no | Include issue comments in page content (default `false`) |
+| `page_size` | no | Jira page size (default `50`, max `100`) |
+
+\* At least one of `jql` or `projects` is required.
+
+**Example output entry:**
+
+```json
+{
+    "metadata": {
+        "source": "https://your-company.atlassian.net/browse/DOCS-123",
+        "loader_id": "jira_main",
+        "loader": "JiraLoader",
+        "issue_key": "DOCS-123",
+        "issue_id": "10001",
+        "status": "In Progress",
+        "project_key": "DOCS",
+        "updated": "2026-05-18T10:00:00.000+0000",
+        "content_hash": "bfe2c1..."
+    },
+    "content": "Issue: DOCS-123\n\nSummary: Improve importer docs ..."
+}
+```
+
+---
+
+## Complete Example (all loaders)
+
+You can copy this to `config/config.json` and replace the placeholders:
+
+```json
+{
+    "loaders": [
+        {
+            "loader_type": "DirectoryLoader",
+            "loader_id": "local_docs",
+            "path": "C:\\path\\to\\your\\documents",
+            "recursive": "True",
+            "silent_errors": "True"
+        },
+        {
+            "loader_type": "CSVLoader",
+            "loader_id": "csv_data",
+            "path": "C:\\path\\to\\your\\data.csv"
+        },
+        {
+            "loader_type": "HTMLLoader",
+            "loader_id": "website",
+            "url": "https://your-website.example.com",
+            "depth": 1
+        },
+        {
+            "loader_type": "SharepointLoader",
+            "loader_id": "sharepoint_docs",
+            "client_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "client_secret": "your-client-secret",
+            "tenant_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "document_library_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "site_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "folder_path": "/General",
+            "recursive": "True",
+            "auth_with_token": "False",
+            "reset_token": "False"
+        },
+        {
+            "loader_type": "DrupalLoader",
+            "loader_id": "drupal_main",
+            "base_url": "https://your-drupal-site.example.com",
+            "content_types": ["article", "page"],
+            "text_fields": ["title", "field_body", "body"],
+            "auth_type": "basic",
+            "username": "api-user",
+            "password": "secret",
+            "language": "en",
+            "page_size": 50
+        },
+        {
+            "loader_type": "JiraLoader",
+            "loader_id": "jira_main",
+            "base_url": "https://your-company.atlassian.net",
+            "auth_type": "basic",
+            "username": "jira-user@example.com",
+            "password": "your-jira-api-token",
+            "jql": "project = DOCS ORDER BY updated DESC",
+            "issue_types": ["Task", "Story", "Bug"],
+            "include_comments": true,
+            "page_size": 50
+        }
+    ]
+}
+```
+
 All results will be written to the the loaded_documents.json for each File in the path an entry like this will be generated 
 
 ```
@@ -433,3 +567,6 @@ where
   - delta import now uses `get_documents` from the pipeline
   - hash comparison now uses sorted chunk hashes per source for stable results
   - **Breaking change:** Qdrant payload field renamed from `path` → `source`; existing collections must be deleted and re-imported
+- v0.0.10
+    - added JiraLoader documentation
+    - added complete multi-loader configuration example

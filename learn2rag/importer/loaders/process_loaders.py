@@ -6,9 +6,9 @@ This module processes configuration entries and delegates loading to specific lo
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.7
+Version: 0.0.8
 Creation Date: June 10, 2025
-Last Modified: May 4, 2026
+Last Modified: May 18, 2026
 """
 
 import hashlib
@@ -25,6 +25,7 @@ from .csv_loader import load_from_csv
 from .html_loader import load_html_content
 from .sharepoint_loader import load_from_sharepoint, get_all_sharepoint_document_ids
 from .drupal_loader import load_from_drupal, get_all_drupal_document_ids
+from .jira_loader import load_from_jira, get_all_jira_document_ids
 
 #
 # initialize logger
@@ -153,6 +154,38 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
                     language=language,
                 )
                 logger.info(f"Loaded {len(documents)} documents from Drupal ({base_url}) using {loader_type}.")
+            elif loader_type == "JiraLoader":
+                base_url = str(entry.get("base_url", ""))
+                auth_type = str(entry.get("auth_type", "basic"))
+                username = str(entry.get("username", ""))
+                password = str(entry.get("password", ""))
+                token = str(entry.get("token", ""))
+                jql = str(entry.get("jql", ""))
+                projects = entry.get("projects", [])
+                issue_types = entry.get("issue_types", [])
+                page_size = int(entry.get("page_size", 50))
+                include_comments = entry.get("include_comments", False)
+                if isinstance(include_comments, str):
+                    include_comments = include_comments.lower() == "true"
+
+                if not base_url:
+                    logger.error(f"Invalid configuration for JiraLoader: Missing 'base_url'. Entry: {entry}")
+                    continue
+
+                documents = load_from_jira(
+                    base_url=base_url,
+                    loader_id=loader_id,
+                    auth_type=auth_type,
+                    username=username,
+                    password=password,
+                    token=token,
+                    jql=jql,
+                    projects=list(projects) if isinstance(projects, list) else [],
+                    issue_types=list(issue_types) if isinstance(issue_types, list) else [],
+                    page_size=page_size,
+                    include_comments=bool(include_comments),
+                )
+                logger.info(f"Loaded {len(documents)} documents from Jira ({base_url}) using {loader_type}.")
             else:
                 logger.error(f"Unknown loader type: {loader_type}")
                 continue
@@ -333,6 +366,80 @@ def process_delta_imports(
                         delete_documents(loader_id, sources_to_delete, user_config, opt_config)
                     index(changed_docs, user_config, opt_config)
                     logger.info(f"SharePoint '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
+
+            elif loader_type == "JiraLoader":
+                base_url = str(entry.get("base_url", ""))
+                auth_type = str(entry.get("auth_type", "basic"))
+                username = str(entry.get("username", ""))
+                password = str(entry.get("password", ""))
+                token = str(entry.get("token", ""))
+                jql = str(entry.get("jql", ""))
+                projects = entry.get("projects", [])
+                issue_types = entry.get("issue_types", [])
+                page_size = int(entry.get("page_size", 50))
+                include_comments = entry.get("include_comments", False)
+                if isinstance(include_comments, str):
+                    include_comments = include_comments.lower() == "true"
+
+                safe_projects = list(projects) if isinstance(projects, list) else []
+                safe_issue_types = list(issue_types) if isinstance(issue_types, list) else []
+
+                if is_initial or last_import_time is None:
+                    logger.info(f"Jira '{loader_id}': full load (initial={is_initial})")
+                    all_docs = load_from_jira(
+                        base_url=base_url,
+                        loader_id=loader_id,
+                        auth_type=auth_type,
+                        username=username,
+                        password=password,
+                        token=token,
+                        jql=jql,
+                        projects=safe_projects,
+                        issue_types=safe_issue_types,
+                        page_size=page_size,
+                        include_comments=bool(include_comments),
+                    )
+                    if is_initial:
+                        index(all_docs, user_config, opt_config)
+                    else:
+                        _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
+                else:
+                    logger.info(f"Jira '{loader_id}': 2-pass delta since {last_import_time.isoformat()}")
+                    current_ids = set(get_all_jira_document_ids(
+                        base_url=base_url,
+                        auth_type=auth_type,
+                        username=username,
+                        password=password,
+                        token=token,
+                        jql=jql,
+                        projects=safe_projects,
+                        issue_types=safe_issue_types,
+                        page_size=page_size,
+                    ))
+                    deleted_paths = [p for p in existing_map if p not in current_ids]
+                    if deleted_paths:
+                        logger.info(f"Jira '{loader_id}': deleting {len(deleted_paths)} removed documents")
+                        delete_documents(loader_id, deleted_paths, user_config, opt_config)
+
+                    changed_docs = load_from_jira(
+                        base_url=base_url,
+                        loader_id=loader_id,
+                        auth_type=auth_type,
+                        username=username,
+                        password=password,
+                        token=token,
+                        jql=jql,
+                        projects=safe_projects,
+                        issue_types=safe_issue_types,
+                        page_size=page_size,
+                        include_comments=bool(include_comments),
+                        since=last_import_time,
+                    )
+                    sources_to_delete = [doc.metadata.get("source", "") for doc in changed_docs]
+                    if sources_to_delete:
+                        delete_documents(loader_id, sources_to_delete, user_config, opt_config)
+                    index(changed_docs, user_config, opt_config)
+                    logger.info(f"Jira '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
 
             # ----------------------------------------------------------------
             # NORMAL LOADERS: Directory / HTML / CSV — hash comparison

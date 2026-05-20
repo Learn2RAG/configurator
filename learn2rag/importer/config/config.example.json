@@ -1,0 +1,59 @@
+{
+    "loaders": [
+        {
+            "loader_type": "DirectoryLoader",
+            "loader_id": "local_docs",
+            "path": "C:\\path\\to\\your\\documents",
+            "recursive": "True",
+            "silent_errors": "True"
+        },
+        {
+            "loader_type": "CSVLoader",
+            "loader_id": "csv_data",
+            "path": "C:\\path\\to\\your\\data.csv"
+        },
+        {
+            "loader_type": "HTMLLoader",
+            "loader_id": "website",
+            "url": "https://your-website.example.com",
+            "depth": 1
+        },
+        {
+            "loader_type": "SharepointLoader",
+            "loader_id": "sharepoint_docs",
+            "client_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "client_secret": "your-client-secret",
+            "tenant_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "document_library_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "site_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "folder_path": "/General",
+            "recursive": "True",
+            "auth_with_token": "False",
+            "reset_token": "False"
+        },
+        {
+            "loader_type": "DrupalLoader",
+            "loader_id": "drupal_main",
+            "base_url": "https://your-drupal-site.example.com",
+            "content_types": ["article", "page"],
+            "text_fields": ["title", "field_body", "body"],
+            "auth_type": "basic",
+            "username": "api-user",
+            "password": "secret",
+            "language": "en",
+            "page_size": 50
+        },
+        {
+            "loader_type": "JiraLoader",
+            "loader_id": "jira_main",
+            "base_url": "https://your-company.atlassian.net",
+            "auth_type": "basic",
+            "username": "jira-user@example.com",
+            "password": "your-jira-api-token",
+            "jql": "project = DOCS ORDER BY updated DESC",
+            "issue_types": ["Task", "Story", "Bug"],
+            "include_comments": true,
+            "page_size": 50
+        }
+    ]
+}

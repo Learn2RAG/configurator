@@ -6,9 +6,9 @@ This module provides a function to load configuration files (e.g., JSON, YAML) f
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.3
+Version: 0.0.5
 Creation Date: June 10, 2025
-Last Modified: February 20, 2026
+Last Modified: May 18, 2026
 """
 
 import json
@@ -62,6 +62,18 @@ def validate_config_entry(entry: Dict[str, Any]) -> bool:
             raise ValueError("Missing 'username' or 'password' for DrupalLoader with auth_type 'basic'.")
         if auth_type == "token" and not entry.get("token"):
             raise ValueError("Missing 'token' for DrupalLoader with auth_type 'token'.")
+    elif loader_type == "JiraLoader":
+        if not entry.get("base_url"):
+            raise ValueError("Missing 'base_url' for 'JiraLoader' in configuration entry.")
+        if not entry.get("jql") and not entry.get("projects"):
+            raise ValueError("Missing filter for 'JiraLoader'. Provide either 'jql' or 'projects'.")
+        auth_type = entry.get("auth_type", "basic")
+        if auth_type not in ("none", "basic", "token"):
+            raise ValueError(f"Invalid 'auth_type' for 'JiraLoader': '{auth_type}'. Must be 'none', 'basic' or 'token'.")
+        if auth_type == "basic" and (not entry.get("username") or not entry.get("password")):
+            raise ValueError("Missing 'username' or 'password' for JiraLoader with auth_type 'basic'.")
+        if auth_type == "token" and not entry.get("token"):
+            raise ValueError("Missing 'token' for JiraLoader with auth_type 'token'.")
      
     else:
         raise ValueError(f"Unknown 'loader_type': {loader_type}")
