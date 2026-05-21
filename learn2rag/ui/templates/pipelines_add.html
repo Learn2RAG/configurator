@@ -17,6 +17,12 @@
   </div>
   <div class="mb-3">
     {{pgettext('form_label', 'Data sources')}}
+    <button class="btn btn-secondary select-sources" data-value="1">
+      {{pgettext('button', 'Select all')}}
+    </button>
+    <button class="btn btn-secondary select-sources" data-value="0">
+      {{pgettext('button', 'Unselect all')}}
+    </button>
     {% for name, source in sources.items() %}
     <div class="form-check">
       <input class="form-check-input" type="checkbox" name="sources" value="{{name}}" id="source-{{loop.index}}" checked="checked">
@@ -75,6 +81,7 @@
 </form>
 
 <script>
+  /* suggested storage directory */
   const labelInput = document.querySelector('#addPipeline input[name=label]');
   const storageInput = document.querySelector('#addPipeline input[name=storage_path]');
   const update = (event) => {
@@ -87,4 +94,12 @@
   };
   labelInput.addEventListener('change', update);
   labelInput.addEventListener('input', update);
+
+  /* select/unselect all sources  */
+  document.querySelectorAll('#addPipeline button.select-sources').forEach(bt => {
+      bt.addEventListener('click', e => {
+          e.preventDefault();
+          document.querySelectorAll('input[name="sources"]').forEach(cb => cb.checked = bt.dataset.value === '1');
+      });
+  });
 </script>
