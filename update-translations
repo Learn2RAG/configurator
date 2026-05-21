@@ -1,5 +1,5 @@
 #!/bin/sh
 set -eu
 .venv/bin/pybabel extract --mapping-file=learn2rag/ui/babel.cfg --output-file=learn2rag/ui/messages.pot learn2rag/ui
-.venv/bin/pybabel update --input-file=learn2rag/ui/messages.pot --output-dir=learn2rag/ui/translations
+.venv/bin/pybabel update --no-fuzzy-matching --input-file=learn2rag/ui/messages.pot --output-dir=learn2rag/ui/translations
 .venv/bin/pybabel compile --directory=learn2rag/ui/translations
