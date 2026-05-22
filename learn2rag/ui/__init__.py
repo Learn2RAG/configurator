@@ -396,6 +396,9 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         data.pop('import', None)
         data['ports'] = [int(port) for port in request.form.getlist("ports") if port]
         data['sources'] = request.form.getlist('sources')
+        if len(data['sources']) < 1:
+            flash(pgettext('flash', 'At least one data source is required'), 'error')
+            return redirect(url_for('pipelines_list'))
         name = learn2rag.data.create_entry(app.instance_path, 'pipelines', data)
         flash(pgettext('flash', 'Added a new pipeline configuration: %(label)s', label=label))
         if request.form.get('import'):
