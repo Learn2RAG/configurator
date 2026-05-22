@@ -1,0 +1,67 @@
+<form method="POST">
+  <input type="hidden" name="type" value="sharepoint"/>
+  <h5>Required</h5>
+  <div class="mb-3">
+    <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
+    <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label"><code>client_id</code></label>
+    <input class="form-control" name="client_id" required="required"/>
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label"><code>client_secret</code></label>
+    <input class="form-control" name="client_secret" required="required"/>
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label"><code>tenant_id</code></label>
+    <input class="form-control" name="tenant_id" value="common" required="required"/>
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label"><code>document_library_id</code></label>
+    <input class="form-control" name="document_library_id" required="required"/>
+  </div>
+  <h5>Optional</h5>
+  <div class="mb-3">
+    <label for="path" class="form-label"><code>folder_path</code></label>
+    <input class="form-control" name="folder_path"/>
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label"><code>folder_id</code></label>
+    <input class="form-control" name="folder_id"/>
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label"><code>site_id</code></label>
+    <input class="form-control" name="site_id"/>
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label"><code>object_ids</code></label>
+    <input class="form-control" name="object_ids"/>
+    <input class="form-control" name="object_ids"/>
+  </div>
+  <div class="mb-3">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" value="True" id="recursive" name="recursive">
+      <label class="form-check-label" for="recursive">
+        <code>recursive</code>
+      </label>
+    </div>
+  </div>
+  <div class="mb-3">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" value="True" id="auth_with_token" name="auth_with_token">
+      <label class="form-check-label" for="auth_with_token">
+        <code>auth_with_token</code>
+      </label>
+    </div>
+  </div>
+  <div class="mb-3">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" value="True" id="reset_token" name="reset_token">
+      <label class="form-check-label" for="reset_token">
+        <code>reset_token</code>
+      </label>
+    </div>
+  </div>
+  <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
+</form>
