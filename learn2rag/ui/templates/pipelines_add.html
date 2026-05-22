@@ -1,7 +1,15 @@
 <form method="POST" id="addPipeline">
   <div class="mb-3">
     <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
-    <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this pipeline')}}">
+    <input
+      required="required"
+      class="form-control"
+      name="label"
+      title="{{pgettext('tooltip', 'A custom display name for this pipeline')}}"
+      {% if pipelines | length == 0 %}
+      value="{{pgettext('value', 'My first pipeline')}}"
+      {% endif %}
+      >
   </div>
   <div class="mb-3">
     <label for="url" class="form-label">{{pgettext('form_label', 'Storage directory path')}}</label>
