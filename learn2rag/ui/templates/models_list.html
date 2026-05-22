@@ -1,3 +1,8 @@
+{% if models | length == 0 %}
+<p class="d-flex gap-1">
+  {{pgettext('list', 'No language models configured')}}
+</p>
+{% else %}
 <table class="table">
   <thead>
     <tr>
@@ -35,3 +40,4 @@
     {% endfor %}
   </tbody>
 </table>
+{% endif %}

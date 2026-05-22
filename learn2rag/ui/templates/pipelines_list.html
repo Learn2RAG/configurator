@@ -1,3 +1,8 @@
+{% if pipelines | length == 0 %}
+<p class="d-flex gap-1">
+  {{pgettext('list', 'No pipelines configured')}}
+</p>
+{% else %}
 <table class="table" id="pipelines_list_table" hx-swap-oob="true" hx-get="" hx-trigger="every 15s" hx-swap="none">
   <thead>
     <tr>
@@ -121,3 +126,4 @@
     {% endfor %}
   </tbody>
 </table>
+{% endif %}
