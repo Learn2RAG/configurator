@@ -8,7 +8,7 @@ import warnings
 from collections.abc import Iterator
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_core.documents.base import Document
+from langchain_core.documents import Document
 from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
@@ -128,85 +128,102 @@ def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, An
                                      ``embedding_model``, and ``search_mode``).
     """
     collection_name = user_config["collection_name"]
-    all_documents = docs
 
     logging.info('Splitting documents into chunks')
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=opt_config["chunk_size"], chunk_overlap=opt_config["chunk_overlap"]
     )
-    chunks = text_splitter.split_documents(all_documents)
+    chunks = text_splitter.split_documents(docs)
 
-    chunks_content = [chunk.page_content for chunk in chunks]
-    if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
-        chunks_metadata: dict[str, list[str]] = {}
-        embeddings_metadata: dict[str, Any] = {}
-        for item in opt_config["multi_search"]:
-            chunks_metadata[item] = list(get_chunks_metadata(chunks, item))
-            embeddings_metadata[item] = create_embeddings(chunks_metadata[item], opt_config["embedding_model"], opt_config["search_mode"])
-            dense_vecs = embeddings_metadata[item]["dense_vecs"]
-            if isinstance(dense_vecs, np.ndarray):
-                assert dense_vecs.ndim == 2, dense_vecs.shape
+    ingestion_batch_size = opt_config["ingestion_batch_size"]
+    logging.info('Creating embeddings and ingesting in batches...')
+    for batch_start in range(0, len(chunks), ingestion_batch_size):
+        batch_chunks = chunks[batch_start:batch_start + ingestion_batch_size]
+        batch_content = [chunk.page_content for chunk in batch_chunks]
+        batch_chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in batch_chunks]
+
+        embeddings = create_embeddings(
+            batch_content,
+            opt_config["embedding_model"],
+            opt_config["search_mode"],
+        )
+
+        if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
+            if not isinstance(embeddings, dict) or "dense_vecs" not in embeddings:
+                raise TypeError("Expected dense_vecs in embeddings for multi query mode")
+
+            embeddings_metadata: dict[str, Any] = {}
+            for item in opt_config["multi_search"]:
+                item_values = list(get_chunks_metadata(batch_chunks, item))
+                embeddings_metadata[item] = create_embeddings(
+                    item_values,
+                    opt_config["embedding_model"],
+                    opt_config["search_mode"],
+                )
+                dense_vecs = embeddings_metadata[item]["dense_vecs"]
+                if isinstance(dense_vecs, np.ndarray):
+                    assert dense_vecs.ndim == 2, dense_vecs.shape
+                else:
+                    raise TypeError(f"dense_vecs must be np.ndarray, got {type(dense_vecs)}")
+
+            mmembeddings: list[np.ndarray[Any, Any]] = []
+            for i in range(len(embeddings['dense_vecs'])):
+                vecs_to_concat: list[np.ndarray[Any, Any]] = [cast(np.ndarray[Any, Any], embeddings['dense_vecs'][i])]
+                for item in embeddings_metadata.keys():
+                    vecs_to_concat.append(cast(np.ndarray[Any, Any], embeddings_metadata[item]['dense_vecs'][i]))
+                mmembeddings.append(np.concatenate(vecs_to_concat, axis=0))
+            embeddings['dense_vecs'] = mmembeddings
+
+        if isinstance(embeddings, dict) and "dense_vecs" in embeddings:
+            if opt_config["search_mode"] == "dense":
+                chunks_with_embeddings = [
+                    dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
+                    for chunk, dense, c_hash in zip(batch_chunks, embeddings["dense_vecs"], batch_chunk_hash)
+                ]
+            elif opt_config["search_mode"] == "dense_sparse":
+                chunks_with_embeddings = [
+                    dict(chunk)
+                    | {"dense_vec": dense, "lexical_weights": sparse, "chunk_hash": c_hash}
+                    for chunk, dense, sparse, c_hash in zip(
+                        batch_chunks,
+                        list(embeddings["dense_vecs"]),
+                        list(embeddings["lexical_weights"]),
+                        batch_chunk_hash
+                    )
+                ]
+            elif opt_config["search_mode"] == "dense_sparse_colbert":
+                chunks_with_embeddings = [
+                    dict(chunk)
+                    | {"dense_vec": dense, "lexical_weights": sparse, "colbert_vecs": colbert, "chunk_hash": c_hash}
+                    for chunk, dense, sparse, colbert, c_hash in zip(
+                        batch_chunks,
+                        list(embeddings["dense_vecs"]),
+                        list(embeddings["lexical_weights"]),
+                        list(embeddings["colbert_vecs"]),
+                        batch_chunk_hash
+                    )
+                ]
             else:
-                raise TypeError(f"dense_vecs must be np.ndarray, got {type(dense_vecs)}")
-
-    chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]
-
-    logging.info('Creating embeddings...')
-    embeddings = create_embeddings(chunks_content, opt_config["embedding_model"], opt_config["search_mode"])
-    if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
-        mmembeddings: list[np.ndarray[Any, Any]] = []
-        for i in range(len(embeddings['dense_vecs'])):
-            vecs_to_concat: list[np.ndarray[Any, Any]] = [cast(np.ndarray[Any, Any], embeddings['dense_vecs'][i])]
-            for item in embeddings_metadata.keys():
-                vecs_to_concat.append(cast(np.ndarray[Any, Any], embeddings_metadata[item]['dense_vecs'][i]))
-            mmembeddings.append(np.concatenate(vecs_to_concat, axis=0))
-        embeddings['dense_vecs'] = mmembeddings
-
-    if isinstance(embeddings, dict) and "dense_vecs" in embeddings:
-        if opt_config["search_mode"] == "dense":
+                chunks_with_embeddings = [
+                    dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
+                    for chunk, dense, c_hash in zip(batch_chunks, embeddings["dense_vecs"], batch_chunk_hash)
+                ]
+        else:
             chunks_with_embeddings = [
                 dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
-                for chunk, dense, c_hash in zip(chunks, embeddings["dense_vecs"], chunk_hash)
+                for chunk, dense, c_hash in zip(batch_chunks, embeddings, batch_chunk_hash)
             ]
-        if opt_config["search_mode"] == "dense_sparse":
-            chunks_with_embeddings = [
-                dict(chunk)
-                | {"dense_vec": dense, "lexical_weights": sparse, "chunk_hash": c_hash}
-                for chunk, dense, sparse, c_hash in zip(
-                    chunks,
-                    list(embeddings["dense_vecs"]),
-                    list(embeddings["lexical_weights"]),
-                    chunk_hash
-                )
-            ]
-        if opt_config["search_mode"] == "dense_sparse_colbert":
-            chunks_with_embeddings = [
-                dict(chunk)
-                | {"dense_vec": dense, "lexical_weights": sparse, "colbert_vecs": colbert, "chunk_hash": c_hash}
-                for chunk, dense, sparse, colbert, c_hash in zip(
-                    chunks,
-                    list(embeddings["dense_vecs"]),
-                    list(embeddings["lexical_weights"]),
-                    list(embeddings['colbert_vecs']),
-                    chunk_hash
-                )
-            ]
-    else:
-        chunks_with_embeddings = [
-            dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
-            for chunk, dense, c_hash in zip(chunks, embeddings, chunk_hash)
-        ]
 
-    for sample in chunks_with_embeddings:
-        if not point_exists(qdrant, collection_name, sample['metadata']['loader_id'], sample['metadata']['source'], sample['metadata']['content_hash'], sample['chunk_hash']):
-            if opt_config["search_mode"] == "dense_sparse":
-                insert_dense_sparse(qdrant, collection_name, sample)
-            elif opt_config["search_mode"] == "dense_sparse_colbert":
-                insert_dense_sparse_colbert(qdrant, collection_name, sample)
-            elif opt_config["query_mode"] == "multi":
-                insert_multi(qdrant, collection_name, sample)
-            else:
-                insert(qdrant, collection_name, sample)
+        for sample in chunks_with_embeddings:
+            if not point_exists(qdrant, collection_name, sample['metadata']['loader_id'], sample['metadata']['source'], sample['metadata']['content_hash'], sample['chunk_hash']):
+                if opt_config["search_mode"] == "dense_sparse":
+                    insert_dense_sparse(qdrant, collection_name, sample)
+                elif opt_config["search_mode"] == "dense_sparse_colbert":
+                    insert_dense_sparse_colbert(qdrant, collection_name, sample)
+                elif opt_config["query_mode"] == "multi":
+                    insert_multi(qdrant, collection_name, sample)
+                else:
+                    insert(qdrant, collection_name, sample)
 
 
 def index(documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
