@@ -1,12 +1,15 @@
 #!/bin/sh
 set -eu
-echo Starting Learn2RAG...
-echo Initializing, please wait...
-echo ========================================
-echo 1/2 Initializing open-webui...
-services/start-open-webui main --version
-echo ========================================
-echo 2/2 Initializing and starting Learn2RAG...
+
+cd "$(dirname "$0")"
+
+echo "Starting Learn2RAG..."
+echo "Initializing, please wait..."
+echo "========================================"
+echo "1/2 Initializing open-webui..."
+./services/start-open-webui main --version
+echo "========================================"
+echo "2/2 Initializing and starting Learn2RAG..."
 FLASK_DEBUG=1 \
 LEARN2RAG_PATH=. \
 ./configurator
