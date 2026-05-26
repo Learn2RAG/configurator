@@ -1,16 +1,19 @@
-name: import
-label: Start one-time import
+name: continuous
+label: Start
 ports:
-  # TODO: UI port is not used; labels in the interface currently assume a specific port order
+  # TODO: labels in the interface currently assume a specific port order
   - ui
   - qdrant_http
+  - pipeline
+  - open_webui_pipelines
+ui_url: '{{learn2rag_scheme}}://{{learn2rag_hostname}}:{{ports.ui}}/'
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |
       log_level: INFO
       service:
         api_key: '{{qdrant_api_key}}'
-        grpc_port: null      
+        grpc_port: null
         http_port: {{ports.qdrant_http}}
         host: '127.0.0.1'
       telemetry_disabled: true
@@ -99,6 +102,52 @@ files:
     content: ''
 
 services:
+  open-webui:
+    working_dir: '{{storage_path}}'
+    command:
+      - '{{learn2rag_path}}/services/start-open-webui{% if is_windows %}.exe{% endif %}'
+      - 'serve'
+      - '--host'
+      - '0.0.0.0'
+      - '--port'
+      - '{{ports.ui}}'
+    environment:
+      LEARN2RAG_PATH: '{{learn2rag_path}}'
+      DATA_DIR: '{{storage_path}}/open-webui-data'
+      DEFAULT_LOCALE: 'de'
+      ENABLE_OPENAI_API: 'True'
+      OPENAI_API_BASE_URL: http://127.0.0.1:{{ports.pipeline}}
+      OPENAI_API_KEY: '0p3n-w3bu!'
+      ENABLE_OLLAMA_API: 'False'
+      ENABLE_PERSISTENT_CONFIG: 'False'
+      ENABLE_TITLE_GENERATION: 'False'
+      GLOBAL_LOG_LEVEL: 'WARNING'
+      OFFLINE_MODE: 'True'
+      USER_PERMISSIONS_CHAT_FILE_UPLOAD: 'False'
+      USER_PERMISSIONS_CHAT_TEMPORARY_ENFORCED: 'True'
+      USER_PERMISSIONS_FEATURES_CODE_INTERPRETER: 'False'
+      USER_PERMISSIONS_FEATURES_IMAGE_GENERATION: 'False'
+      USER_PERMISSIONS_FEATURES_WEB_SEARCH: 'False'
+      #!!! {% if config.get("SIMPLE_AUTH") %}
+      ENABLE_SIGNUP: 'False'
+      WEBUI_AUTH: 'True'
+      WEBUI_ADMIN_EMAIL: '{{config["SIMPLE_AUTH"].get("username", "")}}'
+      WEBUI_ADMIN_NAME: '{{config["SIMPLE_AUTH"].get("username", "")}}'
+      WEBUI_ADMIN_PASSWORD:  '{{config["SIMPLE_AUTH"].get("password", "")}}'
+      #!!! {% else %}
+      # https://docs.openwebui.com/getting-started/env-configuration/#webui_auth
+      # "turning off authentication is only possible for fresh installations without any existing users"
+      ENABLE_SIGNUP: 'True'
+      WEBUI_AUTH: 'False'
+      #!!! {% endif %}
+      WEBUI_NAME: 'Learn2RAG'
+      #!!! {% if config.get("TLS") %}
+      UVICORN_SSL_CERTFILE: '{{ config["TLS"]["CERTFILE"] }}'
+      UVICORN_SSL_KEYFILE: '{{ config["TLS"]["KEYFILE"] }}'
+      #!!! {% endif %}
+    healthcheck:
+      # TODO: We only support ['CMD', 'curl', '-f', ...]
+      test: ['CMD', 'curl', '-f', '{{learn2rag_scheme}}://localhost:{{ports.ui}}/health']
   qdrant:
     working_dir: '{{storage_path}}'
     command:
@@ -111,10 +160,17 @@ services:
       QDRANT__SERVICE__HOST: '127.0.0.1'
       QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
       QDRANT__TELEMETRY_DISABLED: 'true'
-  main:
+  import:
     working_dir: '{{storage_path}}'
     command:
-      - '{{learn2rag_path}}/services/start-import{% if is_windows %}.bat{% endif %}'
+      - '{{learn2rag_path}}/configurator{% if is_windows %}.exe{% endif %}'
+      - '--logging-config'
+      - '{{storage_path}}/logging_config.yml'
+      - '--schedule-interval'
+      - 'PT{{ ((pipeline.import_schedule_interval_hours or 12) * 60) | round | int }}M'
+      - 'learn2rag.importer'
+      - '--config'
+      - '{{storage_path}}/importer_config.json'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       STORAGE_PATH: '{{storage_path}}'
@@ -127,5 +183,26 @@ services:
       LANGCHAIN_TRACING_V2: 'false'
       LLM_API_TYPE: '{{language_model.api}}'
       LLM_API_URL: '{{ language_model.url }}'
+      LLM_API_TOKEN: '{{language_model.token}}'
+      LLM_API_MODEL: '{{language_model.model}}'
+  rag:
+    working_dir: '{{storage_path}}'
+    command:
+      - '{{learn2rag_path}}/configurator{% if is_windows %}.exe{% endif %}'
+      - 'learn2rag.pipeline'
+      - '--logging-config'
+      - '{{storage_path}}/logging_config.yml'
+    environment:
+      LEARN2RAG_PATH: '{{learn2rag_path}}'
+      LEARN2RAG_PIPELINE_PORT: '{{ports.pipeline}}'
+      QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
+      QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'
+      PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
+      IMPORTER_CONFIG: '{{storage_path}}/importer_config.json'
+      PIPELINE_OPT_CONFIG: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
+      LANGCHAIN_API_KEY: '1'
+      LANGCHAIN_TRACING_V2: 'false'
+      LLM_API_TYPE: '{{language_model.api}}'
+      LLM_API_URL: '{{language_model.url}}'
       LLM_API_TOKEN: '{{language_model.token}}'
       LLM_API_MODEL: '{{language_model.model}}'

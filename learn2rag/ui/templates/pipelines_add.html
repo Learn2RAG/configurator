@@ -36,9 +36,16 @@
     </button>
   </div>
   <div class="mb-3 collapse advanced-configuration">
-    <div class="form-floating mb-3">
-      <input class="form-control" name="chat_proxy_url" type="url">
+    <div class="mb-3">
+      <label for="import_schedule_interval_hours" class="form-label">{{pgettext('form_label', 'Automatically import data with interval (hours)')}}</label>
+      <input class="form-control" name="import_schedule_interval_hours"
+             type="number" min="0" step="any"
+             value="12"
+             />
+    </div>
+    <div class="mb-3">
       <label for="ports" class="form-label">{{pgettext('form_label', 'Chat proxy URL')}}</label>
+      <input class="form-control" name="chat_proxy_url" type="url">
     </div>
     <label for="ports" class="form-label">{{pgettext('form_label', 'Ports')}}</label>
     <small class="text-body-secondary">{{gettext('Optional')}}</small>
@@ -64,12 +71,11 @@
   </div>
   <div class="mb-3 collapse advanced-configuration">
     <div class="form-check">
-      <input class="form-check-input" type="checkbox" value="yes" id="import" name="import" checked>
-      <label class="form-check-label" for="import">
-        {{pgettext('form_label', 'Immediately do the data import')}}
+      <input class="form-check-input" type="checkbox" value="yes" id="now" name="now" checked>
+      <label class="form-check-label" for="now">
+        {{pgettext('form_label', 'Immediately start the data import and the chat interface')}}
       </label>
     </div>
-    <small class="text-body-secondary">{{gettext('You can always do the data import later.')}}</small>
   </div>
   <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
 </form>

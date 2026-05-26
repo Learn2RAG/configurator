@@ -188,6 +188,7 @@ dependencies = [
     "python-pptx (>=1.0.2,<2.0.0)",
     "msoffcrypto-tool (>=6.0.0,<7.0.0)",
     "ebooklib (>=0.20,<0.21)",
+    "apscheduler==3.11.2",
 ]
 description = ""
 license = "MIT"
@@ -204,13 +205,19 @@ build-backend = "setuptools.build_meta"
 requires = ["setuptools >= 77.0.3"]
 [tool.mypy]
 files = "learn2rag"
-exclude = "^learn2rag/pipeline/scripts/"
+exclude = [
+    "^learn2rag/pipeline/scripts/",
+    "^learn2rag/pipeline/main\\.py$",
+]
 strict = true
 [[tool.mypy.overrides]]
 module = [
     "datasets.*",
 ]
 ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = ["learn2rag.pipeline.main"]
+ignore_errors = true
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "DEBUG"

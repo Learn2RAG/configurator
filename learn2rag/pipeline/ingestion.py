@@ -12,8 +12,6 @@ from langchain_core.documents.base import Document
 from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
-
-from . import json_loader
 from .embeddings import create_embeddings
 
 
@@ -33,7 +31,7 @@ def point_exists(qdrant: Qdrant, collection_name: str, loader_id: str, path: str
     filter = Filter(
         must=[
             FieldCondition(key="loader_id", match=MatchValue(value=loader_id)),
-            FieldCondition(key="path", match=MatchValue(value=path)),
+            FieldCondition(key="source", match=MatchValue(value=path)),
             FieldCondition(key="content_hash", match=MatchValue(value=content_hash)),
             FieldCondition(key="chunk_hash", match=MatchValue(value=chunk_hash)),
         ]
@@ -97,7 +95,7 @@ def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -
 def payload(sample: dict[str, Any]) -> dict[str, str]:
     return {
         "content": sample["page_content"],
-        "path": sample["metadata"]["source"],
+        "source": sample["metadata"]["source"],
         "content_hash": sample["metadata"]["content_hash"],
         "chunk_hash": sample["chunk_hash"],
         "title": sample["metadata"].get("title",""),
@@ -106,29 +104,42 @@ def payload(sample: dict[str, Any]) -> dict[str, str]:
         "document_id": sample["metadata"].get("document_id", "")
     }
 
-def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
-    logging.info('Loading documents')
-    all_documents = json_loader.json_loader(user_config['imported_documents_file_path'])
 
-    # Split documents into chunks
+def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
+    """
+    Chunk, embed, and bulk-insert a list of documents into Qdrant.
+
+    Mirrors the behaviour of the original ``index()`` function but accepts an
+    already-constructed ``Qdrant`` instance instead of creating one internally.
+    Intended for use by ``process_delta_imports`` and other callers that manage
+    their own Qdrant connection.
+
+    Points that already exist (identical ``loader_id``, ``path``, ``content_hash``,
+    and ``chunk_hash``) are skipped via ``point_exists()``.
+
+    Args:
+        docs (list[Document]): Documents to ingest. May be a full initial load or
+                               a filtered subset of changed documents.
+        qdrant (Qdrant): Authenticated Qdrant wrapper instance.
+        user_config (dict[str, Any]): User configuration dict (must contain
+                                      ``collection_name``).
+        opt_config (dict[str, Any]): Optimisation configuration dict (must contain
+                                     ``chunk_size``, ``chunk_overlap``,
+                                     ``embedding_model``, and ``search_mode``).
+    """
+    collection_name = user_config["collection_name"]
+    all_documents = docs
+
     logging.info('Splitting documents into chunks')
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=opt_config["chunk_size"], chunk_overlap=opt_config["chunk_overlap"]
     )
     chunks = text_splitter.split_documents(all_documents)
 
-    collection_name = user_config["collection_name"]
-
-    # Init vector store
-    qdrant = Qdrant(
-        collection_name=collection_name,
-        opt_config=opt_config
-    )
-
     chunks_content = [chunk.page_content for chunk in chunks]
     if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
-        chunks_metadata =  {}
-        embeddings_metadata = {}
+        chunks_metadata: dict[str, list[str]] = {}
+        embeddings_metadata: dict[str, Any] = {}
         for item in opt_config["multi_search"]:
             chunks_metadata[item] = list(get_chunks_metadata(chunks, item))
             embeddings_metadata[item] = create_embeddings(chunks_metadata[item], opt_config["embedding_model"], opt_config["search_mode"])
@@ -138,8 +149,7 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
             else:
                 raise TypeError(f"dense_vecs must be np.ndarray, got {type(dense_vecs)}")
 
-    chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]            
-    # Todo: handle different vector lengths for batch encoding when using sparse vectors
+    chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]
 
     logging.info('Creating embeddings...')
     embeddings = create_embeddings(chunks_content, opt_config["embedding_model"], opt_config["search_mode"])
@@ -199,12 +209,25 @@ def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
                 insert(qdrant, collection_name, sample)
 
 
-def main() -> None:
-    logging.basicConfig(level=logging.INFO)
-    from .config import user_config, opt_config
-    index(user_config, opt_config)
+def index(documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
+    """
+    Ingest a list of documents — entry point for standalone pipeline operation.
 
+    Creates a ``Qdrant`` instance internally and delegates to ``ingest_batch()``.
+    This function also serves as the replacement for the originally planned
+    ``ingest_document()`` helper: a single-document delta upsert is expressed as
+    ``index([doc], user_config, opt_config)`` without requiring a separate function.
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    main()
+    Called by ``pipeline/main.py`` and the ``/ingest`` HTTP endpoint. For the
+    delta-import path (which manages its own Qdrant connection), use
+    ``ingest_batch()`` directly.
+
+    Args:
+        documents (list[Document]): One or more documents to ingest.
+        user_config (dict[str, Any]): User configuration dict (must contain
+                                      ``collection_name``).
+        opt_config (dict[str, Any]): Optimisation configuration dict.
+    """
+    collection_name = user_config["collection_name"]
+    qdrant = Qdrant(collection_name=collection_name, opt_config=opt_config)
+    ingest_batch(documents, qdrant, user_config, opt_config)
