@@ -78,7 +78,7 @@ def create_embeddings(
 
     elif model_name == "sentence-transformers/all-mpnet-base-v2":
         model = _get_sentence_transformer_model("sentence-transformers/all-mpnet-base-v2")
-        return model.encode(input_sample)  # type: ignore[return-value]
+        return model.encode(input_sample)
 
     else:
         warnings.warn("Embedding model unknown or not provided. Using dense embeddings of default model: BAAI/bge-m3")
