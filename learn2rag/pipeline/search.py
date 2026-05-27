@@ -27,7 +27,7 @@ def _get_flag_reranker(model_name: str, use_fp16: bool) -> FlagReranker:
 
 @lru_cache(maxsize=4)
 def _get_cross_encoder(model_name: str) -> CrossEncoder:
-    return CrossEncoder(model_name)
+    return cast(CrossEncoder, CrossEncoder(model_name))
 
 
 def _sort_and_deduplicate(points: list[ScoredPoint]) -> list[ScoredPoint]:
