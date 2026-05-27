@@ -15,6 +15,7 @@
 - missing import logs in the terminal
 ### Changed
 - by default configuration interface and chat listen on localhost only
+- in config.yml "host" and "port" options are moved under "UI"; see also "CHAT"
 - openwebui upgraded to a newer version
 ### Removed
 - openwebui-pipelines (not needed anymore)
