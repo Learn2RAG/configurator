@@ -228,12 +228,26 @@ def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, An
                     insert(qdrant, collection_name, sample)
 
 
-def main() -> None:
-    logging.basicConfig(level=logging.INFO)
-    from .config import user_config, opt_config
-    index(user_config, opt_config)
+def index(documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
+    """
+    Ingest a list of documents — entry point for standalone pipeline operation.
 
+    Creates a ``Qdrant`` instance internally and delegates to ``ingest_batch()``.
+    This function also serves as the replacement for the originally planned
+    ``ingest_document()`` helper: a single-document delta upsert is expressed as
+    ``index([doc], user_config, opt_config)`` without requiring a separate function.
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    main()
+    Called by ``pipeline/main.py`` and the ``/ingest`` HTTP endpoint. For the
+    delta-import path (which manages its own Qdrant connection), use
+    ``ingest_batch()`` directly.
+
+    Args:
+        documents (list[Document]): One or more documents to ingest.
+        user_config (dict[str, Any]): User configuration dict (must contain
+                                      ``collection_name``).
+        opt_config (dict[str, Any]): Optimisation configuration dict.
+    """
+    collection_name = user_config["collection_name"]
+    Qdrant.ensure_collection(collection_name=collection_name, opt_config=opt_config)
+    qdrant = Qdrant(collection_name=collection_name, opt_config=opt_config)
+    ingest_batch(documents, qdrant, user_config, opt_config)

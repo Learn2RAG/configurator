@@ -14,6 +14,7 @@ from qdrant_client.models import ScoredPoint
 from . import generate
 from . import ingestion
 from .config import user_config, opt_config
+from .qdrant import Qdrant
 from .search import search_authorized
 
 
@@ -55,6 +56,11 @@ example_messages = {
 }
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def startup_event() -> None:
+    Qdrant.ensure_collection(user_config["collection_name"], opt_config)
 
 
 @app.exception_handler(RequestValidationError)
