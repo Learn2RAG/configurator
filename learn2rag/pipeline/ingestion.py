@@ -12,8 +12,6 @@ from langchain_core.documents import Document
 from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
-
-from . import json_loader
 from .embeddings import create_embeddings
 
 
@@ -33,7 +31,7 @@ def point_exists(qdrant: Qdrant, collection_name: str, loader_id: str, path: str
     filter = Filter(
         must=[
             FieldCondition(key="loader_id", match=MatchValue(value=loader_id)),
-            FieldCondition(key="path", match=MatchValue(value=path)),
+            FieldCondition(key="source", match=MatchValue(value=path)),
             FieldCondition(key="content_hash", match=MatchValue(value=content_hash)),
             FieldCondition(key="chunk_hash", match=MatchValue(value=chunk_hash)),
         ]
@@ -97,7 +95,7 @@ def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -
 def payload(sample: dict[str, Any]) -> dict[str, str]:
     return {
         "content": sample["page_content"],
-        "path": sample["metadata"]["source"],
+        "source": sample["metadata"]["source"],
         "content_hash": sample["metadata"]["content_hash"],
         "chunk_hash": sample["chunk_hash"],
         "title": sample["metadata"].get("title",""),

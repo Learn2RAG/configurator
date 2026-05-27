@@ -261,7 +261,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     @app.get('/models')
     def models_list() -> 'str | werkzeug.wrappers.response.Response':
         return render_template(
-            'models_list.html',
+            'models_page.html',
             ollama_models=list_ollama_models(),
         )
 
@@ -383,7 +383,14 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/pipelines')
     def pipelines_list() -> 'str | werkzeug.wrappers.response.Response':
+        pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
+        for pipeline in pipelines.values():
+            try:
+                pipeline['status_message'] = (Path(pipeline['storage_path']) / 'logs' / 'status.log').read_text().splitlines()[-1]
+            except (FileNotFoundError, IndexError):
+                pipeline['status_message'] = ''
         context = {
+            'pipelines': pipelines,
             'projects': Project.get_all(),
         }
         template = 'pipelines_list.html' if request.headers.get('HX-Request') else 'pipelines_page.html'
@@ -393,15 +400,16 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def pipeline_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
         data: dict[str, Any] = request.form.to_dict()
-        data.pop('import', None)
+        data.pop('now', None)
         data['ports'] = [int(port) for port in request.form.getlist("ports") if port]
         data['sources'] = request.form.getlist('sources')
+        data['import_schedule_interval_hours'] = float(data['import_schedule_interval_hours'])
         name = learn2rag.data.create_entry(app.instance_path, 'pipelines', data)
         flash(pgettext('flash', 'Added a new pipeline configuration: %(label)s', label=label))
-        if request.form.get('import'):
+        if request.form.get('now'):
             pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
             assert pipeline is not None
-            start_pipeline(name, pipeline, 'import')
+            start_pipeline(name, pipeline, 'continuous')
         return redirect(url_for('pipelines_list'))
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
@@ -431,9 +439,13 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     # FIXME
                     'local': 'DirectoryLoader',
                     'web': 'HTMLLoader',
+                    'sharepoint': 'SharepointLoader',
                     'drupal': 'DrupalLoader',
-                }.get(source.get('type', 'local')),
-                'recursive': 'True',  # DirectoryLoader
+                }.get(source.get(
+                    'type',
+                    'local'  # FIXME: remove this later and throw Exception
+                )),
+                'recursive': 'True',  # DirectoryLoader; FIXME: add this in the interface
                 **{key: value for key, value in source.items() if key not in ['label', 'type']},
             } for name, source in sources.items()],
         }
@@ -579,8 +591,13 @@ def webbrowser_open(url: str) -> None:
 def main(config: dict[str, Any]) -> None:
     app = create_app(config=config)
 
-    port = config.get('port', '9000')
-    host = config.get('host', '0.0.0.0')
+    ui_config = config.get('UI', {})
+    port = ui_config.get('port', '9000')
+    host = '127.0.0.1'
+    if 'host' in ui_config:
+        host = ui_config['host']
+    else:
+        logging.warning('By default, interface is only accessible from the same machine')
 
     ssl_key = config.get('TLS', {}).get('KEYFILE')
     ssl_cert = config.get('TLS', {}).get('CERTFILE')
@@ -602,7 +619,7 @@ def main(config: dict[str, Any]) -> None:
     logging.info('Learn2RAG: ' + url)
     logging.info('*' * 40)
 
-    uvicorn_kwargs = {
+    uvicorn_kwargs: dict[str, Any] = {
         "app": app,
         "host": host,
         "port": int(port),
