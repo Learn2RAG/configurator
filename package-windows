@@ -26,8 +26,8 @@ cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/configurator.exe
 
 cp services/start-import.windows.bat $BUNDLE/services/start-import.bat
 
-cp services/open-webui/dist/open_webui-0.6.15.tar.gz pyapp
-(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui PYAPP_PROJECT_PATH=open_webui-0.6.15.tar.gz PYAPP_EXEC_SPEC=open_webui:app cross build --release --target $CARGO_BUILD_TARGET)
+cp services/open-webui/dist/open_webui-0.8.12.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui PYAPP_PROJECT_PATH=open_webui-0.8.12.tar.gz PYAPP_EXEC_SPEC=open_webui:app cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp.exe $BUNDLE/services/start-open-webui.exe
 
 while read -u 100 file; do
