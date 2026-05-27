@@ -98,7 +98,7 @@ def objective(config: Configuration,
 # TODO
     ucfg = {
         "file_path": None,
-        "collection_name": dataset_name, # TODO get collection name depending on hyperparameters
+        "collection_name": "CSC-CS_2000-CO_50", # TODO get collection name depending on hyperparameters
         "imported_documents_file_path": None,
         "llm": None,
     }
@@ -117,7 +117,6 @@ def objective(config: Configuration,
             continue
         try:
             source_list, t_s = run_search(q["question"], ucfg, working_cfg)
-            print("SOURCE_LIST: ", source_list)
             t_search += t_s
             predictions.append(source_list)
             goldens.append(q["ground_truth"])
@@ -229,36 +228,50 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
         Categorical("chunk_size", [2000], default=2000),
         Categorical("chunk_overlap", [50], default=50),
         Categorical("search_mode", ["dense", "sparse", "dense_sparse", "dense_sparse_colbert"], default="dense"),
-        Categorical("reranking_mode", ["none", "reranking_with_flagreranker", "reranking_with_sentence_transformers", "reranking_with_colbert"], default="reranking_with_sentence_transformers"),
-        Categorical("rewrite_mode", ["none", "subqueries", "keywords", "subqueries_keywords"], default="subqueries_keywords"),
-        Categorical("fusion_mode", ["none", "DBSF", "RRF"], default="DBSF"),
+        Categorical("reranking_mode", ["none", "reranking_with_flagreranker", "reranking_with_sentence_transformers", "reranking_with_colbert"], default="none"),
+        Categorical("rewrite_mode", ["none", "subqueries", "keywords", "subqueries_keywords"], default="none"),
+        Categorical("fusion_mode", ["none", "DBSF", "RRF"], default="none"),
         Categorical("reranking", ["True", "False"], default="False"),
         Categorical("rewrite", ["True", "False"], default="False"),
     ])
     cs.add(ForbiddenGreaterThanRelation(cs["chunk_overlap"], cs["chunk_size"]))
-    # for sm in ["dense", "sparse"]:
-    #     for fm in ["DBSF", "RRF"]:
-    #         cs.add(
-    #             ForbiddenAndConjunction(
-    #                 ForbiddenEqualsClause(cs["search_mode"], sm),
-    #                 ForbiddenEqualsClause(cs["fusion_mode"], fm),
-    #             )
-    #         )
-    # for rrm in ["reranking_with_flagreranker", "reranking_with_sentence_transformers", "reranking_with_colbert"]:
-    #     cs.add(
-    #         ForbiddenAndConjunction(
-    #             ForbiddenEqualsClause(cs["reranking"], "False"),
-    #             ForbiddenEqualsClause(cs["reranking_mode"], rrm),
-    #         )
-    #     )
-    #
-    # for rwm in ["keywords", "subqueries", "subqueries_keywords"]:
-    #     cs.add(
-    #         ForbiddenAndConjunction(
-    #             ForbiddenEqualsClause(cs["rewrite"], "False"),
-    #             ForbiddenEqualsClause(cs["rewrite_mode"], rwm),
-    #         )
-    #     )
+
+    for sm in ["dense", "sparse"]:
+        for fm in ["DBSF", "RRF"]:
+            cs.add(ForbiddenAndConjunction(
+                ForbiddenEqualsClause(cs["search_mode"], sm),
+                ForbiddenEqualsClause(cs["fusion_mode"], fm),
+            ))
+
+    for sm in ["dense_sparse", "dense_sparse_colbert"]:
+        cs.add(ForbiddenAndConjunction(
+            ForbiddenEqualsClause(cs["search_mode"], sm),
+            ForbiddenEqualsClause(cs["fusion_mode"], "none"),
+        ))
+
+
+    for rrm in ["reranking_with_flagreranker", "reranking_with_sentence_transformers", "reranking_with_colbert"]:
+        cs.add(ForbiddenAndConjunction(
+            ForbiddenEqualsClause(cs["reranking"], "False"),
+            ForbiddenEqualsClause(cs["reranking_mode"], rrm),
+        ))
+
+    cs.add(ForbiddenAndConjunction(
+        ForbiddenEqualsClause(cs["reranking"], "True"),
+        ForbiddenEqualsClause(cs["reranking_mode"], "none"),
+    ))
+
+    for rwm in ["keywords", "subqueries", "subqueries_keywords"]:
+        cs.add(ForbiddenAndConjunction(
+            ForbiddenEqualsClause(cs["rewrite"], "False"),
+            ForbiddenEqualsClause(cs["rewrite_mode"], rwm),
+        ))
+
+    cs.add(ForbiddenAndConjunction(
+        ForbiddenEqualsClause(cs["rewrite"], "True"),
+        ForbiddenEqualsClause(cs["rewrite_mode"], "none"),
+    ))
+
 
     scenario = Scenario(
         cs,

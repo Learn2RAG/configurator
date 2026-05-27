@@ -409,7 +409,7 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
     return results
 
 
-async def search_authorized(question: str, user: str, *, request_id: str | None = None) -> List[ScoredPoint]:
+async def search_authorized(question: str, user: str, *, request_id: str | None = None, user_config = user_config, opt_config = opt_config) -> List[ScoredPoint]:
     points = _collect_query_points(question, user_config, opt_config, request_id=request_id)
     query_response = QueryResponse(points=points)
     authorized_points = await filter_authorized(user, query_response)
