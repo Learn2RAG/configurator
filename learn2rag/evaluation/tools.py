@@ -7,6 +7,7 @@ import logging
 import datasets
 import json_stream  # type: ignore[import-untyped]
 from typing import Any, Callable
+import pandas as pd
 
 import learn2rag.pipeline.ingestion
 from learn2rag.pipeline.config import opt_config
@@ -81,9 +82,25 @@ def ingest_dataset_documents(dataset_name: str) -> None:
 
 def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
     logging.debug(f'{dataset_name=}')
-    dataset_work_dir = pathlib.Path('./datasets') / dataset_name
-    dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
-    return dataset_dict[split] if split is not None else dataset_dict
+
+    if subdirectory.endswith('.csv'):
+        df = pd.read_csv(subdirectory, sep=';')
+        # wrap in object that behaves like HuggingFace dataset
+        class CSVDataset:
+            def __init__(self, df):
+                self.data = df
+            def __len__(self):
+                return len(self.data)
+            def __getitem__(self, idx):
+                return self.data.iloc[idx].to_dict()
+            def select(self, indices):
+                return CSVDataset(self.data.iloc[list(indices)])
+        return CSVDataset(df)
+
+    else:
+        dataset_work_dir = pathlib.Path('./datasets') / dataset_name
+        dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
+        return dataset_dict[split] if split is not None else dataset_dict
 
 
 def basic_pipeline(dataset_name: str, question: str) -> dict[str, Any]:
