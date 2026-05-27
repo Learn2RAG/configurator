@@ -18,8 +18,8 @@ if __name__ == "__main__":
 
     from .config import user_config, opt_config
 
-    #delete_collection(loader_id="json_test_file", user_config=user_config, opt_config=opt_config)
-    results = get_documents(loader_id="json_test_file", user_config=user_config, opt_config=opt_config)
+    #delete_collection(loader_id="local_docs", user_config=user_config, opt_config=opt_config)
+    #results = get_documents(loader_id="local_docs", user_config=user_config, opt_config=opt_config)
 
     documents = [
         Document(page_content=d["content"], metadata=d["metadata"])
@@ -33,7 +33,7 @@ if __name__ == "__main__":
                     "process_date": "2025-07-28",
                     "process_time": "14:42:02",
                     "loader_type": "DirectoryLoader",
-                    "loader_id": "json_test_file",
+                    "loader_id": "local_docs",
                     "title": "The title of a real document",
                     "summary": "This document is awesome"
                 },
@@ -48,7 +48,7 @@ if __name__ == "__main__":
                     "process_date": "2025-07-28",
                     "process_time": "14:42:02",
                     "loader_type": "DirectoryLoader",
-                    "loader_id": "json_test_file",
+                    "loader_id": "local_docs",
                     "title": "The title of a real document",
                     "summary": "This document is awesome"
                 },
@@ -56,7 +56,7 @@ if __name__ == "__main__":
             },
         ]
 ]
-    update_documents(loader_id="json_test_file", documents=documents, user_config=user_config, opt_config=opt_config)
+    #update_documents(loader_id="local_docs", documents=documents, user_config=user_config, opt_config=opt_config)
     ingestion.index(documents, user_config, opt_config)
 
     if opt_config["query_mode"] == "multi":
@@ -71,10 +71,10 @@ if __name__ == "__main__":
         user = "anonymous"
         points = asyncio.run(search.search_authorized(query, user, request_id=None))
 
-    sources = "\n".join(set(point.payload['path'] for point in points)) # type: ignore[index]
+    sources = set(point.payload['source'] for point in points) # type: ignore[index]
 
     for point in points:
-        print(f"ID: {point.id}, Path: {point.payload['path']}, Score: {point.score}") # type: ignore[index]
+        print(f"ID: {point.id}, Path: {point.payload['source']}, Score: {point.score}") # type: ignore[index]
 
     answer = generate.generate(query, points, opt_config)
 
