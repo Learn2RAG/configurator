@@ -246,5 +246,6 @@ def index(documents: list[Document], user_config: dict[str, Any], opt_config: di
         opt_config (dict[str, Any]): Optimisation configuration dict.
     """
     collection_name = user_config["collection_name"]
+    Qdrant.ensure_collection(collection_name=collection_name, opt_config=opt_config)
     qdrant = Qdrant(collection_name=collection_name, opt_config=opt_config)
     ingest_batch(documents, qdrant, user_config, opt_config)
