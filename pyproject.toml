@@ -171,7 +171,7 @@ dependencies = [
     "typing-inspect==0.9.0",
     "typing-inspection==0.4.1",
     "tzdata==2025.2",
-    "unstructured[docx, pub, odt, rtf]==0.21.5",
+    "unstructured[docx, epub, odt, rtf]==0.21.5",
     "unstructured-client==0.42.2",
     "unstructured-inference==1.1.6",
     "unstructured-pytesseract==0.3.15",
