@@ -114,7 +114,12 @@ services:
   main:
     working_dir: '{{storage_path}}'
     command:
-      - '{{learn2rag_path}}/services/start-import{% if is_windows %}.bat{% endif %}'
+      - '{{learn2rag_path}}/configurator{% if is_windows %}.exe{% endif %}'
+      - '--logging-config'
+      - '{{storage_path}}/logging_config.yml'
+      - 'learn2rag.importer'
+      - '--config'
+      - '{{storage_path}}/importer_config.json'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       STORAGE_PATH: '{{storage_path}}'
