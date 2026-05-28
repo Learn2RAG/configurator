@@ -82,7 +82,10 @@ async def qanda(
 
 
 @app.get("/models")  # OpenAI API for Open WebUI
-async def get_models() -> JSONResponse: return JSONResponse([{"id": "Learn2RAG"}])
+async def get_models() -> JSONResponse: return JSONResponse({
+        'object': 'list',
+        'data': [{"id": "Learn2RAG"}],
+})
 
 
 @app.post("/stream")
@@ -174,6 +177,7 @@ async def simple_response(inputs: ChatState) -> JSONResponse:
             {
                 'message': {
                     'content': ''.join(await pipeline(inputs)),
+                    'role': 'assistant',
                 },
                 'finish_reason': 'stop',
             },
