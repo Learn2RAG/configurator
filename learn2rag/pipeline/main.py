@@ -71,10 +71,10 @@ if __name__ == "__main__":
         user = "anonymous"
         points = asyncio.run(search.search_authorized(query, user, request_id=None))
 
-    sources = "\n".join(set(point.payload['path'] for point in points)) # type: ignore[index]
+    sources = set(point.payload['source'] for point in points) # type: ignore[index]
 
     for point in points:
-        print(f"ID: {point.id}, Path: {point.payload['path']}, Score: {point.score}") # type: ignore[index]
+        print(f"ID: {point.id}, Path: {point.payload['source']}, Score: {point.score}") # type: ignore[index]
 
     answer = generate.generate(query, points, opt_config)
 
