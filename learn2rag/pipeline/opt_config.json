@@ -1,6 +1,7 @@
 {
   "chunk_size": 2000,
   "chunk_overlap": 200,
+  "ingestion_batch_size": 32,
   "embedding_model": "BAAI/bge-m3",
   "vector_size": {
     "sentence-transformers/all-mpnet-base-v2": 768,

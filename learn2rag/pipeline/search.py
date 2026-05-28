@@ -2,6 +2,7 @@ import warnings
 from typing import List, Any, cast
 import logging
 import copy
+from functools import lru_cache
 
 import numpy as np
 from FlagEmbedding import FlagReranker # type: ignore[import-untyped]
@@ -17,6 +18,16 @@ from . import rewrite
 
 
 profilingLogger = logging.getLogger('profiling')
+
+
+@lru_cache(maxsize=4)
+def _get_flag_reranker(model_name: str, use_fp16: bool) -> FlagReranker:
+    return FlagReranker(model_name, use_fp16=use_fp16)
+
+
+@lru_cache(maxsize=4)
+def _get_cross_encoder(model_name: str) -> CrossEncoder:
+    return cast(CrossEncoder, CrossEncoder(model_name))
 
 
 def _sort_and_deduplicate(points: list[ScoredPoint]) -> list[ScoredPoint]:
@@ -48,7 +59,7 @@ def _rerank_points_with_flagreranker(
     model_name: str = "BAAI/bge-reranker-v2-m3",
     use_fp16: bool = True,
 ) -> list[ScoredPoint]:
-    reranker = FlagReranker(model_name, use_fp16=use_fp16)
+    reranker = _get_flag_reranker(model_name, use_fp16)
 
     valid_points = [p for p in points if p.payload and isinstance(p.payload.get("content"), str)]
     if len(valid_points) != len(points):
@@ -78,7 +89,7 @@ def _rerank_points_with_sentence_transformers(
         model_name: str = "cross-encoder/ms-marco-MiniLM-L6-v2",
 ) -> list[ScoredPoint]:
 
-    model = CrossEncoder(model_name)
+    model = _get_cross_encoder(model_name)
 
     valid_points = [p for p in points if p.payload and isinstance(p.payload.get("content"), str)]
     if len(valid_points) != len(points):
