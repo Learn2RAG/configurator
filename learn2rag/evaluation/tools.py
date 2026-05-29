@@ -6,7 +6,7 @@ import json
 import logging
 import datasets
 import json_stream  # type: ignore[import-untyped]
-from typing import Any, Callable
+from typing import Any, Callable, cast
 import pandas as pd
 
 import learn2rag.pipeline.ingestion
@@ -96,7 +96,7 @@ def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None = No
                 return len(self.data)
 
             def __getitem__(self, idx: int) -> dict[str, Any]:
-                return dict(self.data.iloc[idx].to_dict())
+                return cast(dict[str, Any], self.data.iloc[idx].to_dict())
 
             def select(self, indices: Any) -> "CSVDataset":
                 return CSVDataset(self.data.iloc[list(indices)])

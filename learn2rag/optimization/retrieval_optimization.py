@@ -14,9 +14,16 @@ from typing import Dict, Any, List, Union, Tuple, cast
 
 import numpy as np
 # from bert_score import score as bert_score  # type: ignore[import-not-found]
-from ConfigSpace import ConfigurationSpace, Integer, Categorical, ForbiddenGreaterThanRelation, Configuration, \
-    ForbiddenAndConjunction, ForbiddenEqualsClause  # type: ignore[import-not-found]
-from smac import HyperparameterOptimizationFacade, Scenario  # type: ignore[import-not-found]
+from ConfigSpace import (
+    ConfigurationSpace,
+    Integer,
+    Categorical,
+    ForbiddenGreaterThanRelation,
+    Configuration,
+    ForbiddenAndConjunction,
+    ForbiddenEqualsClause,
+)
+from smac import HyperparameterOptimizationFacade, Scenario
 
 from learn2rag.evaluation.tools import read_dataset_qa
 from learn2rag.pipeline.config import opt_config
@@ -99,8 +106,10 @@ def objective(config: Configuration,
     if env_user_cfg and pathlib.Path(env_user_cfg).exists():
         ucfg.update(json.loads(pathlib.Path(env_user_cfg).read_text()))
 
-    predictions, goldens = [], [] # type: ignore
-    qa_pairs = []
+    predictions: list[list[Any]] = []
+    goldens: list[Any] = []
+    qa_pairs: list[dict[str, Any]] = []
+
     t_start = time.time()
     t_search = 0.0
 
@@ -178,11 +187,11 @@ def param_importance(smac: HyperparameterOptimizationFacade, output_path: pathli
     if len(configs) < 3:
         return {}
 
-    raw = {}
+    raw: dict[str, float] = {}
     for p in params:
-        groups = {}
+        groups: dict[str, list[float]] = {}
         for c, cost in zip(configs, np.array(costs)):
-            groups.setdefault(str(c[p]), []).append(cost)
+            groups.setdefault(str(c[p]), []).append(float(cost))
         means = [np.mean(g) for g in groups.values()]
         raw[p] = float(np.var(means)) if len(means) > 1 else 0.0
 
@@ -221,7 +230,6 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
         }
         for i, r in enumerate(qa)
     ]
-    prompt_map = registry["prompts"]
 
     cs = ConfigurationSpace(seed=42)
     cs.add([
@@ -290,10 +298,12 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
 
     smac = HyperparameterOptimizationFacade(
         scenario=scenario,
-        target_function=lambda config, seed=0: objective(config, questions, dataset_name, state, answers_dir,prompt_map)
+        target_function=lambda config, seed=0: objective(config, questions, state, answers_dir)
     )
     t0 = time.time()
     incumbent = smac.optimize()
+    if isinstance(incumbent, list):
+        incumbent = incumbent[0]
     importance = param_importance(smac, out)
     total_time = time.time() - t0
     best_cfg = incumbent.get_dictionary()
