@@ -80,21 +80,27 @@ def ingest_dataset_documents(dataset_name: str) -> None:
     # learn2rag.pipeline.ingestion.index(user_config, opt_config)
 
 
-def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
+def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None = None) -> Any:
     logging.debug(f'{dataset_name=}')
 
     if subdirectory.endswith('.csv'):
         df = pd.read_csv(subdirectory, sep=';')
         # wrap in object that behaves like HuggingFace dataset
         class CSVDataset:
-            def __init__(self, df):
+            data: pd.DataFrame
+
+            def __init__(self, df: pd.DataFrame) -> None:
                 self.data = df
-            def __len__(self):
+
+            def __len__(self) -> int:
                 return len(self.data)
-            def __getitem__(self, idx):
-                return self.data.iloc[idx].to_dict()
-            def select(self, indices):
+
+            def __getitem__(self, idx: int) -> dict[str, Any]:
+                return dict(self.data.iloc[idx].to_dict())
+
+            def select(self, indices: Any) -> "CSVDataset":
                 return CSVDataset(self.data.iloc[list(indices)])
+
         return CSVDataset(df)
 
     else:

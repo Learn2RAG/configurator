@@ -10,46 +10,44 @@ import time
 import copy
 import os
 import asyncio
-from typing import Dict, Any, List, Union, Tuple
+from typing import Dict, Any, List, Union, Tuple, cast
 
 import numpy as np
-from bert_score import score as bert_score
+# from bert_score import score as bert_score  # type: ignore[import-not-found]
 from ConfigSpace import ConfigurationSpace, Integer, Categorical, ForbiddenGreaterThanRelation, Configuration, \
-    ForbiddenAndConjunction, ForbiddenEqualsClause
-from smac import HyperparameterOptimizationFacade, Scenario
+    ForbiddenAndConjunction, ForbiddenEqualsClause  # type: ignore[import-not-found]
+from smac import HyperparameterOptimizationFacade, Scenario  # type: ignore[import-not-found]
 
 from learn2rag.evaluation.tools import read_dataset_qa
 from learn2rag.pipeline.config import opt_config
 import learn2rag.pipeline.search
-import learn2rag.pipeline.generate
+# import learn2rag.pipeline.generate
 
 
 
 
-def load_registry(path: str = "registry.json") -> dict:
+def load_registry(path: str = "registry.json") -> dict[str, Any]:
     p = pathlib.Path(path)
     if not p.is_file():
        logging.error("registry file not found")
     with p.open() as f:
-        return json.load(f)
+        return cast(dict[str, Any], json.load(f))
 
 def run_search(question: str, user_config: Dict[str, Any], working_config: Dict[str, Any]) -> Tuple[List[Any], float]:
     t0 = time.time()
-    # docs = learn2rag.pipeline.search.search(question, user_config, working_config)
-    # TODO user config/opt config
     docs = asyncio.run(learn2rag.pipeline.search.search_authorized(question, user="anonymous", request_id=None, user_config=user_config, opt_config=working_config))
     search_time = time.time() - t0
-    source_list = [point.payload['source'] for point in docs]
+    source_list = [point.payload['source'] for point in docs if point.payload is not None and "source" in point.payload]
     return source_list, search_time
 
 
-def recall(search_results, labels):
+def recall(search_results: list[list[Any]], labels: list[Any]) -> float:
     count = 0
     top_k = opt_config["top_k"]
     for q in range(len(search_results)):
         label = str(labels[q])
         hits = [str(h) for h in search_results[q]]
-        print('label ',label, ' hits: ', hits)
+        # print('label ', label, ' hits: ', hits)
         if label in hits[:top_k]:
             count += 1
     return count / len(labels) if labels else 0.0
@@ -59,10 +57,8 @@ def recall(search_results, labels):
 # removed dataset_name because it just use in user config and now we inject it
 def objective(config: Configuration,
     questions: List[Dict[str, Any]],
-    dataset_name: str,
     state: Dict[str, Any],
     answers_dir: pathlib.Path
-    ,prompt_map
 ) -> float:
     state["trial_count"] += 1
     tid = state["trial_count"]
@@ -81,8 +77,6 @@ def objective(config: Configuration,
         logging.warning(f"Skip invalid cfg: {cfg}")
         return 1.0
 
-
-# TODO
     working_cfg = copy.deepcopy(opt_config)
     working_cfg.update({
         "chunk_size": cfg["chunk_size"],
@@ -95,10 +89,9 @@ def objective(config: Configuration,
         "rewrite": cfg["rewrite"]
     })
 
-# TODO
     ucfg = {
         "file_path": None,
-        "collection_name": "CSC-CS_2000-CO_50", # TODO get collection name depending on hyperparameters
+        "collection_name": f"CSC-CS_{cfg['chunk_size']}-CO_{cfg['chunk_overlap']}",
         "imported_documents_file_path": None,
         "llm": None,
     }
@@ -106,7 +99,7 @@ def objective(config: Configuration,
     if env_user_cfg and pathlib.Path(env_user_cfg).exists():
         ucfg.update(json.loads(pathlib.Path(env_user_cfg).read_text()))
 
-    predictions, goldens = [], []
+    predictions, goldens = [], [] # type: ignore
     qa_pairs = []
     t_start = time.time()
     t_search = 0.0
@@ -134,16 +127,23 @@ def objective(config: Configuration,
     t_score = time.time()
     recall_score = recall(predictions, goldens)
     scoring_time = time.time() - t_score
+    total_time = time.time() - t_start
 
     # objective function
-    cost = 1.0 - recall_score
-    total_time = time.time() - t_start
+    w_recall = 0.5
+    w_time = 0.5
+    t_search_per_sample_upper = 50
+    max_time_s = t_search_per_sample_upper*len(predictions)
+    time_cost = max(0.0, 1.0 - (t_search / max_time_s))
+    cost = 1.0 - w_recall*recall_score - w_time*time_cost
+    avg_t_search = t_search/len(predictions)
 
     trial_answers = {
         "trial_id": tid,
         "config": cfg,
         "cost": float(cost),
-        "avg_recall": float(recall_score),
+        "recall": float(recall_score),
+        "avg_t_search": float(avg_t_search),
         "qa_pairs": qa_pairs,
     }
     answers_file = answers_dir / f"trial_{tid}_answers.json"
@@ -154,14 +154,16 @@ def objective(config: Configuration,
     state["convergence"].append({"trial": tid, "cost": float(cost), "best_cost": float(state["best_cost"])})
     state["history"].append({
         "trial_id": tid, "config": cfg,
-        "avg_recall": float(recall_score),
-        "cost": float(cost), "time_s": round(total_time, 2),
+        "recall": float(recall_score),
+        "avg_t_search": float(avg_t_search),
+        "cost": float(cost),
+        "time_s": round(total_time, 2),
         "search_s": round(t_search, 2),
         "scoring_s": round(scoring_time, 2),
     })
 
     logging.info(
-        f"Trial {tid}: recall={recall_score:.4f} cost={cost:.4f} "
+        f"Trial {tid}: recall={recall_score:.4f} avg_t_search={avg_t_search: .4f} cost={cost:.4f} "
         f"time={total_time:.1f}s (search={t_search:.1f} score={scoring_time:.1f})"
     )
     return float(cost)
@@ -186,7 +188,7 @@ def param_importance(smac: HyperparameterOptimizationFacade, output_path: pathli
 
     total = sum(raw.values())
     imp = {p: round(v / total, 4) for p, v in raw.items()} if total > 0 else raw
-    ranking = sorted(imp, key=imp.get, reverse=True)
+    ranking = sorted(imp, key=imp.get, reverse=True)  # type: ignore[arg-type]
     result = {"method": "variance_based", "ranking": ranking, "individual": imp}
     with open(output_path / "parameter_importance.json", "w") as f:
         json.dump(result, f, indent=2)
@@ -223,10 +225,8 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
 
     cs = ConfigurationSpace(seed=42)
     cs.add([
-        # Categorical("chunk_size", [250, 1000, 2000], default=1000),
-        # Categorical("chunk_overlap", [50, 200], default=50),
-        Categorical("chunk_size", [2000], default=2000),
-        Categorical("chunk_overlap", [50], default=50),
+        Categorical("chunk_size", [250, 1000, 2000], default=1000),
+        Categorical("chunk_overlap", [50, 200], default=50),
         Categorical("search_mode", ["dense", "sparse", "dense_sparse", "dense_sparse_colbert"], default="dense"),
         Categorical("reranking_mode", ["none", "reranking_with_flagreranker", "reranking_with_sentence_transformers", "reranking_with_colbert"], default="none"),
         Categorical("rewrite_mode", ["none", "subqueries", "keywords", "subqueries_keywords"], default="none"),
@@ -235,6 +235,11 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
         Categorical("rewrite", ["True", "False"], default="False"),
     ])
     cs.add(ForbiddenGreaterThanRelation(cs["chunk_overlap"], cs["chunk_size"]))
+
+    cs.add(ForbiddenAndConjunction(
+        ForbiddenEqualsClause(cs["chunk_size"], 250),
+        ForbiddenEqualsClause(cs["chunk_overlap"], 200),
+    ))
 
     for sm in ["dense", "sparse"]:
         for fm in ["DBSF", "RRF"]:
@@ -292,9 +297,16 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
     importance = param_importance(smac, out)
     total_time = time.time() - t0
     best_cfg = incumbent.get_dictionary()
+    best_trial = min(
+        (h for h in state["history"] if h.get("config") == best_cfg),
+        key=lambda h: h["cost"],
+        default=None,
+    )
+    best_trial_id = best_trial["trial_id"] if best_trial else None
     results_path = out / "optimization_results.json"
     results_path.write_text(json.dumps({
         "best_config": best_cfg,
+        "best_trial_id": best_trial_id,
         "run_history": state["history"],
         "convergence": state["convergence"],
         "parameter_importance": importance,
