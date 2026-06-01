@@ -7,10 +7,10 @@ ports:
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |
-      log_level: INFO
+      log_level: ERROR
       service:
         api_key: '{{qdrant_api_key}}'
-        grpc_port: null      
+        grpc_port: null
         http_port: {{ports.qdrant_http}}
         host: '127.0.0.1'
       telemetry_disabled: true
@@ -105,12 +105,6 @@ services:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
       - '{{storage_path}}/qdrant_config.yml'
-    # https://qdrant.tech/documentation/guides/configuration/
-    environment:
-      QDRANT__LOG_LEVEL: 'ERROR'
-      QDRANT__SERVICE__HOST: '127.0.0.1'
-      QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
-      QDRANT__TELEMETRY_DISABLED: 'true'
   main:
     working_dir: '{{storage_path}}'
     command:
