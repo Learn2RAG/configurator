@@ -41,9 +41,9 @@ wget --continue -O $BUNDLE_DIR/ollama-linux.tgz https://github.com/ollama/ollama
 mkdir -p $BUNDLE/services/ollama
 tar -C $BUNDLE/services/ollama -xzvf $BUNDLE_DIR/ollama-linux.tgz
 
-wget --continue -O $BUNDLE_DIR/qdrant-linux.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.15.4/qdrant-x86_64-unknown-linux-musl.tar.gz
+wget --continue -O $BUNDLE_DIR/qdrant-linux-v1.17.1.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-x86_64-unknown-linux-musl.tar.gz
 mkdir -p $BUNDLE/services/qdrant
-tar -C $BUNDLE/services/qdrant -xzvf $BUNDLE_DIR/qdrant-linux.tar.gz
+tar -C $BUNDLE/services/qdrant -xzvf $BUNDLE_DIR/qdrant-linux-v1.17.1.tar.gz
 
 cp start.linux $BUNDLE/start
 cp uninstall.linux $BUNDLE/uninstall
