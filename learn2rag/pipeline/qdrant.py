@@ -9,10 +9,8 @@ from .config import user_config
 
 class Qdrant:
     client = QdrantClient(
-        host="localhost",
-        port=int(os.environ.get('QDRANT__SERVICE__HTTP_PORT', 6336)),
+        location=os.environ.get('QDRANT_LOCATION', 'http://localhost:6336'),
         api_key=os.environ.get('QDRANT__SERVICE__API_KEY'),
-        https=False,
     )
 
     def __init__(self, collection_name: str, opt_config: dict[str, Any]) -> None:
