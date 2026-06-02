@@ -1,6 +1,6 @@
 # Changelog
 ## [Unreleased]
-## [0.3.0] - 2026-05-27
+## [0.3.0] - 2026-06-02
 ### Added
 - continuous import with updating the indexed data
 - Sharepoint import and simple configuration interface
