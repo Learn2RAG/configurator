@@ -363,6 +363,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
         if 'depth' in data:
             data['depth'] = int(data['depth'])
+        if 'object_ids' in data:
+            data['object_ids'] = request.form.getlist('object_ids')
         learn2rag.data.create_entry(app.instance_path, 'sources', data)
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
