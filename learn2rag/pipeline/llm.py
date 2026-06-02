@@ -10,10 +10,15 @@ logger = logging.getLogger(__name__)
 
 
 class LLMClient():
-    # ID is used as a key to store in user data, should not be changed
     ID: str
-    # LABEL is a display label for user interface
-    LABEL: str
+    '''A key stored in user data, must not be changed'''
+
+    LABEL: str | None
+    '''
+    A display label for the interface.
+    If None, the option would be excluded from the interface.
+    '''
+
     chat_model: BaseChatModel
 
 

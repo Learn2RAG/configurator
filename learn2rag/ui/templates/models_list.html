@@ -15,7 +15,11 @@
       <td title="{{ name }}">{{ model.label }}</td>
       <td>
         {% if model.api in llm.llms %}
+        {% if llm.llms[model.api].LABEL %}
         {{ llm.llms[model.api].LABEL }}
+        {% else %}
+        <code>{{ model.api }}</code>
+        {% endif %}
         {% else %}
         <code>{{ model.api }}</code>
         <span title="{{pgettext('tooltip', 'Unknown value')}}" style="cursor: default;">⚠️</span>
