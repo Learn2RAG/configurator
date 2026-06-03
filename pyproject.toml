@@ -23,7 +23,7 @@ dependencies = [
     "colorama==0.4.6",
     "coloredlogs==15.0.1",
     "colorlog (>=6.9.0,<7.0.0)",
-    "contourpy==1.3.3",
+    "contourpy==1.3.2",
     "cryptography==45.0.6",
     "cycler==0.12.1",
     "dataclasses-json==0.6.7",
@@ -192,7 +192,7 @@ dependencies = [
 description = ""
 license = "MIT"
 name = "learn2rag"
-requires-python = "==3.13.5"
+requires-python = "~=3.13.0"
 version = "0.2.0"
 [project.urls]
 Homepage = "https://learn2rag.de/"
