@@ -51,7 +51,6 @@ def redirect(url: str) -> 'werkzeug.wrappers.response.Response':
 
 def start_project(name: str, template_file: Path, storage_path: Path, render_context: dict[str, Any]={}) -> Project:
     logging.debug('UI starting project: %s', name)
-    storage_path = normalize_path(storage_path)
     logging.debug('Storage path: %s', storage_path)
     project = None
     if project := Project.get(name):
@@ -466,7 +465,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=app.config.get('PREFERRED_PORTS', range(9001, 9011)))
             render_context['ports'] = dict(zip(port_names, ports))
 
-        storage_path = Path(pipeline['storage_path'])
+        storage_path = normalize_path(pipeline['storage_path'])
 
         try:
             project = start_project(name, template_file, storage_path, render_context)
