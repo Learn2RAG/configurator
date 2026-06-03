@@ -17,7 +17,6 @@ from babel import negotiate_locale
 from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
 from flask_babel import Babel, gettext, ngettext, pgettext  # type: ignore[import-untyped]
 import flask.logging
-import jinja2
 import ollama
 import uvicorn
 import yaml
@@ -54,20 +53,18 @@ def start_project(name: str, template_file: Path, storage_path: Path, render_con
     logging.debug('UI starting project: %s', name)
     storage_path = normalize_path(storage_path)
     logging.debug('Storage path: %s', storage_path)
-    storage_path.mkdir(parents=True, exist_ok=True)
-    project_file = storage_path / 'compose.yml'
-
-    template = jinja2.Template(template_file.read_text())
-    project_file.write_text(template.render(render_context | {
-        'is_windows': is_windows(),
-        'learn2rag_path': Path('.').absolute(),
-        'storage_path': storage_path,
-    }))
     project = None
     if project := Project.get(name):
         assert not project.running
         project.remove()
-    project = Project.create(project_file, name)
+
+    storage_path.mkdir(parents=True, exist_ok=True)
+
+    project = Project.create(template_file, name, template=True, template_context=render_context | {
+        'is_windows': is_windows(),
+        'learn2rag_path': Path('.').absolute(),
+        'storage_path': storage_path,
+    })
     assert project is not None, 'project should not be None'
     project.start()
     return project
