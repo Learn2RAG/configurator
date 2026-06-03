@@ -275,7 +275,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             if request.form.get('ollama') == 'pull':
                 if model.find(':') == -1:
                     model += ':latest'
-                start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(), {'model': model})
+                start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(app.instance_path) / 'ollama_download', {'model': model})
                 return flask_redirect(url_for('model_pulling', model=model))
         elif api == learn2rag.pipeline.llm.OpenAIClient.ID:
             url = request.form['url']
