@@ -14,7 +14,7 @@ files:
       service:
         api_key: '{{qdrant_api_key}}'
         grpc_port: null
-        http_port: '{{ports.qdrant_http}}'
+        http_port: {{ports.qdrant_http}}
         host: '127.0.0.1'
       telemetry_disabled: true
   - path: '{{storage_path}}/basic_user_config.json'
