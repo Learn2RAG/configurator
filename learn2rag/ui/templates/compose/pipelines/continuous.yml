@@ -161,7 +161,7 @@ services:
     healthcheck:
       # TODO: We only support ['CMD', 'curl', '-f', ...]
       test: ['CMD', 'curl', '-f', '{{learn2rag_scheme}}://localhost:{{ports.ui}}/health']
-  #!!! {% if not pipeline.qdrant_location %}
+  #!!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
   qdrant:
     working_dir: '{{storage_path}}'
     command:

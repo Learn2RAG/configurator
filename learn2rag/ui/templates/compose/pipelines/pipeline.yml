@@ -159,7 +159,7 @@ services:
     healthcheck:
       # TODO: We only support ['CMD', 'curl', '-f', ...]
       test: ['CMD', 'curl', '-f', '{{learn2rag_scheme}}://localhost:{{ports.ui}}/health']
-  #!!! {% if not pipeline.qdrant_location %}
+  #!!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
   qdrant:
     working_dir: '{{storage_path}}'
     command:
@@ -178,6 +178,7 @@ services:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       LEARN2RAG_PIPELINE_PORT: '{{ports.pipeline}}'
       QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'
+      QDRANT_PATH: '{{ pipeline.qdrant_path }}'
       QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'
       PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
       IMPORTER_CONFIG: '{{storage_path}}/importer_config.json'
