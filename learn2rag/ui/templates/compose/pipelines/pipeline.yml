@@ -100,6 +100,7 @@ files:
     content: ''
 
 services:
+  #!!! {% if ports.ui %}
   open-webui:
     working_dir: '{{storage_path}}'
     command:
@@ -159,6 +160,7 @@ services:
     healthcheck:
       # TODO: We only support ['CMD', 'curl', '-f', ...]
       test: ['CMD', 'curl', '-f', '{{learn2rag_scheme}}://localhost:{{ports.ui}}/health']
+  #!!! {% endif %}
   #!!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
   qdrant:
     working_dir: '{{storage_path}}'
