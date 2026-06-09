@@ -138,7 +138,7 @@ def _rerank_points_with_colbert(
         query=colbert_query,  # type: ignore[arg-type]
         using="colbert",
         limit=top_k,
-        timeout=100
+        timeout=120
     )
     return list(results.points)
 
@@ -253,7 +253,8 @@ def _collect_query_points(
                 top_k=opt_config["top_k_reranker"],
                 opt_config=opt_config
             )
-
+    else:
+        points = points[:opt_config["top_k"]]
     return points
 
 
@@ -319,7 +320,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
             query=query_embedding, # type: ignore[arg-type, unused-ignore]
             using="dense",
             limit=opt_config["top_k"],
-            timeout=100
+            timeout=120
         )
     elif opt_config["search_mode"] == "sparse":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()]  # type: ignore[union-attr]
@@ -329,7 +330,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
             query=models.SparseVector(indices=indices, values=values),
             using="sparse",
             limit=opt_config["top_k"],
-            timeout=100
+            timeout=120
         )
     elif opt_config["search_mode"] == "dense_sparse":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()] # type: ignore[union-attr]
@@ -350,7 +351,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
             ],
             query=models.FusionQuery(fusion=fusion_mode),
             limit=opt_config["top_k"],
-            timeout=100
+            timeout=120
         )
     
     elif opt_config["search_mode"] == "dense_sparse_colbert":
@@ -377,7 +378,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
             ],
             query=models.FusionQuery(fusion=fusion_mode),
             limit=opt_config["top_k"],
-            timeout=100
+            timeout=120
         )
 
     elif opt_config["search_mode"] == "multi_search":
@@ -386,7 +387,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
             query=query_embedding, # type: ignore[arg-type, unused-ignore]
             using="multi",
             limit=opt_config["top_k"],
-            timeout=100
+            timeout=120
         )
     return results
 
@@ -421,7 +422,7 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
         query=query_embedding, # type: ignore[arg-type, unused-ignore]
         using="multi",
         limit=opt_config["top_k"],
-        timeout=100
+        timeout=120
     )
     profilingLogger.info('end', extra={'activity': 'search', 'request_id': request_id})
     return results

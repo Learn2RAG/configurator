@@ -14,7 +14,7 @@ from typing import Dict, Any, List, Union, Tuple, cast
 
 import numpy as np
 # from bert_score import score as bert_score  # type: ignore[import-not-found]
-from ConfigSpace import (
+from ConfigSpace import (# type: ignore[import-not-found]
     ConfigurationSpace,
     Integer,
     Categorical,
@@ -23,7 +23,7 @@ from ConfigSpace import (
     ForbiddenAndConjunction,
     ForbiddenEqualsClause,
 )
-from smac import HyperparameterOptimizationFacade, Scenario
+from smac import HyperparameterOptimizationFacade, Scenario# type: ignore[import-not-found]
 
 from learn2rag.evaluation.tools import read_dataset_qa
 from learn2rag.pipeline.config import opt_config
@@ -139,8 +139,8 @@ def objective(config: Configuration,
     total_time = time.time() - t_start
 
     # objective function
-    w_recall = 0.5
-    w_time = 0.5
+    w_recall = 1
+    w_time = 0
     t_search_per_sample_upper = 50
     max_time_s = t_search_per_sample_upper*len(predictions)
     time_cost = max(0.0, 1.0 - (t_search / max_time_s))
@@ -153,7 +153,10 @@ def objective(config: Configuration,
         "cost": float(cost),
         "recall": float(recall_score),
         "avg_t_search": float(avg_t_search),
-        "qa_pairs": qa_pairs,
+        "w_recall": w_recall,
+        "w_time": w_time,
+        "top_k": opt_config["top_k"],
+        "qa_pairs": qa_pairs
     }
     answers_file = answers_dir / f"trial_{tid}_answers.json"
     with open(answers_file, "w") as f:
@@ -290,7 +293,7 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
         cs,
         deterministic=True,
         n_trials=n_trials,
-        walltime_limit=7200,
+        walltime_limit=172800, #7200,
         seed=42,
         output_directory=out / "smac_output",
     )
