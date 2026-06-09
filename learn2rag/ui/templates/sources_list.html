@@ -12,7 +12,7 @@
     <tr>
       <td title="{{ name }}">{{ item.label }}</td>
       <td>{{ item.type }}</td>
-      <td>{{ item.path or item.url or item.base_url }}</td>
+      <td>{{ item.path or item.url or item.base_url or item.document_library_id }}</td>
       <td>
         <form method="POST" action="{{ url_for('source_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this data source configuration: %(label)s?', label=item.label)}}">
           <div class="btn-group" role="group">

@@ -6,7 +6,7 @@ This module handles loading documents from HTML sources.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.6
+Version: 0.0.7
 Creation Date: July 28, 2025
 Last Modified: May 05, 2026
 """
@@ -87,29 +87,38 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
         # Use UnstructuredHTMLLoader to extract content
         loader = UnstructuredHTMLLoader(temp_file)
         page_documents = loader.load()
+        # Compute one hash for the entire page so all sub-documents share the same value.
+        # This ensures that get_documents_by_loader_id can safely deduplicate by source URL
+        # without ambiguity caused by different hashes for chunks of the same page.
+        page_hash = hashlib.sha256(response.text.encode('utf-8')).hexdigest()
         # Extract meta properties using BeautifulSoup
         soup = BeautifulSoup(response.text, "html.parser")
         meta_tags = {meta.get("name", meta.get("property", "")): meta.get("content", "")
                      for meta in soup.find_all("meta") if meta.get("content")}
         
-        for doc in page_documents:
+        # Merge all extracted elements into a single Document per URL so that
+        # delta-import deduplication always works on a 1:1 source→document basis.
+        valid_docs = [d for d in page_documents if isinstance(d, Document)]
+        if not valid_docs:
+            logger.warning(f"No valid documents extracted from {url}")
+        else:
             if stop_loading:
                 logger.info("Loading process stopped by user.")
-                break
-            # Generate a unique hash for the document content
-            if isinstance(doc, Document):
-                content_hash = hashlib.sha256(doc.page_content.encode('utf-8')).hexdigest()
-                doc.metadata["content_hash"] = content_hash
             else:
-                logger.warning(f"Document is not of type Document: {type(doc)}. Skipping.")
-                continue
-            doc.metadata["source"] = url
-            doc.metadata["process_date"] = datetime.now().strftime("%Y-%m-%d")
-            doc.metadata["process_time"] = datetime.now().strftime("%H:%M:%S")
-            doc.metadata["loader_type"] = "HTMLLoader"
-            doc.metadata["meta_properties"] = meta_tags  
-            doc.metadata["loader_id"] = loader_id
-        documents.extend(page_documents)
+                merged_content = "\n\n".join(d.page_content for d in valid_docs)
+                merged_doc = Document(
+                    page_content=merged_content,
+                    metadata={
+                        "source": url,
+                        "content_hash": page_hash,
+                        "process_date": datetime.now().strftime("%Y-%m-%d"),
+                        "process_time": datetime.now().strftime("%H:%M:%S"),
+                        "loader_type": "HTMLLoader",
+                        "meta_properties": meta_tags,
+                        "loader_id": loader_id,
+                    },
+                )
+                documents.append(merged_doc)
 
         logger.info(f"Loaded content from {url}")
 

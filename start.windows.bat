@@ -1,5 +1,6 @@
 @echo off
 rem
+echo V 0.0.3
 echo Starting Learn2RAG...
 echo Initializing, please wait...
 echo ========================================

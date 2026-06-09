@@ -22,56 +22,59 @@ class Qdrant:
         self.query_mode = opt_config["query_mode"]
         self.multi_search = opt_config["multi_search"]
 
-        if self.search_mode == "dense_sparse":
-            if not Qdrant.client.collection_exists(self.collection_name):
-                Qdrant.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config={
-                        "dense": VectorParams(size=self.vector_size, distance=Distance.COSINE)
-                    },
-                    sparse_vectors_config={
-                        "sparse": SparseVectorParams(
-                            index=SparseIndexParams(on_disk=False)
-                        ),
-                    },
-                )
-        elif self.search_mode == "dense_sparse_colbert":
-            if not Qdrant.client.collection_exists(self.collection_name):
-                Qdrant.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config={
-                        "dense": VectorParams(size=self.vector_size, distance=Distance.COSINE),
-                        "colbert": VectorParams(
-                            size=self.vector_size,
-                            distance=Distance.COSINE,
-                            multivector_config=MultiVectorConfig(
-                                comparator=MultiVectorComparator.MAX_SIM,
-                                )
-                            ),
-                    },
-                    sparse_vectors_config={
-                        "sparse": SparseVectorParams(
-                            index=SparseIndexParams(on_disk=False)
-                        ),
-                    },
-                    
-                )
-        elif self.query_mode == "multi":
-            if not Qdrant.client.collection_exists(self.collection_name):
-                vector_size = (len(self.multi_search)+1)*self.vector_size
-                Qdrant.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config={
-                        "multi": VectorParams(size=vector_size, distance=Distance.COSINE)
-                    }
-                )
+    @classmethod
+    def ensure_collection(cls, collection_name: str, opt_config: dict[str, Any]) -> None:
+        if cls.client.collection_exists(collection_name):
+            return
 
+        vector_size = opt_config["vector_size"][opt_config["embedding_model"]]
+        search_mode = opt_config["search_mode"]
+        query_mode = opt_config["query_mode"]
+        multi_search = opt_config["multi_search"]
 
+        if search_mode == "dense_sparse":
+            cls.client.create_collection(
+                collection_name=collection_name,
+                vectors_config={
+                    "dense": VectorParams(size=vector_size, distance=Distance.COSINE)
+                },
+                sparse_vectors_config={
+                    "sparse": SparseVectorParams(
+                        index=SparseIndexParams(on_disk=False)
+                    ),
+                },
+            )
+        elif search_mode == "dense_sparse_colbert":
+            cls.client.create_collection(
+                collection_name=collection_name,
+                vectors_config={
+                    "dense": VectorParams(size=vector_size, distance=Distance.COSINE),
+                    "colbert": VectorParams(
+                        size=vector_size,
+                        distance=Distance.COSINE,
+                        multivector_config=MultiVectorConfig(
+                            comparator=MultiVectorComparator.MAX_SIM,
+                        )
+                    ),
+                },
+                sparse_vectors_config={
+                    "sparse": SparseVectorParams(
+                        index=SparseIndexParams(on_disk=False)
+                    ),
+                },
+            )
+        elif query_mode == "multi":
+            multi_vector_size = (len(multi_search) + 1) * vector_size
+            cls.client.create_collection(
+                collection_name=collection_name,
+                vectors_config={
+                    "multi": VectorParams(size=multi_vector_size, distance=Distance.COSINE)
+                }
+            )
         else:
-            if not Qdrant.client.collection_exists(self.collection_name):
-                Qdrant.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config={
-                        "dense": VectorParams(size=self.vector_size, distance=Distance.COSINE)
-                    }
-                )
+            cls.client.create_collection(
+                collection_name=collection_name,
+                vectors_config={
+                    "dense": VectorParams(size=vector_size, distance=Distance.COSINE)
+                }
+            )

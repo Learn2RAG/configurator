@@ -12,6 +12,7 @@ CARGO_TARGET_DIR=target/build/"${CARGO_BUILD_TARGET}"
 BUNDLE_DIR=~/.cache/learn2rag-dist
 BUNDLE=$BUNDLE_DIR/$BUNDLE_NAME
 rm -rf $BUNDLE
+rm -f $BUNDLE.zip
 
 mkdir -p $BUNDLE
 mkdir -p $BUNDLE/services
@@ -35,11 +36,13 @@ cp dist/learn2rag-$VERSION-py3-none-any.whl pyapp
     cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp$BIN_SUFFIX $BUNDLE/configurator$BIN_SUFFIX
 
-cp services/open-webui/dist/open_webui-0.6.15-py3-none-any.whl pyapp
+cp services/open-webui/dist/open_webui-0.8.12-py3-none-any.whl pyapp
+touch pyapp/Cargo.toml
+touch pyapp/src/main.rs 2>/dev/null || true
 (cd pyapp; \
     PYAPP_PYTHON_VERSION=3.11 \
     PYAPP_PROJECT_NAME=open-webui \
-    PYAPP_PROJECT_PATH=open_webui-0.6.15-py3-none-any.whl \
+    PYAPP_PROJECT_PATH=open_webui-0.8.12-py3-none-any.whl \
     PYAPP_EXEC_SPEC=open_webui:app \
     PYAPP_PIP_EXTRA_ARGS="$OFFLINE_ARGS" \
     cross build --release --target $CARGO_BUILD_TARGET)
@@ -52,6 +55,8 @@ done 100<Distfiles
 
 WHEELS_DIR=$BUNDLE/services/wheels
 mkdir -p $WHEELS_DIR
+
+rm -f $WHEELS_DIR/open_webui-*.whl # if something is cached
 
 rm -rf $BUNDLE_DIR/venv313 $BUNDLE_DIR/venv311
 uv venv --seed --python 3.13 $BUNDLE_DIR/venv313
@@ -79,7 +84,7 @@ $BUNDLE_DIR/venv311/bin/python -m pip wheel "antlr4-python3-runtime==4.9.3" "lan
 
 if [[ "$CARGO_BUILD_TARGET" == *"windows"* ]]; then
     echo "Generating strict Windows dependency lockfiles..."
-    echo "services/open-webui/dist/open_webui-0.6.15-py3-none-any.whl" > $BUNDLE_DIR/req-webui.in
+    echo "services/open-webui/dist/open_webui-0.8.12-py3-none-any.whl" > $BUNDLE_DIR/req-webui.in
     echo "dist/learn2rag-$VERSION-py3-none-any.whl" > $BUNDLE_DIR/req-learn2rag.in
     uv pip compile $BUNDLE_DIR/req-webui.in \
         --python-version 3.11 \
@@ -119,7 +124,7 @@ else
 
     $BUNDLE_DIR/venv311/bin/python -m pip download \
         --find-links $WHEELS_DIR \
-        services/open-webui/dist/open_webui-0.6.15-py3-none-any.whl -d $WHEELS_DIR
+        services/open-webui/dist/open_webui-0.8.12-py3-none-any.whl -d $WHEELS_DIR
 fi
 
 rm -rf $BUNDLE_DIR/venv313 $BUNDLE_DIR/venv311
