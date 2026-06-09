@@ -99,12 +99,14 @@ files:
     content: ''
 
 services:
+  #!!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
   qdrant:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
       - '{{storage_path}}/qdrant_config.yml'
+  #!!! {% endif %}
   main:
     working_dir: '{{storage_path}}'
     command:
@@ -118,7 +120,8 @@ services:
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       STORAGE_PATH: '{{storage_path}}'
-      QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
+      QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'
+      QDRANT_PATH: '{{ pipeline.qdrant_path }}'
       QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'
       PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
       IMPORTER_CONFIG: '{{storage_path}}/importer_config.json'
