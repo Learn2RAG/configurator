@@ -6,10 +6,16 @@ import logging.config
 import os
 import pathlib
 import sys
+from datetime import datetime, timedelta
 from types import TracebackType
-from typing import Unpack
+from typing import Any, Unpack
 
 import yaml
+# TODO: apscheduler 4.x would come with py.typed
+# https://github.com/agronholm/apscheduler/issues/648#issuecomment-1195304357
+from apscheduler.schedulers.blocking import BlockingScheduler  # type: ignore[import-untyped]
+from apscheduler.triggers.interval import IntervalTrigger  # type: ignore[import-untyped]
+from pydantic import TypeAdapter
 
 
 class LauncherArgumentParser(argparse.ArgumentParser):
@@ -17,11 +23,14 @@ class LauncherArgumentParser(argparse.ArgumentParser):
         super().__init__()
         self.add_argument('module', type=str, nargs='?', default='learn2rag.ui')
         self.add_argument('--logging-config', type=pathlib.Path)
+        self.add_argument('--schedule-interval', type=TypeAdapter(timedelta).validate_python)
 
 
 def excepthook(*exc_info: Unpack[tuple[type[BaseException], BaseException, TracebackType | None]]) -> None:
     os.environ['NO_COLOR'] = '1'
     logging.critical('Uncaught exception', exc_info=exc_info)
+    # also print it since logging might be not configured properly
+    print(f'Uncaught exception: {exc_info}')
     sys.__excepthook__(*exc_info)
 
 
@@ -42,24 +51,48 @@ def configure_logging(config_path: pathlib.Path, debug: bool) -> None:
 if __name__ == '__main__':
     sys.excepthook = excepthook
 
-    config = {}
+    config: dict[str, Any] = {}
     try:
         with open('config.yml', 'r') as f:
-            config = yaml.safe_load(f)
+            config = yaml.safe_load(f) or {}
     except FileNotFoundError:
-        print('No user config file (config.yml)')
+        if len(sys.argv) == 1:
+            print('You can create config.yml for more configuration options')
+            print('https://docs.learn2rag.de/en/basic/administrator/#advanced-configuration')
 
     args, rest = LauncherArgumentParser().parse_known_args()
-    module = importlib.import_module(args.module)
     configure_logging(args.logging_config, config.get('logging', {}).get('debug', False))
     logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
+    module = importlib.import_module(args.module)
     # TODO
+    module_args: tuple[Any, ...] = ()
+    module_kwargs = {}
     if args.module == 'learn2rag.ollama_tool':
         # FIXME default config values
-        module.main(rest, config=config.get('OLLAMA', {'port': 11434}))
+        module_args = (
+            rest,
+        )
+        module_kwargs = {'config': config.get('OLLAMA', {'port': 11434})}
     elif args.module == 'learn2rag.importer':
-        module.main(module.ImporterArgumentParser().parse_args(rest))
+        module_args = (
+            module.ImporterArgumentParser().parse_args(rest),
+        )
     elif args.module == 'learn2rag.ui':
-        module.main(config)
+        module_args = (
+            config,
+        )
+
+    if args.schedule_interval:
+        scheduler = BlockingScheduler()
+        trigger = IntervalTrigger(seconds=args.schedule_interval.total_seconds())
+        scheduler.add_job(
+            module.main,
+            trigger,
+            next_run_time=datetime.now(),
+            max_instances=1,
+            args=module_args,
+            kwargs=module_kwargs,
+        )
+        scheduler.start()
     else:
-        module.main()
+        module.main(*module_args, **module_kwargs)

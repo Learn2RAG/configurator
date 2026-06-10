@@ -1,7 +1,13 @@
 import json
 import logging
 from operator import itemgetter
-from typing import Any, AsyncGenerator, List, Optional
+from concurrent.futures import ThreadPoolExecutor
+from typing import (
+    Any,
+    AsyncGenerator,
+    List,
+    Optional,
+)
 
 from fastapi import FastAPI, Body, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -11,6 +17,7 @@ from qdrant_client.models import ScoredPoint
 
 from . import ingestion
 from .config import user_config, opt_config
+from .qdrant import Qdrant
 from .search import search_authorized
 from .operators import BasicPipeline
 
@@ -56,6 +63,11 @@ example_messages = {
 app = FastAPI()
 
 
+@app.on_event("startup")
+async def startup_event() -> None:
+    Qdrant.ensure_collection(user_config["collection_name"], opt_config)
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     message = str(exc)
@@ -80,34 +92,48 @@ async def qanda(
 
 
 @app.get("/models")  # OpenAI API for Open WebUI
-async def get_models() -> JSONResponse: return JSONResponse([{"id": "Learn2RAG"}])
+async def get_models() -> JSONResponse: return JSONResponse({
+        'object': 'list',
+        'data': [{"id": "Learn2RAG"}],
+})
 
 
 @app.post("/stream")
-@app.post("/chat/completions")  # OpenAI API for Open WebUI
 async def stream(
         inputs: ChatState = Body(
             ...,
             example=example_messages
         )
 ) -> StreamingResponse:
+    return streaming_response(inputs)
+
+
+@app.post("/chat/completions", response_model=None)  # OpenAI API for Open WebUI
+async def chat_completions(
+        inputs: ChatState = Body(
+            ...,
+            example=example_messages
+        )
+) -> JSONResponse | StreamingResponse:
     if inputs.stream:
         return streaming_response(inputs)
     else:
-        raise NotImplementedError()
+        return await simple_response(inputs)
+
+
+async def run_pipeline(chat_state: ChatState) -> Any:
+    if not chat_state.user:
+        raise ValueError("User Missing")
+
+    return await pipeline(inputs={
+        'question': chat_state.messages[-1].content,
+        'user': chat_state.user,
+    })
 
 
 async def event_stream(inputs: ChatState) -> AsyncGenerator[Any, Any]:
     try:
-        question = inputs.messages[-1].content
-
-        if not inputs.user:
-            raise ValueError("User Missing")
-
-        answer = itemgetter('answer')(await pipeline(inputs={
-            'question': question,
-            'user': inputs.user,
-        }))
+        answer = itemgetter('answer')(await run_pipeline(inputs))
 
         delta = {'content': answer}
         yield f"data: {json.dumps({'choices': [{'delta': delta, 'finish_reason': 'stop'}]})}\n\n"
@@ -116,6 +142,22 @@ async def event_stream(inputs: ChatState) -> AsyncGenerator[Any, Any]:
         content = 'There is a problem with Learn2RAG configuration. Please contact your administrator.'  # FIXME
         delta = {'content': content}
         yield f"data: {json.dumps({'choices': [{'delta': delta, 'finish_reason': 'stop'}]})}\n\n"
+
+
+async def simple_response(inputs: ChatState) -> JSONResponse:
+    answer = itemgetter('answer')(await run_pipeline(inputs))
+
+    return JSONResponse({
+        'choices': [
+            {
+                'message': {
+                    'content': answer,
+                    'role': 'assistant',
+                },
+                'finish_reason': 'stop',
+            },
+        ],
+    })
 
 
 def streaming_response(inputs: ChatState) -> StreamingResponse:
@@ -137,14 +179,6 @@ async def search(
         )
 ) -> List[ScoredPoint]:
     return await search_authorized(user=input.user, question=input.question)
-
-
-
-
-@app.post("/ingest")
-async def ingest() -> None:
-    ingestion.index(user_config, opt_config)
-
 
 
 @app.get("/test")
