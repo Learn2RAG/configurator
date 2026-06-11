@@ -1,6 +1,7 @@
-from typing import Any, Generator
+from typing import Any, Generator, Sequence
 import logging
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
+
 from qdrant_client.http.models import ScoredPoint
 from .llm import llm
 
@@ -14,11 +15,14 @@ Content:
 {content}
 """
 
-def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Any:
+def generate(query: str, search_results: Sequence[ScoredPoint], opt_config: dict[str, Any]) -> Any:
     assert llm is not None
     if hasattr(search_results, "points"):
         search_results = search_results.points
-    context = "\n\n".join([context_template.format(source=result.payload['path'], content=result.payload['content']) for result in search_results]) # type: ignore[index]
+    context = "\n\n".join([
+        context_template.format(source=result.payload['path'], content=result.payload['content'])
+        for result in search_results if result.payload
+    ])
     system_message = SystemMessagePromptTemplate.from_template(opt_config["prompt"])
     user_message = HumanMessagePromptTemplate.from_template("{question}")
     prompt = ChatPromptTemplate.from_messages([system_message, user_message])

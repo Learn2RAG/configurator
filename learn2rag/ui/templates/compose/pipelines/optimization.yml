@@ -99,6 +99,8 @@ services:
       - 'learn2rag.optimization'
       - '--logging-config'
       - '{{storage_path}}/logging_config.yml'
+      - '--registry-path'
+      - '{{learn2rag_path}}/learn2rag/optimization/registry.json'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'

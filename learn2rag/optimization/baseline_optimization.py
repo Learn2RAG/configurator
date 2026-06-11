@@ -9,10 +9,10 @@ import pathlib
 import time
 import copy
 import os
-from typing import Dict, Any, List, Union, Tuple
-
+from typing import Dict, Any, List, Union, Tuple, cast
+from qdrant_client.models import ScoredPoint
 import numpy as np
-from bert_score import score as bert_score
+from bert_score import score as bert_score # type: ignore
 from ConfigSpace import ConfigurationSpace, Integer, Categorical, ForbiddenGreaterThanRelation, Configuration
 from smac import HyperparameterOptimizationFacade, Scenario
 
@@ -21,12 +21,12 @@ from learn2rag.pipeline.config import opt_config
 import learn2rag.pipeline.search
 import learn2rag.pipeline.generate
 
-def load_registry(path: str = "registry.json") -> dict:
+def load_registry(path: str = "registry.json") -> dict[str, Any]:
     p = pathlib.Path(path)
     if not p.is_file():
        logging.error("registry file not found")
     with p.open() as f:
-        return json.load(f)
+        return cast(Dict[str, Any], json.load(f))
 
 def run_pipeline(question: str, user_config: Dict[str, Any], working_config: Dict[str, Any]) -> Tuple[str, str, float, float]:
     t0 = time.time()
@@ -34,16 +34,19 @@ def run_pipeline(question: str, user_config: Dict[str, Any], working_config: Dic
     search_time = time.time() - t0
 
     t0 = time.time()
-    answer = learn2rag.pipeline.generate.generate(question, docs, working_config)
+    answer = learn2rag.pipeline.generate.generate(question, docs.points, working_config)
     gen_time = time.time() - t0
 
     doc_list = docs.points if hasattr(docs, "points") else docs
     context = ""
     if doc_list:
-        context = "\n\n".join([
-            f"Source: {d.payload.get('path', 'unknown')}\nContent: {d.payload.get('content', '')}"
-            for d in doc_list
-        ])
+        context_parts = []
+        for d in doc_list:
+            payload = getattr(d, "payload", {}) or {}
+            path = payload.get("path", "unknown") if isinstance(payload, dict) else "unknown"
+            content = payload.get("content", "") if isinstance(payload, dict) else ""
+            context_parts.append(f"Source: {path}\nContent: {content}")
+        context = "\n\n".join(context_parts)
     return answer, context[:3000], search_time, gen_time
 
 #I removed seed because there are no use for it
@@ -53,7 +56,7 @@ def objective(config: Configuration,
     dataset_name: str,
     state: Dict[str, Any],
     answers_dir: pathlib.Path
-    ,prompt_map
+    ,prompt_map: Dict[str, Any]
 ) -> float:
     state["trial_count"] += 1
     tid = state["trial_count"]
@@ -153,7 +156,7 @@ def param_importance(smac: HyperparameterOptimizationFacade, output_path: pathli
 
     raw = {}
     for p in params:
-        groups = {}
+        groups : Dict[str, List[float]] = {}
         for c, cost in zip(configs, np.array(costs)):
             groups.setdefault(str(c[p]), []).append(cost)
         means = [np.mean(g) for g in groups.values()]
@@ -161,7 +164,7 @@ def param_importance(smac: HyperparameterOptimizationFacade, output_path: pathli
 
     total = sum(raw.values())
     imp = {p: round(v / total, 4) for p, v in raw.items()} if total > 0 else raw
-    ranking = sorted(imp, key=imp.get, reverse=True)
+    ranking = sorted(imp, key=lambda k: imp[k], reverse=True)
     result = {"method": "variance_based", "ranking": ranking, "individual": imp}
     with open(output_path / "parameter_importance.json", "w") as f:
         json.dump(result, f, indent=2)
@@ -170,6 +173,7 @@ def param_importance(smac: HyperparameterOptimizationFacade, output_path: pathli
 
 def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[str, pathlib.Path],registry_path:str) -> Tuple[
         Dict[str, Any], List[Any], Dict[str, Any]]:
+    logging.info(f"registry_path is : {registry_path}")
     registry = load_registry(registry_path)
     datasets = registry["datasets"]
     if dataset_name not in datasets:
@@ -220,9 +224,13 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
     )
     t0 = time.time()
     incumbent = smac.optimize()
+    if isinstance(incumbent, list):
+        best_cfg = incumbent[0].get_dictionary()
+    else:
+        best_cfg = incumbent.get_dictionary()
     importance = param_importance(smac, out)
     total_time = time.time() - t0
-    best_cfg = incumbent.get_dictionary()
+    #best_cfg = incumbent.get_dictionary()
     results_path = out / "optimization_results.json"
     results_path.write_text(json.dumps({
         "best_config": best_cfg,

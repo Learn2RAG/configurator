@@ -6,6 +6,8 @@ import collections.abc
 import copy
 import yaml
 import argparse
+from typing import Any
+from collections.abc import Mapping
 
 from . import baseline_optimization
 #TODO : now we need to copy the dataset to here manually it should consider in installation maybe !
@@ -66,7 +68,7 @@ def main() -> None:
 
     logging.info(f"Successfully updated opt_config at: {target_config_path}")
 
-def deep_update(source, overrides):
+def deep_update(source: dict[str, Any], overrides:Mapping[str, Any]) -> dict[str, Any]:
     """Recursively updates a dictionary."""
     for key, value in overrides.items():
         if isinstance(value, collections.abc.Mapping) and key in source:
