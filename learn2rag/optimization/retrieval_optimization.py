@@ -1,6 +1,9 @@
 """
 RAG Retrieval Optimization.
 """
+import os
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="0" #Select GPU number 0
 
 import argparse
 import json
@@ -39,6 +42,80 @@ def load_registry(path: str = "registry.json") -> dict[str, Any]:
        logging.error("registry file not found")
     with p.open() as f:
         return cast(dict[str, Any], json.load(f))
+
+
+def _load_existing_trial_answers(answers_dir: pathlib.Path) -> list[dict[str, Any]]:
+    if not answers_dir.exists():
+        return []
+    trials: list[dict[str, Any]] = []
+    for p in sorted(answers_dir.glob("trial_*_answers.json")):
+        try:
+            data = json.loads(p.read_text())
+            if isinstance(data, dict) and "trial_id" in data:
+                trials.append(data)
+        except Exception as e:
+            logging.warning(f"Could not read {p}: {e}")
+    return trials
+
+
+def _restore_state_from_existing(out: pathlib.Path, answers_dir: pathlib.Path) -> Dict[str, Any]:
+    state: Dict[str, Any] = {"trial_count": 0, "best_cost": 1.0, "convergence": [], "history": []}
+
+    results_path = out / "optimization_results.json"
+    if results_path.exists():
+        try:
+            results = json.loads(results_path.read_text())
+            history = results.get("run_history", [])
+            convergence = results.get("convergence", [])
+            if isinstance(history, list) and history:
+                state["history"] = history
+                state["convergence"] = convergence if isinstance(convergence, list) else []
+                state["trial_count"] = max(int(h.get("trial_id", 0)) for h in history)
+                state["best_cost"] = min(float(h.get("cost", 1.0)) for h in history)
+                return state
+        except Exception as e:
+            logging.warning(f"Could not read {results_path}: {e}")
+
+    trials = _load_existing_trial_answers(answers_dir)
+    if not trials:
+        return state
+
+    best_cost = 1.0
+    history: list[dict[str, Any]] = []
+    convergence: list[dict[str, Any]] = []
+    for trial in sorted(trials, key=lambda t: int(t.get("trial_id", 0))):
+        tid = int(trial.get("trial_id", 0))
+        cost = float(trial.get("cost", 1.0))
+        best_cost = min(best_cost, cost)
+        history.append({
+            "trial_id": tid,
+            "config": trial.get("config", {}),
+            "recall": float(trial.get("recall", 0.0)),
+            "avg_t_search": float(trial.get("avg_t_search", 0.0)),
+            "cost": cost,
+            "time_s": None,
+            "search_s": None,
+            "scoring_s": None,
+        })
+        convergence.append({"trial": tid, "cost": cost, "best_cost": best_cost})
+
+    state["history"] = history
+    state["convergence"] = convergence
+    state["trial_count"] = max(int(t.get("trial_id", 0)) for t in trials)
+    state["best_cost"] = best_cost
+    return state
+
+
+def _load_existing_importance(out: pathlib.Path) -> Dict[str, Any]:
+    path = out / "parameter_importance.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        logging.warning(f"Could not read {path}: {e}")
+        return {}
 
 def run_search(question: str, user_config: Dict[str, Any], working_config: Dict[str, Any]) -> Tuple[List[Any], float]:
     t0 = time.time()
@@ -128,7 +205,7 @@ def objective(config: Configuration,
             logging.warning(f"Trial {tid}, q{q.get('id','?')} failed: {e}")
             predictions.append([])
             goldens.append(q["ground_truth"])
-            qa_pairs.append({**q, "generated_answer": "", "retrieved_context": ""})
+            qa_pairs.append({**q, "retrieved_sources": ""})
 
     if not predictions:
         return 1.0
@@ -139,8 +216,8 @@ def objective(config: Configuration,
     total_time = time.time() - t_start
 
     # objective function
-    w_recall = 1
-    w_time = 0
+    w_recall = 0.5
+    w_time = 0.5
     t_search_per_sample_upper = 50
     max_time_s = t_search_per_sample_upper*len(predictions)
     time_cost = max(0.0, 1.0 - (t_search / max_time_s))
@@ -159,6 +236,12 @@ def objective(config: Configuration,
         "qa_pairs": qa_pairs
     }
     answers_file = answers_dir / f"trial_{tid}_answers.json"
+    while answers_file.exists():
+        # Keep IDs monotonic when resuming from a partially persisted run.
+        tid += 1
+        state["trial_count"] = tid
+        trial_answers["trial_id"] = tid
+        answers_file = answers_dir / f"trial_{tid}_answers.json"
     with open(answers_file, "w") as f:
         json.dump(trial_answers, f, indent=2, default=str)
 
@@ -207,7 +290,15 @@ def param_importance(smac: HyperparameterOptimizationFacade, output_path: pathli
     return result
 
 
-def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[str, pathlib.Path], registry_path:str) -> Tuple[
+def run(
+    dataset_name: str,
+    max_questions: int,
+    n_trials: int,
+    output_dir: Union[str, pathlib.Path],
+    registry_path: str,
+    resume: bool = False,
+    n_trials_is_total: bool = True,
+) -> Tuple[
         Dict[str, Any], List[Any], Dict[str, Any]]:
     registry = load_registry(registry_path)
     datasets = registry["datasets"]
@@ -289,27 +380,49 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
     ))
 
 
-    scenario = Scenario(
-        cs,
-        deterministic=True,
-        n_trials=n_trials,
-        walltime_limit=172800, #7200,
-        seed=42,
-        output_directory=out / "smac_output",
-    )
-    state: Dict[str, Any] = {"trial_count": 0, "best_cost": 1.0, "convergence": [], "history": []}
+    state: Dict[str, Any]
+    if resume:
+        state = _restore_state_from_existing(out, answers_dir)
+    else:
+        state = {"trial_count": 0, "best_cost": 1.0, "convergence": [], "history": []}
 
-    smac = HyperparameterOptimizationFacade(
-        scenario=scenario,
-        target_function=lambda config, seed=0: objective(config, questions, state, answers_dir)
-    )
-    t0 = time.time()
-    incumbent = smac.optimize()
-    if isinstance(incumbent, list):
-        incumbent = incumbent[0]
-    importance = param_importance(smac, out)
-    total_time = time.time() - t0
-    best_cfg = incumbent.get_dictionary()
+    already_done = int(state["trial_count"])
+    remaining_trials = max(0, n_trials - already_done) if n_trials_is_total else n_trials
+
+    best_cfg: Dict[str, Any] = {}
+    importance: Dict[str, Any] = {}
+    total_time = 0.0
+
+    if remaining_trials > 0:
+        scenario = Scenario(
+            cs,
+            deterministic=True,
+            n_trials=remaining_trials,
+            walltime_limit=172800, #7200,
+            seed=42,
+            output_directory=out / "smac_output",
+        )
+
+        smac = HyperparameterOptimizationFacade(
+            scenario=scenario,
+            target_function=lambda config, seed=0: objective(config, questions, state, answers_dir)
+        )
+        t0 = time.time()
+        incumbent = smac.optimize()
+        if isinstance(incumbent, list):
+            incumbent = incumbent[0]
+        importance = param_importance(smac, out)
+        total_time = time.time() - t0
+        best_cfg = incumbent.get_dictionary()
+    else:
+        logging.info("No remaining trials to run. Returning existing results.")
+        if state["history"]:
+            best_cfg = min(state["history"], key=lambda h: h["cost"]).get("config", {})
+        importance = _load_existing_importance(out)
+
+    if not best_cfg and state["history"]:
+        best_cfg = min(state["history"], key=lambda h: h["cost"]).get("config", {})
+
     best_trial = min(
         (h for h in state["history"] if h.get("config") == best_cfg),
         key=lambda h: h["cost"],
@@ -340,6 +453,12 @@ if __name__ == "__main__":
     parser.add_argument("--logging-config", type=str)
     parser.add_argument("--registry", type=str, default="registry.json")
     parser.add_argument("--output_dir", type=str, default="optimization_results_baseline")
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--n_trials_is_total",
+        action="store_true",
+        help="Interpret --n_trials as the total desired trial count instead of additional trials.",
+    )
     args, _ = parser.parse_known_args()
 
     final_output_dir = pathlib.Path(args.output_dir)
@@ -348,13 +467,21 @@ if __name__ == "__main__":
     if not final_output_dir.exists() and env_out:
         final_output_dir = pathlib.Path(env_out).parent
 
-    incumbent, history, importance = run(args.dataset, args.max_questions, args.n_trials, final_output_dir, args.registry)
+    incumbent, history, importance = run(
+        args.dataset,
+        args.max_questions,
+        args.n_trials,
+        final_output_dir,
+        args.registry,
+        resume=args.resume,
+        n_trials_is_total=(args.n_trials_is_total or args.resume),
+    )
 
     # incumbent, history, importance = run(
     #     args.dataset, args.max_questions, args.n_trials, args.output_dir,
     # )
 
-    best = min(history, key=lambda x: x["cost"])
+    best = min(history, key=lambda x: x["cost"]) if history else None
     print(f"\nBest config: {dict(incumbent)}")
     # print(f"BERTScore (golden): {best['avg_bertscore_golden']:.4f}")
     if importance:
