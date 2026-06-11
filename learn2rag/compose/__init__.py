@@ -10,6 +10,7 @@ import subprocess
 import urllib.request
 from typing import Any, Optional
 
+import jinja2
 import psutil
 import yaml
 
@@ -65,7 +66,7 @@ def init_db(con: sqlite3.Connection) -> None:
         try:
             cur.execute(sql)
         except sqlite3.OperationalError as e:
-            logger.warning('Database initialization: %s', e)
+            logger.debug('Database initialization: %s', e)
 
 
 def process_running(pid: int) -> bool:
@@ -83,7 +84,6 @@ def process_running(pid: int) -> bool:
 
 
 def healthy(value: list[str]) -> bool:
-    print(f"len(value) is {len(value)} and value is : {' '.join(value)}")
     assert len(value) == 4
     assert value[0:3] == ['CMD', 'curl' ,'-f']
     url = value[3]
@@ -110,9 +110,18 @@ class Project():
     content: dict[str, Any]
 
     @staticmethod
-    def create(project_file: str | Path, name: str) -> 'Project | None':
-        with open(project_file) as f:
-            content = yaml.safe_load(f)
+    def create(
+            compose_file: str | Path,
+            name: str,
+            *,
+            template: bool = False,
+            template_context: dict[str, Any] = {},
+    ) -> 'Project | None':
+        if template:
+            content = yaml.safe_load(jinja2.Template(Path(compose_file).read_text()).render(template_context))
+        else:
+            with open(compose_file) as f:
+                content = yaml.safe_load(f)
         assert len(content['services']) > 0
         cur = con.cursor()
         cur.execute('BEGIN EXCLUSIVE')

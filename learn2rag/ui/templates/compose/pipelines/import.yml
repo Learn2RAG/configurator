@@ -1,5 +1,5 @@
 name: import
-label: Import
+label: Start one-time import
 ports:
   # TODO: UI port is not used; labels in the interface currently assume a specific port order
   - ui
@@ -7,10 +7,10 @@ ports:
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |
-      log_level: INFO
+      log_level: ERROR
       service:
         api_key: '{{qdrant_api_key}}'
-        grpc_port: null      
+        grpc_port: null
         http_port: {{ports.qdrant_http}}
         host: '127.0.0.1'
       telemetry_disabled: true
@@ -30,22 +30,43 @@ files:
     content: |
       version: 1
       formatters:
+        status:
+          format: "%(message)s %(asctime)s"
+          datefmt: "%Y-%m-%d %H:%M"
         simple:
           format: "%(asctime)s %(levelname)-8s %(name)s %(message)s"
         colored:
           class: colorlog.ColoredFormatter
           format: "%(log_color)s%(asctime)s %(levelname)-8s %(name)s %(message)s"
+        profiling:
+          format: "%(created)f %(request_id)s %(activity)s %(message)s"
       handlers:
         display:
           class: logging.StreamHandler
           level: INFO
           formatter: colored
           stream: ext://sys.stderr
+        profiling_display:
+          class: logging.StreamHandler
+          formatter: profiling
+          stream: ext://sys.stderr
+        profiling_file:
+          class: logging.FileHandler
+          formatter: profiling
+          filename: '{{storage_path}}/logs/profiling.log'
+          encoding: utf-8
         errors_file:
           class: logging.FileHandler
           level: ERROR
           formatter: simple
           filename: '{{storage_path}}/logs/error.log'
+          encoding: utf-8
+        status_file:
+          class: logging.FileHandler
+          level: INFO
+          formatter: status
+          filename: '{{storage_path}}/logs/status.log'
+          mode: 'w'
           encoding: utf-8
         {% if debug_logging %}
         debug_file:
@@ -55,6 +76,16 @@ files:
           filename: '{{storage_path}}/logs/debug.log'
           encoding: utf-8
         {% endif %}
+      loggers:
+        profiling:
+          handlers:
+            - profiling_display
+            - profiling_file
+          propagate: no
+        status:
+          handlers:
+            - status_file
+          propagate: no
       root:
         level: DEBUG
         handlers:
@@ -68,26 +99,29 @@ files:
     content: ''
 
 services:
+  #!!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
   qdrant:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
       - '{{storage_path}}/qdrant_config.yml'
-    # https://qdrant.tech/documentation/guides/configuration/
-    environment:
-      QDRANT__LOG_LEVEL: 'ERROR'
-      QDRANT__SERVICE__HOST: '127.0.0.1'
-      QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
-      QDRANT__TELEMETRY_DISABLED: 'true'
+  #!!! {% endif %}
   main:
     working_dir: '{{storage_path}}'
     command:
-      - '{{learn2rag_path}}/services/start-import{% if is_windows %}.bat{% endif %}'
+      - '{{learn2rag_path}}/configurator{% if is_windows %}.exe{% endif %}'
+      - '--logging-config'
+      - '{{storage_path}}/logging_config.yml'
+      - 'learn2rag.importer'
+      - '--config'
+      - '{{storage_path}}/importer_config.json'
+      - '--delta'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       STORAGE_PATH: '{{storage_path}}'
-      QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
+      QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'
+      QDRANT_PATH: '{{ pipeline.qdrant_path }}'
       QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'
       PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
       IMPORTER_CONFIG: '{{storage_path}}/importer_config.json'

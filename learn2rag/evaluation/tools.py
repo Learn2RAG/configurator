@@ -74,7 +74,9 @@ def ingest_dataset_documents(dataset_name: str) -> None:
         'imported_documents_file_path': documents_path,
         'llm': None,
     }
-    learn2rag.pipeline.ingestion.index(user_config, opt_config)
+    raise NotImplementedError()
+    # FIXME
+    # learn2rag.pipeline.ingestion.index(user_config, opt_config)
 
 
 def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:

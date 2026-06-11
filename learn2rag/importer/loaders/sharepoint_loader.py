@@ -7,15 +7,17 @@ It includes robust handling for App-Only Authentication (Client Credentials)
 and Site-Specific contexts.
 
 Author: Kyrill Meyer
-Version: 0.0.5
+Version: 0.0.7
 Institution: IFDT
 Creation Date: January 14, 2026
-Last Modified Date: March 17, 2026
+Last Modified Date: May 18, 2026
 """
+
+import hashlib
 import logging
-import os
 import tempfile
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Any, Union
 from langchain_community.document_loaders import UnstructuredFileLoader, TextLoader, UnstructuredExcelLoader, PyPDFLoader
@@ -31,6 +33,9 @@ def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> 
     Parses file using the robust UnstructuredFileLoader.
     """
     docs: List[Document] = []
+    # One hash for the entire file so all chunks share the same value,
+    # enabling unambiguous deduplication by source URL in get_documents_by_loader_id.
+    file_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
     
     # Check file extension (lowercase)
     suffix = file_path.suffix.lower()
@@ -70,7 +75,7 @@ def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> 
         # SPECIAL HANDLING FOR PDF (using PyPDFLoader to avoid unstructured dependencies)
         elif suffix == ".pdf":
             logger.info(f"Detected PDF file: {file_path.name} - using PyPDFLoader")
-            loader = PyPDFLoader(str(file_path))
+            loader = PyPDFLoader(str(file_path), mode="single")
             docs = loader.load()
 
         # SPECIAL HANDLING FOR IMAGES (Skip due to broken OCR environment)
@@ -105,7 +110,8 @@ def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> 
                 "created": str(original_item.created),
                 "modified": str(original_item.modified),
                 "loader": "SharePointLoader",
-                "loader_id": loader_id
+                "loader_id": loader_id,
+                "content_hash": file_hash,
             })
         return docs
 
@@ -137,11 +143,13 @@ def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> 
         for doc in docs:
             doc.metadata.update({
                 "source": original_item.web_url,
-                "sharepoint_id": original_item.object_id,
+                "document_id": original_item.object_id,
                 "name": original_item.name,
                 "created": str(original_item.created),
                 "modified": str(original_item.modified),
-                "loader": "SharePointLoader"
+                "loader": "SharePointLoader",
+                "loader_id": loader_id,
+                "content_hash": file_hash,
             })
         
         return docs
@@ -234,7 +242,7 @@ def _list_available_drives(account: Account, search_term: Optional[str] = None) 
     except Exception as e:
         logger.error(f"Error while listing available drives: {e}")
 
-def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, recursive: bool = True, loader_id: str = "N/A") -> List[Document]:
+def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, recursive: bool = True, loader_id: str = "N/A", since: Optional[datetime] = None) -> List[Document]:
     """
     Internal helper to manually traverse and load items into Document objects.
     This bypasses LangChain's internal 'storage()' call which fails in App-Only context.
@@ -276,6 +284,17 @@ def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, re
                 
                 elif item.is_file:
                     try:
+                        # Seit-Filter: Dateien überspringen, die vor `since` zuletzt geändert wurden
+                        if since is not None:
+                            item_modified = item.modified
+                            if item_modified is not None:
+                                # Sicherstellen, dass beide tz-aware sind
+                                since_utc = since.astimezone(timezone.utc) if since.tzinfo else since.replace(tzinfo=timezone.utc)
+                                item_modified_utc = item_modified.astimezone(timezone.utc) if item_modified.tzinfo else item_modified.replace(tzinfo=timezone.utc)
+                                if item_modified_utc < since_utc:
+                                    logger.debug(f"Skipping unchanged file (modified={item_modified_utc.isoformat()}): {item.name}")
+                                    continue
+
                         # 2. Download file
                         download_success = item.download(to_path=temp_dir)
                         
@@ -307,12 +326,150 @@ def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, re
     return documents
 
 
+def _list_items_web_urls(drive: Any, folder_id: Optional[str] = None, recursive: bool = True) -> List[str]:
+    """
+    Traverse SharePoint files without downloading and collect their web URLs.
+
+    Intended for deletion detection in the 2-pass delta import: compare the returned
+    set against the paths stored in Qdrant to find files that have been removed.
+
+    Args:
+        drive (Any): Authenticated O365 Drive object.
+        folder_id (Optional[str]): Object ID of the folder to start from.
+                                    Uses the drive root when ``None``.
+        recursive (bool): Whether to traverse sub-folders recursively (default ``True``).
+
+    Returns:
+        List[str]: Web URLs of all files found, e.g.
+                   ``["https://tenant.sharepoint.com/.../file.pdf"]``.
+    """
+    urls: List[str] = []
+
+    try:
+        if folder_id:
+            folder = drive.get_item(folder_id)
+        else:
+            folder = drive.get_root_folder()
+
+        items = folder.get_items()
+    except Exception as e:
+        logger.error(f"_list_items_web_urls: error accessing folder: {e}")
+        return urls
+
+    for item in items:
+        try:
+            if item.is_folder and recursive:
+                sub_urls = _list_items_web_urls(drive, folder_id=item.object_id, recursive=recursive)
+                urls.extend(sub_urls)
+            elif item.is_file:
+                if item.web_url:
+                    urls.append(item.web_url)
+        except Exception as e:
+            logger.warning(f"_list_items_web_urls: error processing item {getattr(item, 'name', '?')}: {e}")
+
+    return urls
+
+
+def get_all_sharepoint_document_ids(
+    client_id: str,
+    client_secret: str,
+    document_library_id: str,
+    folder_path: Optional[str] = None,
+    folder_id: Optional[str] = None,
+    recursive: bool = False,
+    auth_with_token: bool = True,
+    reset_token: bool = False,
+    tenant_id: str = "common",
+    site_id: Optional[str] = None,
+) -> List[str]:
+    """
+    Retrieve the web URL for every file in a SharePoint document library without loading content.
+
+    Intended for deletion detection in the 2-pass delta import: compare the returned
+    set against the paths stored in Qdrant to find files that have been removed.
+
+    Args:
+        client_id (str): Azure AD application (client) ID.
+        client_secret (str): Azure AD client secret.
+        document_library_id (str): GUID of the SharePoint document library (Drive ID).
+        folder_path (Optional[str]): Slash-separated path to a sub-folder relative to
+                                      the library root, e.g. ``"Docs/Reports"``.
+        folder_id (Optional[str]): Object ID of the entry-point folder; takes precedence
+                                    over ``folder_path`` when both are provided.
+        recursive (bool): Whether to traverse sub-folders recursively (default ``False``).
+        auth_with_token (bool): Use cached O365 token when available (default ``True``).
+        reset_token (bool): Delete the cached token before authenticating (default ``False``).
+        tenant_id (str): Azure AD tenant ID or ``"common"`` (default).
+        site_id (Optional[str]): SharePoint site ID; when provided, the library is looked
+                                  up on that specific site rather than the root site.
+
+    Returns:
+        List[str]: Web URLs of all files found, e.g.
+                   ``["https://tenant.sharepoint.com/.../file.pdf"]``.
+    """
+    if reset_token:
+        reset_o365_token()
+
+    token_path = Path.home() / ".credentials" / "o365_token.txt"
+    token_backend = FileSystemTokenBackend(token_path=Path.home() / ".credentials", token_filename="o365_token.txt")
+
+    if (not auth_with_token) or (not token_path.exists()):
+        if tenant_id and tenant_id != "common":
+            _authenticate_directly_with_o365(client_id, client_secret, tenant_id)
+        else:
+            logger.error("get_all_sharepoint_document_ids: No valid authentication method available.")
+            return []
+
+    account = Account((client_id, client_secret), token_backend=token_backend)
+
+    if not account.is_authenticated:
+        logger.error("get_all_sharepoint_document_ids: Authentication failed.")
+        return []
+
+    try:
+        if site_id:
+            sp = account.sharepoint()
+            site = sp.get_site(site_id)
+            storage = site.storage
+        else:
+            storage = account.storage()
+
+        drive = storage.get_drive(document_library_id)
+        if drive is None:
+            logger.error(f"get_all_sharepoint_document_ids: Drive not found: {document_library_id}")
+            return []
+
+        # Optionaler Unterordner-Start
+        effective_folder_id = folder_id
+        if folder_path and not folder_id:
+            root = drive.get_root_folder()
+            for part in folder_path.strip("/").split("/"):
+                found = None
+                for child in root.get_items():
+                    if child.is_folder and child.name == part:
+                        found = child
+                        break
+                if found:
+                    root = found
+                else:
+                    logger.warning(f"get_all_sharepoint_document_ids: folder part '{part}' not found")
+                    return []
+            effective_folder_id = root.object_id
+
+        return _list_items_web_urls(drive, folder_id=effective_folder_id, recursive=recursive)
+
+    except Exception as e:
+        logger.error(f"get_all_sharepoint_document_ids: error: {e}")
+        return []
+
+
 def load_from_sharepoint(client_id: str, client_secret: str, document_library_id: str, 
                          folder_path: Optional[str] = None, folder_id: Optional[str] = None, 
                          object_ids: Optional[List[str]] = None, recursive: bool = False, 
                          auth_with_token: bool = True, load_extended_metadata: bool = True,
                          reset_token: bool = False, tenant_id: str = "common",
-                         site_id: Optional[str] = None, loader_id: str = "N/A") -> List[Document]:
+                         site_id: Optional[str] = None, loader_id: str = "N/A",
+                         since: Optional[datetime] = None) -> List[Document]:
     """
     Load documents from SharePoint and set metadata.
     """
@@ -372,7 +529,7 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
         
         # Load documents using internal helper function
         # Use folder_id if provided, otherwise use Root of the Drive
-        loaded_docs = _load_items_manual_traversal(drive, folder_id=folder_id, recursive=recursive, loader_id=loader_id)
+        loaded_docs = _load_items_manual_traversal(drive, folder_id=folder_id, recursive=recursive, loader_id=loader_id, since=since)
         
         logger.info(f"Found {len(loaded_docs)} documents.")
 
