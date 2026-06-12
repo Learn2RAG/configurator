@@ -6,6 +6,7 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="0" #Select GPU number 0
 
 import argparse
+import datetime
 import json
 import logging
 import pathlib
@@ -13,6 +14,8 @@ import time
 import copy
 import os
 import asyncio
+import subprocess
+import sys
 from typing import Dict, Any, List, Union, Tuple, cast
 
 import numpy as np
@@ -61,6 +64,13 @@ def _load_existing_trial_answers(answers_dir: pathlib.Path) -> list[dict[str, An
 def _restore_state_from_existing(out: pathlib.Path, answers_dir: pathlib.Path) -> Dict[str, Any]:
     state: Dict[str, Any] = {"trial_count": 0, "best_cost": 1.0, "convergence": [], "history": []}
 
+    trial_answers = _load_existing_trial_answers(answers_dir)
+    answers_by_id = {
+        int(t.get("trial_id", 0)): t
+        for t in trial_answers
+        if isinstance(t, dict) and t.get("trial_id") is not None
+    }
+
     results_path = out / "optimization_results.json"
     if results_path.exists():
         try:
@@ -68,15 +78,45 @@ def _restore_state_from_existing(out: pathlib.Path, answers_dir: pathlib.Path) -
             history = results.get("run_history", [])
             convergence = results.get("convergence", [])
             if isinstance(history, list) and history:
-                state["history"] = history
-                state["convergence"] = convergence if isinstance(convergence, list) else []
-                state["trial_count"] = max(int(h.get("trial_id", 0)) for h in history)
-                state["best_cost"] = min(float(h.get("cost", 1.0)) for h in history)
+                merged_history: dict[int, dict[str, Any]] = {
+                    int(h.get("trial_id", 0)): dict(h)
+                    for h in history
+                    if isinstance(h, dict) and h.get("trial_id") is not None
+                }
+
+                for tid, trial in answers_by_id.items():
+                    previous = merged_history.get(tid, {})
+                    merged_history[tid] = {
+                        "trial_id": tid,
+                        "config": trial.get("config", previous.get("config", {})),
+                        "recall": float(trial.get("recall") or previous.get("recall") or 0.0),
+                        "avg_t_search": float(trial.get("avg_t_search") or previous.get("avg_t_search") or 0.0),
+                        "cost": float(trial.get("cost") or previous.get("cost") or 1.0),
+                        "time_s": previous.get("time_s"),
+                        "search_s": previous.get("search_s"),
+                        "scoring_s": previous.get("scoring_s"),
+                    }
+
+                merged_list = [merged_history[tid] for tid in sorted(merged_history)]
+                best_cost = 1.0
+                rebuilt_convergence: list[dict[str, Any]] = []
+                for entry in merged_list:
+                    best_cost = min(best_cost, float(entry.get("cost", 1.0)))
+                    rebuilt_convergence.append({
+                        "trial": int(entry.get("trial_id", 0)),
+                        "cost": float(entry.get("cost", 1.0)),
+                        "best_cost": best_cost,
+                    })
+
+                state["history"] = merged_list
+                state["convergence"] = rebuilt_convergence if not isinstance(convergence, list) or len(rebuilt_convergence) != len(convergence) else convergence
+                state["trial_count"] = max(int(h.get("trial_id", 0)) for h in merged_list)
+                state["best_cost"] = best_cost
                 return state
         except Exception as e:
             logging.warning(f"Could not read {results_path}: {e}")
 
-    trials = _load_existing_trial_answers(answers_dir)
+    trials = trial_answers
     if not trials:
         return state
 
@@ -117,7 +157,155 @@ def _load_existing_importance(out: pathlib.Path) -> Dict[str, Any]:
         logging.warning(f"Could not read {path}: {e}")
         return {}
 
+
+def _find_latest_optimization_file(smac_output_dir: pathlib.Path) -> Union[pathlib.Path, None]:
+    if not smac_output_dir.exists():
+        return None
+    candidates = list(smac_output_dir.rglob("optimization.json"))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def _parse_last_update(value: Any) -> Union[float, None]:
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            # Handle ISO values like 2026-06-11T12:34:56.123456+00:00 or trailing Z.
+            dt = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt.timestamp()
+        except ValueError:
+            return None
+    return None
+
+
+def _last_update_age_seconds(smac_output_dir: pathlib.Path) -> Union[float, None]:
+    optimization_file = _find_latest_optimization_file(smac_output_dir)
+    if optimization_file is None:
+        return None
+    try:
+        data = json.loads(optimization_file.read_text())
+    except Exception as e:
+        logging.warning(f"Could not read {optimization_file}: {e}")
+        return None
+    ts = _parse_last_update(data.get("last_update")) if isinstance(data, dict) else None
+    if ts is None:
+        return None
+    return max(0.0, time.time() - ts)
+
+
+def _run_search_heartbeat_age_seconds(heartbeat_file: pathlib.Path) -> Union[float, None]:
+    if not heartbeat_file.exists():
+        return None
+    try:
+        return max(0.0, time.time() - heartbeat_file.stat().st_mtime)
+    except OSError as e:
+        logging.warning(f"Could not stat {heartbeat_file}: {e}")
+        return None
+
+
+def _touch_run_search_heartbeat() -> None:
+    heartbeat_path = os.environ.get("L2R_RUN_SEARCH_HEARTBEAT_FILE")
+    if not heartbeat_path:
+        return
+    try:
+        p = pathlib.Path(heartbeat_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.touch()
+    except Exception as e:
+        logging.warning(f"Could not update run_search heartbeat at {heartbeat_path}: {e}")
+
+
+def _build_worker_command(args: argparse.Namespace, final_output_dir: pathlib.Path) -> List[str]:
+    cmd = [
+        sys.executable,
+        "-m",
+        "learn2rag.optimization.retrieval_optimization",
+        "--dataset", args.dataset,
+        "--max_questions", str(args.max_questions),
+        "--n_trials", str(args.n_trials),
+        "--registry", args.registry,
+        "--output_dir", str(final_output_dir),
+        "--resume",
+    ]
+    if args.n_trials_is_total or args.resume:
+        cmd.append("--n_trials_is_total")
+    if args.logging_config:
+        cmd.extend(["--logging-config", args.logging_config])
+    return cmd
+
+
+def run_with_watchdog(args: argparse.Namespace, final_output_dir: pathlib.Path) -> int:
+    stale_after_s = max(1, args.watchdog_stale_minutes * 60)
+    run_search_stale_after_s = max(1, args.watchdog_run_search_stale_minutes * 60)
+    restart_wait_s = max(1, args.watchdog_restart_delay_minutes * 60)
+    poll_s = max(5, args.watchdog_poll_seconds)
+
+    dataset_out = final_output_dir / args.dataset
+    smac_output_dir = dataset_out / "smac_output"
+    run_search_heartbeat_file = dataset_out / "run_search_heartbeat.txt"
+    worker_cmd = _build_worker_command(args, final_output_dir)
+
+    restart_count = 0
+    while True:
+        logging.info(f"Starting optimization worker (restart #{restart_count})")
+        try:
+            run_search_heartbeat_file.unlink(missing_ok=True)
+        except OSError as e:
+            logging.warning(f"Could not reset heartbeat file {run_search_heartbeat_file}: {e}")
+
+        worker_env = os.environ.copy()
+        worker_env["L2R_RUN_SEARCH_HEARTBEAT_FILE"] = str(run_search_heartbeat_file)
+        proc = subprocess.Popen(worker_cmd, env=worker_env)
+        stale_detected = False
+
+        while proc.poll() is None:
+            time.sleep(poll_s)
+            age = _last_update_age_seconds(smac_output_dir)
+            if age is not None and age > stale_after_s:
+                stale_detected = True
+                logging.warning(
+                    f"Detected stale optimization.json update (age={age:.0f}s > {stale_after_s}s). "
+                    "Terminating worker for restart."
+                )
+                proc.terminate()
+                try:
+                    proc.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+                break
+
+            run_search_age = _run_search_heartbeat_age_seconds(run_search_heartbeat_file)
+            if run_search_age is not None and run_search_age > run_search_stale_after_s:
+                stale_detected = True
+                logging.warning(
+                    f"Detected stale run_search heartbeat (age={run_search_age:.0f}s > {run_search_stale_after_s}s). "
+                    "Terminating worker for restart."
+                )
+                proc.terminate()
+                try:
+                    proc.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+                break
+
+        if not stale_detected:
+            return_code = proc.returncode if proc.returncode is not None else 1
+            if return_code == 0:
+                logging.info("Optimization worker finished successfully.")
+            else:
+                logging.error(f"Optimization worker exited with return code {return_code}.")
+            return return_code
+
+        restart_count += 1
+        logging.info(f"Sleeping {restart_wait_s}s before resuming optimization.")
+        time.sleep(restart_wait_s)
+
 def run_search(question: str, user_config: Dict[str, Any], working_config: Dict[str, Any]) -> Tuple[List[Any], float]:
+    _touch_run_search_heartbeat()
     t0 = time.time()
     docs = asyncio.run(learn2rag.pipeline.search.search_authorized(question, user="anonymous", request_id=None, user_config=user_config, opt_config=working_config))
     search_time = time.time() - t0
@@ -387,7 +575,8 @@ def run(
         state = {"trial_count": 0, "best_cost": 1.0, "convergence": [], "history": []}
 
     already_done = int(state["trial_count"])
-    remaining_trials = max(0, n_trials - already_done) if n_trials_is_total else n_trials
+    target_trials = max(already_done, n_trials) if n_trials_is_total else already_done + n_trials
+    remaining_trials = max(0, target_trials - already_done)
 
     best_cfg: Dict[str, Any] = {}
     importance: Dict[str, Any] = {}
@@ -397,7 +586,7 @@ def run(
         scenario = Scenario(
             cs,
             deterministic=True,
-            n_trials=remaining_trials,
+            n_trials=target_trials,
             walltime_limit=172800, #7200,
             seed=42,
             output_directory=out / "smac_output",
@@ -407,13 +596,14 @@ def run(
             scenario=scenario,
             target_function=lambda config, seed=0: objective(config, questions, state, answers_dir)
         )
+
         t0 = time.time()
         incumbent = smac.optimize()
         if isinstance(incumbent, list):
             incumbent = incumbent[0]
         importance = param_importance(smac, out)
         total_time = time.time() - t0
-        best_cfg = incumbent.get_dictionary()
+        best_cfg = dict(incumbent)
     else:
         logging.info("No remaining trials to run. Returning existing results.")
         if state["history"]:
@@ -459,6 +649,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Interpret --n_trials as the total desired trial count instead of additional trials.",
     )
+    parser.add_argument("--watchdog", action="store_true", help="Restart optimization if SMAC last_update is stale.")
+    parser.add_argument("--watchdog_stale_minutes", type=int, default=90)
+    parser.add_argument("--watchdog_run_search_stale_minutes", type=int, default=7)
+    parser.add_argument("--watchdog_restart_delay_minutes", type=int, default=5)
+    parser.add_argument("--watchdog_poll_seconds", type=int, default=60)
     args, _ = parser.parse_known_args()
 
     final_output_dir = pathlib.Path(args.output_dir)
@@ -466,6 +661,10 @@ if __name__ == "__main__":
     env_out = os.environ.get("PIPELINE_OPT_CONFIG")
     if not final_output_dir.exists() and env_out:
         final_output_dir = pathlib.Path(env_out).parent
+
+    if args.watchdog:
+        exit_code = run_with_watchdog(args, final_output_dir)
+        raise SystemExit(exit_code)
 
     incumbent, history, importance = run(
         args.dataset,

@@ -1,5 +1,6 @@
 import logging
 import os
+import httpx
 from pydantic import SecretStr
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_ollama import ChatOllama
@@ -7,6 +8,25 @@ from langchain_openai import ChatOpenAI
 
 
 logger = logging.getLogger(__name__)
+
+
+def _env_float(name: str, default: float) -> float:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        logger.warning("Invalid float for %s=%r. Falling back to %s.", name, value, default)
+        return default
+
+
+def _ollama_timeout() -> httpx.Timeout:
+    timeout_s = max(1.0, _env_float("L2R_OLLAMA_TIMEOUT_SECONDS", 90.0))
+    connect_s = min(10.0, timeout_s)
+    write_s = min(30.0, timeout_s)
+    pool_s = min(10.0, timeout_s)
+    return httpx.Timeout(timeout=timeout_s, connect=connect_s, read=timeout_s, write=write_s, pool=pool_s)
 
 
 class LLMClient():
@@ -50,6 +70,7 @@ class OllamaClient(LLMClient):
             client_kwargs={
                 'headers': {'Authorization': f'Bearer {token}'} if token else {},
                 'proxy': proxy,
+                'timeout': _ollama_timeout(),
             },
         )
 
