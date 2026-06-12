@@ -66,8 +66,8 @@ def objective(config: Configuration,
     working_cfg = copy.deepcopy(opt_config)
     working_cfg.update({
         "top_k": cfg["top_k"],
-        "chunk_size": cfg["chunk_size"],
-        "chunk_overlap": cfg["chunk_overlap"],
+       # "chunk_size": cfg["chunk_size"],
+       # "chunk_overlap": cfg["chunk_overlap"],
         "prompt": prompt_map[cfg["prompt_template"]],
     })
 
@@ -203,11 +203,11 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
     cs = ConfigurationSpace(seed=42)
     cs.add([
         Integer("top_k", (1, 20), default=4),
-        Integer("chunk_size", (200, 4000), default=2000),
-        Integer("chunk_overlap", (0, 500), default=200),
+        #Integer("chunk_size", (200, 4000), default=2000),
+        #Integer("chunk_overlap", (0, 500), default=200),
         Categorical("prompt_template", list(prompt_map.keys()), default="default"),
     ])
-    cs.add(ForbiddenGreaterThanRelation(cs["chunk_overlap"], cs["chunk_size"]))
+    #cs.add(ForbiddenGreaterThanRelation(cs["chunk_overlap"], cs["chunk_size"]))
     scenario = Scenario(
         cs,
         deterministic=True,
