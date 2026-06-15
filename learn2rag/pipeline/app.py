@@ -20,8 +20,9 @@ from .config import user_config, opt_config
 from .qdrant import Qdrant
 from .search import search_authorized
 from .operators import BasicPipeline
+from .operators.base import BaseOperator
 
-pipeline = BasicPipeline()
+pipeline: BaseOperator = BasicPipeline()
 
 
 class QuestionInput(BaseModel):
