@@ -177,6 +177,7 @@ services:
       - '--logging-config'
       - '{{storage_path}}/logging_config.yml'
     environment:
+      DO_NOT_TRACK: 'true'
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       LEARN2RAG_PIPELINE_PORT: '{{ports.pipeline}}'
       QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'

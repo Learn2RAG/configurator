@@ -184,6 +184,7 @@ services:
       - '{{storage_path}}/importer_config.json'
       - '--delta'
     environment:
+      DO_NOT_TRACK: 'true'
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       STORAGE_PATH: '{{storage_path}}'
       QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'
