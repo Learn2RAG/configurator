@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block header %}
+<h1>{% block title %}{{pipeline.label}}{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<h2>{{pgettext('header', 'Details')}}</h2>
+{{pipeline.label}}
+<hr/>
+<h2>{{pgettext('header', 'Optimization')}}</h2>
+{% if training_examples %}
+<div class="table-responsive">
+  <table class="caption-top table table-hover">
+    <caption>{{pgettext('header', 'Training data')}}</caption>
+    <thead>
+      <!--
+      <tr>
+        <th scope="col">{{pgettext('header', 'Question')}}</th>
+        <th scope="col">{{pgettext('header', 'Answer')}}</th>
+      </tr>
+      -->
+      <tr>
+        <td>
+          <pre>{{training_examples}}&hellip;</pre>
+        </td>
+      </tr>
+    </thead>
+    <tbody>
+    </tbody>
+  </table>
+</div>
+{% endif %}
+<form method="POST" enctype="multipart/form-data" action="{{url_for('pipeline_details_training_data', name=name)}}" class="row">
+  <label for="trainingFile" class="col-auto col-form-label">{{pgettext('label', 'Choose a new training data file:')}}</label>
+  <div class="col-auto">
+    <input class="form-control" type="file" id="trainingFile" name="trainingFile" required="required" accept=".csv,text/csv"/>
+  </div>
+  <div class="col-auto">
+    <button type="submit" class="btn btn-primary">{{pgettext('label', 'Save')}}</button>
+  </div>
+</form>
+{% endblock %}

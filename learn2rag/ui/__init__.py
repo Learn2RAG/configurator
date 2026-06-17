@@ -12,6 +12,7 @@ import threading
 import time
 from typing import Any
 import urllib
+from itertools import islice
 
 from babel import negotiate_locale
 from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
@@ -478,6 +479,39 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             flash(pgettext('flash', 'Could not start the pipeline: %(message)s', message=e), 'error')
 
         # TODO "load" the corresponding Ollama model
+
+    @app.get('/pipelines/<name>')
+    def pipeline_details(name: str) -> 'str | werkzeug.wrappers.response.Response':
+        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        if pipeline is None:
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+            return redirect(url_for('pipelines_list'))
+        storage_path = Path(pipeline['storage_path'])
+        try:
+            with (storage_path / 'training.csv').open() as training_file:
+                training_examples = ''.join(islice(training_file, 3))
+        except FileNotFoundError:
+            training_examples = None
+        return render_template(
+            'pipelines_details_page.html',
+            name=name,
+            pipeline=pipeline,
+            training_examples=training_examples,
+        )
+
+    @app.post('/pipelines/<name>/training')
+    def pipeline_details_training_data(name: str) -> 'str | werkzeug.wrappers.response.Response':
+        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        if pipeline is None:
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+            return redirect(url_for('pipelines_list'))
+        try:
+            training_file = request.files['trainingFile']
+            training_file.save(Path(pipeline['storage_path']) / 'training.csv')
+        except Exception as e:
+            app.logger.exception(e)
+            flash(pgettext('flash', 'Could not save the file'), 'error')
+        return redirect(url_for('pipeline_details', name=name))
 
     @app.post('/pipelines/<name>')
     def pipeline_action(name: str) -> 'str | werkzeug.wrappers.response.Response':
