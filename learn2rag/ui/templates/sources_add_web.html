@@ -1,6 +1,11 @@
 <form method="POST">
   <input type="hidden" name="type" value="web"/>
   <div class="mb-3">
+    <div class="alert alert-warning">
+      {{gettext('This data source type does not support access control. All users will be provided access to all data.')}}
+    </div>
+  </div>
+  <div class="mb-3">
     <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
     <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
   </div>
