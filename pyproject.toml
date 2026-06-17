@@ -222,9 +222,11 @@ exclude = ["^learn2rag/pipeline/scripts/",
 strict = true
 [[tool.mypy.overrides]]
 module = [
-    "datasets.*",
+    "datasets",
+    "datasets.*"
 ]
 ignore_missing_imports = true
+follow_imports = "skip"
 [[tool.mypy.overrides]]
 module = ["learn2rag.pipeline.main"]
 ignore_errors = true
