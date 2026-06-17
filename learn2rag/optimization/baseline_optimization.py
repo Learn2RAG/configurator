@@ -180,13 +180,20 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
         raise ValueError(f"Unknown dataset: {dataset_name}. Available: {list(datasets.keys())}")
     dcfg = datasets[dataset_name]
     fields = dcfg["fields"]
+    base_path = pathlib.Path(dcfg["path"])
 
     out = pathlib.Path(output_dir) / dataset_name
     out.mkdir(parents=True, exist_ok=True)
     answers_dir = out / "trial_answers"
     answers_dir.mkdir(parents=True, exist_ok=True)
+    if base_path.suffix.lower() == '.csv':
+        target_path = base_path
+    else:
+        target_path = base_path / 'source' / dcfg.get("subdirectory", "")
 
-    qa = read_dataset_qa(dataset_name, dcfg["subdirectory"], dcfg["split"])
+    logging.debug(f"target path for dataset is {target_path} ")
+
+    qa = read_dataset_qa(target_path, split=dcfg["split"])
     if max_questions:
         qa = qa.select(range(min(max_questions, len(qa))))
 

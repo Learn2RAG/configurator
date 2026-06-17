@@ -79,11 +79,28 @@ def ingest_dataset_documents(dataset_name: str) -> None:
     # learn2rag.pipeline.ingestion.index(user_config, opt_config)
 
 
-def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
-    logging.debug(f'{dataset_name=}')
-    dataset_work_dir = pathlib.Path('./datasets') / dataset_name
-    dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
+def read_dataset_qa(file_path: pathlib.Path | str, split: str | None = None) -> Any:
+    target_path = pathlib.Path(file_path)
+    logging.debug(f'Loading dataset from: {target_path}')
+
+    if not target_path.exists():
+        raise FileNotFoundError(f"Dataset path does not exist: {target_path}")
+
+    if target_path.suffix.lower() == '.csv':
+        logging.debug(f'load csv file ')
+        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path))
+    else:
+        logging.debug(f'load HF dataset ')
+        dataset_dict = datasets.load_from_disk(str(target_path))
+
     return dataset_dict[split] if split is not None else dataset_dict
+
+
+# def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
+#     logging.debug(f'{dataset_name=}')
+#     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
+#     dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
+#     return dataset_dict[split] if split is not None else dataset_dict
 
 
 def basic_pipeline(dataset_name: str, question: str) -> dict[str, Any]:

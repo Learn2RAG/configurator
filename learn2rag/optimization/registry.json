@@ -2,7 +2,8 @@
   "datasets": {
     "WikiEval": {
       "subdirectory": "", "split": "train",
-      "fields": {"q": "question", "a": "answer", "id": "id"}
+      "fields": {"q": "question", "a": "answer", "id": "id"},
+      "path": "./CSV/WikiEval_dataset.csv"
     }
   },
   "prompts": {
