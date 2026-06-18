@@ -185,7 +185,7 @@ dependencies = [
 description = ""
 license = "MIT"
 name = "learn2rag"
-requires-python = "~=3.13.0"
+requires-python = "==3.13.12"
 version = "0.3.0"
 [project.urls]
 Homepage = "https://learn2rag.de/"

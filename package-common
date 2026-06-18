@@ -92,7 +92,7 @@ if [[ "$CARGO_BUILD_TARGET" == *"windows"* ]]; then
         -o $BUNDLE_DIR/win-webui-reqs.txt
 
     uv pip compile $BUNDLE_DIR/req-learn2rag.in \
-        --python-version 3.13 \
+        --python-version 3.13.12 \
         --python-platform windows \
         -o $BUNDLE_DIR/win-l2r-reqs.txt
 
@@ -106,7 +106,7 @@ if [[ "$CARGO_BUILD_TARGET" == *"windows"* ]]; then
         -r $BUNDLE_DIR/win-webui-reqs.txt -d $WHEELS_DIR
 
     $BUNDLE_DIR/venv313/bin/python -m pip download \
-        --platform win_amd64 --python-version 3.13 --implementation cp --abi cp313 \
+        --platform win_amd64 --python-version 3.13.12 --implementation cp --abi cp313 \
         --no-deps --find-links $WHEELS_DIR \
         -r $BUNDLE_DIR/win-l2r-reqs.txt -d $WHEELS_DIR
 
