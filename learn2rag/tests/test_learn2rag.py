@@ -141,10 +141,6 @@ class Learn2RAGTestCase(TestCase):
         project.start()
         assert project.running
 
-        def check_import() -> None:
-            project = Project.get(self.project_name)
-            assert project is not None
-            assert not project.running
 
         waitUntil(check_import, timeout=1 * 60 * 1000)
 
@@ -186,11 +182,6 @@ class Learn2RAGTestCase(TestCase):
         assert project is not None, 'project should not be None'
         project.start()
         assert project.running
-
-        def check_import() -> None:
-            project = Project.get(self.project_name)
-            assert project is not None
-            assert not project.running
 
         waitUntil(check_import, timeout=1 * 60 * 1000)
 

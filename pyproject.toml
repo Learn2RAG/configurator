@@ -204,9 +204,11 @@ exclude = [
 strict = true
 [[tool.mypy.overrides]]
 module = [
+    "datasets",
     "datasets.*",
 ]
 ignore_missing_imports = true
+follow_imports = "skip"
 [[tool.mypy.overrides]]
 module = ["learn2rag.pipeline.main"]
 ignore_errors = true
