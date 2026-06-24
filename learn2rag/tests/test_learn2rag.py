@@ -214,6 +214,8 @@ class Learn2RAGTestCase(TestCase):
                 )
                 content = completion.choices[-1].message.content
                 logger.debug('Response content: %s', content)
+                assert "Information:\\n" in content, 'contains the prompt'
+                assert not content.endswith("Information:\\n"), 'contains any document chunks in the prompt'
                 assert 'descendants of the wolf' not in content
             except APIConnectionError:
                 assert False
