@@ -1,3 +1,4 @@
+import logging
 import shutil
 from pathlib import Path
 from unittest import TestCase
@@ -6,7 +7,11 @@ from typing import Any
 from ..compose import Project
 from ..utils import is_windows, save_data_path, waitUntil
 
+import pytest
 from openai import APIConnectionError, OpenAI
+from _pytest.logging import LogCaptureFixture
+
+logger = logging.getLogger(__name__)
 
 template_dir = Path(__file__).resolve().parent.parent / 'ui' / 'templates' / 'compose' / 'pipelines'
 data_dir = Path(__file__).resolve().parent / 'data'
@@ -17,6 +22,12 @@ class Learn2RAGTestCase(TestCase):
     project_name: str
     rag_port: int
     storage_path: Path
+
+    @pytest.fixture(autouse=True)
+    def use_caplog(self, caplog: LogCaptureFixture) -> None:
+        caplog.set_level(logging.WARNING, logger='httpcore')
+        caplog.set_level(logging.WARNING, logger='httpx')
+        caplog.set_level(logging.WARNING, logger='openai')
 
     def setUp(self) -> None:
         self.project_name = 'test'
@@ -93,6 +104,7 @@ class Learn2RAGTestCase(TestCase):
                     ],
                 )
                 content = completion.choices[-1].message.content
+                logger.debug('Response content: %s', content)
                 assert 'for testing only' in content, 'contains test marker'
                 assert "Information:\\n" in content, 'contains the prompt'
                 assert not content.endswith("Information:\\n"), 'contains any document chunks in the prompt'
