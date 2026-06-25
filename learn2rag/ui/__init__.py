@@ -497,6 +497,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             name=name,
             pipeline=pipeline,
             training_dataset=training_dataset,
+            projects=Project.get_all(),
         )
 
     @app.post('/pipelines/<name>/training')

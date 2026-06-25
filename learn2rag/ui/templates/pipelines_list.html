@@ -91,7 +91,7 @@
                   <li><hr class="dropdown-divider"></li>
                   {% if not (projects[name] and projects[name].running) %}
                   {% for project_name, project in compose_templates.items() %}
-                  {% if project_name not in ['continuous'] %}
+                  {% if project_name not in ['continuous', 'optimization'] %}
                   <li>
                     {{ pipeline_start(name, project, 'dropdown-item text-bg-primary') }}
                   </li>

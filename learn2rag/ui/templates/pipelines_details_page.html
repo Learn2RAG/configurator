@@ -37,6 +37,11 @@
   </table>
 </div>
 {% endif %}
+{% if training_dataset and not (projects[name] and projects[name].running) %}
+<form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
+  <button class="btn btn-primary" type="submit" name="action" value="start:optimization">{{pgettext('button', 'Start optimization')}}</button>
+</form>
+{% endif %}
 <form method="POST" enctype="multipart/form-data" action="{{url_for('pipeline_details_training_data', name=name)}}" class="row">
   <label for="trainingFile" class="col-auto col-form-label">{{pgettext('label', 'Choose a new training data file:')}}</label>
   <div class="col-auto">
