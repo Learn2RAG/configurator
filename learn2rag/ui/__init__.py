@@ -24,6 +24,7 @@ import yaml
 import werkzeug.wrappers
 
 from learn2rag.compose import Project
+from learn2rag.evaluation.tools import read_dataset_qa
 import learn2rag.data
 import learn2rag.pipeline.llm
 from ..utils import (
@@ -488,15 +489,14 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             return redirect(url_for('pipelines_list'))
         storage_path = Path(pipeline['storage_path'])
         try:
-            with (storage_path / 'training.csv').open() as training_file:
-                training_examples = ''.join(islice(training_file, 3))
+            training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
         except FileNotFoundError:
-            training_examples = None
+            training_dataset = None
         return render_template(
             'pipelines_details_page.html',
             name=name,
             pipeline=pipeline,
-            training_examples=training_examples,
+            training_dataset=training_dataset,
         )
 
     @app.post('/pipelines/<name>/training')
