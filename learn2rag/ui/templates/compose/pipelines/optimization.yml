@@ -5,6 +5,9 @@ ports:
   - ui
   - qdrant_http
 files:
+  - path: '{{storage_path}}/importer_config.json'
+    content: '{{import_config | tojson}}'
+
   - path: '{{storage_path}}/basic_user_config.json'
     content: |
       {
