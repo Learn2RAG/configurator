@@ -206,8 +206,15 @@ class Project():
         try:
             for file in self.content.get('files', []):
                 file_path = Path(file['path']).expanduser().absolute()
-                file_path.parent.mkdir(parents=True, exist_ok=True)
-                file_path.write_text(file['content'])
+                if not file_path.exists() or file.get('force', True):
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    if 'content' in file:
+                        content = file['content']
+                    elif 'src' in file:
+                        content = Path(file['src']).read_text()
+                    else:
+                        raise NotImplementedError(file)
+                    file_path.write_text(content)
         except Exception as e:
             con.rollback()
             raise e

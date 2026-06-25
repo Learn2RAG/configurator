@@ -15,6 +15,10 @@ files:
         host: '127.0.0.1'
       telemetry_disabled: true
 
+  - path: '{{storage_path}}/opt_config.json'
+    src: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
+    force: false
+
   - path: '{{storage_path}}/importer_config.json'
     content: '{{import_config | tojson}}'
 
@@ -125,7 +129,7 @@ services:
       QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'
       PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
       IMPORTER_CONFIG: '{{storage_path}}/importer_config.json'
-      PIPELINE_OPT_CONFIG: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
+      PIPELINE_OPT_CONFIG: '{{storage_path}}/opt_config.json'
       LANGCHAIN_API_KEY: '1'
       LANGCHAIN_TRACING_V2: 'false'
       LLM_API_TYPE: '{{language_model.api}}'
