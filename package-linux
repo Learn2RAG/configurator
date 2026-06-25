@@ -9,8 +9,6 @@ CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
 BIN_SUFFIX=""
 
 . ./package-common
-#TODO : why it removed ?
-#cp services/start-import.linux $BUNDLE/services/start-import
 
 wget --continue -O $BUNDLE_DIR/ollama-linux.tgz https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-linux-amd64.tgz
 mkdir -p $BUNDLE/services/ollama
