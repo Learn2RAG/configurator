@@ -35,7 +35,7 @@ class Learn2RAGTestCase(TestCase):
         self.storage_path = Path(save_data_path('Learn2RAG', 'tests'))
         self.storage_path.mkdir(parents=True, exist_ok=True)
         self.openai_client = OpenAI(
-            api_key='mock-key',
+            api_key='',
             base_url=f'http://localhost:{self.rag_port}',
             max_retries=0,
         )
