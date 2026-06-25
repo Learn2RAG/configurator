@@ -101,6 +101,7 @@ dependencies = [
     "omegaconf==2.3.0",
     "onnx==1.18.0",
     "onnxruntime==1.22.1",
+    "openai==2.33.0",
     "opencv-python==4.12.0.88",
     "openpyxl==3.1.5",
     "orjson==3.11.1",
@@ -186,7 +187,7 @@ description = ""
 license = "MIT"
 name = "learn2rag"
 requires-python = "==3.13.5"
-version = "0.3.0"
+version = "0.3.0.dev0"
 [project.urls]
 Homepage = "https://learn2rag.de/"
 Documentation = "https://docs.learn2rag.de/"

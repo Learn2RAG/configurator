@@ -4,13 +4,10 @@ import importlib
 import logging
 import math
 import os
-import platform
-import xdg.BaseDirectory
 import secrets
 import shutil
 import signal
 import socket
-import subprocess
 import threading
 import time
 from typing import Any
@@ -20,7 +17,6 @@ from babel import negotiate_locale
 from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
 from flask_babel import Babel, gettext, ngettext, pgettext  # type: ignore[import-untyped]
 import flask.logging
-import jinja2
 import ollama
 import uvicorn
 import yaml
@@ -29,16 +25,18 @@ import werkzeug.wrappers
 from learn2rag.compose import Project
 import learn2rag.data
 import learn2rag.pipeline.llm
+from ..utils import (
+    is_windows,
+    normalize_path,
+    open_web_browser,
+    save_data_path,
+)
 
 from datetime import datetime  # <-- ADD THIS
 
 
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
-
-
-def expand_path(path: Path) -> Path:
-    return Path(path).expanduser().absolute()
 
 
 import werkzeug
@@ -53,22 +51,19 @@ def redirect(url: str) -> 'werkzeug.wrappers.response.Response':
 
 def start_project(name: str, template_file: Path, storage_path: Path, render_context: dict[str, Any]={}) -> Project:
     logging.debug('UI starting project: %s', name)
-    storage_path = expand_path(storage_path)
     logging.debug('Storage path: %s', storage_path)
-    storage_path.mkdir(parents=True, exist_ok=True)
-    project_file = storage_path / 'compose.yml'
-
-    template = jinja2.Template(template_file.read_text())
-    project_file.write_text(template.render(render_context | {
-        'is_windows': platform.system() == 'Windows',
-        'learn2rag_path': Path('.').absolute(),
-        'storage_path': storage_path,
-    }))
     project = None
     if project := Project.get(name):
         assert not project.running
         project.remove()
-    project = Project.create(project_file, name)
+
+    storage_path.mkdir(parents=True, exist_ok=True)
+
+    project = Project.create(template_file, name, template=True, template_context=render_context | {
+        'is_windows': is_windows(),
+        'learn2rag_path': Path('.').absolute(),
+        'storage_path': storage_path,
+    })
     assert project is not None, 'project should not be None'
     project.start()
     return project
@@ -126,14 +121,9 @@ def merge(source: dict[str, Any], destination: dict[str, Any]) -> dict[str, Any]
 
 def create_app(config: dict[str, Any]={}) -> Flask:
     # create and configure the app
-    if platform.system() == 'Windows':
-        windows_app_data = os.getenv('LOCALAPPDATA')
-        assert windows_app_data is not None
-        default_instance_path = windows_app_data + '/Learn2RAG/instance'
-    else:
-        default_instance_path = xdg.BaseDirectory.save_data_path('Learn2RAG/instance')
+    default_instance_path = save_data_path('Learn2RAG', 'instance')
 
-    example_local_path = r'C:\Users\User\Documents' if platform.system() == 'Windows' else '/home/user/Documents'
+    example_local_path = r'C:\Users\User\Documents' if is_windows() else '/home/user/Documents'
     app = Flask(
         __name__,
         instance_path=config.get('flask', {}).get('instance_path', default_instance_path),
@@ -220,7 +210,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     def remove_pipeline_storage_directory(storage_path: Path) -> bool:
         try:
-            storage_path = expand_path(storage_path)
+            storage_path = normalize_path(storage_path)
             shutil.rmtree(storage_path)
             flash(pgettext('flash', 'Directory removed: %(path)s', path=storage_path))
         except FileNotFoundError:
@@ -281,7 +271,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             if request.form.get('ollama') == 'pull':
                 if model.find(':') == -1:
                     model += ':latest'
-                start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(), {'model': model})
+                start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(app.instance_path) / 'ollama_download', {'model': model})
                 return flask_redirect(url_for('model_pulling', model=model))
         elif api == learn2rag.pipeline.llm.OpenAIClient.ID:
             url = request.form['url']
@@ -423,7 +413,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
         for path_name, source in sources.items():
             if 'path' in source:
-                source['path'] = str(expand_path(source['path']))
+                source['path'] = str(normalize_path(source['path']))
 
         #  Fetch the language model configuration first let see if it works
         language_model = learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model'])
@@ -475,7 +465,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=app.config.get('PREFERRED_PORTS', range(9001, 9011)))
             render_context['ports'] = dict(zip(port_names, ports))
 
-        storage_path = Path(pipeline['storage_path'])
+        storage_path = normalize_path(pipeline['storage_path'])
 
         try:
             project = start_project(name, template_file, storage_path, render_context)
@@ -520,7 +510,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         if pipeline is None:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
         elif file in ['debug.log', 'error.log']:
-            storage_path = expand_path(pipeline['storage_path'])
+            storage_path = normalize_path(pipeline['storage_path'])
             log_file = storage_path / 'logs' / file
             try:
                 content = log_file.read_text()
@@ -578,18 +568,6 @@ def shutdown() -> None:
     os.kill(os.getpid(), signal.SIGTERM)
 
 
-def webbrowser_open(url: str) -> None:
-    try:
-        if platform.system() == 'Windows':
-            subprocess.Popen(['explorer', url])
-        else:
-            subprocess.Popen(['xdg-open', url])
-    except FileNotFoundError:
-        pass
-    except Exception as e:
-        print(e)
-
-
 def main(config: dict[str, Any]) -> None:
     app = create_app(config=config)
 
@@ -616,7 +594,7 @@ def main(config: dict[str, Any]) -> None:
 
     protocol = 'https' if use_https else 'http'
     url = f"{protocol}://localhost:{port}"
-    webbrowser_open(url)
+    open_web_browser(url)
     logging.info('*' * 40)
     logging.info('Learn2RAG: ' + url)
     logging.info('*' * 40)
