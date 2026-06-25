@@ -85,6 +85,28 @@ files:
   - path: '{{storage_path}}/logs/.keep'
     content: ''
 
+  - path: '{{storage_path}}/optimization_registry.json'
+    content: |
+      {
+        "datasets": {
+          "training": {
+            "subdirectory": "", "split": "train",
+            "fields": {"q": "question", "a": "answer", "id": "id"},
+            "path": "{{storage_path}}/training.csv"
+          }
+        },
+        "prompts": {
+          "default":
+              "# Role and Objective\nYou will act as a smart AI chatbot that answers questions only by using the content from the provided information list.\n\n  # Instructions\n- Respond in the language of the question.\n - Answer clear and concise.\n- Only use the provided information.\n        - NEVER use your general knowledge.\n\n # Information:\n{context}"
+          ,
+          "concise":
+              "Answer the question using ONLY the provided information.   Be concise and direct. If the information does not contain the answer, say so.\n\n        Information:\n{context}"
+          ,
+          "detailed":
+              "You are a knowledgeable assistant. Using ONLY the provided information below,        answer the question thoroughly. Cite your sources.         If the information is insufficient, state that clearly.\n\n        Information:\n{context}"
+        }
+      }
+
 services:
   qdrant:
     working_dir: '{{storage_path}}'
@@ -106,7 +128,9 @@ services:
       - '--logging-config'
       - '{{storage_path}}/logging_config.yml'
       - '--registry-path'
-      - '{{learn2rag_path}}/learn2rag/optimization/registry.json'
+      - '{{storage_path}}/optimization_registry.json'
+      - '--dataset'
+      - 'training'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
