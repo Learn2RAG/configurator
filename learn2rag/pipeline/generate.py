@@ -18,7 +18,7 @@ def generate(query: str, search_results: Sequence[ScoredPoint], opt_config: dict
     if hasattr(search_results, "points"):
         search_results = search_results.points
     context = "\n\n".join([
-        context_template.format(source=result.payload['path'], content=result.payload['content'])
+        context_template.format(source=result.payload['source'], content=result.payload['content'])
         for result in search_results if result.payload
     ])
 
