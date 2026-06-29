@@ -30,6 +30,7 @@ import requests
 
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
+statusLogger = logging.getLogger('status')
 
 
 def _is_same_site(url: str, base_url: str) -> bool:
@@ -121,6 +122,7 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
                 documents.append(merged_doc)
 
         logger.info(f"Loaded content from {url}")
+        statusLogger.info('Importing, URLs found: %i', len(visited))
 
         # If depth > 0 or depth == -1, extract links and process them recursively
         if depth > 0 or depth == -1:
