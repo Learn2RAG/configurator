@@ -6,16 +6,17 @@ This module processes configuration entries and delegates loading to specific lo
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.7
+Version: 0.0.8
 Creation Date: June 10, 2025
-Last Modified: May 4, 2026
+Last Modified: June 29, 2026
 """
 
 import hashlib
 import logging
-from typing import Dict, List, Any, TYPE_CHECKING
+from typing import Dict, List, Any, TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from learn2rag.importer.utils.import_state import ImportState
+    from learn2rag.importer.utils.progress import ImportProgress
 from learn2rag.pipeline.ingestion import index
 from learn2rag.pipeline.store import get_documents, delete_documents, update_documents
 from ..globals import stop_loading
@@ -30,7 +31,19 @@ from .drupal_loader import load_from_drupal, get_all_drupal_document_ids
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
 
-def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[Document]:
+def _entry_source(entry: Dict[str, Any]) -> str:
+    return str(
+        entry.get("path")
+        or entry.get("url")
+        or entry.get("base_url")
+        or entry.get("folder_path")
+        or entry.get("document_library_id")
+        or entry.get("loader_id")
+        or "unknown-source"
+    )
+
+
+def process_configuration_entries(config_entries: List[Dict[str, Any]], progress: Optional["ImportProgress"] = None) -> List[Document]:
     """
     Process configuration entries and load documents based on loader type.
 
@@ -43,7 +56,7 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
 
     all_documents = []
 
-    for entry in config_entries:
+    for entry_idx, entry in enumerate(config_entries, start=1):
         loader_type = entry.get("loader_type")
 
         if not loader_type:
@@ -53,6 +66,8 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
         try:
             logger.info(f"Processing entry: {entry}, please wait...")
             loader_id = entry.get("loader_id") or ""
+            if progress is not None:
+                progress.start_loader(entry_idx, loader_type, _entry_source(entry))
             if not loader_id:
                 logger.warning(f"No loader_id specified for entry: {entry}.\nIt is recommended to set a unique loader_id for each loader.")
             if loader_type == "DirectoryLoader":
@@ -62,7 +77,7 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
                 if not path:
                     logger.error("Missing 'path' for 'DirectoryLoader' in configuration entry.")
                     continue
-                documents = load_from_directory(path, recursive=recursive, silent_errors=silent_errors, loader_id=loader_id)
+                documents = load_from_directory(path, recursive=recursive, silent_errors=silent_errors, loader_id=loader_id, progress=progress)
                 logger.info(f"Loaded {len(documents)} documents from {path} using {loader_type} for configuration entry with loader_id: {loader_id}.")
             elif loader_type == "CSVLoader":
                 path = entry.get("path")
@@ -82,7 +97,7 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
                 if not url or not isinstance(depth, int) or depth < -1:
                     logger.error(f"Invalid configuration for HTMLLoader: {entry}")
                     continue
-                documents = load_html_content(url, depth=depth, loader_id=loader_id)
+                documents = load_html_content(url, depth=depth, loader_id=loader_id, progress=progress)
                 logger.info(f"Loaded {len(documents)} documents from {url} using {loader_type}.")
             elif loader_type == "SharepointLoader":
                 client_id = entry.get("client_id")
@@ -123,7 +138,8 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
                     reset_token=reset_token,
                     tenant_id=tenant_id,
                     site_id=site_id,
-                    loader_id=loader_id
+                    loader_id=loader_id,
+                    progress=progress,
                 )
                 logger.info(f"Loaded {len(documents)} documents from SharePoint using {loader_type}.")
 
@@ -151,6 +167,7 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
                     text_fields=text_fields,
                     page_size=page_size,
                     language=language,
+                    progress=progress,
                 )
                 logger.info(f"Loaded {len(documents)} documents from Drupal ({base_url}) using {loader_type}.")
             else:
@@ -159,8 +176,12 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
             for doc in documents:
                 doc.metadata["loader_id"] = loader_id
             all_documents.extend(documents)
+            if progress is not None:
+                progress.finish_loader(len(documents))
         except Exception as e:
             logger.error(f"Error processing entry {entry}: {e}")
+            if progress is not None:
+                progress.emit("Phase 2/4 Load", f"Loader failed | error {e}")
 
     return all_documents
 
@@ -170,6 +191,7 @@ def process_delta_imports(
     user_config: Dict[str, Any],
     opt_config: Dict[str, Any],
     import_state: "ImportState",
+    progress: Optional["ImportProgress"] = None,
 ) -> None:
     """
     Perform a delta import for all configured loaders.
@@ -195,7 +217,7 @@ def process_delta_imports(
     """
     from datetime import datetime, timezone
 
-    for entry in config_entries:
+    for entry_idx, entry in enumerate(config_entries, start=1):
         if stop_loading:
             logger.info("Delta import stopped by user.")
             break
@@ -208,6 +230,9 @@ def process_delta_imports(
             continue
 
         try:
+            loaded_document_count = 0
+            if progress is not None:
+                progress.start_loader(entry_idx, loader_type, _entry_source(entry))
             last_import_time = import_state.get_last_import_time(loader_id)
             import_start = datetime.now(timezone.utc)
             import_state.record_import_start(loader_id, import_start)
@@ -247,13 +272,16 @@ def process_delta_imports(
                     all_docs = load_from_drupal(
                         base_url=base_url, content_types=content_types, loader_id=loader_id,
                         auth_type=auth_type, username=username, password=password, token=token,
-                        text_fields=text_fields, page_size=page_size, language=language,
+                        text_fields=text_fields, page_size=page_size, language=language, progress=progress,
                     )
+                    loaded_document_count = len(all_docs)
                     if is_initial:
-                        index(all_docs, user_config, opt_config)
+                        if progress is not None:
+                            progress.start_indexing(len(all_docs))
+                        index(all_docs, user_config, opt_config, progress=progress)
                     else:
                         # Hash comparison: replace changed, remove deleted
-                        _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
+                        _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config, progress=progress)
                 else:
                     # 2-pass delta
                     logger.info(f"Drupal '{loader_id}': 2-pass delta since {last_import_time.isoformat()}")
@@ -273,13 +301,18 @@ def process_delta_imports(
                         base_url=base_url, content_types=content_types, loader_id=loader_id,
                         auth_type=auth_type, username=username, password=password, token=token,
                         text_fields=text_fields, page_size=page_size, language=language,
-                        since=last_import_time,
+                        since=last_import_time, progress=progress,
                     )
+                    loaded_document_count = len(changed_docs)
                     sources_to_delete = [doc.metadata.get("source", "") for doc in changed_docs]
                     if sources_to_delete:
                         delete_documents(loader_id, sources_to_delete, user_config, opt_config)
-                    index(changed_docs, user_config, opt_config)
+                    if progress is not None:
+                        progress.start_indexing(len(changed_docs))
+                    index(changed_docs, user_config, opt_config, progress=progress)
                     logger.info(f"Drupal '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
+                    if progress is not None:
+                        progress.emit("Phase 2/4 Load", f"Delta applied | deleted {len(deleted_paths)} | updated {len(changed_docs)}")
 
             elif loader_type == "SharepointLoader":
                 client_id = entry.get("client_id", "")
@@ -300,12 +333,15 @@ def process_delta_imports(
                         document_library_id=document_library_id, folder_path=folder_path,
                         folder_id=folder_id, recursive=recursive, auth_with_token=auth_with_token,
                         reset_token=reset_token, tenant_id=tenant_id, site_id=site_id,
-                        loader_id=loader_id,
+                        loader_id=loader_id, progress=progress,
                     )
+                    loaded_document_count = len(all_docs)
                     if is_initial:
-                        index(all_docs, user_config, opt_config)
+                        if progress is not None:
+                            progress.start_indexing(len(all_docs))
+                        index(all_docs, user_config, opt_config, progress=progress)
                     else:
-                        _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
+                        _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config, progress=progress)
                 else:
                     logger.info(f"SharePoint '{loader_id}': 2-pass delta since {last_import_time.isoformat()}")
                     # Pass 1: fetch all current URLs to detect deleted documents
@@ -326,13 +362,18 @@ def process_delta_imports(
                         document_library_id=document_library_id, folder_path=folder_path,
                         folder_id=folder_id, recursive=recursive, auth_with_token=auth_with_token,
                         reset_token=reset_token, tenant_id=tenant_id, site_id=site_id,
-                        loader_id=loader_id, since=last_import_time,
+                        loader_id=loader_id, since=last_import_time, progress=progress,
                     )
+                    loaded_document_count = len(changed_docs)
                     sources_to_delete = [doc.metadata.get("source", "") for doc in changed_docs]
                     if sources_to_delete:
                         delete_documents(loader_id, sources_to_delete, user_config, opt_config)
-                    index(changed_docs, user_config, opt_config)
+                    if progress is not None:
+                        progress.start_indexing(len(changed_docs))
+                    index(changed_docs, user_config, opt_config, progress=progress)
                     logger.info(f"SharePoint '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
+                    if progress is not None:
+                        progress.emit("Phase 2/4 Load", f"Delta applied | deleted {len(deleted_paths)} | updated {len(changed_docs)}")
 
             # ----------------------------------------------------------------
             # NORMAL LOADERS: Directory / HTML / CSV — hash comparison
@@ -347,11 +388,15 @@ def process_delta_imports(
                     recursive=entry.get("recursive", False),
                     silent_errors=entry.get("silent_errors", True),
                     loader_id=loader_id,
+                    progress=progress,
                 )
+                loaded_document_count = len(all_docs)
                 if is_initial:
-                    index(all_docs, user_config, opt_config)
+                    if progress is not None:
+                        progress.start_indexing(len(all_docs))
+                    index(all_docs, user_config, opt_config, progress=progress)
                 else:
-                    _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
+                    _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config, progress=progress)
 
             elif loader_type == "HTMLLoader":
                 url = entry.get("url")
@@ -359,11 +404,14 @@ def process_delta_imports(
                 if not url:
                     logger.error(f"HTMLLoader '{loader_id}': missing 'url'")
                     continue
-                all_docs = load_html_content(url, depth=depth, loader_id=loader_id)
+                all_docs = load_html_content(url, depth=depth, loader_id=loader_id, progress=progress)
+                loaded_document_count = len(all_docs)
                 if is_initial:
-                    index(all_docs, user_config, opt_config)
+                    if progress is not None:
+                        progress.start_indexing(len(all_docs))
+                    index(all_docs, user_config, opt_config, progress=progress)
                 else:
-                    _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
+                    _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config, progress=progress)
 
             elif loader_type == "CSVLoader":
                 path = entry.get("path")
@@ -375,10 +423,13 @@ def process_delta_imports(
                     doc.metadata["loader_id"] = loader_id
                     doc.metadata["source"] = path
                     doc.metadata["content_hash"] = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
+                loaded_document_count = len(all_docs)
                 if is_initial:
-                    index(all_docs, user_config, opt_config)
+                    if progress is not None:
+                        progress.start_indexing(len(all_docs))
+                    index(all_docs, user_config, opt_config, progress=progress)
                 else:
-                    _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config)
+                    _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config, progress=progress)
 
             else:
                 logger.error(f"process_delta_imports: unknown loader_type '{loader_type}' for loader_id '{loader_id}'")
@@ -386,9 +437,13 @@ def process_delta_imports(
 
             import_state.save_success(loader_id)
             logger.info(f"Delta import '{loader_id}': completed successfully.")
+            if progress is not None:
+                progress.finish_loader(loaded_document_count)
 
         except Exception as e:
             logger.error(f"process_delta_imports: error processing loader '{loader_id}': {e}", exc_info=True)
+            if progress is not None:
+                progress.emit("Phase 2/4 Load", f"Loader failed | error {e}")
 
 
 def _delta_by_source(
@@ -397,6 +452,7 @@ def _delta_by_source(
     loader_id: str,
     user_config: Dict[str, Any],
     opt_config: Dict[str, Any],
+    progress: Optional["ImportProgress"] = None,
 ) -> None:
     """
     Hash-based delta import for normal loaders (DirectoryLoader, HTMLLoader, CSVLoader).
@@ -444,9 +500,16 @@ def _delta_by_source(
             changed_docs.extend(docs)
 
     if changed_docs:
-        update_documents(loader_id, changed_docs, user_config, opt_config)
+        update_documents(loader_id, changed_docs, user_config, opt_config, progress=progress)
 
     changed_source_count = len(set(d.metadata.get("source", "") for d in changed_docs))
+    if progress is not None:
+        progress.emit(
+            "Phase 2/4 Load",
+            f"Delta compared | deleted {len(deleted_sources)} | changed sources {changed_source_count}",
+            processed=changed_source_count + len(deleted_sources),
+            total=len(new_docs_by_source) + len(deleted_sources),
+        )
     logger.info(
         f"_delta_by_source '{loader_id}': {len(deleted_sources)} deleted, "
         f"{len(changed_docs)} chunks re-indexed from {changed_source_count} changed sources"
