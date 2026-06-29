@@ -1,41 +1,14 @@
 #!/bin/bash
 set -eu
 
-./build-python
-
-VERSION=$(uv version --short)
-
 # 64-bit Linux (kernel 3.2+, glibc 2.17+)
 # https://doc.rust-lang.org/rustc/platform-support.html#tier-1-with-host-tools
 # https://github.com/cross-rs/cross#supported-targets
 # See also: pyapp/Cross.toml
 CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
-# https://github.com/cross-rs/cross/wiki/FAQ#glibc-version-error
-CARGO_TARGET_DIR=target/build/"${CARGO_BUILD_TARGET}"
+BIN_SUFFIX=""
 
-BUNDLE_DIR=~/.cache/learn2rag-dist
-BUNDLE_NAME=learn2rag-linux
-BUNDLE=$BUNDLE_DIR/$BUNDLE_NAME
-
-mkdir -p $BUNDLE
-mkdir -p $BUNDLE/services
-
-PYAPP_DISTRIBUTION_EMBED=true
-PYAPP_FULL_ISOLATION=true
-PYAPP_EXPOSE_ALL_COMMANDS=true
-
-cp dist/learn2rag-$VERSION.tar.gz pyapp
-(cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=learn2rag PYAPP_PROJECT_PATH=learn2rag-$VERSION.tar.gz cross build --release --target $CARGO_BUILD_TARGET)
-cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/configurator
-
-cp services/open-webui/dist/open_webui-0.8.12.tar.gz pyapp
-(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui PYAPP_PROJECT_PATH=open_webui-0.8.12.tar.gz PYAPP_EXEC_SPEC=open_webui:app cross build --release --target $CARGO_BUILD_TARGET)
-cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/services/start-open-webui
-
-while read -u 100 file; do
-    mkdir -p $BUNDLE/$(dirname $file)
-    cp -r $file $BUNDLE/$file
-done 100<Distfiles
+. ./package-common
 
 wget --continue -O $BUNDLE_DIR/ollama-linux.tgz https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-linux-amd64.tgz
 mkdir -p $BUNDLE/services/ollama
