@@ -1,12 +1,28 @@
 #!/bin/sh
 set -eu
+
+cleanup_pyapp() {
+    echo "Initialization failed. Cleaning up pyapp related files... try again"
+    rm -rf "$HOME/.local/share/pyapp/learn2rag"
+    rm -rf "$HOME/.local/share/pyapp/open-webui"
+    rm -rf "$HOME/.local/share/pyapp/open-webui-pipelines"
+    exit 1
+}
+
 echo Starting Learn2RAG...
 echo Initializing, please wait...
 echo ========================================
-echo 1/2 Initializing open-webui...
-services/start-open-webui main --version
+echo 1/3 Initializing open-webui...
+if ! services/start-open-webui main --version; then
+    cleanup_pyapp
+fi
 echo ========================================
-echo 2/2 Initializing and starting Learn2RAG...
+echo 2/3 Preparing configurator...
+if ! FLASK_DEBUG=1 LEARN2RAG_PATH=. ./configurator --prepare-only; then
+    cleanup_pyapp
+fi
+echo ========================================
+echo 3/3 Initializing and starting Learn2RAG...
 FLASK_DEBUG=1 \
 LEARN2RAG_PATH=. \
 ./configurator
