@@ -24,6 +24,7 @@ class LauncherArgumentParser(argparse.ArgumentParser):
         self.add_argument('module', type=str, nargs='?', default='learn2rag.ui')
         self.add_argument('--logging-config', type=pathlib.Path)
         self.add_argument('--schedule-interval', type=TypeAdapter(timedelta).validate_python)
+        self.add_argument('--prepare-only', action='store_true')
 
 
 def excepthook(*exc_info: Unpack[tuple[type[BaseException], BaseException, TracebackType | None]]) -> None:
@@ -50,7 +51,6 @@ def configure_logging(config_path: pathlib.Path, debug: bool) -> None:
 
 if __name__ == '__main__':
     sys.excepthook = excepthook
-
     config: dict[str, Any] = {}
     try:
         with open('config.yml', 'r') as f:
@@ -61,9 +61,18 @@ if __name__ == '__main__':
             print('https://docs.learn2rag.de/en/basic/administrator/#advanced-configuration')
 
     args, rest = LauncherArgumentParser().parse_known_args()
+    logging.info(f"DEBUG - PARSED ARGS: {args}")
+    logging.info(f"DEBUG - UNPARSED REST: {rest}")
     configure_logging(args.logging_config, config.get('logging', {}).get('debug', False))
     logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
+
+    if args.prepare_only:
+        logging.info('Preparation mode enabled. Environment extracted and initialized.')
+        sys.exit(0)
+
+
     module = importlib.import_module(args.module)
+
     # TODO
     module_args: tuple[Any, ...] = ()
     module_kwargs = {}
@@ -81,6 +90,7 @@ if __name__ == '__main__':
         module_args = (
             config,
         )
+
 
     if args.schedule_interval:
         scheduler = BlockingScheduler()
