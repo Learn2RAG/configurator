@@ -1,6 +1,6 @@
 {% macro pipeline_start(name, project, cls) %}
 <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
-  <button class="{{ cls }}" type="submit" name="action" value="start:{{ project.name }}">{{project.label}}</button>
+  <button class="{{ cls }}" type="submit" name="action" value="start:{{ project.name }}" title="{{project.description}}">{{project.label}}</button>
 </form>
 {% endmacro %}
 
@@ -109,7 +109,7 @@
                   <li>
                     <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove all data stored for this pipeline: %(label)s?', label=pipeline.label)}}">
                       <input type="hidden" name="action" value="clean"/>
-                      <button type="submit" class="dropdown-item text-bg-danger">
+                      <button type="submit" class="dropdown-item text-bg-danger" title="Delete the stored data">
                         {{pgettext('button', 'Remove the stored data')}}
                       </button>
                     </form>
@@ -117,7 +117,7 @@
                   <li>
                     <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this pipeline configuration and all its stored data: %(label)s?', label=pipeline.label)}}">
                       <input type="hidden" name="action" value="delete"/>
-                      <button type="submit" class="dropdown-item text-bg-danger">
+                      <button type="submit" class="dropdown-item text-bg-danger" title="Delete the stored data and the pipeline">
                         {{pgettext('button', 'Remove the stored data and the pipeline')}}
                       </button>
                     </form>

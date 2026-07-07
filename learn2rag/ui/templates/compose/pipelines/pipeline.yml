@@ -1,5 +1,6 @@
 name: pipeline
 label: Start only the chat
+description: "Start the chat only with no import "
 ports:
   # TODO: labels in the interface currently assume a specific port order
   - ui

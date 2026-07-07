@@ -1,5 +1,6 @@
 name: import
 label: Start one-time import
+description: "Start the pipeline with one time data import"
 ports:
   # TODO: UI port is not used; labels in the interface currently assume a specific port order
   - ui
