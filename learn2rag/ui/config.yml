@@ -2,15 +2,24 @@
 # The user-provided configuration file extends this one.
 # (config.yml next to the project root or executable)
 SUGGESTED_MODELS:
-  gemma3_27b:
-    label: Google Gemma 3 (27B)
+  gpt_oss_20b:
+    label: OpenAI GPT-OSS (20B)
     description: |
-      Download size: 17GB
-    link: https://ollama.com/library/gemma3
+      Download size: 14GB
+    link: https://ollama.com/library/gpt-oss:20b
     ollama: pull
     config:
       api: ChatOllama
-      model: gemma3:27b
+      model: gpt-oss:20b
+  gemma4_26b:
+    label: Google Gemma 4 (26B)
+    description: |
+      Download size: ~15GB
+    link: https://ollama.com/library/gemma4
+    ollama: pull
+    config:
+      api: ChatOllama
+      model: gemma4:26b
   llama3.3_70b:
     label: Meta Llama 3.3
     description: |
