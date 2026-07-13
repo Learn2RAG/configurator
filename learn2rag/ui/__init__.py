@@ -507,8 +507,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
             return redirect(url_for('pipelines_list'))
         try:
+            storage_path = Path(pipeline['storage_path'])
+            storage_path.mkdir(parents=True, exist_ok=True)
             training_file = request.files['trainingFile']
-            training_file.save(Path(pipeline['storage_path']) / 'training.csv')
+            training_file.save(storage_path / 'training.csv')
         except Exception as e:
             app.logger.exception(e)
             flash(pgettext('flash', 'Could not save the file'), 'error')
