@@ -92,17 +92,29 @@ def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -
     )
     qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
 
-def payload(sample: dict[str, Any]) -> dict[str, str]:
-    return {
+def payload(sample: dict[str, Any]) -> dict[str, Any]:
+    meta = sample["metadata"]
+    result: dict[str, Any] = {
         "content": sample["page_content"],
-        "source": sample["metadata"]["source"],
-        "content_hash": sample["metadata"]["content_hash"],
+        "source": meta["source"],
+        "content_hash": meta["content_hash"],
         "chunk_hash": sample["chunk_hash"],
-        "title": sample["metadata"].get("title",""),
-        "uri": sample["metadata"].get("uri",""),
-        "loader_id": sample["metadata"]["loader_id"],
-        "document_id": sample["metadata"].get("document_id", "")
+        "title": meta.get("title") or meta.get("summary", ""),
+        "uri": meta.get("uri", ""),
+        "loader_id": meta["loader_id"],
+        "document_id": meta.get("document_id", ""),
     }
+
+    if meta.get("loader") == "JiraLoader":
+        result["assignee"] = meta.get("assignee", "")
+        result["reporter"] = meta.get("reporter", "")
+        result["status"] = meta.get("status", "")
+        result["labels"] = meta.get("labels", [])
+        result["components"] = meta.get("components", [])
+        result["sprint"] = meta.get("sprints", [])
+        result["story_points"] = meta.get("story_points")
+
+    return result
 
 
 def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
