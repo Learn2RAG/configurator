@@ -161,10 +161,9 @@ def main(args: argparse.Namespace) -> None:
             statusLogger.error('Import failed')
             sys.exit(1)
 
-    except Exception as e:
-        logger.error(f"Error loading configuration: {e}")
+    except Exception:
         statusLogger.error('Import failed')
-        sys.exit(1)
+        raise
 
 
 if __name__ == "__main__":

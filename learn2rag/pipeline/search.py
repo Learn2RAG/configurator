@@ -16,7 +16,6 @@ from .embeddings import create_embeddings
 from .qdrant import Qdrant
 from . import rewrite
 
-
 profilingLogger = logging.getLogger('profiling')
 
 
@@ -27,8 +26,7 @@ def _get_flag_reranker(model_name: str, use_fp16: bool) -> FlagReranker:
 
 @lru_cache(maxsize=4)
 def _get_cross_encoder(model_name: str) -> CrossEncoder:
-    return CrossEncoder(model_name)  # type: ignore[no-any-return]
-
+    return cast(CrossEncoder, CrossEncoder(model_name))
 
 def _sort_and_deduplicate(points: list[ScoredPoint]) -> list[ScoredPoint]:
     best_by_id: dict[str, ScoredPoint] = {}
@@ -171,7 +169,7 @@ def _collect_query_points(
         opt_config.get("top_k"),
         extra={'activity': '_collect_query_points', 'request_id': request_id},
     )
-    base_results = search(query, user_config, opt_config, request_id=request_id)
+    base_results = search(query, user_config, opt_config)
     points_all.extend(base_results.points)
 
     if opt_config.get("rewrite") == "True":
@@ -198,6 +196,7 @@ def _collect_query_points(
                 extra={'activity': '_collect_query_points', 'request_id': request_id},
             )
 
+
             for idx, sq in enumerate(subqueries, start=1):
                 profilingLogger.info(
                     "subquery_search_start query=%r subquery_index=%d/%d subquery=%r top_k=%s",
@@ -208,7 +207,7 @@ def _collect_query_points(
                     opt_config_subqueries["top_k"],
                     extra={'activity': '_collect_query_points', 'request_id': request_id},
                 )
-                sq_results = search(sq, user_config, opt_config_subqueries, request_id=request_id)
+                sq_results = search(sq, user_config, opt_config_subqueries,request_id=request_id)
                 profilingLogger.info(
                     "subquery_search_done query=%r subquery_index=%d/%d subquery=%r points=%d",
                     query,
@@ -218,6 +217,7 @@ def _collect_query_points(
                     len(sq_results.points),
                     extra={'activity': '_collect_query_points', 'request_id': request_id},
                 )
+
                 points_all.extend(sq_results.points)
 
         if rewrite_mode in ["keywords", "subqueries_keywords"]:
@@ -235,6 +235,7 @@ def _collect_query_points(
                 opt_config_keywords["search_mode"],
                 extra={'activity': '_collect_query_points', 'request_id': request_id},
             )
+
 
             for idx, kw in enumerate(keywords, start=1):
                 profilingLogger.info(
@@ -256,6 +257,7 @@ def _collect_query_points(
                     len(kw_results.points),
                     extra={'activity': '_collect_query_points', 'request_id': request_id},
                 )
+
                 points_all.extend(kw_results.points)
 
     points = _sort_and_deduplicate(points_all)
@@ -297,7 +299,7 @@ def _collect_query_points(
 
 
 # similarity search
-def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], *, request_id: str | None=None) -> QueryResponse:
+def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], *, request_id: str | None = None) -> QueryResponse:
     profilingLogger.info('start', extra={'activity': 'search', 'request_id': request_id})
     profilingLogger.info(
         "search_called query=%r search_mode=%s collection_name=%s",
@@ -429,8 +431,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
         )
     return results
 
-
-def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_config: dict[str, Any], request_id: str | None=None) -> QueryResponse:
+def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
     collection_name = user_config["collection_name"]
 
     # Init vector store
@@ -462,12 +463,13 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
         limit=opt_config["top_k"],
         timeout=120
     )
-    profilingLogger.info('end', extra={'activity': 'search', 'request_id': request_id})
     return results
+
 
 
 async def search_authorized(question: str, user: str, *, request_id: str | None = None, user_config: dict[str, Any] = user_config, opt_config: dict[str, Any] = opt_config) -> List[ScoredPoint]:
     points = _collect_query_points(question, user_config, opt_config, request_id=request_id)
+
     query_response = QueryResponse(points=points)
     authorized_points = await filter_authorized(user, query_response)
     # keep deterministic order after auth filter

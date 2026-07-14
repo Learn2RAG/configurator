@@ -28,10 +28,8 @@ cp dist/learn2rag-$VERSION.tar.gz pyapp
 (cd pyapp; PYAPP_PYTHON_VERSION=3.13 PYAPP_PROJECT_NAME=learn2rag PYAPP_PROJECT_PATH=learn2rag-$VERSION.tar.gz cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/configurator
 
-cp services/start-import.linux $BUNDLE/services/start-import
-
-cp services/open-webui/dist/open_webui-0.6.15.tar.gz pyapp
-(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui PYAPP_PROJECT_PATH=open_webui-0.6.15.tar.gz PYAPP_EXEC_SPEC=open_webui:app cross build --release --target $CARGO_BUILD_TARGET)
+cp services/open-webui/dist/open_webui-0.8.12.tar.gz pyapp
+(cd pyapp; PYAPP_PYTHON_VERSION=3.11 PYAPP_PROJECT_NAME=open-webui PYAPP_PROJECT_PATH=open_webui-0.8.12.tar.gz PYAPP_EXEC_SPEC=open_webui:app cross build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp $BUNDLE/services/start-open-webui
 
 while read -u 100 file; do
@@ -43,9 +41,9 @@ wget --continue -O $BUNDLE_DIR/ollama-linux.tgz https://github.com/ollama/ollama
 mkdir -p $BUNDLE/services/ollama
 tar -C $BUNDLE/services/ollama -xzvf $BUNDLE_DIR/ollama-linux.tgz
 
-wget --continue -O $BUNDLE_DIR/qdrant-linux.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.15.4/qdrant-x86_64-unknown-linux-musl.tar.gz
+wget --continue -O $BUNDLE_DIR/qdrant-linux-v1.17.1.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-x86_64-unknown-linux-musl.tar.gz
 mkdir -p $BUNDLE/services/qdrant
-tar -C $BUNDLE/services/qdrant -xzvf $BUNDLE_DIR/qdrant-linux.tar.gz
+tar -C $BUNDLE/services/qdrant -xzvf $BUNDLE_DIR/qdrant-linux-v1.17.1.tar.gz
 
 cp start.linux $BUNDLE/start
 cp uninstall.linux $BUNDLE/uninstall

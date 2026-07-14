@@ -10,7 +10,6 @@ This document describes all keys present in:
 | Key | Type | Allowed / expected values | Implemented behavior                                                                                            |
 |---|---|---|-----------------------------------------------------------------------------------------------------------------|
 | `collection_name` | `string` | Qdrant collection name | Used to create/select the Qdrant collection for ingestion/retrieval. Required.                                  |
-| `imported_documents_file_path` | `string` | Path to JSON file compatible with `JSONLoader` | Used by `ingestion.index()` to load input documents via `json_loader.json_loader(...)`. Required for ingestion. |
 
 ### Notes
 

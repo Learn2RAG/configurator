@@ -20,7 +20,7 @@ from typing import Dict, Any, List, Union, Tuple, cast
 
 import numpy as np
 # from bert_score import score as bert_score  # type: ignore[import-not-found]
-from ConfigSpace import (# type: ignore[import-not-found]
+from ConfigSpace import (
     ConfigurationSpace,
     Integer,
     Categorical,
@@ -29,7 +29,7 @@ from ConfigSpace import (# type: ignore[import-not-found]
     ForbiddenAndConjunction,
     ForbiddenEqualsClause,
 )
-from smac import HyperparameterOptimizationFacade, Scenario# type: ignore[import-not-found]
+from smac import HyperparameterOptimizationFacade, Scenario
 
 from learn2rag.evaluation.tools import read_dataset_qa
 from learn2rag.pipeline.config import opt_config
@@ -121,13 +121,13 @@ def _restore_state_from_existing(out: pathlib.Path, answers_dir: pathlib.Path) -
         return state
 
     best_cost = 1.0
-    history: list[dict[str, Any]] = []
-    convergence: list[dict[str, Any]] = []
+    new_history: list[dict[str, Any]] = []
+    new_convergence: list[dict[str, Any]] = []
     for trial in sorted(trials, key=lambda t: int(t.get("trial_id", 0))):
         tid = int(trial.get("trial_id", 0))
         cost = float(trial.get("cost", 1.0))
         best_cost = min(best_cost, cost)
-        history.append({
+        new_history.append({
             "trial_id": tid,
             "config": trial.get("config", {}),
             "recall": float(trial.get("recall", 0.0)),
@@ -137,10 +137,10 @@ def _restore_state_from_existing(out: pathlib.Path, answers_dir: pathlib.Path) -
             "search_s": None,
             "scoring_s": None,
         })
-        convergence.append({"trial": tid, "cost": cost, "best_cost": best_cost})
+        new_convergence.append({"trial": tid, "cost": cost, "best_cost": best_cost})
 
-    state["history"] = history
-    state["convergence"] = convergence
+    state["history"] = new_history
+    state["convergence"] = new_convergence
     state["trial_count"] = max(int(t.get("trial_id", 0)) for t in trials)
     state["best_cost"] = best_cost
     return state
@@ -499,8 +499,13 @@ def run(
     out.mkdir(parents=True, exist_ok=True)
     answers_dir = out / "trial_answers"
     answers_dir.mkdir(parents=True, exist_ok=True)
-
-    qa = read_dataset_qa(dataset_name, dcfg["subdirectory"], dcfg["split"])
+    base_path = pathlib.Path(dcfg["path"])
+    if base_path.suffix.lower() == '.csv':
+        target_path = base_path
+    else:
+        target_path = base_path / 'source' / dcfg.get("subdirectory", "")
+    logging.info(f"target path is {target_path}")
+    qa = read_dataset_qa(target_path, split=dcfg["split"])
     if max_questions:
         qa = qa.select(range(min(max_questions, len(qa))))
 
@@ -592,9 +597,15 @@ def run(
             output_directory=out / "smac_output",
         )
 
+        initial_design = HyperparameterOptimizationFacade.get_initial_design(
+            scenario=scenario,
+            additional_configs=[cs.get_default_configuration()],
+        )
+
         smac = HyperparameterOptimizationFacade(
             scenario=scenario,
-            target_function=lambda config, seed=0: objective(config, questions, state, answers_dir)
+            target_function=lambda config, seed=0: objective(config, questions, state, answers_dir),
+            initial_design=initial_design
         )
 
         t0 = time.time()

@@ -10,6 +10,7 @@ import subprocess
 import urllib.request
 from typing import Any, Optional
 
+import jinja2
 import psutil
 import yaml
 
@@ -109,9 +110,18 @@ class Project():
     content: dict[str, Any]
 
     @staticmethod
-    def create(project_file: str | Path, name: str) -> 'Project | None':
-        with open(project_file) as f:
-            content = yaml.safe_load(f)
+    def create(
+            compose_file: str | Path,
+            name: str,
+            *,
+            template: bool = False,
+            template_context: dict[str, Any] = {},
+    ) -> 'Project | None':
+        if template:
+            content = yaml.safe_load(jinja2.Template(Path(compose_file).read_text()).render(template_context))
+        else:
+            with open(compose_file) as f:
+                content = yaml.safe_load(f)
         assert len(content['services']) > 0
         cur = con.cursor()
         cur.execute('BEGIN EXCLUSIVE')
@@ -196,8 +206,15 @@ class Project():
         try:
             for file in self.content.get('files', []):
                 file_path = Path(file['path']).expanduser().absolute()
-                file_path.parent.mkdir(parents=True, exist_ok=True)
-                file_path.write_text(file['content'])
+                if not file_path.exists() or file.get('force', True):
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    if 'content' in file:
+                        content = file['content']
+                    elif 'src' in file:
+                        content = Path(file['src']).read_text()
+                    else:
+                        raise NotImplementedError(file)
+                    file_path.write_text(content)
         except Exception as e:
             con.rollback()
             raise e

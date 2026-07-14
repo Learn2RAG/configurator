@@ -79,34 +79,27 @@ def ingest_dataset_documents(dataset_name: str) -> None:
     # FIXME
     # learn2rag.pipeline.ingestion.index(user_config, opt_config)
 
+def read_dataset_qa(file_path: pathlib.Path | str, split: str | None = None) -> Any:
+    target_path = pathlib.Path(file_path)
+    logging.debug(f'Loading dataset from: {target_path}')
 
-def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None = None) -> Any:
-    logging.debug(f'{dataset_name=}')
+    if not target_path.exists():
+        raise FileNotFoundError(f"Dataset path does not exist: {target_path}")
 
-    if subdirectory.endswith('.csv'):
-        df = pd.read_csv(subdirectory, sep=';')
-        # wrap in object that behaves like HuggingFace dataset
-        class CSVDataset:
-            data: pd.DataFrame
-
-            def __init__(self, df: pd.DataFrame) -> None:
-                self.data = df
-
-            def __len__(self) -> int:
-                return len(self.data)
-
-            def __getitem__(self, idx: int) -> dict[str, Any]:
-                return cast(dict[str, Any], self.data.iloc[idx].to_dict())
-
-            def select(self, indices: Any) -> "CSVDataset":
-                return CSVDataset(self.data.iloc[list(indices)])
-
-        return CSVDataset(df)
-
+    if target_path.suffix.lower() == '.csv':
+        logging.debug(f'load csv file ')
+        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path))
     else:
-        dataset_work_dir = pathlib.Path('./datasets') / dataset_name
-        dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
-        return dataset_dict[split] if split is not None else dataset_dict
+        logging.debug(f'load HF dataset ')
+        dataset_dict = datasets.load_from_disk(str(target_path))
+
+    return dataset_dict[split] if split is not None else dataset_dict
+
+# def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
+#     logging.debug(f'{dataset_name=}')
+#     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
+#     dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
+#     return dataset_dict[split] if split is not None else dataset_dict
 
 
 def basic_pipeline(dataset_name: str, question: str) -> dict[str, Any]:

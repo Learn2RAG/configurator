@@ -1,3 +1,0 @@
-#!/bin/sh
-set -eux
-"$LEARN2RAG_PATH"/configurator learn2rag.importer --config "$IMPORTER_CONFIG" --logging-config "$STORAGE_PATH"/logging_config.yml

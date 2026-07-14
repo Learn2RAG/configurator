@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-03-30 12:48+0200\n"
-"PO-Revision-Date: 2026-03-30 12:48+0200\n"
+"POT-Creation-Date: 2026-05-26 15:48+0200\n"
+"PO-Revision-Date: 2026-05-26 15:48+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: de\n"
 "Language-Team: de <LL@li.org>\n"
@@ -18,35 +18,47 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: learn2rag/ui/__init__.py:276
+#: learn2rag/ui/__init__.py:225
+#, python-format
+msgctxt "flash"
+msgid "Directory removed: %(path)s"
+msgstr "Verzeichnis entfernt: %(path)s"
+
+#: learn2rag/ui/__init__.py:232
+#, python-format
+msgctxt "flash"
+msgid "Failed to remove directory: %(path)s: %(message)s"
+msgstr "Kann den Dateipfad nicht entfernen: %(path)s: %(message)s"
+
+#: learn2rag/ui/__init__.py:291
 #, python-format
 msgid "API is not supported: %(api)s"
 msgstr "API wird nicht unterstützt: %(api)s"
 
-#: learn2rag/ui/__init__.py:286
+#: learn2rag/ui/__init__.py:301
 #, python-format
 msgctxt "flash"
 msgid "Added a new language model configuration: %(label)s"
 msgstr "Neue Modellkonfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:305
+#: learn2rag/ui/__init__.py:320
 #, python-format
 msgctxt "flash"
 msgid "Downloaded a language model: %(model)s"
 msgstr "Sprachmodell %(model)s heruntergeladen"
 
-#: learn2rag/ui/__init__.py:310
+#: learn2rag/ui/__init__.py:325
 #, python-format
 msgctxt "flash"
 msgid "Failed to download a language model: %(model)s"
 msgstr "Das Herunterladen des Sprachmodells %(model)s ist fehlgeschlagenn"
 
-#: learn2rag/ui/__init__.py:324
+#: learn2rag/ui/__init__.py:339
 msgctxt "flash"
 msgid "The requested language model configuration is not found"
 msgstr "Die gewünschte Pipeline konnte nicht gefunden werden"
 
-#: learn2rag/ui/__init__.py:328
+#: learn2rag/ui/__init__.py:343
 msgctxt "flash"
 msgid ""
 "Some configured pipelines use this language model configuration, remove "
@@ -55,24 +67,24 @@ msgstr ""
 "Einige konfigurierte Pipelines verwenden diese Sprachmodellkonfiguration,"
 " entfernen sie zuerst"
 
-#: learn2rag/ui/__init__.py:332
+#: learn2rag/ui/__init__.py:347
 #, python-format
 msgctxt "flash"
 msgid "Removed language model configuration: %(label)s"
 msgstr "Entfernen der Konfiguration: %(label)s"
 
-#: learn2rag/ui/__init__.py:346
+#: learn2rag/ui/__init__.py:367
 #, python-format
 msgctxt "flash"
 msgid "Added a new data source configuration: %(label)s"
 msgstr "Neue Datenquellenkonfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:353
+#: learn2rag/ui/__init__.py:374
 msgctxt "flash"
 msgid "The requested data source configuration is not found"
 msgstr "Die gewünschte Datenquellenkonfiguration konnte nicht gefunden werden"
 
-#: learn2rag/ui/__init__.py:357
+#: learn2rag/ui/__init__.py:378
 msgctxt "flash"
 msgid ""
 "Some configured pipelines use this data source configuration, remove them"
@@ -81,156 +93,62 @@ msgstr ""
 "Einige konfigurierte Pipelines nutzen diese Datenquellenkonfiguration, "
 "entfernen sie zuerst"
 
-#: learn2rag/ui/__init__.py:360
+#: learn2rag/ui/__init__.py:381
 #, python-format
 msgctxt "flash"
 msgid "Removed data source configuration: %(label)s"
 msgstr "Entfernen der Konfiguration: %(label)s"
 
-#: learn2rag/ui/__init__.py:382
+#: learn2rag/ui/__init__.py:408
 #, python-format
 msgctxt "flash"
 msgid "Added a new pipeline configuration: %(label)s"
 msgstr "Neue Pipeline-Konfiguration hinzugefügt: %(label)s"
 
-#: learn2rag/ui/__init__.py:435
+#: learn2rag/ui/__init__.py:481
 #, python-format
 msgctxt "flash"
 msgid "Started the pipeline: %(label)s"
 msgstr "Pipeline gestartet: %(label)s"
 
-#: learn2rag/ui/__init__.py:437
+#: learn2rag/ui/__init__.py:483
 #, python-format
 msgctxt "flash"
 msgid "Failed to start the pipeline: %(label)s"
 msgstr "Pipeline konnte nicht gestartet werden: %(label)s"
 
-#: learn2rag/ui/__init__.py:441
+#: learn2rag/ui/__init__.py:487
 #, python-format
 msgctxt "flash"
 msgid "Could not start the pipeline: %(message)s"
 msgstr "Pipeline konnte nicht gestartet werden: %(message)s"
 
-#: learn2rag/ui/__init__.py:449 learn2rag/ui/__init__.py:480
+#: learn2rag/ui/__init__.py:495 learn2rag/ui/__init__.py:519
 msgctxt "flash"
 msgid "The requested pipeline is not found"
 msgstr "Die gewünschte Pipeline konnte nicht gefunden werden"
 
-#: learn2rag/ui/__init__.py:459
-#, python-format
-msgctxt "flash"
-msgid "Failed to remove directory: %(path)s"
-msgstr "Kann den Dateipfad nicht entfernen: %(path)s"
-
-#: learn2rag/ui/__init__.py:463
+#: learn2rag/ui/__init__.py:502
 #, python-format
 msgctxt "flash"
 msgid "Removed pipeline: %(label)s"
 msgstr "Die Pipeline entfernt: %(label)s"
 
-#: learn2rag/ui/__init__.py:469
+#: learn2rag/ui/__init__.py:508
 msgctxt "flash"
 msgid "Stopped the pipeline"
 msgstr "Pipeline gestoppt"
 
-#: learn2rag/ui/__init__.py:473
+#: learn2rag/ui/__init__.py:512
 #, python-format
 msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
 msgstr "Pipeline konnte nicht gestoppt werden: %(message)s"
 
-#: learn2rag/ui/__init__.py:512
+#: learn2rag/ui/__init__.py:551
 msgctxt "shutdown"
 msgid "Bye!"
-msgstr ""
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:4
-#: learn2rag/ui/templates/models_list.html:165
-#: learn2rag/ui/templates/sources_list.html:77
-msgctxt "column_heading"
-msgid "Label"
-msgstr "Name"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:5
-msgctxt "column_heading"
-msgid "Storage directory path"
-msgstr "Speicherpfad"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:6
-#: learn2rag/ui/templates/models_list.html:169
-msgctxt "column_heading"
-msgid "Language model"
-msgstr "Sprachmodell"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:7
-msgctxt "column_heading"
-msgid "Data sources"
-msgstr "Datenquellen"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:8
-msgctxt "column_heading"
-msgid "Ports"
-msgstr "Ports"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:9
-msgctxt "column_heading"
-msgid "Status"
-msgstr "Status"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:35
-msgctxt "tooltip"
-msgid "succeeded"
-msgstr "erfolgreich"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:36
-msgctxt "tooltip"
-msgid "failed"
-msgstr "fehlgeschlagen"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:39
-msgid "running"
-msgstr "läuft"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:63
-msgctxt "button"
-msgid "Open"
-msgstr "Öffnen"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:75
-msgctxt "button"
-msgid "Stop"
-msgstr "Stopp"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:81
-msgctxt "button"
-msgid "More"
-msgstr "Mehr"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:87
-msgctxt "button"
-msgid "Show debug log"
-msgstr "Debugprotokoll anzeigen"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:93
-msgctxt "button"
-msgid "Show error log"
-msgstr "Fehlerprotokoll anzeigen"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:98
-#, python-format
-msgid ""
-"Are you sure you want to remove this pipeline configuration and all "
-"stored data: %(label)s?"
-msgstr ""
-"Möchten Sie diese Konfiguration und alle gespeicherten Daten entfernen: "
-"%(label)s?"
-
-#: learn2rag/ui/templates/_pipelines_list_table.html:101
-#: learn2rag/ui/templates/models_list.html:191
-#: learn2rag/ui/templates/sources_list.html:90
-msgctxt "button"
-msgid "Remove"
-msgstr "Löschen"
+msgstr "Auf Wiedersehen!"
 
 #: learn2rag/ui/templates/base.html:34
 msgctxt "nav"
@@ -272,7 +190,14 @@ msgstr "Learn2RAG Webseite"
 msgid ""
 "Debug logging is enabled in config file <code>%(file)s</code>. It might "
 "capture sensitive information."
-msgstr "Debug-Protokollierung ist in der Konfigurationsdatei <code>%(file)s</code> aktiviert. Es könnte sensible Informationen erfassen."
+msgstr ""
+"Debug-Protokollierung ist in der Konfigurationsdatei "
+"<code>%(file)s</code> aktiviert. Es könnte sensible Informationen "
+"erfassen."
+
+#: learn2rag/ui/templates/base.html:101
+msgid "Failed to connect to your Learn2RAG server"
+msgstr "Die Verbindung zu Ihrem Learn2RAG-Server ist nicht möglich"
 
 #: learn2rag/ui/templates/firststeps_models.html:16
 #, python-format
@@ -297,133 +222,147 @@ msgstr "Das Herunterladen gelang nicht"
 msgid "Download is done"
 msgstr "Das Herunterladen ist fertig"
 
-#: learn2rag/ui/templates/models_list.html:4
-msgctxt "title"
-msgid "Language models"
-msgstr "Sprachmodelle"
-
-#: learn2rag/ui/templates/models_list.html:10
-msgctxt "button"
-msgid "Add a new language model"
-msgstr "Neues Sprachmodell hinzufügen"
-
-#: learn2rag/ui/templates/models_list.html:20
+#: learn2rag/ui/templates/models_add.html:5
 msgctxt "heading"
 msgid "Connect an external language model"
 msgstr "Ein externes Sprachmodell anbinden"
 
-#: learn2rag/ui/templates/models_list.html:27
-#: learn2rag/ui/templates/models_list.html:138
-#: learn2rag/ui/templates/pipelines_list.html:18
-#: learn2rag/ui/templates/sources_list.html:28
-#: learn2rag/ui/templates/sources_list.html:57
+#: learn2rag/ui/templates/models_add.html:12
+#: learn2rag/ui/templates/models_add.html:126
+#: learn2rag/ui/templates/pipelines_add.html:3
+#: learn2rag/ui/templates/sources_add_drupal.html:4
+#: learn2rag/ui/templates/sources_add_local.html:4
+#: learn2rag/ui/templates/sources_add_sharepoint.html:5
+#: learn2rag/ui/templates/sources_add_web.html:4
 msgctxt "form_label"
 msgid "Label"
 msgstr "Name"
 
-#: learn2rag/ui/templates/models_list.html:28
-#: learn2rag/ui/templates/models_list.html:139
+#: learn2rag/ui/templates/models_add.html:13
+#: learn2rag/ui/templates/models_add.html:127
 msgctxt "tooltip"
 msgid "A custom display name for this language model"
 msgstr "Ein individueller Anzeigename"
 
-#: learn2rag/ui/templates/models_list.html:31
+#: learn2rag/ui/templates/models_add.html:16
 msgctxt "form_label"
 msgid "API type"
 msgstr "API Typ"
 
-#: learn2rag/ui/templates/models_list.html:44
+#: learn2rag/ui/templates/models_add.html:29
 msgctxt "form_label"
 msgid "API URL"
 msgstr "API URL"
 
-#: learn2rag/ui/templates/models_list.html:45
+#: learn2rag/ui/templates/models_add.html:31
+msgid "If you use a model from an external provider, they will see your data."
+msgstr ""
+"Wenn Sie ein Modell eines externen Anbieters verwenden, hat dieser "
+"Zugriff auf Ihre Daten."
+
+#: learn2rag/ui/templates/models_add.html:33
 msgctxt "tooltip"
 msgid "For example: https://example.com/api"
 msgstr "Zum Beispiel: https://example.com/api"
 
-#: learn2rag/ui/templates/models_list.html:48
+#: learn2rag/ui/templates/models_add.html:36
+#: learn2rag/ui/templates/sources_add_drupal.html:35
 msgctxt "form_label"
 msgid "Access token"
 msgstr "Zugans-Token"
 
-#: learn2rag/ui/templates/models_list.html:52
-#: learn2rag/ui/templates/models_list.html:109
-#: learn2rag/ui/templates/models_list.html:142
-#: learn2rag/ui/templates/pipelines_list.html:26
+#: learn2rag/ui/templates/models_add.html:40
+#: learn2rag/ui/templates/models_add.html:97
+#: learn2rag/ui/templates/models_add.html:130
+#: learn2rag/ui/templates/pipelines_add.html:11
 msgctxt "form_label"
 msgid "Language model"
 msgstr "Sprachmodell"
 
-#: learn2rag/ui/templates/models_list.html:53
-#: learn2rag/ui/templates/models_list.html:110
+#: learn2rag/ui/templates/models_add.html:41
+#: learn2rag/ui/templates/models_add.html:98
 #, python-format
 msgctxt "tooltip"
 msgid "For example: %(model)s"
 msgstr "Zum Beispiel: %(model)s"
 
-#: learn2rag/ui/templates/models_list.html:55
-#: learn2rag/ui/templates/models_list.html:151
-#: learn2rag/ui/templates/pipelines_list.html:79
-#: learn2rag/ui/templates/sources_list.html:41
-#: learn2rag/ui/templates/sources_list.html:64
+#: learn2rag/ui/templates/models_add.html:43
+#: learn2rag/ui/templates/models_add.html:139
+#: learn2rag/ui/templates/pipelines_add.html:80
+#: learn2rag/ui/templates/sources_add_drupal.html:38
+#: learn2rag/ui/templates/sources_add_local.html:18
+#: learn2rag/ui/templates/sources_add_sharepoint.html:66
+#: learn2rag/ui/templates/sources_add_web.html:13
 msgctxt "button"
 msgid "Save"
 msgstr "Speichern"
 
-#: learn2rag/ui/templates/models_list.html:64
+#: learn2rag/ui/templates/models_add.html:52
 msgctxt "heading"
 msgid "Download a language model"
 msgstr "Neues Sprachmodell herunterladen"
 
-#: learn2rag/ui/templates/models_list.html:82
+#: learn2rag/ui/templates/models_add.html:70
 msgctxt "link"
 msgid "Website"
 msgstr "Webseite"
 
-#: learn2rag/ui/templates/models_list.html:95
+#: learn2rag/ui/templates/models_add.html:83
 msgctxt "button"
 msgid "Use this suggested language model"
 msgstr "Empfohlenes Sprachmodell verwenden"
 
-#: learn2rag/ui/templates/models_list.html:102
+#: learn2rag/ui/templates/models_add.html:90
 msgid "Another model"
 msgstr "Ein weiteres Sprachmodell"
 
-#: learn2rag/ui/templates/models_list.html:103
+#: learn2rag/ui/templates/models_add.html:91
 msgid "Download any model from Ollama library."
 msgstr "Laden Sie jedes Modell aus der Ollama herunter."
 
-#: learn2rag/ui/templates/models_list.html:118
+#: learn2rag/ui/templates/models_add.html:106
 msgid "Ollama is not running. Please restart the Learn2RAG configurator."
 msgstr "Ollama ist nicht verfügbar. Es wird empfohlen Learn2RAG neuzustarten."
 
-#: learn2rag/ui/templates/models_list.html:131
+#: learn2rag/ui/templates/models_add.html:119
 msgctxt "heading"
 msgid "Use previously downloaded model"
 msgstr "Heruntergeladenes Modell verwenden"
 
-#: learn2rag/ui/templates/models_list.html:166
+#: learn2rag/ui/templates/models_list.html:4
+#: learn2rag/ui/templates/pipelines_list.html:10
+#: learn2rag/ui/templates/sources_list.html:4
+msgctxt "column_heading"
+msgid "Label"
+msgstr "Name"
+
+#: learn2rag/ui/templates/models_list.html:5
 msgctxt "column_heading"
 msgid "API type"
 msgstr "API Typ"
 
-#: learn2rag/ui/templates/models_list.html:167
+#: learn2rag/ui/templates/models_list.html:6
 msgctxt "column_heading"
 msgid "API URL"
 msgstr "API URL"
 
-#: learn2rag/ui/templates/models_list.html:168
+#: learn2rag/ui/templates/models_list.html:7
 msgctxt "column_heading"
 msgid "Access token"
 msgstr "Zugangs-Token"
 
-#: learn2rag/ui/templates/models_list.html:182
+#: learn2rag/ui/templates/models_list.html:8
+#: learn2rag/ui/templates/pipelines_list.html:12
+msgctxt "column_heading"
+msgid "Language model"
+msgstr "Sprachmodell"
+
+#: learn2rag/ui/templates/models_list.html:21
 msgctxt "tooltip"
 msgid "Unknown value"
 msgstr "Unbekannt"
 
-#: learn2rag/ui/templates/models_list.html:189
+#: learn2rag/ui/templates/models_list.html:28
 #, python-format
 msgid ""
 "Are you sure you want to remove this language model configuration: "
@@ -432,134 +371,320 @@ msgstr ""
 "Sind Sie sicher, dass Sie diese Sprachmodellkonfiguration entfernen "
 "möchten: %(label)s"
 
-#: learn2rag/ui/templates/pipelines_list.html:4
-msgctxt "title"
-msgid "Pipelines"
-msgstr "Pipelines"
-
-#: learn2rag/ui/templates/pipelines_list.html:10
+#: learn2rag/ui/templates/models_list.html:30
+#: learn2rag/ui/templates/sources_list.html:19
 msgctxt "button"
-msgid "Add a new pipeline"
-msgstr "Neue Pipeline hinzufügen"
+msgid "Remove"
+msgstr "Löschen"
 
-#: learn2rag/ui/templates/pipelines_list.html:19
+#: learn2rag/ui/templates/models_page.html:4
+msgctxt "title"
+msgid "Language models"
+msgstr "Sprachmodelle"
+
+#: learn2rag/ui/templates/models_page.html:10
+msgctxt "button"
+msgid "Add a new language model"
+msgstr "Neues Sprachmodell hinzufügen"
+
+#: learn2rag/ui/templates/pipelines_add.html:4
 msgctxt "tooltip"
 msgid "A custom display name for this pipeline"
 msgstr "Ein individueller Anzeigename"
 
-#: learn2rag/ui/templates/pipelines_list.html:22
+#: learn2rag/ui/templates/pipelines_add.html:7
 msgctxt "form_label"
 msgid "Storage directory path"
 msgstr "Speicherpfad"
 
-#: learn2rag/ui/templates/pipelines_list.html:34
+#: learn2rag/ui/templates/pipelines_add.html:19
 msgctxt "form_label"
 msgid "Data sources"
 msgstr "Datenquellen"
 
-#: learn2rag/ui/templates/pipelines_list.html:44
+#: learn2rag/ui/templates/pipelines_add.html:21
+msgctxt "button"
+msgid "Select all"
+msgstr "Alles auswählen"
+
+#: learn2rag/ui/templates/pipelines_add.html:24
+msgctxt "button"
+msgid "Unselect all"
+msgstr "Alle Abwahl"
+
+#: learn2rag/ui/templates/pipelines_add.html:35
 msgid "Advanced configuration"
 msgstr "Erweiterte Optionen"
 
-#: learn2rag/ui/templates/pipelines_list.html:48
+#: learn2rag/ui/templates/pipelines_add.html:40
+msgctxt "form_label"
+msgid "Automatically import data with interval (hours)"
+msgstr "Daten automatisch in Intervallen (Stunden) importieren"
+
+#: learn2rag/ui/templates/pipelines_add.html:47
+msgctxt "form_label"
+msgid "Chat proxy URL"
+msgstr "URL des Chat-Proxys"
+
+#: learn2rag/ui/templates/pipelines_add.html:50
 msgctxt "form_label"
 msgid "Ports"
 msgstr "Ports"
 
-#: learn2rag/ui/templates/pipelines_list.html:49
+#: learn2rag/ui/templates/pipelines_add.html:51
 msgid "Optional"
 msgstr "Optional"
 
-#: learn2rag/ui/templates/pipelines_list.html:55
+#: learn2rag/ui/templates/pipelines_add.html:57
 msgctxt "form_label"
 msgid "User interface"
 msgstr ""
 
-#: learn2rag/ui/templates/pipelines_list.html:59
+#: learn2rag/ui/templates/pipelines_add.html:61
 msgctxt "form_label"
 msgid "Internal RAG service"
 msgstr ""
 
-#: learn2rag/ui/templates/pipelines_list.html:63
+#: learn2rag/ui/templates/pipelines_add.html:65
 msgctxt "form_label"
 msgid "Internal vector store"
 msgstr ""
 
-#: learn2rag/ui/templates/pipelines_list.html:67
+#: learn2rag/ui/templates/pipelines_add.html:69
 msgctxt "form_label"
 msgid "Additional internal port"
 msgstr ""
 
-#: learn2rag/ui/templates/pipelines_list.html:74
+#: learn2rag/ui/templates/pipelines_add.html:76
 msgctxt "form_label"
-msgid "Immediately do the data import"
-msgstr "Datenimport direkt starten"
+msgid "Immediately start the data import and the chat interface"
+msgstr "Der Datenimport und die Chat direkt starten"
 
-#: learn2rag/ui/templates/pipelines_list.html:77
-msgid "You can always do the data import later."
-msgstr "Sie können den Datenimport auch später starten."
+#: learn2rag/ui/templates/pipelines_list.html:11
+msgctxt "column_heading"
+msgid "Storage directory path"
+msgstr "Speicherpfad"
 
-#: learn2rag/ui/templates/sources_list.html:4
-msgctxt "title"
+#: learn2rag/ui/templates/pipelines_list.html:13
+msgctxt "column_heading"
 msgid "Data sources"
 msgstr "Datenquellen"
 
-#: learn2rag/ui/templates/sources_list.html:10
-msgctxt "button"
-msgid "Add a new data source"
-msgstr "Neue Datenquelle hinzufügen"
+#: learn2rag/ui/templates/pipelines_list.html:14
+msgctxt "column_heading"
+msgid "Ports"
+msgstr "Ports"
 
-#: learn2rag/ui/templates/sources_list.html:20
+#: learn2rag/ui/templates/pipelines_list.html:15
+msgctxt "column_heading"
+msgid "Status"
+msgstr "Status"
+
+#: learn2rag/ui/templates/pipelines_list.html:41
+msgctxt "tooltip"
+msgid "succeeded"
+msgstr "erfolgreich"
+
+#: learn2rag/ui/templates/pipelines_list.html:42
+msgctxt "tooltip"
+msgid "failed"
+msgstr "fehlgeschlagen"
+
+#: learn2rag/ui/templates/pipelines_list.html:45
+msgid "running"
+msgstr "läuft"
+
+#: learn2rag/ui/templates/pipelines_list.html:65
+msgctxt "button"
+msgid "Open"
+msgstr "Öffnen"
+
+#: learn2rag/ui/templates/pipelines_list.html:77
+msgctxt "button"
+msgid "Stop"
+msgstr "Stopp"
+
+#: learn2rag/ui/templates/pipelines_list.html:83
+msgctxt "button"
+msgid "More"
+msgstr "Mehr"
+
+#: learn2rag/ui/templates/pipelines_list.html:99
+msgctxt "button"
+msgid "Show debug log"
+msgstr "Debugprotokoll anzeigen"
+
+#: learn2rag/ui/templates/pipelines_list.html:105
+msgctxt "button"
+msgid "Show error log"
+msgstr "Fehlerprotokoll anzeigen"
+
+#: learn2rag/ui/templates/pipelines_list.html:110
+#, python-format
+msgid ""
+"Are you sure you want to remove all data stored for this pipeline: "
+"%(label)s?"
+msgstr ""
+"Sind Sie sicher, dass Sie alle gespeicherten Daten entfernen möchten: "
+"%(label)s?"
+
+#: learn2rag/ui/templates/pipelines_list.html:113
+msgctxt "button"
+msgid "Remove the stored data"
+msgstr "Löschen die gespeicherten Daten"
+
+#: learn2rag/ui/templates/pipelines_list.html:118
+#, python-format
+msgid ""
+"Are you sure you want to remove this pipeline configuration and all its "
+"stored data: %(label)s?"
+msgstr ""
+"Sind Sie sicher, dass Sie diese Konfiguration und alle gespeicherten "
+"Daten entfernen möchten: %(label)s?"
+
+#: learn2rag/ui/templates/pipelines_list.html:121
+msgctxt "button"
+msgid "Remove the stored data and the pipeline"
+msgstr "Löschen diese Konfiguration und alle gespeicherten Daten"
+
+#: learn2rag/ui/templates/pipelines_page.html:4
+msgctxt "title"
+msgid "Pipelines"
+msgstr "Pipelines"
+
+#: learn2rag/ui/templates/pipelines_page.html:10
+msgctxt "button"
+msgid "Add a new pipeline"
+msgstr "Neue Pipeline hinzufügen"
+
+#: learn2rag/ui/templates/sources_add.html:5
 msgctxt "heading"
 msgid "Local file or directory"
 msgstr "Lokale Datei oder Verzeichnis"
 
-#: learn2rag/ui/templates/sources_list.html:29
-#: learn2rag/ui/templates/sources_list.html:58
+#: learn2rag/ui/templates/sources_add.html:17
+msgctxt "heading"
+msgid "Web page"
+msgstr "Webseite"
+
+#: learn2rag/ui/templates/sources_add.html:29
+msgctxt "heading"
+msgid "Sharepoint"
+msgstr ""
+
+#: learn2rag/ui/templates/sources_add.html:41
+msgctxt "heading"
+msgid "Drupal"
+msgstr ""
+
+#: learn2rag/ui/templates/sources_add_drupal.html:5
+#: learn2rag/ui/templates/sources_add_local.html:5
+#: learn2rag/ui/templates/sources_add_sharepoint.html:6
+#: learn2rag/ui/templates/sources_add_web.html:5
 msgctxt "tooltip"
 msgid "A custom display name for this data source"
 msgstr "Ein individueller Anzeigename"
 
-#: learn2rag/ui/templates/sources_list.html:32
+#: learn2rag/ui/templates/sources_add_drupal.html:8
+msgctxt "form_label"
+msgid "Base URL"
+msgstr "Basis-URL"
+
+#: learn2rag/ui/templates/sources_add_drupal.html:9
+#, python-format
+msgctxt "tooltip"
+msgid "For example: %(example)s"
+msgstr "Zum Beispiel: %(example)s"
+
+#: learn2rag/ui/templates/sources_add_drupal.html:12
+msgctxt "form_label"
+msgid "Content types"
+msgstr ""
+
+#: learn2rag/ui/templates/sources_add_drupal.html:16
+msgctxt "form_label"
+msgid "Authentication"
+msgstr ""
+
+#: learn2rag/ui/templates/sources_add_drupal.html:18
+msgctxt "form_auth_option"
+msgid "None"
+msgstr "keine"
+
+#: learn2rag/ui/templates/sources_add_drupal.html:19
+msgctxt "form_auth_option"
+msgid "Username and password"
+msgstr "Benutzername und Passwort"
+
+#: learn2rag/ui/templates/sources_add_drupal.html:20
+msgctxt "form_auth_option"
+msgid "Access token"
+msgstr "Zugangs-Token"
+
+#: learn2rag/ui/templates/sources_add_drupal.html:24
+msgctxt "form_label"
+msgid "Username"
+msgstr "Benutzername"
+
+#: learn2rag/ui/templates/sources_add_drupal.html:28
+msgctxt "form_label"
+msgid "Password"
+msgstr "Passwort"
+
+#: learn2rag/ui/templates/sources_add_drupal.html:31
+msgid "This password would be saved in plain text in the configuration."
+msgstr "Dieses Passwort würde in der Konfiguration im Klartext gespeichert werden."
+
+#: learn2rag/ui/templates/sources_add_local.html:9
 msgctxt "form_label"
 msgid "Path on the local filesystem"
 msgstr "Pfad im lokalen Dateisytem"
 
-#: learn2rag/ui/templates/sources_list.html:35
+#: learn2rag/ui/templates/sources_add_local.html:12
 #, python-format
 msgctxt "tooltip"
 msgid "For example: %(path)s"
 msgstr "Zum Beispiel: %(path)s"
 
-#: learn2rag/ui/templates/sources_list.html:37
+#: learn2rag/ui/templates/sources_add_local.html:14
 msgctxt "tooltip"
 msgid "For example: /home/user/Documents"
 msgstr "Zum Beispiel: /home/user/Documents"
 
-#: learn2rag/ui/templates/sources_list.html:49
-msgctxt "heading"
-msgid "Web page"
-msgstr "Webseite"
-
-#: learn2rag/ui/templates/sources_list.html:61
+#: learn2rag/ui/templates/sources_add_web.html:9
 msgctxt "form_label"
 msgid "Web page URL"
 msgstr "Webseiten URL"
 
-#: learn2rag/ui/templates/sources_list.html:62
+#: learn2rag/ui/templates/sources_add_web.html:10
 msgctxt "tooltip"
 msgid "For example: https://learn2rag.de/"
 msgstr "Zum Beispiel: https://learn2rag.de/"
 
-#: learn2rag/ui/templates/sources_list.html:78
+#: learn2rag/ui/templates/sources_list.html:5
 msgctxt "column_heading"
-msgid "Path"
-msgstr "Pfad"
+msgid "Data source type"
+msgstr "Datenquellen Typ"
 
-#: learn2rag/ui/templates/sources_list.html:88
+#: learn2rag/ui/templates/sources_list.html:6
+msgctxt "column_heading"
+msgid "Details"
+msgstr "Weitere"
+
+#: learn2rag/ui/templates/sources_list.html:17
 #, python-format
 msgid "Are you sure you want to remove this data source configuration: %(label)s?"
 msgstr "Sind Sie sicher, dass Sie diese Konfiguration entfernen möchten: %(label)s"
+
+#: learn2rag/ui/templates/sources_page.html:4
+msgctxt "title"
+msgid "Data sources"
+msgstr "Datenquellen"
+
+#: learn2rag/ui/templates/sources_page.html:10
+msgctxt "button"
+msgid "Add a new data source"
+msgstr "Neue Datenquelle hinzufügen"
 
 #: learn2rag/ui/templates/start.html:3 learn2rag/ui/templates/start.html:6
 msgctxt "title"
@@ -612,7 +737,7 @@ msgstr[1] "%(num)d Pipelinekonfigurationen"
 #, python-format
 msgid "%(num)d pipeline running"
 msgid_plural "%(num)d pipelines running"
-msgstr[0] "%(num)d Pipeline läuft"
+msgstr[0] "Löschen die gespeicherten Daten"
 msgstr[1] "%(num)d Pipeline laufen"
 
 #~ msgid "Download failed"
@@ -644,4 +769,11 @@ msgstr[1] "%(num)d Pipeline laufen"
 #~ msgctxt "form_label"
 #~ msgid "Vector store"
 #~ msgstr ""
+
+#~ msgid "You can always do the data import later."
+#~ msgstr "Sie können den Datenimport auch später starten."
+
+#~ msgctxt "column_heading"
+#~ msgid "Path"
+#~ msgstr "Pfad"
 

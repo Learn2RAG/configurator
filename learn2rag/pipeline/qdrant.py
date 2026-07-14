@@ -6,13 +6,16 @@ from qdrant_client.models import Distance, VectorParams, SparseVectorParams, Spa
 
 from .config import user_config
 
+api_key = os.environ.get('QDRANT__SERVICE__API_KEY')
+path = os.environ.get('QDRANT_PATH') or None
+location = None if path else os.environ.get('QDRANT_LOCATION', 'http://localhost:6336')
+
 
 class Qdrant:
     client = QdrantClient(
-        host="localhost",
-        port=int(os.environ.get('QDRANT__SERVICE__HTTP_PORT', 6336)),
-        api_key=os.environ.get('QDRANT__SERVICE__API_KEY'),
-        https=False,
+        location=location,
+        api_key=api_key,
+        path=path,
     )
 
     def __init__(self, collection_name: str, opt_config: dict[str, Any]) -> None:

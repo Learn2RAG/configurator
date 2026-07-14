@@ -16,12 +16,14 @@
             <label for="api" class="form-label">{{pgettext('form_label', 'API type')}}</label>
             <select required="required" class="form-select" name="api">
               {% for llm_client in llm.llms.values() %}
+              {% if llm_client.LABEL %}
               <option
                 value="{{ llm_client.ID }}"
                 {% if loop.first %}
                 selected="selected"
                 {% endif %}
                 >{{ llm_client.LABEL }}</option>
+              {% endif %}
               {% endfor %}
             </select>
           </div>

@@ -25,6 +25,18 @@
   </div>
   <div class="accordion-item">
     <h2 class="accordion-header">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateSharepoint" aria-expanded="false" aria-controls="collapseCreateSharepoint">
+        {{pgettext('heading', 'Sharepoint')}}
+      </button>
+    </h2>
+    <div id="collapseCreateSharepoint" class="accordion-collapse collapse" data-bs-parent="#accordionCreate">
+      <div class="accordion-body">
+        {% include 'sources_add_sharepoint.html' %}
+      </div>
+    </div>
+  </div>
+  <div class="accordion-item">
+    <h2 class="accordion-header">
       <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateDrupal" aria-expanded="false" aria-controls="collapseCreateDrupal">
         {{pgettext('heading', 'Drupal')}}
       </button>
