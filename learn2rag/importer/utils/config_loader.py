@@ -12,6 +12,7 @@ Last Modified: May 18, 2026
 """
 
 import json
+import os
 import yaml
 from typing import Dict, Any, cast
 from ..config.config_constants import ALLOWED_LOADERS
@@ -70,8 +71,12 @@ def validate_config_entry(entry: Dict[str, Any]) -> bool:
         auth_type = entry.get("auth_type", "basic")
         if auth_type not in ("none", "basic", "token"):
             raise ValueError(f"Invalid 'auth_type' for 'JiraLoader': '{auth_type}'. Must be 'none', 'basic' or 'token'.")
-        if auth_type == "basic" and (not entry.get("username") or not entry.get("password")):
-            raise ValueError("Missing 'username' or 'password' for JiraLoader with auth_type 'basic'.")
+        if auth_type == "basic":
+            username = entry.get("username") or os.environ.get("JIRA_USERNAME", "")
+            password = entry.get("password") or os.environ.get("JIRA_API_TOKEN", "")
+            if not username or not password:
+                raise ValueError("Missing 'username' or 'password' for JiraLoader with auth_type 'basic'. "
+                                 "Provide them in config or set JIRA_USERNAME/JIRA_API_TOKEN environment variables.")
         if auth_type == "token" and not entry.get("token"):
             raise ValueError("Missing 'token' for JiraLoader with auth_type 'token'.")
      

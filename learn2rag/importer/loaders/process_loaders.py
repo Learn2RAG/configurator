@@ -13,6 +13,7 @@ Last Modified: May 18, 2026
 
 import hashlib
 import logging
+import os
 from typing import Dict, List, Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from learn2rag.importer.utils.import_state import ImportState
@@ -157,13 +158,14 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
             elif loader_type == "JiraLoader":
                 base_url = str(entry.get("base_url", ""))
                 auth_type = str(entry.get("auth_type", "basic"))
-                username = str(entry.get("username", ""))
-                password = str(entry.get("password", ""))
+                username = str(entry.get("username", "") or os.environ.get("JIRA_USERNAME", ""))
+                password = str(entry.get("password", "") or os.environ.get("JIRA_API_TOKEN", ""))
                 token = str(entry.get("token", ""))
                 jql = str(entry.get("jql", ""))
                 projects = entry.get("projects", [])
                 issue_types = entry.get("issue_types", [])
                 page_size = int(entry.get("page_size", 50))
+                max_issues = int(entry.get("max_issues", 0))
                 include_comments = entry.get("include_comments", False)
                 if isinstance(include_comments, str):
                     include_comments = include_comments.lower() == "true"
@@ -184,6 +186,7 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]]) -> List[
                     issue_types=list(issue_types) if isinstance(issue_types, list) else [],
                     page_size=page_size,
                     include_comments=bool(include_comments),
+                    max_issues=max_issues,
                 )
                 logger.info(f"Loaded {len(documents)} documents from Jira ({base_url}) using {loader_type}.")
             else:
@@ -370,8 +373,8 @@ def process_delta_imports(
             elif loader_type == "JiraLoader":
                 base_url = str(entry.get("base_url", ""))
                 auth_type = str(entry.get("auth_type", "basic"))
-                username = str(entry.get("username", ""))
-                password = str(entry.get("password", ""))
+                username = str(entry.get("username", "") or os.environ.get("JIRA_USERNAME", ""))
+                password = str(entry.get("password", "") or os.environ.get("JIRA_API_TOKEN", ""))
                 token = str(entry.get("token", ""))
                 jql = str(entry.get("jql", ""))
                 projects = entry.get("projects", [])

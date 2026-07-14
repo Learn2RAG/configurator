@@ -144,6 +144,8 @@ def _issue_to_document(
     status_name = str(((fields.get("status") or {}).get("name", ""))).strip()
     assignee_name = str((((fields.get("assignee") or {}).get("displayName", "")))).strip()
 
+    reporter_name = str(((fields.get("reporter") or {}).get("displayName", ""))).strip()
+
     labels_raw = fields.get("labels", [])
     labels = [str(label) for label in labels_raw] if isinstance(labels_raw, list) else []
 
@@ -153,6 +155,23 @@ def _issue_to_document(
     project = fields.get("project") or {}
     project_key = str(project.get("key", "")).strip()
     project_name = str(project.get("name", "")).strip()
+
+    # Epic / Parent
+    parent = fields.get("parent") or {}
+    parent_key = str(parent.get("key", "")).strip()
+    parent_summary = str(((parent.get("fields") or {}).get("summary", ""))).strip()
+
+    # Story Points (customfield_10026 is the common Jira Cloud field)
+    story_points_raw = fields.get("customfield_10026")
+    story_points = float(story_points_raw) if story_points_raw is not None else None
+
+    # Sprint (customfield_10020 is the common Jira Cloud field)
+    sprint_raw = fields.get("customfield_10020") or []
+    sprints = [str(s.get("name", "")) for s in sprint_raw if isinstance(s, dict) and s.get("name")]
+
+    # Components
+    components_raw = fields.get("components") or []
+    components = [str(c.get("name", "")) for c in components_raw if isinstance(c, dict) and c.get("name")]
 
     comments_text: List[str] = []
     if include_comments:
@@ -166,14 +185,24 @@ def _issue_to_document(
         page_parts.append(f"Issue: {issue_key}")
     if summary:
         page_parts.append(f"Summary: {summary}")
+    if parent_key:
+        page_parts.append(f"Epic/Parent: {parent_key} - {parent_summary}")
     if description:
         page_parts.append(f"Description:\n{description}")
     if status_name:
         page_parts.append(f"Status: {status_name}")
     if assignee_name:
         page_parts.append(f"Assignee: {assignee_name}")
+    if reporter_name:
+        page_parts.append(f"Reporter: {reporter_name}")
     if labels:
         page_parts.append(f"Labels: {', '.join(labels)}")
+    if components:
+        page_parts.append(f"Components: {', '.join(components)}")
+    if sprints:
+        page_parts.append(f"Sprint: {', '.join(sprints)}")
+    if story_points is not None:
+        page_parts.append(f"Story Points: {story_points}")
     if include_comments and comments_text:
         page_parts.append("Comments:\n" + "\n".join(comments_text))
 
@@ -196,29 +225,93 @@ def _issue_to_document(
             "summary": summary,
             "status": status_name,
             "assignee": assignee_name,
+            "reporter": reporter_name,
             "labels": labels,
             "updated": updated,
             "created": created,
             "project_key": project_key,
             "project_name": project_name,
+            "parent_key": parent_key,
+            "parent_summary": parent_summary,
+            "story_points": story_points,
+            "sprints": sprints,
+            "components": components,
         },
     )
 
 
-def _iter_issues(
+def _iter_issues_post(
     base_url: str,
     session: requests.Session,
     jql: str,
     page_size: int,
     fields: List[str],
 ) -> Generator[Dict[str, Any], None, None]:
-    """Iterate all Jira issues for a query using paging and endpoint fallback."""
+    """Iterate Jira issues using the new POST /search/jql endpoint (Jira Cloud 2024+)."""
+    endpoint_candidates = [
+        f"{base_url.rstrip('/')}/rest/api/3/search/jql",
+        f"{base_url.rstrip('/')}/rest/api/2/search/jql",
+    ]
+
+    for candidate in endpoint_candidates:
+        try:
+            body: Dict[str, Any] = {
+                "jql": jql,
+                "maxResults": page_size,
+                "fields": fields,
+            }
+            response = session.post(candidate, json=body, timeout=30)
+            if response.status_code in (404, 405):
+                continue
+            response.raise_for_status()
+            data = response.json()
+
+            issues = data.get("issues", [])
+            for issue in issues:
+                if isinstance(issue, dict):
+                    yield issue
+
+            next_page_token = data.get("nextPageToken")
+            while next_page_token and not data.get("isLast", True):
+                if stop_loading:
+                    break
+
+                body["nextPageToken"] = next_page_token
+                next_response = session.post(candidate, json=body, timeout=30)
+                next_response.raise_for_status()
+                data = next_response.json()
+
+                issues = data.get("issues", [])
+                if not issues:
+                    break
+
+                for issue in issues:
+                    if isinstance(issue, dict):
+                        yield issue
+
+                next_page_token = data.get("nextPageToken")
+
+            return
+
+        except requests.exceptions.RequestException as err:
+            logger.warning("JiraLoader: endpoint %s failed: %s", candidate, err)
+            continue
+
+    raise StopIteration("POST endpoints not available")
+
+
+def _iter_issues_get(
+    base_url: str,
+    session: requests.Session,
+    jql: str,
+    page_size: int,
+    fields: List[str],
+) -> Generator[Dict[str, Any], None, None]:
+    """Iterate Jira issues using the legacy GET /search endpoint (Jira Server / older Cloud)."""
     endpoint_candidates = [
         f"{base_url.rstrip('/')}/rest/api/3/search",
         f"{base_url.rstrip('/')}/rest/api/2/search",
     ]
-
-    endpoint: Optional[str] = None
 
     for candidate in endpoint_candidates:
         try:
@@ -228,16 +321,11 @@ def _iter_issues(
                 "maxResults": page_size,
                 "fields": ",".join(fields),
             }
-            response = session.get(
-                candidate,
-                params=first_params,
-                timeout=30,
-            )
-            if response.status_code in (404, 405):
+            response = session.get(candidate, params=first_params, timeout=30)
+            if response.status_code in (404, 405, 410):
                 continue
             response.raise_for_status()
             first_data = response.json()
-            endpoint = candidate
 
             issues = first_data.get("issues", [])
             total = int(first_data.get("total", len(issues)))
@@ -258,11 +346,7 @@ def _iter_issues(
                     "maxResults": page_size,
                     "fields": ",".join(fields),
                 }
-                next_response = session.get(
-                    endpoint,
-                    params=next_params,
-                    timeout=30,
-                )
+                next_response = session.get(candidate, params=next_params, timeout=30)
                 next_response.raise_for_status()
                 next_data = next_response.json()
 
@@ -282,8 +366,24 @@ def _iter_issues(
             logger.warning("JiraLoader: endpoint %s failed: %s", candidate, err)
             continue
 
-    if endpoint is None:
-        logger.error("JiraLoader: no usable Jira search endpoint found under %s", base_url)
+    logger.error("JiraLoader: no usable Jira search endpoint found under %s", base_url)
+
+
+def _iter_issues(
+    base_url: str,
+    session: requests.Session,
+    jql: str,
+    page_size: int,
+    fields: List[str],
+) -> Generator[Dict[str, Any], None, None]:
+    """Iterate all Jira issues for a query. Tries new POST endpoint first, falls back to legacy GET."""
+    try:
+        yield from _iter_issues_post(base_url, session, jql, page_size, fields)
+        return
+    except StopIteration:
+        pass
+
+    yield from _iter_issues_get(base_url, session, jql, page_size, fields)
 
 
 def load_from_jira(
@@ -299,6 +399,7 @@ def load_from_jira(
     page_size: int = 50,
     include_comments: bool = False,
     since: Optional[datetime] = None,
+    max_issues: int = 0,
 ) -> List[Document]:
     """Load Jira issues and map them to one Document per issue."""
     projects = projects or []
@@ -309,7 +410,10 @@ def load_from_jira(
     base_jql = _build_base_jql(jql=jql, projects=projects, issue_types=issue_types)
     effective_jql = _add_since_to_jql(base_jql, since)
 
-    fields = ["summary", "description", "status", "assignee", "labels", "updated", "created", "project"]
+    fields = [
+        "summary", "description", "status", "assignee", "labels", "updated", "created", "project",
+        "reporter", "parent", "components", "customfield_10026", "customfield_10020",
+    ]
     if include_comments:
         fields.append("comment")
 
@@ -337,6 +441,10 @@ def load_from_jira(
         )
         if doc is not None:
             documents.append(doc)
+
+        if max_issues > 0 and len(documents) >= max_issues:
+            logger.info("JiraLoader: reached max_issues limit (%d)", max_issues)
+            break
 
     logger.info("JiraLoader: loaded %s document(s)", len(documents))
     return documents
