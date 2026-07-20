@@ -1,0 +1,11 @@
+product_id,product_name,category,price,stock_quantity,supplier
+P001,Laptop Computer,Electronics,1299.99,45,TechCorp Ltd
+P002,Office Chair,Furniture,249.50,120,FurniturePro Inc
+P003,Desk Lamp,Lighting,89.99,200,LightWorks
+P004,Monitor Stand,Accessories,45.00,340,TechCorp Ltd
+P005,USB Cable,Accessories,12.99,1500,CableMakers
+P006,Wireless Mouse,Electronics,29.99,550,TechCorp Ltd
+P007,Mechanical Keyboard,Electronics,159.99,75,PeripheralTech
+P008,Monitor 27inch,Electronics,399.99,32,DisplayCorp
+P009,Standing Desk,Furniture,599.99,18,FurniturePro Inc
+P010,Desk Organizer,Accessories,34.99,425,OfficeSupplies
