@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from qdrant_client.models import ScoredPoint
 
+from .. import ragdemo
 from . import ingestion
 from .config import user_config, opt_config
 from .qdrant import Qdrant
@@ -62,6 +63,7 @@ example_messages = {
 }
 
 app = FastAPI()
+app.include_router(ragdemo.router, prefix='/ragdemo')
 
 
 @app.on_event("startup")
