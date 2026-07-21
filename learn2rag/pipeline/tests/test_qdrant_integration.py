@@ -1,7 +1,7 @@
 import os
 import unittest
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from dotenv import load_dotenv
 from langchain_core.documents import Document
@@ -128,38 +128,50 @@ class QdrantConnectionTestCase(unittest.TestCase):
         Qdrant.ensure_collection(self.collection_name, opt)
 
         info = Qdrant.client.get_collection(self.collection_name)
-        self.assertIn('dense', info.config.params.vectors)
-        self.assertEqual(info.config.params.vectors['dense'].size, VECTOR_SIZE)
-        self.assertEqual(info.config.params.vectors['dense'].distance, Distance.COSINE)
+        vectors = info.config.params.vectors
+        assert isinstance(vectors, dict)
+        self.assertIn('dense', vectors)
+        self.assertEqual(vectors['dense'].size, VECTOR_SIZE)
+        self.assertEqual(vectors['dense'].distance, Distance.COSINE)
 
     def test_ensure_collection_dense_sparse(self) -> None:
         opt = make_opt_config(search_mode='dense_sparse')
         Qdrant.ensure_collection(self.collection_name, opt)
 
         info = Qdrant.client.get_collection(self.collection_name)
-        self.assertIn('dense', info.config.params.vectors)
-        self.assertIn('sparse', info.config.params.sparse_vectors)
+        vectors = info.config.params.vectors
+        sparse_vectors = info.config.params.sparse_vectors
+        assert isinstance(vectors, dict)
+        assert isinstance(sparse_vectors, dict)
+        self.assertIn('dense', vectors)
+        self.assertIn('sparse', sparse_vectors)
 
     def test_ensure_collection_dense_sparse_colbert(self) -> None:
         opt = make_opt_config(search_mode='dense_sparse_colbert')
         Qdrant.ensure_collection(self.collection_name, opt)
 
         info = Qdrant.client.get_collection(self.collection_name)
-        self.assertIn('dense', info.config.params.vectors)
-        self.assertIn('colbert', info.config.params.vectors)
-        self.assertIn('sparse', info.config.params.sparse_vectors)
-        self.assertEqual(info.config.params.vectors['colbert'].size, VECTOR_SIZE)
-        self.assertIsNotNone(info.config.params.vectors['colbert'].multivector_config)
+        vectors = info.config.params.vectors
+        sparse_vectors = info.config.params.sparse_vectors
+        assert isinstance(vectors, dict)
+        assert isinstance(sparse_vectors, dict)
+        self.assertIn('dense', vectors)
+        self.assertIn('colbert', vectors)
+        self.assertIn('sparse', sparse_vectors)
+        self.assertEqual(vectors['colbert'].size, VECTOR_SIZE)
+        self.assertIsNotNone(vectors['colbert'].multivector_config)
 
     def test_ensure_collection_multi_vector(self) -> None:
         multi_search = ['title', 'summary']
         opt = make_opt_config(query_mode='multi', multi_search=multi_search)
         Qdrant.ensure_collection(self.collection_name, opt)
 
-        expected_size = (len(multi_search) + 1) * VECTOR_SIZE  # 3 * 1024 = 3072
+        expected_size = (len(multi_search) + 1) * VECTOR_SIZE
         info = Qdrant.client.get_collection(self.collection_name)
-        self.assertIn('multi', info.config.params.vectors)
-        self.assertEqual(info.config.params.vectors['multi'].size, expected_size)
+        vectors = info.config.params.vectors
+        assert isinstance(vectors, dict)
+        self.assertIn('multi', vectors)
+        self.assertEqual(vectors['multi'].size, expected_size)
 
     def test_ensure_collection_idempotent(self) -> None:
         opt = make_opt_config()
@@ -183,11 +195,13 @@ class QdrantDenseSearchTestCase(unittest.TestCase):
     """Ingest and search with dense-only mode (bge-m3)."""
 
     collection_name = 'test_integration_dense'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
 
     @classmethod
     def setUpClass(cls) -> None:
         _setup_qdrant_env()
-        cls.user_config: dict[str, Any] = {'collection_name': cls.collection_name}
+        cls.user_config = {'collection_name': cls.collection_name}
         cls.opt_config = make_opt_config(search_mode='dense')
         _cleanup_collection(cls.collection_name)
         index(SAMPLE_DOCUMENTS, cls.user_config, cls.opt_config)
@@ -203,20 +217,23 @@ class QdrantDenseSearchTestCase(unittest.TestCase):
     def test_search_finds_relevant_result(self) -> None:
         results = search('What are rabbits?', self.user_config, self.opt_config)
         self.assertGreater(len(results.points), 0)
-        top_content = results.points[0].payload['content']
-        self.assertIn('Lagomorpha', top_content)
+        payload = results.points[0].payload
+        assert payload is not None
+        self.assertIn('Lagomorpha', payload['content'])
 
     def test_search_relevance_ranking(self) -> None:
         results = search('vector similarity search engine', self.user_config, self.opt_config)
-        top_content = results.points[0].payload['content']
-        self.assertIn('Qdrant', top_content)
+        payload = results.points[0].payload
+        assert payload is not None
+        self.assertIn('Qdrant', payload['content'])
 
     def test_search_returns_payload_fields(self) -> None:
         results = search('programming language', self.user_config, self.opt_config)
         self.assertGreater(len(results.points), 0)
-        point = results.points[0]
+        payload = results.points[0].payload
+        assert payload is not None
         for field in ('content', 'source', 'content_hash', 'loader_id', 'chunk_hash'):
-            self.assertIn(field, point.payload, f'Missing payload field: {field}')
+            self.assertIn(field, payload, f'Missing payload field: {field}')
 
     def test_deduplication(self) -> None:
         index(SAMPLE_DOCUMENTS, self.user_config, self.opt_config)
@@ -232,11 +249,14 @@ class QdrantSparseSearchTestCase(unittest.TestCase):
     """Ingest with dense_sparse mode but search using only sparse (BM25)."""
 
     collection_name = 'test_integration_sparse'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config_ingest: ClassVar[dict[str, Any]]
+    opt_config_search: ClassVar[dict[str, Any]]
 
     @classmethod
     def setUpClass(cls) -> None:
         _setup_qdrant_env()
-        cls.user_config: dict[str, Any] = {'collection_name': cls.collection_name}
+        cls.user_config = {'collection_name': cls.collection_name}
         cls.opt_config_ingest = make_opt_config(search_mode='dense_sparse')
         cls.opt_config_search = make_opt_config(search_mode='sparse')
         _cleanup_collection(cls.collection_name)
@@ -257,8 +277,9 @@ class QdrantSparseSearchTestCase(unittest.TestCase):
     def test_sparse_search_relevance(self) -> None:
         results = search('vector similarity Qdrant', self.user_config, self.opt_config_search)
         self.assertGreater(len(results.points), 0)
-        top_content = results.points[0].payload['content']
-        self.assertIn('Qdrant', top_content)
+        payload = results.points[0].payload
+        assert payload is not None
+        self.assertIn('Qdrant', payload['content'])
 
 
 @unittest.skipUnless(
@@ -269,11 +290,13 @@ class QdrantDenseSparseSearchTestCase(unittest.TestCase):
     """Ingest and search with hybrid dense+sparse mode (fusion)."""
 
     collection_name = 'test_integration_dense_sparse'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
 
     @classmethod
     def setUpClass(cls) -> None:
         _setup_qdrant_env()
-        cls.user_config: dict[str, Any] = {'collection_name': cls.collection_name}
+        cls.user_config = {'collection_name': cls.collection_name}
         cls.opt_config = make_opt_config(search_mode='dense_sparse')
         _cleanup_collection(cls.collection_name)
         index(SAMPLE_DOCUMENTS, cls.user_config, cls.opt_config)
@@ -289,14 +312,16 @@ class QdrantDenseSparseSearchTestCase(unittest.TestCase):
     def test_hybrid_search_finds_results(self) -> None:
         results = search('What are rabbits?', self.user_config, self.opt_config)
         self.assertGreater(len(results.points), 0)
-        top_content = results.points[0].payload['content']
-        self.assertIn('Lagomorpha', top_content)
+        payload = results.points[0].payload
+        assert payload is not None
+        self.assertIn('Lagomorpha', payload['content'])
 
     def test_hybrid_search_relevance(self) -> None:
         results = search('programming language paradigms', self.user_config, self.opt_config)
         self.assertGreater(len(results.points), 0)
-        top_content = results.points[0].payload['content']
-        self.assertIn('Python', top_content)
+        payload = results.points[0].payload
+        assert payload is not None
+        self.assertIn('Python', payload['content'])
 
 
 @unittest.skipUnless(
@@ -307,11 +332,13 @@ class QdrantDenseSparseColbertSearchTestCase(unittest.TestCase):
     """Ingest and search with dense+sparse+colbert mode."""
 
     collection_name = 'test_integration_dense_sparse_colbert'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
 
     @classmethod
     def setUpClass(cls) -> None:
         _setup_qdrant_env()
-        cls.user_config: dict[str, Any] = {'collection_name': cls.collection_name}
+        cls.user_config = {'collection_name': cls.collection_name}
         cls.opt_config = make_opt_config(search_mode='dense_sparse_colbert')
         _cleanup_collection(cls.collection_name)
         index(SAMPLE_DOCUMENTS, cls.user_config, cls.opt_config)
@@ -326,21 +353,27 @@ class QdrantDenseSparseColbertSearchTestCase(unittest.TestCase):
 
     def test_collection_has_all_vector_types(self) -> None:
         info = Qdrant.client.get_collection(self.collection_name)
-        self.assertIn('dense', info.config.params.vectors)
-        self.assertIn('colbert', info.config.params.vectors)
-        self.assertIn('sparse', info.config.params.sparse_vectors)
+        vectors = info.config.params.vectors
+        sparse_vectors = info.config.params.sparse_vectors
+        assert isinstance(vectors, dict)
+        assert isinstance(sparse_vectors, dict)
+        self.assertIn('dense', vectors)
+        self.assertIn('colbert', vectors)
+        self.assertIn('sparse', sparse_vectors)
 
     def test_search_finds_results(self) -> None:
         results = search('What are rabbits?', self.user_config, self.opt_config)
         self.assertGreater(len(results.points), 0)
-        top_content = results.points[0].payload['content']
-        self.assertIn('Lagomorpha', top_content)
+        payload = results.points[0].payload
+        assert payload is not None
+        self.assertIn('Lagomorpha', payload['content'])
 
     def test_search_relevance(self) -> None:
         results = search('vector database search engine API', self.user_config, self.opt_config)
         self.assertGreater(len(results.points), 0)
-        top_content = results.points[0].payload['content']
-        self.assertIn('Qdrant', top_content)
+        payload = results.points[0].payload
+        assert payload is not None
+        self.assertIn('Qdrant', payload['content'])
 
 
 @unittest.skipUnless(
@@ -351,12 +384,14 @@ class QdrantMultiVectorSearchTestCase(unittest.TestCase):
     """Ingest and search with multi-vector mode (content + metadata embeddings concatenated)."""
 
     collection_name = 'test_integration_multi_vector'
-    multi_search_fields = ['title', 'summary']
+    multi_search_fields: ClassVar[list[str]] = ['title', 'summary']
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
 
     @classmethod
     def setUpClass(cls) -> None:
         _setup_qdrant_env()
-        cls.user_config: dict[str, Any] = {'collection_name': cls.collection_name}
+        cls.user_config = {'collection_name': cls.collection_name}
         cls.opt_config = make_opt_config(
             search_mode='dense',
             query_mode='multi',
@@ -374,10 +409,12 @@ class QdrantMultiVectorSearchTestCase(unittest.TestCase):
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
 
     def test_collection_has_correct_vector_size(self) -> None:
-        expected_size = (len(self.multi_search_fields) + 1) * VECTOR_SIZE  # 3 * 1024 = 3072
+        expected_size = (len(self.multi_search_fields) + 1) * VECTOR_SIZE
         info = Qdrant.client.get_collection(self.collection_name)
-        self.assertIn('multi', info.config.params.vectors)
-        self.assertEqual(info.config.params.vectors['multi'].size, expected_size)
+        vectors = info.config.params.vectors
+        assert isinstance(vectors, dict)
+        self.assertIn('multi', vectors)
+        self.assertEqual(vectors['multi'].size, expected_size)
 
     def test_multi_search_finds_results(self) -> None:
         multi_query = {
@@ -396,8 +433,9 @@ class QdrantMultiVectorSearchTestCase(unittest.TestCase):
         }
         results = search_multi(multi_query, self.user_config, self.opt_config)
         self.assertGreater(len(results.points), 0)
-        top_content = results.points[0].payload['content']
-        self.assertIn('Qdrant', top_content)
+        payload = results.points[0].payload
+        assert payload is not None
+        self.assertIn('Qdrant', payload['content'])
 
 
 @unittest.skipUnless(
@@ -408,11 +446,13 @@ class QdrantFusionRRFTestCase(unittest.TestCase):
     """Test hybrid search with RRF fusion mode instead of DBSF."""
 
     collection_name = 'test_integration_rrf'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
 
     @classmethod
     def setUpClass(cls) -> None:
         _setup_qdrant_env()
-        cls.user_config: dict[str, Any] = {'collection_name': cls.collection_name}
+        cls.user_config = {'collection_name': cls.collection_name}
         cls.opt_config = make_opt_config(search_mode='dense_sparse')
         cls.opt_config['fusion_mode'] = 'RRF'
         _cleanup_collection(cls.collection_name)
@@ -429,8 +469,9 @@ class QdrantFusionRRFTestCase(unittest.TestCase):
     def test_rrf_search_relevance(self) -> None:
         results = search('vector similarity search engine', self.user_config, self.opt_config)
         self.assertGreater(len(results.points), 0)
-        top_content = results.points[0].payload['content']
-        self.assertIn('Qdrant', top_content)
+        payload = results.points[0].payload
+        assert payload is not None
+        self.assertIn('Qdrant', payload['content'])
 
     def test_rrf_returns_scores(self) -> None:
         results = search('programming language', self.user_config, self.opt_config)
@@ -446,11 +487,13 @@ class QdrantRerankingFlagRerankerTestCase(unittest.TestCase):
     """Test search with FlagReranker reranking."""
 
     collection_name = 'test_integration_rerank_flag'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
 
     @classmethod
     def setUpClass(cls) -> None:
         _setup_qdrant_env()
-        cls.user_config: dict[str, Any] = {'collection_name': cls.collection_name}
+        cls.user_config = {'collection_name': cls.collection_name}
         cls.opt_config = make_opt_config(search_mode='dense')
         cls.opt_config['reranking'] = 'True'
         cls.opt_config['reranking_mode'] = 'reranking_with_flagreranker'
@@ -470,12 +513,15 @@ class QdrantRerankingFlagRerankerTestCase(unittest.TestCase):
         points = _collect_query_points('small mammals herbivore', self.user_config, self.opt_config)
         self.assertGreater(len(points), 0)
         for point in points:
+            assert point.payload is not None
             self.assertIn('reranking_score', point.payload)
 
     def test_reranking_relevance(self) -> None:
         points = _collect_query_points('vector similarity search engine', self.user_config, self.opt_config)
         self.assertGreater(len(points), 0)
-        self.assertIn('Qdrant', points[0].payload['content'])
+        payload = points[0].payload
+        assert payload is not None
+        self.assertIn('Qdrant', payload['content'])
 
     def test_reranking_respects_top_k(self) -> None:
         points = _collect_query_points('programming', self.user_config, self.opt_config)
@@ -490,11 +536,13 @@ class QdrantRerankingCrossEncoderTestCase(unittest.TestCase):
     """Test search with sentence-transformers CrossEncoder reranking."""
 
     collection_name = 'test_integration_rerank_crossencoder'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
 
     @classmethod
     def setUpClass(cls) -> None:
         _setup_qdrant_env()
-        cls.user_config: dict[str, Any] = {'collection_name': cls.collection_name}
+        cls.user_config = {'collection_name': cls.collection_name}
         cls.opt_config = make_opt_config(search_mode='dense')
         cls.opt_config['reranking'] = 'True'
         cls.opt_config['reranking_mode'] = 'reranking_with_sentence_transformers'
@@ -514,12 +562,15 @@ class QdrantRerankingCrossEncoderTestCase(unittest.TestCase):
         points = _collect_query_points('small mammals herbivore', self.user_config, self.opt_config)
         self.assertGreater(len(points), 0)
         for point in points:
+            assert point.payload is not None
             self.assertIn('reranking_score', point.payload)
 
     def test_reranking_relevance(self) -> None:
         points = _collect_query_points('vector similarity search engine', self.user_config, self.opt_config)
         self.assertGreater(len(points), 0)
-        self.assertIn('Qdrant', points[0].payload['content'])
+        payload = points[0].payload
+        assert payload is not None
+        self.assertIn('Qdrant', payload['content'])
 
     def test_reranking_respects_top_k(self) -> None:
         points = _collect_query_points('programming', self.user_config, self.opt_config)
@@ -534,11 +585,13 @@ class QdrantStoreOperationsTestCase(unittest.TestCase):
     """Test get_documents, delete_documents, update_documents against a real Qdrant server."""
 
     collection_name = 'test_integration_store'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
 
     @classmethod
     def setUpClass(cls) -> None:
         _setup_qdrant_env()
-        cls.user_config: dict[str, Any] = {'collection_name': cls.collection_name}
+        cls.user_config = {'collection_name': cls.collection_name}
         cls.opt_config = make_opt_config(search_mode='dense')
 
     def setUp(self) -> None:
@@ -590,8 +643,9 @@ class QdrantStoreOperationsTestCase(unittest.TestCase):
 
         results = search('rabbits internet infrastructure', self.user_config, self.opt_config)
         self.assertGreater(len(results.points), 0)
-        top_content = results.points[0].payload['content']
-        self.assertIn('internet infrastructure', top_content)
+        payload = results.points[0].payload
+        assert payload is not None
+        self.assertIn('internet infrastructure', payload['content'])
 
     def test_update_documents_does_not_affect_other_sources(self) -> None:
         updated_doc = Document(
@@ -617,11 +671,13 @@ class QdrantDeduplicationTestCase(unittest.TestCase):
     """Verify that ingesting the same document multiple times does not create duplicates."""
 
     collection_name = 'test_integration_dedup'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
 
     @classmethod
     def setUpClass(cls) -> None:
         _setup_qdrant_env()
-        cls.user_config: dict[str, Any] = {'collection_name': cls.collection_name}
+        cls.user_config = {'collection_name': cls.collection_name}
         cls.opt_config = make_opt_config(search_mode='dense')
 
     def setUp(self) -> None:
@@ -650,5 +706,3 @@ class QdrantDeduplicationTestCase(unittest.TestCase):
 
         info = Qdrant.client.get_collection(self.collection_name)
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
-
-
