@@ -21,8 +21,12 @@ from learn2rag.pipeline.config import opt_config
 import learn2rag.pipeline.search
 import learn2rag.pipeline.generate
 
-def load_registry(path: str = "registry.json") -> dict[str, Any]:
-    p = pathlib.Path(path)
+def load_registry(registry_source: Union[str, pathlib.Path, Dict[str, Any]] = "registry.json") -> dict[str, Any]:
+    if isinstance(registry_source, dict):
+        return registry_source
+
+
+    p = pathlib.Path(registry_source)
     if not p.is_file():
        logging.error("registry file not found")
     with p.open() as f:
@@ -171,7 +175,7 @@ def param_importance(smac: HyperparameterOptimizationFacade, output_path: pathli
     return result
 
 
-def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[str, pathlib.Path],registry_path:str) -> Tuple[
+def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[str, pathlib.Path],registry_path: Union[str, pathlib.Path, Dict[str, Any]] ) -> Tuple[
         Dict[str, Any], List[Any], Dict[str, Any]]:
     logging.info(f"registry_path is : {registry_path}")
     registry = load_registry(registry_path)

@@ -14,6 +14,7 @@ from _pytest.logging import LogCaptureFixture
 logger = logging.getLogger(__name__)
 
 template_dir = Path(__file__).resolve().parent.parent / 'ui' / 'templates' / 'compose' / 'pipelines'
+# optimization_dir = Path(__file__).resolve().parent.parent / 'optimization'
 data_dir = Path(__file__).resolve().parent / 'data'
 
 
@@ -112,3 +113,108 @@ class Learn2RAGTestCase(TestCase):
             except APIConnectionError:
                 assert False
         waitUntil(check_rag, timeout=1 * 60 * 1000)
+
+    def test_optimization(self) -> None:
+        template_context = {
+            'is_windows': is_windows(),
+            'learn2rag_path': Path('.').absolute(),
+            'storage_path': self.storage_path,
+            'ports': {
+                'pipeline': self.rag_port,
+            },
+            'qdrant_api_key': '',
+            'language_model': {'api': 'ChatFake'},
+            'pipeline': {
+                'qdrant_path': self.storage_path / 'qdrant_persistence',
+            },
+            'import_config': {
+                'loaders': [
+                    {
+                        'loader_id': 'local_test',
+                        'loader_type': 'DirectoryLoader',
+                        'recursive': 'True',
+                        'path': str(data_dir),
+                    },
+                ],
+            },
+        }
+
+        project = Project.create(template_dir / 'import.yml', self.project_name, template=True,
+                                 template_context=template_context)
+        assert project is not None, 'project should not be None'
+        project.start()
+        assert project.running
+
+        def check_import() -> None:
+            project = Project.get(self.project_name)
+            assert project is not None
+            assert not project.running
+
+        waitUntil(check_import, timeout=1 * 60 * 1000)
+
+        project.remove()
+
+        project = Project.create(template_dir / 'pipeline.yml', self.project_name, template=True,
+                                 template_context=template_context)
+        project.start()
+
+        def check_pipeline() -> None:
+            try:
+                self.openai_client.models.list()
+            except APIConnectionError:
+                assert False
+
+        waitUntil(check_pipeline, timeout=1 * 60 * 1000)
+
+        # Optimization
+        from learn2rag.optimization.baseline_optimization import run
+        import os
+        import json
+        dataset_name = "test_rabbit"
+        opt_out_dir = self.storage_path / "opt_output"
+        results_file = opt_out_dir / dataset_name / "optimization_results.json"
+
+        mock_user_config = {
+            "collection_name": dataset_name,
+            "qdrant_path": str(self.storage_path / 'qdrant_persistence')
+        }
+        os.environ["PIPELINE_USER_CONFIG"] = json.dumps(mock_user_config)
+
+        initial_mtime = results_file.stat().st_mtime if results_file.exists() else 0.0
+
+
+        mock_registry = {
+            "datasets": {
+                dataset_name: {
+                    "subdirectory": "", "split": "train",
+                    "fields": {"q": "question", "a": "answer", "id": "id"},
+                    "path": str(data_dir / "rabbit_eval.csv")
+                }
+            },
+            "prompts": {
+                "default": "Answer using ONLY the provided information: {context}",
+                "concise": "Be concise. Information: {context}"
+            }
+        }
+
+        best_cfg, history, importance = run(
+            dataset_name=dataset_name ,
+            max_questions=2,
+            n_trials=2,
+            output_dir=opt_out_dir,
+            registry_path=mock_registry
+        )
+
+
+        assert best_cfg is not None, "Optimization should return a valid configuration"
+        assert len(history) == 2, "History length should match n_trials"
+
+
+        assert results_file.exists(), "Optimization output JSON was not created"
+        current_mtime = results_file.stat().st_mtime
+        assert current_mtime > initial_mtime, "The optimization results file was not updated during the run!"
+
+        with open(results_file, 'r') as f:
+            results_data = json.load(f)
+            assert "best_config" in results_data
+            assert "top_k" in results_data["best_config"], "Optimization failed to output expected parameters"
