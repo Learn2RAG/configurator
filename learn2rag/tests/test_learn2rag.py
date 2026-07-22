@@ -156,6 +156,8 @@ class Learn2RAGTestCase(TestCase):
 
         project = Project.create(template_dir / 'pipeline.yml', self.project_name, template=True,
                                  template_context=template_context)
+
+        assert project is not None
         project.start()
 
         def check_pipeline() -> None:
