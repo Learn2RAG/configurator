@@ -9,8 +9,15 @@ import argparse
 from typing import Any
 from collections.abc import Mapping
 
-#from . import baseline_optimization
+from . import baseline_optimization
 from . import retrieval_optimization
+
+OPTIMIZATION_STRATEGIES = {
+    "baseline": baseline_optimization.run,
+    "retrieval": retrieval_optimization.run,
+}
+
+
 #TODO : now we need to copy the dataset to here manually it should consider in installation maybe !
 # {storage_path}/datasets/WikiEval/
 def main() -> None:
@@ -21,6 +28,13 @@ def main() -> None:
     parser.add_argument("--dataset", type=str, default="WikiEval")
     parser.add_argument("--questions", type=int, default=10)
     parser.add_argument("--trials", type=int, default=10)
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default="baseline",
+        choices=list(OPTIMIZATION_STRATEGIES.keys()),
+        help="Which optimization algorithm to run"
+    )
     args, unknown = parser.parse_known_args()
 
     if args.logging_config and pathlib.Path(args.logging_config).exists():
@@ -30,7 +44,7 @@ def main() -> None:
 
     logger = logging.getLogger(__name__)
     logger.info(f"Running task: {args.task}")
-
+    logger.info(f"Optimization started for {args.dataset} using strategy: {args.strategy}")
 
     logging.info(f"Optimization started for {args.dataset}")
     #TODO : read or get dataset_name and maxquestions and n_trails
@@ -38,8 +52,9 @@ def main() -> None:
     output_dir = pathlib.Path("./optimization/output/")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    retrieval_optimization.run(args.dataset, args.questions, args.trials, output_dir, args.registry_path)
-    #baseline_optimization.run(args.dataset,args.questions,args.trials,output_dir,args.registry_path)
+    run_optimization = OPTIMIZATION_STRATEGIES[args.strategy]
+    run_optimization(args.dataset, args.questions, args.trials, output_dir, args.registry_path)
+
     logging.info("optimization is done")
     results_path = output_dir /args.dataset/ "optimization_results.json"
     logging.info(f"save optimized results here : {results_path}")
