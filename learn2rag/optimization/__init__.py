@@ -6,13 +6,13 @@ import collections.abc
 import copy
 import yaml
 import argparse
-from typing import Any
+from typing import Any, Dict, Callable
 from collections.abc import Mapping
 
 from . import baseline_optimization
 from . import retrieval_optimization
 
-OPTIMIZATION_STRATEGIES = {
+OPTIMIZATION_STRATEGIES: Dict[str, Callable[..., Any]] = {
     "baseline": baseline_optimization.run,
     "retrieval": retrieval_optimization.run,
 }
