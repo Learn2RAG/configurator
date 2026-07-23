@@ -1,7 +1,7 @@
-# Usage
+# Test instance
 ## Start Drupal
 ```
-docker-compose -f drupal/docker-compose.yml up -d
+docker compose -f drupal/docker-compose.yml up
 ```
 
 ## Log in
@@ -11,13 +11,8 @@ username
 password
 : test
 
-## Enable the required modules
-http://localhost:3470/en/admin/modules
-Install
-- JSON:API
-
+# Data import from your instance
 ## Configure authorization
-
 ### None
 For instances with public data and API.
 
