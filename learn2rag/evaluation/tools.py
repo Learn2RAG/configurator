@@ -88,7 +88,7 @@ def read_dataset_qa(file_path: pathlib.Path | str, split: str | None = None) -> 
 
     if target_path.suffix.lower() == '.csv':
         logging.debug(f'load csv file ')
-        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path))
+        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path), sep=';')
     else:
         logging.debug(f'load HF dataset ')
         dataset_dict = datasets.load_from_disk(str(target_path))
