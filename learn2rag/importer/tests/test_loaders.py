@@ -221,7 +221,7 @@ class AllFileTypesTestCase(unittest.TestCase):
         self.assertGreater(len(txt_docs), 0, "No TXT files loaded")
         for doc in txt_docs:
             self.assertGreater(len(doc.page_content), 0, "TXT document has no content")
-            self.assertIn("test document", doc.page_content.lower(), "Expected content not found in TXT")
+            self.assertIn("plain text", doc.page_content.lower(), "Expected content not found in TXT")
 
     def test_csv_file_parsing(self) -> None:
         """Verify CSV files are parsed correctly."""
