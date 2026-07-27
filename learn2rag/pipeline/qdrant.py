@@ -12,11 +12,7 @@ location = None if path else os.environ.get('QDRANT_LOCATION', 'http://localhost
 
 
 class Qdrant:
-    client = QdrantClient(
-        location=location,
-        api_key=api_key,
-        path=path,
-    )
+    client = QdrantClient(location=location, api_key=api_key, path=path)
 
     def __init__(self, collection_name: str, opt_config: dict[str, Any]) -> None:
         self.collection_name = collection_name

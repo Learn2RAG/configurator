@@ -6,6 +6,8 @@ from typing import Any, cast
 import numpy as np
 import warnings
 from collections.abc import Iterator
+from collections import deque
+from time import perf_counter
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
@@ -13,6 +15,13 @@ from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
 from .embeddings import create_embeddings
+
+
+def _format_hhmmss(total_seconds: float) -> str:
+    seconds = max(0, int(total_seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
 def get_chunks_metadata(chunks: list[Document], item: str) -> Iterator[str]:
@@ -136,8 +145,16 @@ def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, An
     chunks = text_splitter.split_documents(docs)
 
     ingestion_batch_size = opt_config["ingestion_batch_size"]
+    total_batches = (len(chunks) + ingestion_batch_size - 1) // ingestion_batch_size
+    eta_window_size = 100
+    report_every = 100
+    recent_batch_durations: deque[float] = deque(maxlen=eta_window_size)
+    ingest_start = perf_counter()
+
     logging.info('Creating embeddings and ingesting in batches...')
-    for batch_start in range(0, len(chunks), ingestion_batch_size):
+
+    for batch_idx, batch_start in enumerate(range(0, len(chunks), ingestion_batch_size), start=1):
+        batch_started_at = perf_counter()
         batch_chunks = chunks[batch_start:batch_start + ingestion_batch_size]
         batch_content = [chunk.page_content for chunk in batch_chunks]
         batch_chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in batch_chunks]
@@ -225,7 +242,34 @@ def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, An
                 else:
                     insert(qdrant, collection_name, sample)
 
+        batch_duration = perf_counter() - batch_started_at
+        recent_batch_durations.append(batch_duration)
 
+        if batch_idx % report_every == 0:
+            elapsed = perf_counter() - ingest_start
+            avg_batch_duration = sum(recent_batch_durations) / len(recent_batch_durations)
+            remaining_batches = total_batches - batch_idx
+            eta_seconds = avg_batch_duration * remaining_batches
+            progress_percent = (batch_idx / total_batches) * 100 if total_batches > 0 else 100.0
+
+            logging.info(
+                "Ingestion progress: %d/%d batches (%.2f%%), elapsed=%s, eta in %s",
+                batch_idx,
+                total_batches,
+                progress_percent,
+                _format_hhmmss(elapsed),
+                _format_hhmmss(eta_seconds),
+            )
+
+    total_elapsed = perf_counter() - ingest_start
+    logging.info(
+        "Ingestion finished: %d/%d batches (100.00%%), total_elapsed=%s",
+        total_batches,
+        total_batches,
+        _format_hhmmss(total_elapsed),
+    )
+
+            
 def index(documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     """
     Ingest a list of documents — entry point for standalone pipeline operation.

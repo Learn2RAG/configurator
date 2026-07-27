@@ -133,6 +133,8 @@ services:
       - '{{storage_path}}/optimization_registry.json'
       - '--dataset'
       - 'training'
+      - '--strategy'
+      - 'retrieval'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       QDRANT__SERVICE__HTTP_PORT: '{{ports.qdrant_http}}'
