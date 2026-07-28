@@ -4,12 +4,14 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from starlette.middleware.sessions import SessionMiddleware
 
 from . import api
-from .config import user_config, opt_config
+from .config import importer_config, user_config, opt_config
 from .qdrant import Qdrant
 from .operators import BasicPipeline
 from .operators.base import BaseOperator
+from ..userui import auth
 
 pipeline: BaseOperator = BasicPipeline()
 
@@ -21,6 +23,9 @@ class TestResponse(BaseModel):
 
 
 app = FastAPI()
+# required by oauth library
+app.add_middleware(SessionMiddleware, secret_key="FIXME")
+app.include_router(auth.build_router(importer_config), prefix='/auth')
 
 
 api_prefix = '/api'

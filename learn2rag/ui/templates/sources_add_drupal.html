@@ -40,5 +40,15 @@
     <label for="token" class="form-label">{{pgettext('form_label', 'Access token')}}</label>
     <input class="form-control" name="token"/>
   </div>
+  <fieldset>
+    <legend>{{pgettext('form_label', 'OAuth')}}</legend>
+    <div class="input-group mb-3">
+      <label for="token" class="form-label"></label>
+      <span class="input-group-text"><code>client_id</code></span>
+      <input name="oauth_client_id" type="text" class="form-control" aria-label="client_id">
+      <span class="input-group-text"><code>client_secret</code></span>
+      <input name="oauth_client_secret" type="text" class="form-control" aria-label="client_secret">
+    </div>
+  </fieldset>
   <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
 </form>
