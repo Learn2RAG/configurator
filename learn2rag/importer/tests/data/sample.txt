@@ -1,0 +1,14 @@
+Plain Text Document Example
+============================
+
+This is a sample plain text file used for testing the DirectoryLoader and SharePointLoader.
+
+It contains multiple paragraphs to test content extraction.
+
+Key Features:
+- Simple text format
+- No special formatting
+- UTF-8 encoded
+- Multiple lines
+
+This file is located at: tests/data/sample.txt
