@@ -87,8 +87,8 @@ def read_dataset_qa(file_path: pathlib.Path | str, split: str | None = None) -> 
         raise FileNotFoundError(f"Dataset path does not exist: {target_path}")
 
     if target_path.suffix.lower() == '.csv':
-        logging.debug(f'load csv file ')
-        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path), sep=';')
+        logging.debug('load csv file')
+        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path))
     else:
         logging.debug(f'load HF dataset ')
         dataset_dict = datasets.load_from_disk(str(target_path))
