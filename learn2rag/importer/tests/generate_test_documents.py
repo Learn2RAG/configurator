@@ -6,6 +6,8 @@ This script creates test documents in the tests/data directory.
 """
 
 import io
+import zipfile
+
 from pathlib import Path
 
 
@@ -52,81 +54,21 @@ startxref
     return pdf_content
 
 
-def create_xlsx() -> bytes:
-    """Create a minimal valid XLSX file using built-in zip."""
-    import zipfile
+def create_pptx() -> bytes:
+    """Create a minimal valid PPTX file using python-pptx."""
+    from pptx import Presentation
 
-    # XLSX is a ZIP archive with XML files
-    xlsx_buffer = io.BytesIO()
-    with zipfile.ZipFile(xlsx_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        # [Content_Types].xml
-        content_types = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
-<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-</Types>"""
-        zf.writestr("[Content_Types].xml", content_types)
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[0])
+    title = slide.shapes.title
+    subtitle = slide.placeholders[1]
 
-        # _rels/.rels
-        rels = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-</Relationships>"""
-        zf.writestr("_rels/.rels", rels)
+    title.text = "PPTX Presentation Example"
+    subtitle.text = "This is a sample PPTX file for testing."
 
-        # xl/_rels/workbook.xml.rels
-        wb_rels = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>
-</Relationships>"""
-        zf.writestr("xl/_rels/workbook.xml.rels", wb_rels)
-
-        # xl/workbook.xml
-        workbook = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<sheets>
-<sheet name="Sheet1" sheetId="1" r:id="rId1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
-</sheets>
-</workbook>"""
-        zf.writestr("xl/workbook.xml", workbook)
-
-        # xl/worksheets/sheet1.xml
-        sheet = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<sheetData>
-<row r="1"><c r="A1" t="inlineStr"><is><t>Name</t></is></c><c r="B1" t="inlineStr"><is><t>Age</t></is></c></row>
-<row r="2"><c r="A2" t="inlineStr"><is><t>Alice</t></is></c><c r="B2" t="n"><v>28</v></c></row>
-<row r="3"><c r="A3" t="inlineStr"><is><t>Bob</t></is></c><c r="B3" t="n"><v>34</v></c></row>
-</sheetData>
-</worksheet>"""
-        zf.writestr("xl/worksheets/sheet1.xml", sheet)
-
-        # xl/styles.xml (minimal)
-        styles = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<cellXfs count="1"><xf numFmtId="0"/></cellXfs>
-</styleSheet>"""
-        zf.writestr("xl/styles.xml", styles)
-
-        # xl/theme/theme1.xml (minimal)
-        theme = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme"/>"""
-        zf.writestr("xl/theme/theme1.xml", theme)
-
-        # docProps/core.xml
-        core_props = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"/>"""
-        zf.writestr("docProps/core.xml", core_props)
-
-    return xlsx_buffer.getvalue()
+    pptx_buffer = io.BytesIO()
+    prs.save(pptx_buffer)
+    return pptx_buffer.getvalue()
 
 
 def create_docx() -> bytes:
@@ -172,65 +114,31 @@ def create_docx() -> bytes:
     return docx_buffer.getvalue()
 
 
-def create_pptx() -> bytes:
-    """Create a minimal valid PPTX file using built-in zip."""
-    import zipfile
-
-    pptx_buffer = io.BytesIO()
-    with zipfile.ZipFile(pptx_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        # [Content_Types].xml
-        content_types = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
-<Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
-<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
-<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
-<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
-<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-</Types>"""
-        zf.writestr("[Content_Types].xml", content_types)
-
-        # _rels/.rels
-        rels = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-</Relationships>"""
-        zf.writestr("_rels/.rels", rels)
-
-        # ppt/presentation.xml
-        presentation = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<p:sldIdLst>
-<p:sldId id="256" r:id="rId2"/>
-</p:sldIdLst>
-</p:presentation>"""
-        zf.writestr("ppt/presentation.xml", presentation)
-
-        # ppt/slides/slide1.xml
-        slide = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-<p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name="Title"/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="6858000"/><a:chOff x="0" y="0"/><a:chExt cx="9144000" cy="6858000"/></a:xfrm></p:grpSpPr>
-<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/></p:nvSpPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>PPTX Presentation Example</a:t></a:r></a:p></p:txBody></p:sp>
-</p:spTree></p:cSld>
-</p:sld>"""
-        zf.writestr("ppt/slides/slide1.xml", slide)
-
-        # ppt/_rels/presentation.xml.rels
-        pres_rels = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>
-</Relationships>"""
-        zf.writestr("ppt/_rels/presentation.xml.rels", pres_rels)
-
-        # docProps/core.xml
-        core_props = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"/>"""
-        zf.writestr("docProps/core.xml", core_props)
-
-    return pptx_buffer.getvalue()
+def create_xlsx() -> bytes:
+    """Create a minimal valid XLSX file in memory using pure zip."""
+    xlsx_buffer = io.BytesIO()
+    with zipfile.ZipFile(xlsx_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "[Content_Types].xml",
+            b'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+        )
+        zf.writestr(
+            "_rels/.rels",
+            b'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+        )
+        zf.writestr(
+            "xl/workbook.xml",
+            b'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        )
+        zf.writestr(
+            "xl/_rels/workbook.xml.rels",
+            b'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+        )
+        zf.writestr(
+            "xl/worksheets/sheet1.xml",
+            b'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Sample Text</t></is></c></row></sheetData></worksheet>',
+        )
+    return xlsx_buffer.getvalue()
 
 
 def create_test_documents(data_dir: Path) -> None:
