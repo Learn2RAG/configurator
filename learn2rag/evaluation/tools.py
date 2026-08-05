@@ -88,7 +88,18 @@ def read_dataset_qa(file_path: pathlib.Path | str, split: str | None = None) -> 
 
     if target_path.suffix.lower() == '.csv':
         logging.debug('load csv file')
-        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path))
+        with open(target_path, 'r', encoding='utf-8') as f:
+            first_line = f.readline()
+            try:
+                # Sniff for comma, semicolon, or tab
+                dialect = csv.Sniffer().sniff(first_line, delimiters=[',', ';', '\t'])
+                detected_sep = dialect.delimiter
+            except csv.Error:
+                # Fallback to standard comma if sniffing fails
+                detected_sep = ','
+
+        logging.debug(f'load csv file with delimiter: "{detected_sep}"')
+        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path), sep=detected_sep)
     else:
         logging.debug(f'load HF dataset ')
         dataset_dict = datasets.load_from_disk(str(target_path))
