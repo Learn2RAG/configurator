@@ -6,13 +6,26 @@ from qdrant_client.models import Distance, VectorParams, SparseVectorParams, Spa
 
 from .config import user_config
 
+# FIXME: when running a Windows package,
+# this import causes segmentation fault if done after creating QdrantClient.
+# Importing it here prevents this situation...
+__import__('FlagEmbedding')
+
 api_key = os.environ.get('QDRANT__SERVICE__API_KEY')
 path = os.environ.get('QDRANT_PATH') or None
 location = None if path else os.environ.get('QDRANT_LOCATION', 'http://localhost:6336')
 
 
 class Qdrant:
-    client = QdrantClient(location=location, api_key=api_key, path=path)
+
+    # FIXME: only create QdrantClient instance when needed,
+    # do not create it when just importing this module
+    client = QdrantClient(
+        location=location,
+        api_key=api_key,
+        path=path,
+    )
+
 
     def __init__(self, collection_name: str, opt_config: dict[str, Any]) -> None:
         self.collection_name = collection_name

@@ -157,7 +157,11 @@ def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, An
         batch_started_at = perf_counter()
         batch_chunks = chunks[batch_start:batch_start + ingestion_batch_size]
         batch_content = [chunk.page_content for chunk in batch_chunks]
-        batch_chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in batch_chunks]
+        # prevent Surrogate Halves errors through invalid UTF-8 characters in the text through replacing
+        batch_chunk_hash = [
+            hashlib.md5(chunk.page_content.encode("utf-8", errors="replace")).hexdigest()
+            for chunk in batch_chunks
+        ]
 
         embeddings = create_embeddings(
             batch_content,
