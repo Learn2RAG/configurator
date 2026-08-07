@@ -92,7 +92,7 @@ def read_dataset_qa(file_path: pathlib.Path | str, split: str | None = None) -> 
             first_line = f.readline()
             try:
                 # Sniff for comma, semicolon, or tab
-                dialect = csv.Sniffer().sniff(first_line, delimiters=[',', ';', '\t'])
+                dialect = csv.Sniffer().sniff(first_line, delimiters=",;\t")
                 detected_sep = dialect.delimiter
             except csv.Error:
                 # Fallback to standard comma if sniffing fails

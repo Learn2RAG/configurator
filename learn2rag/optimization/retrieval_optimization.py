@@ -518,6 +518,7 @@ def run(
         for i, r in enumerate(qa)
     ]
 
+    prompt_map = registry["prompts"]
     cs = ConfigurationSpace(seed=42)
     cs.add([
         Categorical("chunk_size", [250, 1000, 2000], default=1000),
@@ -528,6 +529,8 @@ def run(
         Categorical("fusion_mode", ["none", "DBSF", "RRF"], default="none"),
         Categorical("reranking", ["True", "False"], default="False"),
         Categorical("rewrite", ["True", "False"], default="False"),
+        Integer("top_k", (1, 20), default=4),
+        Categorical("prompt_template", list(prompt_map.keys()), default="default"),
     ])
     cs.add(ForbiddenGreaterThanRelation(cs["chunk_overlap"], cs["chunk_size"]))
 
