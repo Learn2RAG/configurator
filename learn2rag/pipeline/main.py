@@ -1,16 +1,19 @@
+import asyncio
+import logging
 import logging.config
 import yaml
-import asyncio
+from operator import itemgetter
 
 from langchain_core.documents.base import Document
 
 from . import ingestion
 from . import search
 from . import generate
+from .operators import BasicPipeline
 from .store import delete_collection, delete_documents, get_documents, update_documents
 
 
-if __name__ == "__main__":
+async def main() -> None:
     try:
         logging.config.dictConfig(yaml.safe_load(open("./learn2rag/pipeline/logging.yaml").read()))
     except FileNotFoundError:
@@ -62,22 +65,26 @@ if __name__ == "__main__":
     if opt_config["query_mode"] == "multi":
         # in query_mode 'multi' different querys for each vector in the multi-vector are allowed
         multi_query = {"content": "What is USM AI?", "title": "What is USM AI?", "summary": "What is USM AI?", "source_path":"USU/ITSM/"}
-        results = search.search_multi(multi_query, user_config, opt_config, request_id=None)
+        results = search.search_multi(multi_query, user_config, opt_config)
         points = results.points
         # modify the query for generation part
         query = " ".join(f"{k}={v}" for k, v in multi_query.items())
+        answer = generate.generate(query, points, opt_config)
     else:
+        pipeline = BasicPipeline()
         query = "Was sind A, B und C?"
-        user = "anonymous"
-        points = asyncio.run(search.search_authorized(query, user, request_id=None))
+        answer, points = itemgetter('answer', 'documents')(await pipeline(
+            inputs={'question': query, 'user': 'anonymous'},
+        ))
 
-    sources = set(point.payload['source'] for point in points) # type: ignore[index]
+    sources = "\n".join(set(point.payload['path'] for point in points)) # type: ignore[index]
 
     for point in points:
         print(f"ID: {point.id}, Path: {point.payload['source']}, Score: {point.score}") # type: ignore[index]
 
-    answer = generate.generate(query, points, opt_config)
-
     print(query)
     print(answer)
     print(sources)
+
+if __name__ == "__main__":
+    asyncio.run(main())

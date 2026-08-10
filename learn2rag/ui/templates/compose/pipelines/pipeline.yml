@@ -41,6 +41,8 @@ files:
           format: "%(log_color)s%(asctime)s %(levelname)-8s %(name)s %(message)s"
         profiling:
           format: "%(created)f %(request_id)s %(activity)s %(message)s"
+          defaults:
+            request_id: null
       handlers:
         display:
           class: logging.StreamHandler

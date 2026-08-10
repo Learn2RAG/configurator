@@ -5,8 +5,6 @@ from qdrant_client.http.models import ScoredPoint
 from .llm import llm
 
 
-profilingLogger = logging.getLogger('profiling')
-
 context_template ="""
 -----
 Source: {source}
@@ -27,8 +25,7 @@ def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str
     return answer.content
 
 
-def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], request_id: str | None=None) -> Generator[str, None, None]:
-    profilingLogger.info('start', extra={'activity': 'generate', 'request_id': request_id})
+def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Generator[str, None, None]:
     assert llm is not None
 
     if hasattr(search_results, "points"):
@@ -44,5 +41,3 @@ def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: d
         text_chunk = chunk.text()
         if text_chunk:
             yield text_chunk
-
-    profilingLogger.info('end', extra={'activity': 'generate', 'request_id': request_id})

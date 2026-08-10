@@ -188,7 +188,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         suggested_models = app.config.get('SUGGESTED_MODELS', {})
         return {
             'suggested_models': suggested_models,
-            'firststeps_model': suggested_models.get('gemma3_27b'),
+            'firststeps_model': suggested_models.get('gemma4_26b'),
             'models': learn2rag.data.get_all(app.instance_path, 'models'),
             'sources': learn2rag.data.get_all(app.instance_path, 'sources'),
             'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
