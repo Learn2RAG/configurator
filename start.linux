@@ -18,7 +18,7 @@ if ! services/start-open-webui main --version; then
 fi
 echo ========================================
 echo 2/3 Preparing configurator...
-if ! FLASK_DEBUG=1 LEARN2RAG_PATH=. ./configurator --prepare-only; then
+if ! ./configurator learn2rag.noop; then
     cleanup_pyapp
 fi
 echo ========================================

@@ -11,8 +11,7 @@ if %ERRORLEVEL% neq 0 goto cleanup
 
 echo ========================================
 echo 2/3 Preparing configurator...
-set FLASK_DEBUG=1
-.\configurator --prepare-only
+.\configurator learn2rag.noop
 if %ERRORLEVEL% neq 0 goto cleanup
 
 echo ========================================

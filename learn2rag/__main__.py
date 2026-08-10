@@ -24,7 +24,6 @@ class LauncherArgumentParser(argparse.ArgumentParser):
         self.add_argument('module', type=str, nargs='?', default='learn2rag.ui')
         self.add_argument('--logging-config', type=pathlib.Path)
         self.add_argument('--schedule-interval', type=TypeAdapter(timedelta).validate_python)
-        self.add_argument('--prepare-only', action='store_true')
 
 
 def excepthook(*exc_info: Unpack[tuple[type[BaseException], BaseException, TracebackType | None]]) -> None:
@@ -65,11 +64,6 @@ if __name__ == '__main__':
     logging.info(f"DEBUG - UNPARSED REST: {rest}")
     configure_logging(args.logging_config, config.get('logging', {}).get('debug', False))
     logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
-
-    if args.prepare_only:
-        logging.info('Preparation mode enabled. Environment extracted and initialized.')
-        sys.exit(0)
-
 
     module = importlib.import_module(args.module)
 
