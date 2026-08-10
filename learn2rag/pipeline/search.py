@@ -2,6 +2,7 @@ import warnings
 from typing import List, Any, cast
 import logging
 import copy
+from functools import lru_cache
 
 import numpy as np
 from FlagEmbedding import FlagReranker # type: ignore[import-untyped]
@@ -15,8 +16,17 @@ from .embeddings import create_embeddings
 from .qdrant import Qdrant
 from . import rewrite
 
-
 profilingLogger = logging.getLogger('profiling')
+
+
+@lru_cache(maxsize=4)
+def _get_flag_reranker(model_name: str, use_fp16: bool) -> FlagReranker:
+    return FlagReranker(model_name, use_fp16=use_fp16)
+
+
+@lru_cache(maxsize=4)
+def _get_cross_encoder(model_name: str) -> CrossEncoder:
+    return cast(CrossEncoder, CrossEncoder(model_name))
 
 
 def _sort_and_deduplicate(points: list[ScoredPoint]) -> list[ScoredPoint]:
@@ -48,7 +58,7 @@ def _rerank_points_with_flagreranker(
     model_name: str = "BAAI/bge-reranker-v2-m3",
     use_fp16: bool = True,
 ) -> list[ScoredPoint]:
-    reranker = FlagReranker(model_name, use_fp16=use_fp16)
+    reranker = _get_flag_reranker(model_name, use_fp16)
 
     valid_points = [p for p in points if p.payload and isinstance(p.payload.get("content"), str)]
     if len(valid_points) != len(points):
@@ -78,7 +88,7 @@ def _rerank_points_with_sentence_transformers(
         model_name: str = "cross-encoder/ms-marco-MiniLM-L6-v2",
 ) -> list[ScoredPoint]:
 
-    model = CrossEncoder(model_name)
+    model = _get_cross_encoder(model_name)
 
     valid_points = [p for p in points if p.payload and isinstance(p.payload.get("content"), str)]
     if len(valid_points) != len(points):
@@ -141,34 +151,34 @@ def _collect_query_points(
 
 
     profilingLogger.info(
-        "collect_query_points_start query=%r rewrite=%s rewrite_mode=%s request_id=%s",
+        "collect_query_points_start query=%r rewrite=%s rewrite_mode=%s",
         query,
         opt_config.get("rewrite"),
         opt_config.get("rewrite_mode"),
-        request_id,
+        extra={'activity': '_collect_query_points', 'request_id': request_id},
     )
 
     points_all: list[ScoredPoint] = []
 
     # Base query
     profilingLogger.info(
-        "base_search_start query=%r search_mode=%s top_k=%s request_id=%s",
+        "base_search_start query=%r search_mode=%s top_k=%s",
         query,
         opt_config.get("search_mode"),
         opt_config.get("top_k"),
-        request_id,
+        extra={'activity': '_collect_query_points', 'request_id': request_id},
     )
-    base_results = search(query, user_config, opt_config, request_id=request_id)
+    base_results = search(query, user_config, opt_config)
     points_all.extend(base_results.points)
 
     if opt_config.get("rewrite") == "True":
         rewrite_mode = opt_config.get("rewrite_mode")
 
         profilingLogger.info(
-            "rewrite_enabled query=%r rewrite_mode=%s request_id=%s",
+            "rewrite_enabled query=%r rewrite_mode=%s",
             query,
             rewrite_mode,
-            request_id,
+            extra={'activity': '_collect_query_points', 'request_id': request_id},
         )
 
         if rewrite_mode in ["subqueries", "subqueries_keywords"]:
@@ -177,16 +187,16 @@ def _collect_query_points(
 
             subqueries = rewrite.generate_subqueries(query, n=opt_config["n_subqueries"])
             profilingLogger.info(
-                "subqueries_generated query=%r subqueries=%r n_subqueries=%d top_k_subqueries=%s request_id=%s",
+                "subqueries_generated query=%r subqueries=%r n_subqueries=%d top_k_subqueries=%s",
                 query,
                 subqueries,
                 len(subqueries),
                 opt_config_subqueries["top_k"],
-                request_id,
+                extra={'activity': '_collect_query_points', 'request_id': request_id},
             )
 
             for sq in subqueries:
-                sq_results = search(sq, user_config, opt_config_subqueries, request_id=request_id)
+                sq_results = search(sq, user_config, opt_config_subqueries)
                 points_all.extend(sq_results.points)
 
         if rewrite_mode in ["keywords", "subqueries_keywords"]:
@@ -196,17 +206,17 @@ def _collect_query_points(
 
             keywords = rewrite.generate_keywords(query, n=opt_config["n_keywords"])
             profilingLogger.info(
-                "keywords_generated query=%r keywords=%r n_keywords=%d top_k_keywords=%s search_mode=%s request_id=%s",
+                "keywords_generated query=%r keywords=%r n_keywords=%d top_k_keywords=%s search_mode=%s",
                 query,
                 keywords,
                 len(keywords),
                 opt_config_keywords["top_k"],
                 opt_config_keywords["search_mode"],
-                request_id,
+                extra={'activity': '_collect_query_points', 'request_id': request_id},
             )
 
             for kw in keywords:
-                kw_results = search(kw, user_config, opt_config_keywords, request_id=request_id)
+                kw_results = search(kw, user_config, opt_config_keywords)
                 points_all.extend(kw_results.points)
 
     points = _sort_and_deduplicate(points_all)
@@ -214,10 +224,10 @@ def _collect_query_points(
     if opt_config["reranking"] == "True":
         reranking_mode = opt_config["reranking_mode"]
         profilingLogger.info(
-            "reranking_enabled query=%r reranking_mode=%s request_id=%s",
+            "reranking_enabled query=%r reranking_mode=%s",
             query,
             reranking_mode,
-            request_id,
+            extra={'activity': '_collect_query_points', 'request_id': request_id},
         )
 
         if reranking_mode == "reranking_with_flagreranker":
@@ -246,14 +256,14 @@ def _collect_query_points(
 
 
 # similarity search
-def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], *, request_id: str | None=None) -> QueryResponse:
-    profilingLogger.info('start', extra={'activity': 'search', 'request_id': request_id})
+def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
+    profilingLogger.info('start', extra={'activity': 'search'})
     profilingLogger.info(
-        "search_called query=%r search_mode=%s collection_name=%s request_id=%s",
+        "search_called query=%r search_mode=%s collection_name=%s",
         query,
         opt_config.get("search_mode"),
         user_config.get("collection_name"),
-        request_id,
+        extra={'activity': '_collect_query_points'},
     )
     collection_name = user_config["collection_name"]
 
@@ -373,8 +383,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
         )
     return results
 
-
-def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_config: dict[str, Any], request_id: str | None=None) -> QueryResponse:
+def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
     collection_name = user_config["collection_name"]
 
     # Init vector store
@@ -405,12 +414,10 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
         using="multi",
         limit=opt_config["top_k"],
     )
-    profilingLogger.info('end', extra={'activity': 'search', 'request_id': request_id})
     return results
 
-
-async def search_authorized(question: str, user: str, *, request_id: str | None = None) -> List[ScoredPoint]:
-    points = _collect_query_points(question, user_config, opt_config, request_id=request_id)
+async def search_authorized(question: str, user: str) -> List[ScoredPoint]:
+    points = _collect_query_points(question, user_config, opt_config)
     query_response = QueryResponse(points=points)
     authorized_points = await filter_authorized(user, query_response)
     # keep deterministic order after auth filter

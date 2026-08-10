@@ -1,0 +1,11 @@
+id,timestamp,event_type,user_id,action,status
+1,2026-01-15T08:30:00,login,u001,user_logged_in,success
+2,2026-01-15T08:35:22,document_view,u001,view_document_pdf,success
+3,2026-01-15T09:00:15,document_edit,u001,edit_configuration,success
+4,2026-01-15T09:15:00,document_export,u001,export_to_csv,success
+5,2026-01-15T09:45:33,search,u001,search_query_executed,success
+6,2026-01-15T10:00:00,login,u002,user_logged_in,success
+7,2026-01-15T10:15:22,document_view,u002,view_document_pdf,success
+8,2026-01-15T10:30:00,document_create,u002,create_new_project,success
+9,2026-01-15T10:45:15,error,u002,file_upload_failed,error
+10,2026-01-15T11:00:00,logout,u002,user_logged_out,success

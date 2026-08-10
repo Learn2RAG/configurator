@@ -74,6 +74,9 @@
           {% endfor %}
         </div>
 
+        <div id="connection_indicator">
+        </div>
+
         {% include 'firststeps.html' %}
 
         <header>
@@ -88,19 +91,17 @@
     {% include 'footer.html' %}
 
     <script type="text/javascript">
-      // FIXME
-      const errorHandler = event => {
-          console.log(event.type);
-          if (!document.querySelector('#communication_error')) {
+      document.body.addEventListener('htmx:afterRequest', event => {
+          if (event.detail.successful) {
+              document.querySelector('#communication_error')?.remove();
+          } else if (!document.querySelector('#communication_error')) {
               const el = document.createElement('div');
               el.className = 'alert alert-danger';
               el.id = 'communication_error';
-              el.innerText = 'Server communication error';
-              document.querySelector('#flashed_messages').append(el);
+              el.innerText = "{{gettext('Failed to connect to your Learn2RAG server')}}";
+              document.querySelector('#connection_indicator').append(el);
           }
-      };
-      document.body.addEventListener('htmx:sendError', errorHandler);
-      document.body.addEventListener('htmx:responseError', errorHandler);
+      });
     </script>
   </body>
 </html>

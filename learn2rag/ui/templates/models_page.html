@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}{{pgettext('title', 'Language models')}}{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<p class="d-inline-flex gap-1">
+  <button accesskey="n" class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
+    {{pgettext('button', 'Add a new language model')}}
+  </button>
+</p>
+<div class="collapse" id="collapseCreate">
+  <div class="card card-body">
+    {% include 'models_add.html' %}
+  </div>
+</div>
+
+{% include 'models_list.html' %}
+{% endblock %}

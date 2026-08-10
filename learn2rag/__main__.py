@@ -50,11 +50,10 @@ def configure_logging(config_path: pathlib.Path, debug: bool) -> None:
 
 if __name__ == '__main__':
     sys.excepthook = excepthook
-
-    config = {}
+    config: dict[str, Any] = {}
     try:
         with open('config.yml', 'r') as f:
-            config = yaml.safe_load(f)
+            config = yaml.safe_load(f) or {}
     except FileNotFoundError:
         if len(sys.argv) == 1:
             print('You can create config.yml for more configuration options')
@@ -63,7 +62,9 @@ if __name__ == '__main__':
     args, rest = LauncherArgumentParser().parse_known_args()
     configure_logging(args.logging_config, config.get('logging', {}).get('debug', False))
     logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
+
     module = importlib.import_module(args.module)
+
     # TODO
     module_args: tuple[Any, ...] = ()
     module_kwargs = {}
@@ -81,6 +82,7 @@ if __name__ == '__main__':
         module_args = (
             config,
         )
+
 
     if args.schedule_interval:
         scheduler = BlockingScheduler()
