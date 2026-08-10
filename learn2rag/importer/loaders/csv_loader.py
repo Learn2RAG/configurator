@@ -27,7 +27,7 @@ def load_from_csv(path: str) -> List[Document]:
     """
 
     loader = CSVLoader(file_path=path)
-    documents = cast(List[Document], loader.load())
+    documents = loader.load()
     if not documents:
         raise ValueError(f"No document found in CSV file: {path}")
 
