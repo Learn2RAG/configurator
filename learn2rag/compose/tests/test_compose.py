@@ -29,7 +29,11 @@ class ComposeTestCase(unittest.TestCase):
         assert self.project is not None
         self.project.start()
         assert self.project.running
-        time.sleep(0.1)
+        for _ in range(20):
+            self.project = Project.get(name)
+            if not self.project.running:
+                break
+            time.sleep(0.1)
         self.project = Project.get(name)
         assert self.project is not None
         assert not self.project.running
@@ -42,7 +46,11 @@ class ComposeTestCase(unittest.TestCase):
         assert self.project is not None
         self.project.start()
         assert self.project.running
-        time.sleep(0.1)
+        for _ in range(20):
+            self.project = Project.get(name)
+            if not self.project.running:
+                break
+            time.sleep(0.1)
         self.project = Project.get(name)
         assert self.project is not None
         assert not self.project.running
@@ -55,7 +63,11 @@ class ComposeTestCase(unittest.TestCase):
         assert self.project is not None
         self.project.start()
         assert self.project.running
-        time.sleep(0.1)
+        for _ in range(20):
+            self.project = Project.get(name)
+            if not self.project.running:
+                break
+            time.sleep(0.1)
         self.project = Project.get(name)
         assert self.project is not None
         assert self.project.running
