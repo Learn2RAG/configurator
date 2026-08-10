@@ -15,7 +15,7 @@ import psutil
 import yaml
 
 logger = logging.getLogger(__name__)
-
+active_popens: dict[int, subprocess.Popen] = {}
 # FIXME
 # remove child processes immediately when they exit
 import platform
@@ -23,7 +23,7 @@ import signal
 
 
 exit_statuses = {}
-
+# Windows does not support SIGCHLD
 if hasattr(signal, "SIGCHLD"):
     def handle_SIGCHLD(signum: int, frame: Optional[Any]) -> None:
         with contextlib.suppress(ChildProcessError):
@@ -158,9 +158,23 @@ class Project():
         cur.execute('SELECT * FROM services WHERE project = :project', {'project': self.name})
         rows = cur.fetchall()
         cur.close()
+
+        if not hasattr(signal, "SIGCHLD"):
+            for row in rows:
+                pid = row['pid']
+                if pid in active_popens:
+                    ret = active_popens[pid].poll()
+                    if ret is not None:
+                        exit_statuses[pid] = ret
+
         if stopped := list(filter(lambda row: not process_running(row['pid']), rows)):
             logger.info('Stopping project %s due to stopped services: %s', self.name, [row['name'] for row in stopped])
             self.stop(stopped=stopped)
+
+            for process in stopped:
+                pid = process['pid']
+                if pid in active_popens:
+                    del active_popens[pid]
 
     def healthcheck(self) -> None:
         # what it should be when there are no healthchecks defined?
@@ -239,12 +253,14 @@ class Project():
                 con.rollback()
                 raise e
             self.services.append(proc)
+            active_popens[proc.pid] = proc
             cur.execute('INSERT INTO services (project, name, pid) VALUES (:project, :name, :pid)', {
                 'project': self.name,
                 'name': name,
                 'pid': proc.pid,
             })
-            del proc
+            # we dont delete because for windows we need to retrive the exit code
+            # del proc
             # what if insert failed?
         con.commit()
         cur.close()
