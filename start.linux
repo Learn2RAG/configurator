@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+cd "$(dirname "$0")"
+
 cleanup_pyapp() {
     echo "Initialization failed. Cleaning up, please try to run it again"
     ./services/start-open-webui self remove

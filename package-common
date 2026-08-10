@@ -1,0 +1,133 @@
+#!/bin/bash
+set -eu
+
+BUNDLE_NAME=learn2rag-$(echo $CARGO_BUILD_TARGET |cut -d '-' -f 3)
+
+./build-python
+VERSION=$(uv version --short)
+
+# https://github.com/cross-rs/cross/wiki/FAQ#glibc-version-error
+CARGO_TARGET_DIR=target/build/"${CARGO_BUILD_TARGET}"
+
+BUNDLE_DIR=~/.cache/learn2rag-dist
+BUNDLE=$BUNDLE_DIR/$BUNDLE_NAME
+rm -rf $BUNDLE
+rm -f $BUNDLE.zip
+
+mkdir -p $BUNDLE
+mkdir -p $BUNDLE/services
+
+export PYAPP_DISTRIBUTION_EMBED=true
+export PYAPP_FULL_ISOLATION=false
+export PYAPP_EXPOSE_ALL_COMMANDS=true
+
+echo "Clearing Cargo cache..."
+(cd pyapp && cross clean)
+
+# Bake the relative offline path directly into the binaries
+OFFLINE_ARGS="--no-index --find-links=./services/wheels"
+
+cp dist/learn2rag-$VERSION-py3-none-any.whl pyapp
+(cd pyapp; \
+    PYAPP_PYTHON_VERSION=3.13 \
+    PYAPP_PROJECT_NAME=learn2rag \
+    PYAPP_PROJECT_PATH=learn2rag-$VERSION-py3-none-any.whl \
+    PYAPP_PIP_EXTRA_ARGS="$OFFLINE_ARGS" \
+    PYAPP_DISTRIBUTION_EMBED=true \
+    PYAPP_FULL_ISOLATION=false \
+    PYAPP_EXPOSE_ALL_COMMANDS=true \
+    cross build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp$BIN_SUFFIX $BUNDLE/configurator$BIN_SUFFIX
+
+cp services/open-webui/dist/open_webui-0.8.12-py3-none-any.whl pyapp
+touch pyapp/Cargo.toml
+touch pyapp/src/main.rs 2>/dev/null || true
+(cd pyapp; \
+    PYAPP_PYTHON_VERSION=3.11 \
+    PYAPP_PROJECT_NAME=open-webui \
+    PYAPP_PROJECT_PATH=open_webui-0.8.12-py3-none-any.whl \
+    PYAPP_EXEC_SPEC=open_webui:app \
+    PYAPP_PIP_EXTRA_ARGS="$OFFLINE_ARGS" \
+    cross build --release --target $CARGO_BUILD_TARGET)
+cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp$BIN_SUFFIX $BUNDLE/services/start-open-webui$BIN_SUFFIX
+
+while read -u 100 file; do
+    mkdir -p $BUNDLE/$(dirname $file)
+    cp -r $file $BUNDLE/$file
+done 100<Distfiles
+
+WHEELS_DIR=$BUNDLE/services/wheels
+mkdir -p $WHEELS_DIR
+
+rm -f $WHEELS_DIR/open_webui-*.whl # if something is cached
+
+rm -rf $BUNDLE_DIR/venv313 $BUNDLE_DIR/venv311
+uv venv --seed --python 3.13.5 $BUNDLE_DIR/venv313
+uv venv --seed --python 3.11 $BUNDLE_DIR/venv311
+
+echo "Pre-building known pure-python source packages to universal wheels..."
+$BUNDLE_DIR/venv311/bin/python -m pip wheel "antlr4-python3-runtime==4.9.3" "langdetect==1.0.9" -w $WHEELS_DIR
+
+#if [[ "$CARGO_BUILD_TARGET" == *"windows"* ]]; then
+#    echo "Downloading dependencies for Windows target..."
+##--only-binary=:all:
+#    $BUNDLE_DIR/venv311/bin/python -m pip download \
+#        --no-deps --platform win_amd64 --python-version 3.11 --implementation cp --abi cp311 \
+#         wheel setuptools -d $WHEELS_DIR
+#
+#    $BUNDLE_DIR/venv312/bin/python -m pip download \
+#        --platform win_amd64 --python-version 3.12 --implementation cp --abi cp312 \
+#        --no-deps --find-links $WHEELS_DIR \
+#        dist/learn2rag-$VERSION-py3-none-any.whl -d $WHEELS_DIR
+#
+#    $BUNDLE_DIR/venv311/bin/python -m pip download \
+#        --platform win_amd64 --python-version 3.11 --implementation cp --abi cp311 \
+#        --no-deps --find-links $WHEELS_DIR \
+#        services/open-webui/dist/open_webui-0.6.15-py3-none-any.whl -d $WHEELS_DIR
+
+if [[ "$CARGO_BUILD_TARGET" == *"windows"* ]]; then
+    echo "Generating strict Windows dependency lockfiles..."
+    echo "services/open-webui/dist/open_webui-0.8.12-py3-none-any.whl" > $BUNDLE_DIR/req-webui.in
+    echo "dist/learn2rag-$VERSION-py3-none-any.whl" > $BUNDLE_DIR/req-learn2rag.in
+    uv pip compile $BUNDLE_DIR/req-webui.in \
+        --python-version 3.11 \
+        --python-platform windows \
+        -o $BUNDLE_DIR/win-webui-reqs.txt
+
+    uv pip compile $BUNDLE_DIR/req-learn2rag.in \
+        --python-version 3.13.5 \
+        --python-platform windows \
+        -o $BUNDLE_DIR/win-l2r-reqs.txt
+
+    echo "Downloading locked dependencies for Windows target..."
+
+    # 2. Download the exact packages from the lockfiles
+    # (--no-deps stops pip from re-evaluating the tree and crashing)
+    $BUNDLE_DIR/venv311/bin/python -m pip download \
+        --platform win_amd64 --python-version 3.11 --implementation cp --abi cp311 \
+        --no-deps --find-links $WHEELS_DIR \
+        -r $BUNDLE_DIR/win-webui-reqs.txt -d $WHEELS_DIR
+
+    $BUNDLE_DIR/venv313/bin/python -m pip download \
+        --platform win_amd64 --python-version 3.13.5 --implementation cp --abi cp313 \
+        --no-deps --find-links $WHEELS_DIR \
+        -r $BUNDLE_DIR/win-l2r-reqs.txt -d $WHEELS_DIR
+
+    $BUNDLE_DIR/venv311/bin/python -m pip download \
+        --platform win_amd64 --python-version 3.11 --implementation cp --abi cp311 \
+        --no-deps wheel setuptools -d $WHEELS_DIR
+else
+    echo "Downloading dependencies for Native Linux target..."
+
+    $BUNDLE_DIR/venv311/bin/python -m pip download wheel setuptools -d $WHEELS_DIR
+
+    $BUNDLE_DIR/venv313/bin/python -m pip download \
+        --find-links $WHEELS_DIR \
+        dist/learn2rag-$VERSION-py3-none-any.whl -d $WHEELS_DIR
+
+    $BUNDLE_DIR/venv311/bin/python -m pip download \
+        --find-links $WHEELS_DIR \
+        services/open-webui/dist/open_webui-0.8.12-py3-none-any.whl -d $WHEELS_DIR
+fi
+
+rm -rf $BUNDLE_DIR/venv313 $BUNDLE_DIR/venv311
