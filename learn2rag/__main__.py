@@ -60,8 +60,6 @@ if __name__ == '__main__':
             print('https://docs.learn2rag.de/en/basic/administrator/#advanced-configuration')
 
     args, rest = LauncherArgumentParser().parse_known_args()
-    logging.info(f"DEBUG - PARSED ARGS: {args}")
-    logging.info(f"DEBUG - UNPARSED REST: {rest}")
     configure_logging(args.logging_config, config.get('logging', {}).get('debug', False))
     logging.debug('Learn2RAG launcher starting: %s, %s', args, rest)
 
