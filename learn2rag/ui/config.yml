@@ -31,6 +31,8 @@ SUGGESTED_MODELS:
       model: llama3.3:70b
   tinyllama:
     label: TinyLlama
+    description: |
+      A very small model to try things out. Do not expect good results from it!
     image: models/tinyllama.png
     link: https://github.com/jzhang38/TinyLlama
     ollama: pull
