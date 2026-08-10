@@ -730,6 +730,8 @@ class JiraLoaderUnitTestCase(unittest.TestCase):
             "maxResults": 50,
         }
 
+        # Simulate a Jira Server without the new POST /search/jql endpoint so the loader falls back to GET.
+        mock_session.post.return_value = _make_response("", status_code=404)
         mock_session.get.return_value = _make_json_response(issue_payload)
 
         docs = load_from_jira(
@@ -773,6 +775,7 @@ class JiraLoaderUnitTestCase(unittest.TestCase):
                 "maxResults": 1,
             }
         )
+        mock_session.post.return_value = _make_response("", status_code=404)
         mock_session.get.side_effect = [first_page, second_page]
 
         ids = get_all_jira_document_ids(
@@ -795,6 +798,7 @@ class JiraLoaderUnitTestCase(unittest.TestCase):
     def test_load_from_jira_applies_since_filter_to_jql(self, mock_session_cls: MagicMock) -> None:
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
+        mock_session.post.return_value = _make_response("", status_code=404)
         mock_session.get.return_value = _make_json_response(
             {
                 "issues": [],

@@ -10,7 +10,7 @@ Author: Kyrill Meyer
 Institution: IFDT
 Version: 0.0.1
 Creation Date: May 18, 2026
-Last Modified: May 18, 2026
+Last Modified: August 10, 2026
 """
 
 import hashlib
@@ -246,8 +246,12 @@ def _iter_issues_post(
     jql: str,
     page_size: int,
     fields: List[str],
-) -> Generator[Dict[str, Any], None, None]:
-    """Iterate Jira issues using the new POST /search/jql endpoint (Jira Cloud 2024+)."""
+) -> Generator[Dict[str, Any], None, bool]:
+    """Iterate Jira issues using the new POST /search/jql endpoint (Jira Cloud 2024+).
+
+    Returns (via the generator's return value) True if a working endpoint was found
+    (even with zero issues), False if none of the candidates are available.
+    """
     endpoint_candidates = [
         f"{base_url.rstrip('/')}/rest/api/3/search/jql",
         f"{base_url.rstrip('/')}/rest/api/2/search/jql",
@@ -291,13 +295,13 @@ def _iter_issues_post(
 
                 next_page_token = data.get("nextPageToken")
 
-            return
+            return True
 
         except requests.exceptions.RequestException as err:
             logger.warning("JiraLoader: endpoint %s failed: %s", candidate, err)
             continue
 
-    raise StopIteration("POST endpoints not available")
+    return False
 
 
 def _iter_issues_get(
@@ -377,11 +381,9 @@ def _iter_issues(
     fields: List[str],
 ) -> Generator[Dict[str, Any], None, None]:
     """Iterate all Jira issues for a query. Tries new POST endpoint first, falls back to legacy GET."""
-    try:
-        yield from _iter_issues_post(base_url, session, jql, page_size, fields)
+    used_post = yield from _iter_issues_post(base_url, session, jql, page_size, fields)
+    if used_post:
         return
-    except StopIteration:
-        pass
 
     yield from _iter_issues_get(base_url, session, jql, page_size, fields)
 
