@@ -6,7 +6,7 @@ echo Initializing, please wait...
 echo ========================================
 
 echo 1/3 Initializing open-webui...
-call services\start-open-webui main --version
+.\services\start-open-webui main --version
 if %ERRORLEVEL% neq 0 goto cleanup
 
 echo ========================================
