@@ -43,3 +43,18 @@ class ComposeTestCase(unittest.TestCase):
         assert not self.project.running
         assert not self.project.succeeded
         assert self.project.failed
+
+    def test_stop(self) -> None:
+        name = 'stop'
+        self.project = Project.create(data_dir / 'sleep.yml', name)
+        assert self.project is not None
+        self.project.start()
+        assert self.project.running
+        time.sleep(0.1)
+        self.project = Project.get(name)
+        assert self.project is not None
+        assert self.project.running
+        self.project.stop()
+        assert not self.project.running
+        assert not self.project.succeeded
+        assert not self.project.failed
