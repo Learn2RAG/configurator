@@ -603,7 +603,7 @@ def main(config: dict[str, Any]) -> None:
         "app": app,
         "host": host,
         "port": int(port),
-        "log_level": "info",
+        "log_level": "warning",
         "interface": "wsgi",
     }
 
