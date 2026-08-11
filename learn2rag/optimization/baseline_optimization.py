@@ -14,7 +14,7 @@ from typing import Dict, Any, List, Union, Tuple, cast
 from qdrant_client.models import ScoredPoint
 import numpy as np
 from bert_score import score as bert_score # type: ignore
-from ConfigSpace import ConfigurationSpace, Integer, Categorical, ForbiddenGreaterThanRelation, Configuration
+from ConfigSpace import ConfigurationSpace, Integer, Categorical, ForbiddenGreaterThanRelation, Configuration, ForbiddenAndConjunction, ForbiddenEqualsClause
 from smac import HyperparameterOptimizationFacade, Scenario
 
 from learn2rag.evaluation.tools import read_dataset_qa
@@ -85,12 +85,41 @@ def objective(config: Configuration,
     tid = state["trial_count"]
     cfg = dict(config)
     logging.info(f"Trial {tid}: {cfg}")
+    t_start = time.time()
+
+    if (
+            (cfg["rewrite"] == "False" and cfg["rewrite_mode"] != "none") or
+            (cfg["rewrite"] == "True" and cfg["rewrite_mode"] == "none") or
+            (cfg["reranking"] == "False" and cfg["reranking_mode"] != "none") or
+            (cfg["reranking"] == "True" and cfg["reranking_mode"] == "none") or
+            (cfg["search_mode"] in {"dense", "sparse"} and cfg["fusion_mode"] != "none") or
+            (cfg["search_mode"] in {"dense_sparse", "dense_sparse_colbert"} and cfg["fusion_mode"] == "none")
+    ):
+        logging.warning(f"Trial {tid}: Invalid config skipped: {cfg}")
+        cost = 1.0
+        state["best_cost"] = min(state["best_cost"], cost)
+        state["convergence"].append({"trial": tid, "cost": float(cost), "best_cost": float(state["best_cost"])})
+        state["history"].append({
+            "trial_id": tid,
+            "config": cfg,
+            "avg_bertscore_golden": 0.0,
+            "cost": float(cost),
+            "time_s": round(time.time() - t_start, 2),
+            "search_s": 0.0,
+            "gen_s": 0.0,
+            "scoring_s": 0.0,
+        })
+        return float(cost)
 
     working_cfg = copy.deepcopy(opt_config)
     working_cfg.update({
         "top_k": cfg["top_k"],
-       # "chunk_size": cfg["chunk_size"],
-       # "chunk_overlap": cfg["chunk_overlap"],
+        "search_mode": cfg["search_mode"],
+        "reranking_mode": cfg["reranking_mode"],
+        "rewrite_mode": cfg["rewrite_mode"],
+        "fusion_mode": cfg["fusion_mode"],
+        "reranking": cfg["reranking"],
+        "rewrite": cfg["rewrite"],
         "prompt": prompt_map[cfg["prompt_template"]],
     })
 
@@ -99,7 +128,7 @@ def objective(config: Configuration,
 
     predictions, goldens = [], []
     qa_pairs = []
-    t_start = time.time()
+
     t_search, t_gen = 0.0, 0.0
 
     for q in questions:
@@ -121,7 +150,20 @@ def objective(config: Configuration,
             qa_pairs.append({**q, "generated_answer": "", "retrieved_context": ""})
 
     if not predictions:
-        return 1.0
+        cost = 1.0
+        state["best_cost"] = min(state["best_cost"], cost)
+        state["convergence"].append({"trial": tid, "cost": float(cost), "best_cost": float(state["best_cost"])})
+        state["history"].append({
+            "trial_id": tid,
+            "config": cfg,
+            "avg_bertscore_golden": 0.0,
+            "cost": float(cost),
+            "time_s": round(time.time() - t_start, 2),
+            "search_s": round(t_search, 2),
+            "gen_s": round(t_gen, 2),
+            "scoring_s": 0.0,
+        })
+        return float(cost)
 
     t_score = time.time()
     _, _, F1_gold = bert_score(predictions, goldens, lang="en", verbose=False, rescale_with_baseline=True)
@@ -229,12 +271,19 @@ def run(
 
     cs = ConfigurationSpace(seed=42)
     cs.add([
+        #Categorical("chunk_size", [250, 1000, 2000], default=1000),
+        #Categorical("chunk_overlap", [50, 200], default=50),
         Integer("top_k", (1, 20), default=4),
-        #Integer("chunk_size", (200, 4000), default=2000),
-        #Integer("chunk_overlap", (0, 500), default=200),
+        Categorical("search_mode", ["dense", "sparse"], default="dense"),
+        Categorical("reranking_mode", ["none", "reranking_with_flagreranker", "reranking_with_sentence_transformers"], default="none"),
+        Categorical("rewrite_mode", ["none", "subqueries", "keywords", "subqueries_keywords"], default="none"),
+        Categorical("fusion_mode", ["none", "DBSF", "RRF"], default="none"),
+        Categorical("reranking", ["True", "False"], default="False"),
+        Categorical("rewrite", ["True", "False"], default="False"),
         Categorical("prompt_template", list(prompt_map.keys()), default="default"),
     ])
     #cs.add(ForbiddenGreaterThanRelation(cs["chunk_overlap"], cs["chunk_size"]))
+
     scenario = Scenario(
         cs,
         deterministic=True,
