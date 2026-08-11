@@ -6,9 +6,9 @@ This is the main script of the learn2rag-importer project, which is designed to 
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.4
+Version: 0.0.5
 Creation Date: June 10, 2025
-Last Modified: May 20, 2026
+Last Modified: June 29, 2026
 """
 
 import argparse
@@ -24,6 +24,7 @@ from .utils.logging_setup import setup_logging
 from .utils.config_loader import load_json_config, validate_config_entry
 from .loaders.process_loaders import process_configuration_entries, process_delta_imports
 from .utils.import_state import ImportState
+from .utils.progress import ImportProgress
 from learn2rag.pipeline.ingestion import index
 
 
@@ -101,10 +102,14 @@ def init(args: argparse.Namespace) -> None:
 
 #main function to run the application
 def main(args: argparse.Namespace) -> None:
-    statusLogger.info('Import started')
     try:
         config = load_json_config(args.config)
         logger.debug("Configuration loaded successfully, starting validation...")
+        progress = ImportProgress(
+            total_loaders=len(config.get("loaders", [])),
+            mode="delta" if args.delta else "full",
+        )
+        progress.start_import()
 
         # load pipeline configuration for user and opt settings, needed for delta-import and indexing
         user_config_path = os.environ.get("PIPELINE_USER_CONFIG", "learn2rag/pipeline/user_config.json")
@@ -140,13 +145,16 @@ def main(args: argparse.Namespace) -> None:
                     user_config=user_config,
                     opt_config=opt_config,
                     import_state=import_state,
+                    progress=progress,
                 )
+                progress.finish_import()
             else:
                 # full import: all documents load and directly ingest in Qdrant
                 logger.info("Running full import")
-                all_documents = process_configuration_entries(config.get("loaders", []))
+                all_documents = process_configuration_entries(config.get("loaders", []), progress=progress)
                 logger.debug(f"Total documents loaded: {len(all_documents)}")
-                index(all_documents, user_config, opt_config)
+                progress.start_indexing(len(all_documents))
+                index(all_documents, user_config, opt_config, progress=progress)
 
                 # JSON-Dump für Rückwärtskompatibilität (nur mit --save-documents)
                 if args.save_documents:
@@ -155,14 +163,17 @@ def main(args: argparse.Namespace) -> None:
                         json.dump([{"metadata": doc.metadata, "content": doc.page_content} for doc in all_documents], f, ensure_ascii=False, indent=4)
                     logger.debug('Documents saved to: %s', output_path)
 
-            statusLogger.info('Import finished')
+                progress.finish_import(total_documents=len(all_documents))
         else:
             logger.error("Configuration validation failed. No documents were processed.")
-            statusLogger.error('Import failed')
+            progress.fail_import("Configuration validation failed")
             sys.exit(1)
 
     except Exception:
-        statusLogger.error('Import failed')
+        if 'progress' in locals():
+            progress.fail_import()
+        else:
+            statusLogger.error('Import failed')
         raise
 
 

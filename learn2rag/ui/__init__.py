@@ -433,6 +433,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     'web': 'HTMLLoader',
                     'sharepoint': 'SharepointLoader',
                     'drupal': 'DrupalLoader',
+                    'jira': 'JiraLoader',
                 }.get(source.get(
                     'type',
                     'local'  # FIXME: remove this later and throw Exception
