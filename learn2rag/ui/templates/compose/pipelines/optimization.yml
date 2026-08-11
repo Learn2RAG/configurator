@@ -128,7 +128,7 @@ services:
       - '--dataset'
       - 'training'
       - '--strategy'
-      - 'retrieval'
+      - 'baseline'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'

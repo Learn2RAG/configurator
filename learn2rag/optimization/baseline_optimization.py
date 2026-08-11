@@ -9,6 +9,7 @@ import pathlib
 import time
 import copy
 import os
+import asyncio
 from typing import Dict, Any, List, Union, Tuple, cast
 from qdrant_client.models import ScoredPoint
 import numpy as np
@@ -18,8 +19,8 @@ from smac import HyperparameterOptimizationFacade, Scenario
 
 from learn2rag.evaluation.tools import read_dataset_qa
 from learn2rag.pipeline.config import opt_config
-import learn2rag.pipeline.search
-import learn2rag.pipeline.generate
+from learn2rag.pipeline.operators import BasicPipeline
+from learn2rag.pipeline.prov import Prov
 
 def load_registry(registry_source: Union[str, pathlib.Path, Dict[str, Any]] = "registry.json") -> dict[str, Any]:
     if isinstance(registry_source, dict):
@@ -32,35 +33,53 @@ def load_registry(registry_source: Union[str, pathlib.Path, Dict[str, Any]] = "r
     with p.open() as f:
         return cast(Dict[str, Any], json.load(f))
 
-def run_pipeline(question: str, user_config: Dict[str, Any], working_config: Dict[str, Any]) -> Tuple[str, str, float, float]:
-    t0 = time.time()
-    docs = learn2rag.pipeline.search.search(question, user_config, working_config)
-    search_time = time.time() - t0
+# Fixing run_pipeline() to use BasicPipeline()
+def run_pipeline (question: str, user: str) -> Tuple[str, str, float, float]: 
+    prov = Prov()
+    result = asyncio.run(
+        BasicPipeline()(
+            inputs={
+                "question": question,
+                "user": user,
+            },
+            prov=prov,
+        )
+    )
 
-    t0 = time.time()
-    answer = learn2rag.pipeline.generate.generate(question, docs.points, working_config)
-    gen_time = time.time() - t0
+    answer = result["answer"]
+    documents = result["documents"]
 
-    doc_list = docs.points if hasattr(docs, "points") else docs
-    context = ""
-    if doc_list:
-        context_parts = []
-        for d in doc_list:
-            payload = getattr(d, "payload", {}) or {}
-            path = payload.get("path", "unknown") if isinstance(payload, dict) else "unknown"
-            content = payload.get("content", "") if isinstance(payload, dict) else ""
-            context_parts.append(f"Source: {path}\nContent: {content}")
-        context = "\n\n".join(context_parts)
-    return answer, context[:3000], search_time, gen_time
+    search_time = sum(
+        activity.endedAtTime - activity.startedAtTime
+        for activity in prov.items
+        if activity.label == "SearchOperator"
+    )
+    gen_time = sum(
+        activity.endedAtTime - activity.startedAtTime
+        for activity in prov.items
+        if activity.label == "GenerationOperator"
+    )
+
+    context_parts = []
+    for document in documents:
+        payload = getattr(document, "payload", {}) or {}
+        path = payload.get("path", "unknown") if isinstance(payload, dict) else "unknown"
+        content = payload.get("content", "") if isinstance(payload, dict) else ""
+        context_parts.append(f"Source: {path}\nContent: {content}")
+
+    context = "\n\n".join(context_parts)
+
+    return answer, context, search_time, gen_time
+
 
 #I removed seed because there are no use for it
 # removed dataset_name becuase it just use in yser config and now we inject it
 def objective(config: Configuration,
     questions: List[Dict[str, Any]],
-    dataset_name: str,
     state: Dict[str, Any],
-    answers_dir: pathlib.Path
-    ,prompt_map: Dict[str, Any]
+    answers_dir: pathlib.Path, 
+    prompt_map: Dict[str, Any],
+    user: str
 ) -> float:
     state["trial_count"] += 1
     tid = state["trial_count"]
@@ -75,15 +94,8 @@ def objective(config: Configuration,
         "prompt": prompt_map[cfg["prompt_template"]],
     })
 
-    ucfg = {
-        "file_path": None,
-        "collection_name": dataset_name,
-        "imported_documents_file_path": None,
-        "llm": None,
-    }
-    env_user_cfg = os.environ.get("PIPELINE_USER_CONFIG")
-    if env_user_cfg and pathlib.Path(env_user_cfg).exists():
-        ucfg.update(json.loads(pathlib.Path(env_user_cfg).read_text()))
+    opt_config.clear()
+    opt_config.update(working_cfg)
 
     predictions, goldens = [], []
     qa_pairs = []
@@ -95,7 +107,7 @@ def objective(config: Configuration,
         if not q.get("question"):
             continue
         try:
-            answer, context, t_s, t_g = run_pipeline(q["question"], ucfg, working_cfg)
+            answer, context, t_s, t_g = run_pipeline(q["question"], user)
             t_search += t_s
             t_gen += t_g
             predictions.append(answer)
@@ -175,7 +187,11 @@ def param_importance(smac: HyperparameterOptimizationFacade, output_path: pathli
     return result
 
 
-def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[str, pathlib.Path],registry_path: Union[str, pathlib.Path, Dict[str, Any]] ) -> Tuple[
+def run(
+        dataset_name: str, max_questions: int, n_trials: int, 
+        output_dir: Union[str, pathlib.Path],
+        registry_path: Union[str, pathlib.Path, Dict[str, Any]],
+        user: str = 'anonymous') -> Tuple[
         Dict[str, Any], List[Any], Dict[str, Any]]:
     logging.info(f"registry_path is : {registry_path}")
     registry = load_registry(registry_path)
@@ -231,7 +247,8 @@ def run(dataset_name: str, max_questions: int, n_trials: int, output_dir: Union[
 
     smac = HyperparameterOptimizationFacade(
         scenario=scenario,
-        target_function=lambda config, seed=0: objective(config, questions, dataset_name, state, answers_dir,prompt_map)
+        target_function=lambda config, seed=0: objective(
+            config, questions, state, answers_dir,prompt_map, user)
     )
     t0 = time.time()
     incumbent = smac.optimize()
