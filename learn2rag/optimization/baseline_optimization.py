@@ -92,8 +92,8 @@ def objective(config: Configuration,
             (cfg["rewrite"] == "True" and cfg["rewrite_mode"] == "none") or
             (cfg["reranking"] == "False" and cfg["reranking_mode"] != "none") or
             (cfg["reranking"] == "True" and cfg["reranking_mode"] == "none") or
-            (cfg["search_mode"] in {"dense", "sparse"} and cfg["fusion_mode"] != "none") or
-            (cfg["search_mode"] in {"dense_sparse", "dense_sparse_colbert"} and cfg["fusion_mode"] == "none")
+            (cfg["search_mode"] =="dense" and cfg["fusion_mode"] != "none") or
+            (cfg["search_mode"] == "dense_sparse" and cfg["fusion_mode"] == "none")
     ):
         logging.warning(f"Trial {tid}: Invalid config skipped: {cfg}")
         cost = 1.0
@@ -274,7 +274,8 @@ def run(
         #Categorical("chunk_size", [250, 1000, 2000], default=1000),
         #Categorical("chunk_overlap", [50, 200], default=50),
         Integer("top_k", (1, 20), default=4),
-        Categorical("search_mode", ["dense", "sparse"], default="dense"),
+        #Categorical("search_mode", ["dense", "dense_sparse"], default="dense"),   # Can be uncommented when sparse issue is resolved
+        Categorical("search_mode", ["dense"], default="dense"), # Using only until dense_sparse is working
         Categorical("reranking_mode", ["none", "reranking_with_flagreranker", "reranking_with_sentence_transformers"], default="none"),
         Categorical("rewrite_mode", ["none", "subqueries", "keywords", "subqueries_keywords"], default="none"),
         Categorical("fusion_mode", ["none", "DBSF", "RRF"], default="none"),
@@ -283,6 +284,43 @@ def run(
         Categorical("prompt_template", list(prompt_map.keys()), default="default"),
     ])
     #cs.add(ForbiddenGreaterThanRelation(cs["chunk_overlap"], cs["chunk_size"]))
+    for sm in ["dense"]:
+        for fm in ["DBSF", "RRF"]:
+            cs.add(ForbiddenAndConjunction(
+                ForbiddenEqualsClause(cs["search_mode"], sm),
+                ForbiddenEqualsClause(cs["fusion_mode"], fm),
+            ))
+    # Can be uncommented when sparse issue is resolved
+    """ 
+    for sm in ["dense_sparse"]:
+        cs.add(ForbiddenAndConjunction(
+            ForbiddenEqualsClause(cs["search_mode"], sm),
+            ForbiddenEqualsClause(cs["fusion_mode"], "none"),
+       ))
+    """
+
+    for rrm in ["reranking_with_flagreranker", "reranking_with_sentence_transformers"]:
+        cs.add(ForbiddenAndConjunction(
+            ForbiddenEqualsClause(cs["reranking"], "False"),
+            ForbiddenEqualsClause(cs["reranking_mode"], rrm),
+        ))
+
+    cs.add(ForbiddenAndConjunction(
+        ForbiddenEqualsClause(cs["reranking"], "True"),
+        ForbiddenEqualsClause(cs["reranking_mode"], "none"),
+    ))
+
+    for rwm in ["keywords", "subqueries", "subqueries_keywords"]:
+        cs.add(ForbiddenAndConjunction(
+            ForbiddenEqualsClause(cs["rewrite"], "False"),
+            ForbiddenEqualsClause(cs["rewrite_mode"], rwm),
+        ))
+
+    cs.add(ForbiddenAndConjunction(
+        ForbiddenEqualsClause(cs["rewrite"], "True"),
+        ForbiddenEqualsClause(cs["rewrite_mode"], "none"),
+    ))
+
 
     scenario = Scenario(
         cs,
@@ -294,10 +332,16 @@ def run(
     )
     state: Dict[str, Any] = {"trial_count": 0, "best_cost": 1.0, "convergence": [], "history": []}
 
+    initial_design = HyperparameterOptimizationFacade.get_initial_design(
+        scenario = scenario,
+        additional_configs = [cs.sample_configuration()]
+    )
+
     smac = HyperparameterOptimizationFacade(
         scenario=scenario,
         target_function=lambda config, seed=0: objective(
-            config, questions, state, answers_dir,prompt_map, user)
+            config, questions, state, answers_dir,prompt_map, user),
+        initial_design = initial_design
     )
     t0 = time.time()
     incumbent = smac.optimize()
@@ -305,6 +349,7 @@ def run(
         best_cfg = incumbent[0].get_dictionary()
     else:
         best_cfg = incumbent.get_dictionary()
+    best_cfg["prompt"] = prompt_map[best_cfg.pop("prompt_template")]
     importance = param_importance(smac, out)
     total_time = time.time() - t0
     #best_cfg = incumbent.get_dictionary()
@@ -326,8 +371,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("task", nargs='?', default="learn2rag.optimization")
     parser.add_argument("--dataset", type=str, default="WikiEval")
-    parser.add_argument("--max_questions", type=int, default=50)
-    parser.add_argument("--n_trials", type=int, default=10)
+    parser.add_argument("--max_questions", type=int, default=2)
+    parser.add_argument("--n_trials", type=int, default=2)
     parser.add_argument("--logging-config", type=str)
     parser.add_argument("--registry", type=str, default="registry.json")
     parser.add_argument("--output_dir", type=str, default="optimization_results_baseline")
