@@ -70,18 +70,20 @@ def init_db(con: sqlite3.Connection) -> None:
 
 
 def process_running(pid: int) -> bool:
-    # if process := popens.get(pid):
-    #     returncode = process.poll()
-    #     print(returncode)
-    #     return returncode == None
+    # I comment it because it seems for windows kill(pid,0) does not work
+    # try:
+    #     process = psutil.Process(pid)
+    #     os.kill(pid, 0)
+    # except psutil.NoSuchProcess:
+    #     return False
+    # else:
+    #     return process.is_running()
     try:
         process = psutil.Process(pid)
-        os.kill(pid, 0)
     except psutil.NoSuchProcess:
         return False
     else:
         return process.is_running()
-
 
 def healthy(value: list[str]) -> bool:
     assert len(value) == 4
@@ -151,7 +153,8 @@ class Project():
             project.healthcheck()
 
         return project
-
+    # TODO : check for memory leak
+    # If a process stops on its own, check() runs and cleans up the dictionary. But if a user manually stops a project (triggering Project.stop() directly), check() never runs. The processes are killed, but their handles stay in active_popens forever, causing a memory leak
     def check(self) -> None:
         cur = con.cursor()
         cur.row_factory = sqlite3.Row  # type: ignore[assignment]
@@ -287,7 +290,7 @@ class Project():
                 try:
                     kill_process(row['pid'])
                     # TODO wait for services to actually terminate
-                except ProcessLookupError:
+                except (ProcessLookupError, OSError):
                     logger.debug('Attempted to stop a process which does not exist: %s', dict(row))
                 except Exception as e:
                     logger.debug('Attempted to stop a process but got exception: %s, %s', dict(row), e)
