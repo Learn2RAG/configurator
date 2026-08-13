@@ -6,9 +6,9 @@ This is the main script of the learn2rag-importer project, which is designed to 
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.5
+Version: 0.0.6
 Creation Date: June 10, 2025
-Last Modified: June 29, 2026
+Last Modified: August 13, 2026
 """
 
 import argparse
@@ -155,6 +155,11 @@ def main(args: argparse.Namespace) -> None:
                 logger.debug(f"Total documents loaded: {len(all_documents)}")
                 progress.start_indexing(len(all_documents))
                 index(all_documents, user_config, opt_config, progress=progress)
+                for entry in config.get("loaders", []):
+                    loader_id = entry.get("loader_id")
+                    if loader_id:
+                        import_state.save_success(loader_id)
+                        logger.info(f"Updated import state timestamp for loader '{loader_id}'")
 
                 # JSON-Dump für Rückwärtskompatibilität (nur mit --save-documents)
                 if args.save_documents:
