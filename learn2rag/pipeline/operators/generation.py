@@ -17,7 +17,7 @@ Outputs = TypedDict('Outputs', {
 
 class GenerationOperator(BaseOperator):
     async def run(self, inputs: Inputs, prov: Prov) -> Outputs:
-        answer = generate(inputs['question'], inputs['documents'], opt_config)
+        answer = await generate(inputs['question'], inputs['documents'], opt_config)
         return {
             'answer': answer,
         }

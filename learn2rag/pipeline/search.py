@@ -15,6 +15,7 @@ from .config import opt_config, user_config
 from .embeddings import create_embeddings
 from .qdrant import Qdrant
 from . import rewrite
+from .judges import judge_context_relevance
 
 profilingLogger = logging.getLogger('profiling')
 
@@ -421,4 +422,28 @@ async def search_authorized(question: str, user: str) -> List[ScoredPoint]:
     query_response = QueryResponse(points=points)
     authorized_points = await filter_authorized(user, query_response)
     # keep deterministic order after auth filter
-    return _sort_and_deduplicate(list(authorized_points))
+    documents = _sort_and_deduplicate(list(authorized_points))
+
+    if opt_config["context_relevance_judge"]:
+        context_relevance_score = await judge_context_relevance(
+            question=question,
+            documents=documents,
+        )
+        print("Context relevance score:", context_relevance_score)
+        if context_relevance_score < opt_config["judge_threshold"]:
+                retry_config = opt_config.copy()
+                retry_config["rewrite"] = "True"
+
+                points = _collect_query_points(question, user_config, retry_config)
+                query_response = QueryResponse(points=points)
+                authorized_points = await filter_authorized(user, query_response)
+                documents = _sort_and_deduplicate(list(authorized_points))
+
+                context_relevance_score = await judge_context_relevance(
+                    question=question,
+                    documents=documents,
+                )
+
+                print(f"Context relevance score after retry: {context_relevance_score}")
+
+    return documents
