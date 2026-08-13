@@ -91,9 +91,9 @@ def objective(config: Configuration,
             (cfg["rewrite"] == "False" and cfg["rewrite_mode"] != "none") or
             (cfg["rewrite"] == "True" and cfg["rewrite_mode"] == "none") or
             (cfg["reranking"] == "False" and cfg["reranking_mode"] != "none") or
-            (cfg["reranking"] == "True" and cfg["reranking_mode"] == "none") or
-            (cfg["search_mode"] =="dense" and cfg["fusion_mode"] != "none") or
-            (cfg["search_mode"] == "dense_sparse" and cfg["fusion_mode"] == "none")
+            (cfg["reranking"] == "True" and cfg["reranking_mode"] == "none")
+            #(cfg["search_mode"] =="dense" and cfg["fusion_mode"] != "none") or
+            #(cfg["search_mode"] == "dense_sparse" and cfg["fusion_mode"] == "none")
     ):
         logging.warning(f"Trial {tid}: Invalid config skipped: {cfg}")
         cost = 1.0
@@ -114,7 +114,7 @@ def objective(config: Configuration,
     working_cfg = copy.deepcopy(opt_config)
     working_cfg.update({
         "top_k": cfg["top_k"],
-        "search_mode": cfg["search_mode"],
+        #"search_mode": cfg["search_mode"],
         "reranking_mode": cfg["reranking_mode"],
         "rewrite_mode": cfg["rewrite_mode"],
         "fusion_mode": cfg["fusion_mode"],
@@ -275,29 +275,29 @@ def run(
         #Categorical("chunk_overlap", [50, 200], default=50),
         Integer("top_k", (1, 20), default=4),
         #Categorical("search_mode", ["dense", "dense_sparse"], default="dense"),   # Can be uncommented when sparse issue is resolved
-        Categorical("search_mode", ["dense"], default="dense"), # Using only until dense_sparse is working
+        #Categorical("search_mode", ["dense"], default="dense"), # Using only until dense_sparse is working
         Categorical("reranking_mode", ["none", "reranking_with_flagreranker", "reranking_with_sentence_transformers"], default="none"),
-        Categorical("rewrite_mode", ["none", "subqueries", "keywords", "subqueries_keywords"], default="none"),
+        Categorical("rewrite_mode", ["none", "subqueries"], default="none"),
         Categorical("fusion_mode", ["none", "DBSF", "RRF"], default="none"),
         Categorical("reranking", ["True", "False"], default="False"),
         Categorical("rewrite", ["True", "False"], default="False"),
         Categorical("prompt_template", list(prompt_map.keys()), default="default"),
     ])
     #cs.add(ForbiddenGreaterThanRelation(cs["chunk_overlap"], cs["chunk_size"]))
-    for sm in ["dense"]:
-        for fm in ["DBSF", "RRF"]:
-            cs.add(ForbiddenAndConjunction(
-                ForbiddenEqualsClause(cs["search_mode"], sm),
-                ForbiddenEqualsClause(cs["fusion_mode"], fm),
-            ))
+    # for sm in ["dense"]:
+    #     for fm in ["DBSF", "RRF"]:
+    #         cs.add(ForbiddenAndConjunction(
+    #             ForbiddenEqualsClause(cs["search_mode"], sm),
+    #             ForbiddenEqualsClause(cs["fusion_mode"], fm),
+    #         ))
     # Can be uncommented when sparse issue is resolved
-    """ 
-    for sm in ["dense_sparse"]:
-        cs.add(ForbiddenAndConjunction(
-            ForbiddenEqualsClause(cs["search_mode"], sm),
-            ForbiddenEqualsClause(cs["fusion_mode"], "none"),
-       ))
-    """
+    # """
+    # for sm in ["dense_sparse"]:
+    #     cs.add(ForbiddenAndConjunction(
+    #         ForbiddenEqualsClause(cs["search_mode"], sm),
+    #         ForbiddenEqualsClause(cs["fusion_mode"], "none"),
+    #    ))
+    # """
 
     for rrm in ["reranking_with_flagreranker", "reranking_with_sentence_transformers"]:
         cs.add(ForbiddenAndConjunction(
@@ -310,7 +310,7 @@ def run(
         ForbiddenEqualsClause(cs["reranking_mode"], "none"),
     ))
 
-    for rwm in ["keywords", "subqueries", "subqueries_keywords"]:
+    for rwm in ["subqueries"]:
         cs.add(ForbiddenAndConjunction(
             ForbiddenEqualsClause(cs["rewrite"], "False"),
             ForbiddenEqualsClause(cs["rewrite_mode"], rwm),
