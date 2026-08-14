@@ -8,7 +8,7 @@ from .llm import ragas_llm
 
 assert ragas_llm is not None
 
-embeddings = embedding_factory("huggingface", model = opt_config["embedding_model"])
+embeddings = embedding_factory("huggingface", model = opt_config["embedding_model"]) # type: ignore[no-untyped-call]
 
 context_relevance_scorer = ContextRelevance(llm = ragas_llm)
 

@@ -125,9 +125,11 @@ def ragas_llm_from_env() -> Any:     #ragas.metrics.collections doesn't support 
     token = os.environ.get('LLM_API_TOKEN') or None
     model = os.environ.get('LLM_API_MODEL')
 
-    if llm_id == OllamaClient.ID:
-        if url is not None: 
-            url = f"{url.rstrip('/')}/v1"
+    if url is None or model is None:
+        raise ValueError("LLM_API_URL and LLM_API_MODEL must be configured.")
+
+    if llm_id == OllamaClient.ID:        
+        url = f"{url.rstrip('/')}/v1"
         token = token or 'ollama'
 
     client = AsyncOpenAI(
