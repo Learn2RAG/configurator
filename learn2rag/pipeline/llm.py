@@ -8,6 +8,8 @@ from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from typing import Any, ClassVar
 
+from openai import AsyncOpenAI
+from ragas.llms import llm_factory
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +119,34 @@ def chat_model_from_env() -> BaseChatModel:
     logger.debug('Using LLM args: %s', llm_kwargs)
     return llms[llm_id](**llm_kwargs).chat_model
 
+def ragas_llm_from_env() -> Any:     #ragas.metrics.collections doesn't support LangchainLLMWrapper
+    llm_id = os.environ.get('LLM_API_TYPE', OpenAIClient.ID)
+
+    if llm_id == FakeClient.ID:
+        return None
+    
+    url = os.environ.get('LLM_API_URL')
+    token = os.environ.get('LLM_API_TOKEN') or None
+    model = os.environ.get('LLM_API_MODEL')
+
+    if url is None or model is None:
+        raise ValueError("LLM_API_URL and LLM_API_MODEL must be configured.")
+
+    if llm_id == OllamaClient.ID:        
+        url = f"{url.rstrip('/')}/v1"
+        token = token or 'ollama'
+
+    client = AsyncOpenAI(
+        base_url = url,
+        api_key = token,
+    )
+
+    return llm_factory(
+        model,
+        client=client,
+    )
 
 llm = chat_model_from_env() if 'LLM_API_TYPE' in os.environ else None
+ragas_llm = ragas_llm_from_env() if 'LLM_API_TYPE' in os.environ else None
 if not llm:
     logger.warning('LLM is not configured')

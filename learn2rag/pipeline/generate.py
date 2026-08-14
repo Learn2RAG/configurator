@@ -3,6 +3,7 @@ import logging
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
 from qdrant_client.http.models import ScoredPoint
 from .llm import llm
+from .judges import judge_answer_relevance
 
 
 context_template ="""
@@ -12,7 +13,7 @@ Content:
 {content}
 """
 
-def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Any:
+async def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Any:
     assert llm is not None
     if hasattr(search_results, "points"):
         search_results = search_results.points
@@ -21,8 +22,23 @@ def generate(query: str, search_results: list[ScoredPoint], opt_config: dict[str
     user_message = HumanMessagePromptTemplate.from_template("{question}")
     prompt = ChatPromptTemplate.from_messages([system_message, user_message])
     chain = prompt | llm
-    answer = chain.invoke({"context": context, "question": query})
-    return answer.content
+    answer = chain.invoke({"context": context, "question": query}).content
+    assert isinstance(answer, str)
+    logging.info("\nFirst answer: %s", answer)
+    if opt_config["answer_relevance_judge"]:
+        answer_relevance_score = await judge_answer_relevance(
+            question = query,
+            answer = answer,
+        )
+        logging.info("Answer relevance score: %s", answer_relevance_score)
+        if answer_relevance_score < opt_config["judge_threshold"]:
+            answer = chain.invoke({
+                "context": context,
+                "question": query,
+            }).content
+            assert isinstance(answer, str)
+            logging.info("\nRetry answer: %s", answer)
+    return answer
 
 
 def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any]) -> Generator[str, None, None]:
