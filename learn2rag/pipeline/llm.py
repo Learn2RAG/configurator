@@ -121,6 +121,10 @@ def chat_model_from_env() -> BaseChatModel:
 
 def ragas_llm_from_env() -> Any:     #ragas.metrics.collections doesn't support LangchainLLMWrapper
     llm_id = os.environ.get('LLM_API_TYPE', OpenAIClient.ID)
+
+    if llm_id == FakeClient.ID:
+        return None
+    
     url = os.environ.get('LLM_API_URL')
     token = os.environ.get('LLM_API_TOKEN') or None
     model = os.environ.get('LLM_API_MODEL')
