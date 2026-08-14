@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 from typing import Any, ClassVar
 
 from openai import AsyncOpenAI
-from ragas.llms.base import llm_factory
+from ragas.llms import llm_factory
 
 logger = logging.getLogger(__name__)
 
@@ -126,12 +126,13 @@ def ragas_llm_from_env() -> Any:     #ragas.metrics.collections doesn't support 
     model = os.environ.get('LLM_API_MODEL')
 
     if llm_id == OllamaClient.ID:
-        url = f"{url.rstrip('/')}/v1"
+        if url is not None: 
+            url = f"{url.rstrip('/')}/v1"
         token = token or 'ollama'
 
     client = AsyncOpenAI(
-        base_url=url,
-        api_key=token,
+        base_url = url,
+        api_key = token,
     )
 
     return llm_factory(

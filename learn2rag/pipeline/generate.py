@@ -23,13 +23,12 @@ async def generate(query: str, search_results: list[ScoredPoint], opt_config: di
     prompt = ChatPromptTemplate.from_messages([system_message, user_message])
     chain = prompt | llm
     answer = chain.invoke({"context": context, "question": query}).content
-
-    logging.info("\nFirst answer:")
-    logging.info(answer)
+    assert isinstance(answer, str)
+    logging.info("\nFirst answer: %s", answer)
     if opt_config["answer_relevance_judge"]:
         answer_relevance_score = await judge_answer_relevance(
-            question=query,
-            answer=answer,
+            question = query,
+            answer = answer,
         )
         logging.info("Answer relevance score: %s", answer_relevance_score)
         if answer_relevance_score < opt_config["judge_threshold"]:
@@ -37,8 +36,8 @@ async def generate(query: str, search_results: list[ScoredPoint], opt_config: di
                 "context": context,
                 "question": query,
             }).content
-            logging.info("\nRetry answer:")
-            logging.info(answer)
+            assert isinstance(answer, str)
+            logging.info("\nRetry answer: %s", answer)
     return answer
 
 

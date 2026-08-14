@@ -182,6 +182,7 @@ dependencies = [
     "wrapt==1.17.2",
     "yarl==1.20.1",
     "zstandard==0.23.0",
+    "ragas==0.4.3",
 ]
 description = ""
 license = "MIT"

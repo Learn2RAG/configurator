@@ -1,5 +1,5 @@
 from qdrant_client.models import ScoredPoint
-from ragas.embeddings.base import embedding_factory
+from ragas.embeddings import embedding_factory
 from ragas.metrics.collections import AnswerRelevancy, ContextRelevance
 
 from .config import opt_config
