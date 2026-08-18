@@ -51,7 +51,7 @@ def generate_documents(dataset_dict: Any, id_key: str | None, content_getter: Ca
 def import_dataset_documents(dataset_name: str, subdirectory: str, id_key: str | None, content_getter: Callable[[Any], Any]) -> None:
     logging.debug(f'{dataset_name=}')
     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
-    dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory) # type: ignore[attr-defined]
+    dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory) # type: ignore[attr-defined, unused-ignore]
     content_counter = collections.Counter[str]()
     with (dataset_work_dir / 'loaded_documents.json').open('w') as f:
         json.dump(generate_documents(dataset_dict, id_key, content_getter, dataset_name, content_counter), f)
@@ -82,7 +82,7 @@ def ingest_dataset_documents(dataset_name: str) -> None:
 def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
     logging.debug(f'{dataset_name=}')
     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
-    dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory) # type: ignore[attr-defined]
+    dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory) # type: ignore[attr-defined, unused-ignore]
     return dataset_dict[split] if split is not None else dataset_dict
 
 

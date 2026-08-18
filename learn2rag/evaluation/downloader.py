@@ -1,4 +1,4 @@
-from datasets import load_dataset # type: ignore[attr-defined]
+from datasets import load_dataset # type: ignore[attr-defined, unused-ignore]
 
 
 load_dataset('ServiceNow/repliqa').save_to_disk('datasets/repliqa/source')
