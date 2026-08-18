@@ -266,7 +266,6 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) 
         extra={'activity': '_collect_query_points'},
     )
     collection_name = user_config["collection_name"]
-
     if opt_config["fusion_mode"] == "RRF":
         fusion_mode = models.Fusion.RRF
     if opt_config["fusion_mode"] == "DBSF":

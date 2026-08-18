@@ -28,9 +28,9 @@ class Qdrant:
     @classmethod
     def get_client(cls) -> QdrantClient:
         """Lazy initialization of the QdrantClient."""
-        logging.info("Lazy initialization of QdrantClient")
+        logging.debug("Lazy initialization of QdrantClient")
         if cls._client is None:
-            logging.info("make new one")
+            logging.debug("make new one")
             api_key = os.environ.get('QDRANT__SERVICE__API_KEY')
             path = os.environ.get('QDRANT_PATH') or None
             location = None if path else os.environ.get('QDRANT_LOCATION', 'http://localhost:6336')
@@ -47,11 +47,11 @@ class Qdrant:
 
         client = cls.get_client()
         logging.info("lets make sure the collection exists")
-        logging.info(f" collection_name : {collection_name} opt_config:{opt_config.keys()}")
+        logging.debug(f" collection_name : {collection_name} opt_config:{opt_config.keys()}")
         if client.collection_exists(collection_name):
             logging.info("collection already exists")
             return
-        logging.info("creating collection")
+        logging.debug("creating collection")
         vector_size = opt_config["vector_size"][opt_config["embedding_model"]]
         search_mode = opt_config["search_mode"]
         query_mode = opt_config["query_mode"]

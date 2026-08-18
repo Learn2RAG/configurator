@@ -87,13 +87,13 @@ def find_free_ports(n: int, *, configured_ports: list[int] | None = None, prefer
     for p in filter(lambda p: p not in ports, preferred_ports):
         if len(ports) >= n:
             break
-        logging.info('Checking if preferred port %d is available...', p)
+        logging.debug('Checking if preferred port %d is available...', p)
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 # Set REUSEADDR to handle ports in TIME_WAIT state
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind(('', p))
-                logging.info('Port %d is free. Allocating.', p)
+                logging.debug('Port %d is free. Allocating.', p)
                 ports.append(p)
         except OSError:
             logging.warning('Port %d is busy. Trying next...', p)

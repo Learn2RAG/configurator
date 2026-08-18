@@ -15,7 +15,7 @@ import psutil
 import yaml
 
 logger = logging.getLogger(__name__)
-active_popens: dict[int, subprocess.Popen] = {}
+active_popens: dict[int, subprocess.Popen[Any]] = {}
 # FIXME
 # remove child processes immediately when they exit
 import platform

@@ -31,6 +31,7 @@ class ComposeTestCase(unittest.TestCase):
         assert self.project.running
         for _ in range(20):
             self.project = Project.get(name)
+            assert self.project is not None, "Project disappeared unexpectedly"
             if not self.project.running:
                 break
             time.sleep(0.1)
@@ -48,6 +49,7 @@ class ComposeTestCase(unittest.TestCase):
         assert self.project.running
         for _ in range(20):
             self.project = Project.get(name)
+            assert self.project is not None, "Project disappeared unexpectedly"
             if not self.project.running:
                 break
             time.sleep(0.1)
@@ -65,6 +67,7 @@ class ComposeTestCase(unittest.TestCase):
         assert self.project.running
         for _ in range(20):
             self.project = Project.get(name)
+            assert self.project is not None, "Project disappeared unexpectedly"
             if not self.project.running:
                 break
             time.sleep(0.1)
