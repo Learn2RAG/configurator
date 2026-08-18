@@ -10,15 +10,15 @@ from learn2rag.pipeline.qdrant import Qdrant
 def delete_collection(loader_id: str|None, user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     """Delete a collection from the vector store or a subset of points based on loader_id."""
     qdrant = Qdrant(user_config["collection_name"], opt_config)
-    if qdrant.client.collection_exists(user_config["collection_name"]):
+    if qdrant.get_client().collection_exists(user_config["collection_name"]):
         if loader_id is None:
             logging.info('Deleting entire collection: %s', user_config["collection_name"])
-            qdrant.client.delete_collection(collection_name=user_config["collection_name"])
+            qdrant.get_client().delete_collection(collection_name=user_config["collection_name"])
             return
         else:
             # Delete points with the specified loader_id
             logging.info('Deleting points with loader_id: %s from collection: %s', loader_id, user_config["collection_name"])
-            qdrant.client.delete(
+            qdrant.get_client().delete(
                 collection_name=user_config["collection_name"],
                 points_selector=FilterSelector(
                     filter=Filter(
@@ -34,11 +34,11 @@ def delete_collection(loader_id: str|None, user_config: dict[str, Any], opt_conf
 def delete_documents(loader_id: str, docs: list[str], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     """Delete documents from the vector store based on loader_id and their source. A source is the path to and the identification of one document."""
     qdrant = Qdrant(user_config["collection_name"], opt_config)
-    if qdrant.client.collection_exists(user_config["collection_name"]):
+    if qdrant.get_client().collection_exists(user_config["collection_name"]):
         logging.info('Deleting documents with loader_id: %s and paths: %s', loader_id, docs)
         # Delete points with the specified loader_id and paths
         for path in docs:
-            qdrant.client.delete(
+            qdrant.get_client().delete(
                 collection_name=user_config["collection_name"],
                 points_selector=FilterSelector(
                     filter=Filter(
@@ -60,7 +60,7 @@ def get_documents(loader_id: str, user_config: dict[str, Any], opt_config: dict[
     """Retrieve documents from the vector store and return a {source: content_hash} mapping."""
     qdrant = Qdrant(user_config["collection_name"], opt_config)
     path_hash_dict: dict[str, str] = {}
-    if qdrant.client.collection_exists(user_config["collection_name"]):
+    if qdrant.get_client().collection_exists(user_config["collection_name"]):
         logging.info('Scrolling through collection to retrieve documents with loader_id: %s', loader_id)
         filter = Filter(
             must=[
@@ -74,7 +74,7 @@ def get_documents(loader_id: str, user_config: dict[str, Any], opt_config: dict[
         offset = None
 
         while True:
-            result = qdrant.client.scroll(
+            result = qdrant.get_client().scroll(
                 collection_name=user_config["collection_name"],
                 scroll_filter=filter,
                 limit=100,
@@ -103,7 +103,7 @@ def get_documents(loader_id: str, user_config: dict[str, Any], opt_config: dict[
 def update_documents(loader_id: str, documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     """Update documents in the vector store. This is done by deleting all chunks of the existing document based on source and loader_id, and then re-indexing the new document."""
     qdrant = Qdrant(user_config["collection_name"], opt_config)
-    if qdrant.client.collection_exists(user_config["collection_name"]):
+    if qdrant.get_client().collection_exists(user_config["collection_name"]):
         logging.info('Updating documents with loader_id: %s', loader_id)
         delete_documents(loader_id, docs=[doc.metadata["source"] for doc in documents], user_config=user_config, opt_config=opt_config)
         index(documents, user_config, opt_config)

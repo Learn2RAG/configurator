@@ -55,9 +55,39 @@ CREATE TABLE IF NOT EXISTS services (
 
 def kill_process(pid: int) -> None:
     if hasattr(os, 'killpg'):
+        logger.debug('Using os.killpg for process group %s', pid)
         os.killpg(os.getpgid(pid), signal.SIGTERM)
     else:
-        os.kill(pid, signal.SIGTERM)
+        try:
+            parent = psutil.Process(pid)
+            procs = parent.children(recursive=True)
+            procs.append(parent)
+
+            logger.debug('Found process tree for %s with %d processes', pid, len(procs))
+
+            for p in procs:
+                try:
+                    logger.debug('Terminating process %s', p.pid)
+                    p.terminate()
+                except psutil.NoSuchProcess:
+                    pass
+
+            logger.debug('Waiting up to 5 seconds for processes to terminate and release ports...')
+            gone, alive = psutil.wait_procs(procs, timeout=5)
+
+            if alive:
+                logger.warning('%d processes refused to terminate gracefully. Forcing kill.', len(alive))
+                for p in alive:
+                    try:
+                        logger.debug('Force killing process %s', p.pid)
+                        p.kill()
+                    except psutil.NoSuchProcess:
+                        pass
+            else:
+                logger.debug('All processes in tree %s terminated gracefully.', pid)
+
+        except psutil.NoSuchProcess:
+            logger.debug('Process %s already stopped, nothing to kill.', pid)
 
 
 def init_db(con: sqlite3.Connection) -> None:
