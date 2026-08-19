@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-19 14:52+0200\n"
+"POT-Creation-Date: 2026-08-19 15:51+0200\n"
 "PO-Revision-Date: 2026-05-26 15:48+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: de\n"
@@ -219,6 +219,12 @@ msgstr ""
 msgctxt "first-step"
 msgid "Yes, automatically configure a pipeline"
 msgstr "Ja, eine Pipeline automatisch konfigurieren"
+
+#: learn2rag/ui/templates/firststeps_pipelines.html:21
+#: learn2rag/ui/templates/firststeps_sources.html:15
+msgctxt "first-step"
+msgid "More options"
+msgstr "Weitere Optionen"
 
 #: learn2rag/ui/templates/firststeps_sources.html:11
 msgctxt "tooltip"
