@@ -4,7 +4,7 @@
 </form>
 {% endmacro %}
 
-<table class="table" id="pipelines_list_table" hx-swap-oob="true" hx-get="" hx-trigger="every 15s" hx-swap="none">
+<table class="table table-borderless" id="pipelines_list_table" hx-swap-oob="true" hx-get="" hx-trigger="every 15s" hx-swap="none">
   <thead>
     <tr>
       <th scope="col">{{pgettext('column_heading', 'Label')}}</th>
@@ -19,7 +19,12 @@
   <tbody>
     {% for name, pipeline in pipelines.items() %}
     <tr>
-      <td title="{{ name }}">
+      <td colspan="7">
+        <hr/>
+      </td>
+    </tr>
+    <tr>
+      <td rowspan="2" title="{{ name }}">
         {{ pipeline.label }}
       </td>
       <td>{{ pipeline.storage_path }}</td>
@@ -128,10 +133,13 @@
             </div>
           </div>
         </div>
-        <div>
-          {{ pipeline.status_message }}
-        </div>
       </td>
+    </tr>
+    <tr>
+      <td colspan="6">
+        {{ pipeline.status_message }}
+      </td>
+    </tr>
     </tr>
     {% endfor %}
   </tbody>

@@ -188,7 +188,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         suggested_models = app.config.get('SUGGESTED_MODELS', {})
         return {
             'suggested_models': suggested_models,
-            'firststeps_model': suggested_models.get('gemma3_27b'),
+            'firststeps_model': suggested_models.get('gemma4_26b'),
             'models': learn2rag.data.get_all(app.instance_path, 'models'),
             'sources': learn2rag.data.get_all(app.instance_path, 'sources'),
             'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
@@ -433,6 +433,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     'web': 'HTMLLoader',
                     'sharepoint': 'SharepointLoader',
                     'drupal': 'DrupalLoader',
+                    'jira': 'JiraLoader',
                 }.get(source.get(
                     'type',
                     'local'  # FIXME: remove this later and throw Exception
@@ -603,7 +604,7 @@ def main(config: dict[str, Any]) -> None:
         "app": app,
         "host": host,
         "port": int(port),
-        "log_level": "info",
+        "log_level": "warning",
         "interface": "wsgi",
     }
 

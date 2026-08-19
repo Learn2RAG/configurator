@@ -5,25 +5,30 @@ Description:
 This module handles loading documents from directories.
 
 Author: Kyrill Meyer
-Version: 0.0.6
+Version: 0.0.7
 Institution: IFDT
 Creation Date: June 10, 2025
-Last Modified: Mai 05, 2026
+Last Modified: June 29, 2026
 """
 import hashlib
 import logging
 import os
 from datetime import datetime
-from typing import List, Union
+from typing import List, Union, Optional, TYPE_CHECKING
 from ..globals import stop_loading
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain_core.documents import Document
+
+if TYPE_CHECKING:
+    from ..utils.progress import ImportProgress
 
 # supress pdfminer-Warnings
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
+
+_DIRECTORY_STATUS_INTERVAL = 25
 
 def ensure_pandoc_available() -> None:
     """Checks if pandoc is available and downloads it with pypandoc if necessary."""
@@ -43,7 +48,7 @@ def ensure_pandoc_available() -> None:
         logger.warning("pypandoc is not installed. Install it with 'poetry add pypandoc' to manage pandoc automatically.")
 
 
-def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: bool = False, loader_id: str = "N/A") -> List[Document]:
+def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: bool = False, loader_id: str = "N/A", progress: Optional["ImportProgress"] = None) -> List[Document]:
     """
     Load documents from a directory and set metadata.
 
@@ -57,6 +62,9 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
 
     # Check if pandoc is available (for RTF, DOCX etc.)
     ensure_pandoc_available()
+
+    if progress is not None:
+        progress.emit("Phase 2/4 Load", f"Scanning directory | recursive {recursive}", source=path)
 
     documents = []
     if isinstance(recursive, str):
@@ -102,6 +110,14 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
         other_docs = loader.load()
         pdf_docs = pdf_loader.load()
         loaded_documents = other_docs + pdf_docs
+        if progress is not None:
+            progress.emit(
+                "Phase 2/4 Load",
+                "Directory scan finished",
+                processed=0,
+                total=len(loaded_documents),
+                source=path,
+            )
     except Exception as e:
         logger.error(f"Error loading documents from directory: {e}")
         return []
@@ -147,6 +163,14 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
 
             documents.append(doc)
             logger.debug(f"Loaded file: {doc.metadata.get('source', 'Unknown')}")
+            if progress is not None and len(documents) % _DIRECTORY_STATUS_INTERVAL == 0:
+                progress.emit(
+                    "Phase 2/4 Load",
+                    "Directory files processed",
+                    processed=len(documents),
+                    total=len(loaded_documents),
+                    source=path,
+                )
         except Exception as e:
             error_str = str(e)
             doc_source = getattr(doc, 'metadata', {}).get('source', 'Unknown')
@@ -164,6 +188,14 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
         file_types = [doc.metadata.get("file_extension", "unknown") for doc in documents]
         type_count = {ext: file_types.count(ext) for ext in set(file_types)}
         logger.info(f"Loaded {len(documents)} documents from '{path}'. File types: {type_count}")
+        if progress is not None:
+            progress.emit(
+                "Phase 2/4 Load",
+                f"Directory load finished | file types {type_count}",
+                processed=len(documents),
+                total=len(loaded_documents),
+                source=path,
+            )
 
     else:
         logger.warning(f"No documents found in directory: {path}")

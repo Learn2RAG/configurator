@@ -1,11 +1,14 @@
 import logging
-from typing import Any
+from typing import Any, Optional, TYPE_CHECKING
 
 from qdrant_client.models import Filter, FieldCondition, MatchValue, FilterSelector
 from langchain_core.documents.base import Document
 
 from learn2rag.pipeline.ingestion import index
 from learn2rag.pipeline.qdrant import Qdrant
+
+if TYPE_CHECKING:
+    from learn2rag.importer.utils.progress import ImportProgress
 
 def delete_collection(loader_id: str|None, user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
     """Delete a collection from the vector store or a subset of points based on loader_id."""
@@ -100,10 +103,12 @@ def get_documents(loader_id: str, user_config: dict[str, Any], opt_config: dict[
 
 
 
-def update_documents(loader_id: str, documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
+def update_documents(loader_id: str, documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any], progress: Optional["ImportProgress"] = None) -> None:
     """Update documents in the vector store. This is done by deleting all chunks of the existing document based on source and loader_id, and then re-indexing the new document."""
     qdrant = Qdrant(user_config["collection_name"], opt_config)
     if qdrant.client.collection_exists(user_config["collection_name"]):
         logging.info('Updating documents with loader_id: %s', loader_id)
         delete_documents(loader_id, docs=[doc.metadata["source"] for doc in documents], user_config=user_config, opt_config=opt_config)
-        index(documents, user_config, opt_config)
+        if progress is not None:
+            progress.start_indexing(len(documents))
+        index(documents, user_config, opt_config, progress=progress)

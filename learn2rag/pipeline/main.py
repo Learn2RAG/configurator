@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import logging.config
 import yaml
@@ -21,45 +22,13 @@ async def main() -> None:
 
     from .config import user_config, opt_config
 
-    #delete_collection(loader_id="local_docs", user_config=user_config, opt_config=opt_config)
-    #results = get_documents(loader_id="local_docs", user_config=user_config, opt_config=opt_config)
+    with open("loaded_documents.json", "r", encoding="utf-8") as f:
+        raw = json.load(f)
 
     documents = [
         Document(page_content=d["content"], metadata=d["metadata"])
-        for d in [
-            {
-                "metadata": {
-                    "source": "C:C:\\Users\\foo\\Revised Manuscript_Text categorization approach.docx",
-                    "content_hash": "e18e509d138cf86c22df0b0dfafc5ca5b8f1e266f5e3470de68190f3ebe495b0",
-                    "source_path": "C:\\Users\\foo",
-                    "file_extension": "docx",
-                    "process_date": "2025-07-28",
-                    "process_time": "14:42:02",
-                    "loader_type": "DirectoryLoader",
-                    "loader_id": "local_docs",
-                    "title": "The title of a real document",
-                    "summary": "This document is awesome"
-                },
-                "content": "A brand-new Corpus-based Real-time Text Classification and Tagging Approach for Social Data..."
-            },
-            {
-                "metadata": {
-                    "source": "C:C:\\Users\\foo\\qdrant.docx",
-                    "content_hash": "7f3b9c1a0d4e6f8b2c5a7d9e1f0b3c6d8a4e2f1c9b7d0a6e5f1c3a8b9d2e4f0",
-                    "source_path": "C:\\Users\\foo",
-                    "file_extension": "docx",
-                    "process_date": "2025-07-28",
-                    "process_time": "14:42:02",
-                    "loader_type": "DirectoryLoader",
-                    "loader_id": "local_docs",
-                    "title": "The title of a real document",
-                    "summary": "This document is awesome"
-                },
-                "content": "Qdrant ist eine Open-Source-Vektordatenbank..."
-            },
-        ]
-]
-    #update_documents(loader_id="local_docs", documents=documents, user_config=user_config, opt_config=opt_config)
+        for d in raw
+    ]
     ingestion.index(documents, user_config, opt_config)
 
     if opt_config["query_mode"] == "multi":
@@ -77,7 +46,7 @@ async def main() -> None:
             inputs={'question': query, 'user': 'anonymous'},
         ))
 
-    sources = "\n".join(set(point.payload['path'] for point in points)) # type: ignore[index]
+    sources = "\n".join(set(point.payload['source'] for point in points)) # type: ignore[index]
 
     for point in points:
         print(f"ID: {point.id}, Path: {point.payload['source']}, Score: {point.score}") # type: ignore[index]
