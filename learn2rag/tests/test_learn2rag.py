@@ -36,7 +36,7 @@ class Learn2RAGTestCase(TestCase):
         self.storage_path.mkdir(parents=True, exist_ok=True)
         self.openai_client = OpenAI(
             api_key='',
-            base_url=f'http://localhost:{self.rag_port}',
+            base_url=f'http://localhost:{self.rag_port}/api/v1',
             max_retries=0,
         )
         if project := Project.get(self.project_name):
