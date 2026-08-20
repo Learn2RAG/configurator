@@ -8,7 +8,9 @@
         <input type="hidden" name="type" value="local"/>
         <input type="hidden" name="label" value="~/Documents/RAG"/>
         <input type="hidden" name="path" value="~/Documents/RAG"/>
-        <button type="submit" class="btn btn-primary" title="{{ pgettext('tooltip','Include documents from that folder')}}">🪄 {{ pgettext('first-step','Yes, add my')}} <code>~/Documents/RAG</code> {{ pgettext('first-step','folder')}}</button>
+        <button type="submit" class="btn btn-primary" title="{{ pgettext('tooltip', 'Include documents from %(path)s folder', path='~/Documents/RAG') }}">
+          🪄 {{ pgettext('first-step', 'Yes, add my <code>%(path)s</code> folder', path='~/Documents/RAG') | safe }}
+        </button>
       </form>
     </div>
     <div class="btn-group me-2" role="group">

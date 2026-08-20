@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-19 15:51+0200\n"
+"POT-Creation-Date: 2026-08-20 13:26+0200\n"
 "PO-Revision-Date: 2026-05-26 15:48+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: de\n"
@@ -221,25 +221,22 @@ msgid "Yes, automatically configure a pipeline"
 msgstr "Ja, eine Pipeline automatisch konfigurieren"
 
 #: learn2rag/ui/templates/firststeps_pipelines.html:21
-#: learn2rag/ui/templates/firststeps_sources.html:15
+#: learn2rag/ui/templates/firststeps_sources.html:17
 msgctxt "first-step"
 msgid "More options"
 msgstr "Weitere Optionen"
 
 #: learn2rag/ui/templates/firststeps_sources.html:11
+#, python-format
 msgctxt "tooltip"
-msgid "Include documents from that folder"
-msgstr "Dokumente aus diesem Ordner einbeziehen"
+msgid "Include documents from %(path)s folder"
+msgstr "Dokumente aus dem Ordner %(path)s einbeziehen"
 
-#: learn2rag/ui/templates/firststeps_sources.html:11
+#: learn2rag/ui/templates/firststeps_sources.html:12
+#, python-format
 msgctxt "first-step"
-msgid "Yes, add my"
-msgstr "Ja, fügen Sie meinen Ordner"
-
-#: learn2rag/ui/templates/firststeps_sources.html:11
-msgctxt "first-step"
-msgid "folder"
-msgstr "hinzu"
+msgid "Yes, add my <code>%(path)s</code> folder"
+msgstr "Ja, füge meinen <code>%(path)s</code>-Ordner hinzu."
 
 #: learn2rag/ui/templates/model_pulling.html:6
 msgid "The language model is downloading, please wait"
@@ -1013,4 +1010,16 @@ msgstr[1] "%(num)d Pipeline laufen"
 #~ msgctxt "tooltip"
 #~ msgid "Include documents from the ~/Documents/RAG folder"
 #~ msgstr ""
+
+#~ msgctxt "tooltip"
+#~ msgid "Include documents from that folder"
+#~ msgstr "Dokumente aus diesem Ordner einbeziehen"
+
+#~ msgctxt "first-step"
+#~ msgid "Yes, add my"
+#~ msgstr "Ja, fügen Sie meinen Ordner"
+
+#~ msgctxt "first-step"
+#~ msgid "folder"
+#~ msgstr "hinzu"
 
