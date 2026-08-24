@@ -1,8 +1,10 @@
+from pathlib import Path
 import logging
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -48,6 +50,13 @@ app.add_middleware(
     ],
 )
 app.mount(chat_prefix, chat.build_app())
+
+
+templates = Jinja2Templates(directory=Path(__file__).parent.parent / 'userui' / 'templates')
+@app.get('/')
+async def index(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, 'index.html', context={
+    })
 
 
 @app.on_event("startup")
