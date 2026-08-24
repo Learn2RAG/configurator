@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+(cd llama.cpp/tools/ui && npm ci && npm run build)

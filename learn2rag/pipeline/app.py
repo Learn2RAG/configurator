@@ -11,16 +11,15 @@ from .config import importer_config, user_config, opt_config
 from .qdrant import Qdrant
 from .operators import BasicPipeline
 from .operators.base import BaseOperator
-from ..userui import auth
+from ..userui import auth, chat
 from ..userui.constants import SESSION_USER_AUTHS
+from ..utils.starlette import PrefixRewriteMiddleware
 
 pipeline: BaseOperator = BasicPipeline()
 
 
-
 class TestResponse(BaseModel):
     message: str
-
 
 
 app = FastAPI()
@@ -35,6 +34,20 @@ app.include_router(auth.build_router(importer_config, token_handler), prefix='/a
 
 api_prefix = '/api'
 app.include_router(api.build_router(), prefix=api_prefix)
+
+
+chat_prefix = '/chat'
+# llama.cpp UI always uses a relative path
+app.add_middleware(
+    PrefixRewriteMiddleware,
+    source=chat_prefix,
+    target=api_prefix,
+    paths=[
+        '/v1/models',
+        '/v1/chat/completions',
+    ],
+)
+app.mount(chat_prefix, chat.build_app())
 
 
 @app.on_event("startup")
