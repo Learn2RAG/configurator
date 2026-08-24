@@ -1,6 +1,6 @@
 services:
   drupal:
-    image: docker.io/library/drupal:11.3.5
+    image: docker.io/library/drupal:11.3.16
     volumes:
       - ./scripts:/opt/drupal/scripts:ro
     command:

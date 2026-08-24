@@ -1,8 +1,10 @@
 #!/bin/sh
 set -eux
-composer require 'drupal/simple_oauth:^6.1' 'drush/drush'
+composer require --with-all-dependencies 'drupal/simple_oauth:^6.1' 'drush/drush:*'
 php -d memory_limit=256M web/core/scripts/drupal install --password=test --no-interaction demo_umami
-drush install jsonapi simple_oauth
+drush config:set system.logging error_level verbose
+# simple_oauth_static_scope: provides 'user' granularity_id
+drush pm:install -v jsonapi simple_oauth simple_oauth_static_scope
 scripts/configure_oauth_keys.sh
 drush scr scripts/configure_oauth_scope.php
 drush scr scripts/create_consumer.php

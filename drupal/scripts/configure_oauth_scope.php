@@ -45,6 +45,11 @@ $scope = $storage->create([
     'authorization_code' => ['status' => TRUE],
     'refresh_token' => ['status' => TRUE],
   ],
+  // TODO in a real setup a different configuration might be needed
+  'granularity_id' => 'role',
+  'granularity_configuration' => [
+    'role' => 'authenticated',
+  ],
 ]);
 
 $violations = $scope->getTypedData()->validate();
