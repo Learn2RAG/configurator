@@ -6,7 +6,8 @@ import json
 import logging
 import datasets
 import json_stream  # type: ignore[import-untyped]
-from typing import Any, Callable
+from typing import Any, Callable, cast
+import pandas as pd
 
 import learn2rag.pipeline.ingestion
 from learn2rag.pipeline.config import opt_config
@@ -78,12 +79,38 @@ def ingest_dataset_documents(dataset_name: str) -> None:
     # FIXME
     # learn2rag.pipeline.ingestion.index(user_config, opt_config)
 
+def read_dataset_qa(file_path: pathlib.Path | str, split: str | None = None) -> Any:
+    target_path = pathlib.Path(file_path)
+    logging.debug(f'Loading dataset from: {target_path}')
 
-def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
-    logging.debug(f'{dataset_name=}')
-    dataset_work_dir = pathlib.Path('./datasets') / dataset_name
-    dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
+    if not target_path.exists():
+        raise FileNotFoundError(f"Dataset path does not exist: {target_path}")
+
+    if target_path.suffix.lower() == '.csv':
+        logging.debug('load csv file')
+        with open(target_path, 'r', encoding='utf-8') as f:
+            first_line = f.readline()
+            try:
+                # Sniff for comma, semicolon, or tab
+                dialect = csv.Sniffer().sniff(first_line, delimiters=",;\t")
+                detected_sep = dialect.delimiter
+            except csv.Error:
+                # Fallback to standard comma if sniffing fails
+                detected_sep = ','
+
+        logging.debug(f'load csv file with delimiter: "{detected_sep}"')
+        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path), sep=detected_sep)
+    else:
+        logging.debug(f'load HF dataset ')
+        dataset_dict = datasets.load_from_disk(str(target_path))
+
     return dataset_dict[split] if split is not None else dataset_dict
+
+# def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
+#     logging.debug(f'{dataset_name=}')
+#     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
+#     dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
+#     return dataset_dict[split] if split is not None else dataset_dict
 
 
 def basic_pipeline(dataset_name: str, question: str) -> dict[str, Any]:

@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block header %}
+<h1>{% block title %}{{pipeline.label}}{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<h2>{{pgettext('header', 'Details')}}</h2>
+{{pipeline.label}}
+<hr/>
+<h2>{{pgettext('header', 'Optimization')}}</h2>
+{% if training_dataset %}
+<div class="table-responsive">
+  <table class="caption-top table table-hover">
+    <caption>{{pgettext('header', 'Training data')}}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{pgettext('header', 'Question')}}</th>
+        <th scope="col">{{pgettext('header', 'Answer')}}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for training_item in training_dataset.select(range(3)) %}
+      <tr>
+        <td>{{training_item['question']}}</td>
+        <td>{{training_item['answer']}}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2">{{gettext('Total rows: %(amount)s', amount=training_dataset.num_rows)}}</td>
+      </tr>
+    </tfoot>
+    <tbody>
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% if training_dataset and not (projects[name] and projects[name].running) %}
+<form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
+  <button class="btn btn-primary" type="submit" name="action" value="start:optimization">{{pgettext('button', 'Start optimization')}}</button>
+</form>
+{% endif %}
+<form method="POST" enctype="multipart/form-data" action="{{url_for('pipeline_details_training_data', name=name)}}" class="row">
+  <label for="trainingFile" class="col-auto col-form-label">{{pgettext('label', 'Choose a new training data file:')}}</label>
+  <div class="col-auto">
+    <input class="form-control" type="file" id="trainingFile" name="trainingFile" required="required" accept=".csv,text/csv"/>
+  </div>
+  <div class="col-auto">
+    <button type="submit" class="btn btn-primary">{{pgettext('label', 'Save')}}</button>
+  </div>
+</form>
+{% endblock %}

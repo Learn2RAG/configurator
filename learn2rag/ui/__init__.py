@@ -12,6 +12,7 @@ import threading
 import time
 from typing import Any
 import urllib
+from itertools import islice
 
 from babel import negotiate_locale
 from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
@@ -23,6 +24,7 @@ import yaml
 import werkzeug.wrappers
 
 from learn2rag.compose import Project
+from learn2rag.evaluation.tools import read_dataset_qa
 import learn2rag.data
 import learn2rag.pipeline.llm
 from ..utils import (
@@ -32,7 +34,7 @@ from ..utils import (
     save_data_path,
 )
 
-from datetime import datetime  # <-- ADD THIS
+from datetime import datetime
 
 
 logging.getLogger().addHandler(flask.logging.default_handler)
@@ -406,7 +408,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
         has_ssl = bool(app.config.get("TLS"))
-
         url = urllib.parse.urlparse(request.base_url)
         assert url.scheme
 
@@ -480,6 +481,41 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             flash(pgettext('flash', 'Could not start the pipeline: %(message)s', message=e), 'error')
 
         # TODO "load" the corresponding Ollama model
+
+    @app.get('/pipelines/<name>')
+    def pipeline_details(name: str) -> 'str | werkzeug.wrappers.response.Response':
+        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        if pipeline is None:
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+            return redirect(url_for('pipelines_list'))
+        storage_path = Path(pipeline['storage_path'])
+        try:
+            training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
+        except FileNotFoundError:
+            training_dataset = None
+        return render_template(
+            'pipelines_details_page.html',
+            name=name,
+            pipeline=pipeline,
+            training_dataset=training_dataset,
+            projects=Project.get_all(),
+        )
+
+    @app.post('/pipelines/<name>/training')
+    def pipeline_details_training_data(name: str) -> 'str | werkzeug.wrappers.response.Response':
+        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        if pipeline is None:
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+            return redirect(url_for('pipelines_list'))
+        try:
+            storage_path = Path(pipeline['storage_path'])
+            storage_path.mkdir(parents=True, exist_ok=True)
+            training_file = request.files['trainingFile']
+            training_file.save(storage_path / 'training.csv')
+        except Exception as e:
+            app.logger.exception(e)
+            flash(pgettext('flash', 'Could not save the file'), 'error')
+        return redirect(url_for('pipeline_details', name=name))
 
     @app.post('/pipelines/<name>')
     def pipeline_action(name: str) -> 'str | werkzeug.wrappers.response.Response':

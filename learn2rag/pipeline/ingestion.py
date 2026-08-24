@@ -6,6 +6,8 @@ from typing import Any, cast, Optional, TYPE_CHECKING
 import numpy as np
 import warnings
 from collections.abc import Iterator
+from collections import deque
+from time import perf_counter
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
@@ -16,6 +18,13 @@ from .embeddings import create_embeddings
 
 if TYPE_CHECKING:
     from learn2rag.importer.utils.progress import ImportProgress
+
+
+def _format_hhmmss(total_seconds: float) -> str:
+    seconds = max(0, int(total_seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
 def get_chunks_metadata(chunks: list[Document], item: str) -> Iterator[str]:
@@ -153,9 +162,17 @@ def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, An
         progress.emit("Phase 3/4 Index", f"Chunking finished | chunks {len(chunks)}", processed=0, total=len(chunks))
 
     ingestion_batch_size = opt_config["ingestion_batch_size"]
+    total_batches = (len(chunks) + ingestion_batch_size - 1) // ingestion_batch_size
+    eta_window_size = 100
+    report_every = 100
+    recent_batch_durations: deque[float] = deque(maxlen=eta_window_size)
+    ingest_start = perf_counter()
+
     logging.info('Creating embeddings and ingesting in batches...')
     total_batches = max(1, (len(chunks) + ingestion_batch_size - 1) // ingestion_batch_size)
-    for batch_start in range(0, len(chunks), ingestion_batch_size):
+    for batch_idx, batch_start in enumerate(range(0, len(chunks), ingestion_batch_size), start=1):
+        batch_started_at = perf_counter()
+
         batch_chunks = chunks[batch_start:batch_start + ingestion_batch_size]
         batch_content = [chunk.page_content for chunk in batch_chunks]
         # prevent Surrogate Halves errors through invalid UTF-8 characters in the text through replacing
@@ -246,16 +263,40 @@ def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, An
                     insert_multi(qdrant, collection_name, sample)
                 else:
                     insert(qdrant, collection_name, sample)
+        batch_duration = perf_counter() - batch_started_at
+        recent_batch_durations.append(batch_duration)
 
+        if batch_idx % report_every == 0:
+            elapsed = perf_counter() - ingest_start
+            avg_batch_duration = sum(recent_batch_durations) / len(recent_batch_durations)
+            remaining_batches = total_batches - batch_idx
+            eta_seconds = avg_batch_duration * remaining_batches
+            progress_percent = (batch_idx / total_batches) * 100 if total_batches > 0 else 100.0
+
+            logging.info(
+                "Ingestion progress: %d/%d batches (%.2f%%), elapsed=%s, eta in %s",
+                batch_idx,
+                total_batches,
+                progress_percent,
+                _format_hhmmss(elapsed),
+                _format_hhmmss(eta_seconds),
+            )
         if progress is not None:
             processed_chunks = min(batch_start + len(batch_chunks), len(chunks))
-            batch_number = (batch_start // ingestion_batch_size) + 1
             progress.emit(
                 "Phase 3/4 Index",
-                f"Embedding and ingest batch {batch_number}/{total_batches}",
+                f"Embedding and ingest batch {batch_idx}/{total_batches}",
                 processed=processed_chunks,
                 total=len(chunks),
             )
+
+    total_elapsed = perf_counter() - ingest_start
+    logging.info(
+        "Ingestion finished: %d/%d batches (100.00%%), total_elapsed=%s",
+        total_batches,
+        total_batches,
+        _format_hhmmss(total_elapsed),
+    )
 
 
 def index(documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any], progress: Optional["ImportProgress"] = None) -> None:

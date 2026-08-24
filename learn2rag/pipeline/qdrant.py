@@ -17,6 +17,7 @@ location = None if path else os.environ.get('QDRANT_LOCATION', 'http://localhost
 
 
 class Qdrant:
+
     # FIXME: only create QdrantClient instance when needed,
     # do not create it when just importing this module
     client = QdrantClient(
@@ -24,6 +25,7 @@ class Qdrant:
         api_key=api_key,
         path=path,
     )
+
 
     def __init__(self, collection_name: str, opt_config: dict[str, Any]) -> None:
         self.collection_name = collection_name
