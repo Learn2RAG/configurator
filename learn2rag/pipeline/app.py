@@ -12,6 +12,7 @@ from .qdrant import Qdrant
 from .operators import BasicPipeline
 from .operators.base import BaseOperator
 from ..userui import auth
+from ..userui.constants import SESSION_USER_AUTHS
 
 pipeline: BaseOperator = BasicPipeline()
 
@@ -25,7 +26,11 @@ class TestResponse(BaseModel):
 app = FastAPI()
 # required by oauth library
 app.add_middleware(SessionMiddleware, secret_key="FIXME")
-app.include_router(auth.build_router(importer_config), prefix='/auth')
+def token_handler(request: Request, name: str, token: str) -> None:
+    if SESSION_USER_AUTHS not in request.session:
+        request.session[SESSION_USER_AUTHS] = {}
+    request.session[SESSION_USER_AUTHS][name] = {'token': token}
+app.include_router(auth.build_router(importer_config, token_handler), prefix='/auth')
 
 
 api_prefix = '/api'

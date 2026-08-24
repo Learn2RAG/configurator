@@ -2,7 +2,12 @@
 <ul>
   {% for prefix, router in auth_routers.items() %}
   {% for name, label in router.registered_applications().items() %}
-  <li><a href="{{ prefix }}{{ router.url_path_for('login', name=name) }}">{{ label }}</a></li>
+  <li>
+    {% if name in user_auths %}
+    ✅
+    {% endif %}
+    <a href="{{ prefix }}{{ router.url_path_for('login', name=name) }}">{{ label }}</a>
+  </li>
   {% endfor %}
   {% endfor %}
 </ul>
