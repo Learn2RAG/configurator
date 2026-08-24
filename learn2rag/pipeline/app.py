@@ -13,6 +13,7 @@ from .config import importer_config, user_config, opt_config
 from .qdrant import Qdrant
 from .operators import BasicPipeline
 from .operators.base import BaseOperator
+from ..bootstrap import setup_fastapi as learn2rag_bootstrap_setup
 from ..userui import auth, chat
 from ..userui.constants import SESSION_USER_AUTHS
 from ..utils.starlette import PrefixRewriteMiddleware
@@ -51,8 +52,11 @@ app.add_middleware(
 )
 app.mount(chat_prefix, chat.build_app())
 
+templates = Jinja2Templates(directory=learn2rag_bootstrap_setup(app, [
+    Path(__file__).parent.parent / 'userui' / 'templates',
+]))
 
-templates = Jinja2Templates(directory=Path(__file__).parent.parent / 'userui' / 'templates')
+
 @app.get('/')
 async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, 'index.html', context={

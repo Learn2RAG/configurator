@@ -25,6 +25,7 @@ import werkzeug.wrappers
 from learn2rag.compose import Project
 import learn2rag.data
 import learn2rag.pipeline.llm
+from ..bootstrap import setup_flask as learn2rag_bootstrap_setup
 from ..utils import (
     is_windows,
     normalize_path,
@@ -136,6 +137,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     packaged_config = yaml.safe_load((importlib.resources.files(__package__) / 'config.yml').open())
     app.logger.debug('Packaged config: %s', packaged_config)
     app.config.from_mapping(merge(config, packaged_config))
+
+    learn2rag_bootstrap_setup(app)
 
     # ensure the instance folder exists
     try:
