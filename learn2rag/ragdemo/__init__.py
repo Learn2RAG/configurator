@@ -1,8 +1,3 @@
-from fastapi import APIRouter
+from .routes import router
 
-router = APIRouter()
-
-
-@router.get("/test")
-async def test():
-    return {'test': 123}
+__all__ = ["router"]

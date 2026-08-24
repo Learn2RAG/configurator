@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Learn2RAG · Interactive RAG Demo</title>
+  <link rel="stylesheet" href="./assets/bootstrap.css">
+  <link rel="stylesheet" href="./assets/configurator.css">
+  <link rel="stylesheet" href="./static/ragdemo.css">
+</head>
+<body class="d-flex flex-column min-vh-100">
+  <header>
+    <nav class="navbar navbar-expand-lg gradient-header demo-header" aria-label="RAG Demo navigation">
+      <div class="container d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="navbar-brand d-flex align-items-center mb-0">
+          <img src="./assets/learn2rag-logo.png" alt="Learn2RAG logo">
+          <div class="navbar-brand-text">
+            <strong class="d-block">Learn2RAG</strong>
+            <small class="d-block">Interactive RAG Demo</small>
+          </div>
+        </div>
+
+        <ul class="navbar-nav d-flex flex-row demo-nav" aria-label="Demo sections" role="tablist">
+          <li class="nav-item">
+            <button class="nav-link active" id="index-tab" type="button" role="tab" aria-selected="true" aria-controls="index-panel" data-panel="index-panel">Index</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" id="ask-tab" type="button" role="tab" aria-selected="false" aria-controls="ask-panel" data-panel="ask-panel">Ask RAG</button>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <main class="flex-grow-1" id="main">
+    <div class="container my-5">
+      <section id="index-panel" class="card shadow-sm demo-panel" role="tabpanel" aria-labelledby="index-tab">
+        <div class="card-body p-4 p-lg-5">
+          <div class="d-flex flex-column flex-md-row align-items-md-start justify-content-between gap-3">
+            <div>
+              <h1 class="h2 mb-2">Indexed documents</h1>
+              <p class="text-body-secondary mb-0">These documents have already been processed and stored in the RAG index.</p>
+            </div>
+            <button id="refresh-index" class="btn btn-primary px-4" type="button">Refresh</button>
+          </div>
+
+          <div id="index-status" class="alert alert-primary mt-4 mb-0" role="status" aria-live="polite">
+            Loading indexed documents…
+          </div>
+
+          <div id="index-content" hidden>
+            <div class="row g-3 my-4" role="group" aria-label="Index summary">
+              <div class="col-sm-6 col-lg-4">
+                <div class="card h-100 summary-card">
+                  <div class="card-body">
+                    <p class="text-body-secondary fw-semibold mb-1">Documents</p>
+                    <p id="document-count" class="summary-number mb-0">0</p>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-4">
+                <div class="card h-100 summary-card">
+                  <div class="card-body">
+                    <p class="text-body-secondary fw-semibold mb-1">Chunks</p>
+                    <p id="chunk-count" class="summary-number mb-0">0</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p id="partial-note" class="alert alert-warning" hidden>The safety scan limit was reached, so these counts show a partial index snapshot.</p>
+            <div id="document-list" class="row g-3"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="ask-panel" class="card shadow-sm demo-panel" role="tabpanel" aria-labelledby="ask-tab" hidden>
+        <div class="card-body p-4 p-lg-5">
+          <h1 class="h2 mb-3">Ask RAG</h1>
+          <div class="alert alert-info mb-0">
+            Interactive query inspection will be added in the next phase.
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer gradient-header py-4 demo-footer">
+    <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-4">
+      <div class="d-flex flex-column align-items-center align-items-md-start">
+        <div class="mb-2">
+          <a href="https://github.com/learn2rag" class="footer-link" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://learn2rag.de/" class="footer-link" target="_blank" rel="noopener noreferrer">Learn2RAG website</a>
+        </div>
+        <div>© {{ current_year }} Learn2RAG.</div>
+      </div>
+      <div>
+        <img class="funding-logo" src="./assets/bmwi.svg" alt="BMWK funding logo">
+      </div>
+    </div>
+  </footer>
+
+  <script src="./static/ragdemo.js" defer></script>
+</body>
+</html>

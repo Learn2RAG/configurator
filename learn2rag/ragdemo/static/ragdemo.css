@@ -1,0 +1,87 @@
+.demo-nav .nav-link {
+  padding: 0.65rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--bs-border-radius);
+  font-weight: 600;
+}
+
+.demo-nav .nav-link:hover,
+.demo-nav .nav-link:focus-visible {
+  border-color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+}
+
+.demo-nav .nav-link.active {
+  border-color: rgba(255, 255, 255, 0.75);
+  color: white !important;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 0.15rem rgba(255, 255, 255, 0.12);
+  text-decoration: none;
+}
+
+.demo-panel {
+  min-height: 400px;
+}
+
+.summary-card {
+  border-left: 0.3rem solid #7c3aed;
+}
+
+.summary-number {
+  color: #4c1d95;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.document-card {
+  border-color: var(--bs-border-color);
+}
+
+.document-card .card-title {
+  overflow-wrap: anywhere;
+}
+
+.funding-logo {
+  display: block;
+  width: auto;
+  height: 120px;
+  max-width: 100%;
+}
+
+[hidden] { display: none !important; }
+
+@media (max-width: 767.98px) {
+  .demo-header {
+    padding-right: 0.75rem;
+    padding-left: 0.75rem;
+  }
+
+  .demo-header .navbar-brand {
+    margin-right: 0;
+  }
+
+  .demo-header .navbar-brand img {
+    height: 50px;
+    margin-right: 10px;
+  }
+
+  .demo-nav {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .demo-nav .nav-item {
+    flex: 1;
+  }
+
+  .demo-nav .nav-link {
+    width: 100%;
+    margin-left: 0;
+    text-align: center;
+  }
+
+  .funding-logo {
+    height: 100px;
+  }
+}
