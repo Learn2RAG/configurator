@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, Optional
 import logging
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, SparseVectorParams, SparseIndexParams, MultiVectorComparator, MultiVectorConfig
@@ -15,7 +15,7 @@ __import__('FlagEmbedding')
 
 class Qdrant:
 
-    _client = None
+    _client =  None
     def __init__(self, collection_name: str, opt_config: dict[str, Any]) -> None:
         self.collection_name = collection_name
         self.vector_size = opt_config["vector_size"][opt_config["embedding_model"]]
