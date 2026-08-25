@@ -1,15 +1,24 @@
-# Test instance
-## Start Drupal
+# Test Drupal instance
+## Manual tests
+### Start Drupal
 ```
 docker compose -f drupal/docker-compose.yml up
 ```
 
-## Log in
-http://localhost:3470
+### Details
+base URL
+: http://localhost:3470
 username
 : admin
 password
 : test
+oauth client
+: test_client
+oauth secret
+: test_secret
+
+## Automated tests
+The relevant tests automatically use this `docker compose` file, if docker is available.
 
 # Data import from your instance
 ## Configure authorization
