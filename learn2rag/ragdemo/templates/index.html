@@ -76,9 +76,74 @@
 
       <section id="ask-panel" class="card shadow-sm demo-panel" role="tabpanel" aria-labelledby="ask-tab" hidden>
         <div class="card-body p-4 p-lg-5">
-          <h1 class="h2 mb-3">Ask RAG</h1>
-          <div class="alert alert-info mb-0">
-            Interactive query inspection will be added in the next phase.
+          <div class="mb-4">
+            <h1 class="h2 mb-2">Ask RAG</h1>
+            <p class="text-body-secondary mb-0">Ask a question and inspect both the generated answer and the retrieved source chunks.</p>
+          </div>
+
+          <form id="query-form" novalidate>
+            <label for="question-input" class="form-label fw-semibold">Question</label>
+            <textarea id="question-input" class="form-control question-input" name="question" rows="3" maxlength="1000" required placeholder="What would you like to know?"></textarea>
+            <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mt-3">
+              <span class="form-text mt-0">Questions are answered using the currently indexed documents.</span>
+              <button id="ask-button" class="btn btn-primary btn-lg px-4" type="submit">Ask RAG</button>
+            </div>
+          </form>
+
+          <div class="mt-4" aria-label="Example questions">
+            <p class="small text-uppercase text-body-secondary fw-semibold mb-2">Try an example</p>
+            <div class="d-flex flex-column flex-lg-row gap-2">
+              <button class="btn btn-outline-secondary example-question" type="button" data-question="Where is the Learn2RAG interactive RAG demo intended to be shown?">Where is the interactive RAG demo intended to be shown?</button>
+              <button class="btn btn-outline-secondary example-question" type="button" data-question="Which retrieval approaches should the interactive demonstration compare?">Which retrieval approaches should the demonstration compare?</button>
+            </div>
+          </div>
+
+          <div id="query-error" class="alert alert-danger mt-4 mb-0" role="alert" hidden></div>
+          <div id="query-loading" class="alert alert-primary mt-4 mb-0" role="status" aria-live="polite" hidden>
+            Searching the index and generating an answer…
+          </div>
+
+          <div id="query-results" class="mt-5" hidden>
+            <section aria-labelledby="answer-heading">
+              <p class="result-kicker mb-2">Answer</p>
+              <h2 id="answer-heading" class="visually-hidden">Generated answer</h2>
+              <div id="answer-container" class="card shadow-sm answer-card">
+                <div id="answer-content" class="card-body answer-content"></div>
+              </div>
+            </section>
+
+            <section class="mt-5" aria-labelledby="search-heading">
+              <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-3">
+                <div>
+                  <p class="result-kicker mb-1">Search</p>
+                  <h2 id="search-heading" class="h4 mb-0">
+                    <span id="search-label">Semantic vector search</span>
+                  </h2>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <span id="search-technical-label" class="badge text-bg-primary">Dense / BGE-M3</span>
+                  <span id="score-label" class="badge text-bg-light border text-secondary">Dense similarity</span>
+                </div>
+              </div>
+              <div id="search-results" class="d-flex flex-column gap-3"></div>
+            </section>
+
+            <section class="mt-5" aria-labelledby="prompt-heading">
+              <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-2">
+                <div>
+                  <p class="result-kicker mb-1">Prompt</p>
+                  <h2 id="prompt-heading" class="h4 mb-0">
+                    <span id="prompt-label">Prompt sent to the model</span>
+                  </h2>
+                </div>
+                <span id="prompt-technical-label" class="badge text-bg-light border text-secondary">Application-level chat messages</span>
+              </div>
+              <p id="prompt-note" class="small text-body-secondary mb-3"></p>
+              <details class="card prompt-details">
+                <summary class="card-header fw-semibold">Inspect exact messages</summary>
+                <div id="prompt-messages" class="card-body d-flex flex-column gap-3"></div>
+              </details>
+            </section>
           </div>
         </div>
       </section>

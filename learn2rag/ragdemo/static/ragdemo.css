@@ -42,6 +42,68 @@
   overflow-wrap: anywhere;
 }
 
+.question-input {
+  min-height: 8rem;
+  font-size: 1.15rem;
+  line-height: 1.55;
+}
+
+.example-question {
+  white-space: normal;
+  text-align: left;
+}
+
+.result-kicker {
+  color: #6f42c1;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.answer-card {
+  border-left: 0.3rem solid #7c3aed;
+}
+
+.answer-content,
+.chunk-content {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.answer-content {
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+.retrieval-card .card-header {
+  background: var(--bs-tertiary-bg);
+}
+
+.chunk-content {
+  line-height: 1.6;
+}
+
+.prompt-details > summary {
+  cursor: pointer;
+  background: var(--bs-tertiary-bg);
+}
+
+.prompt-details > summary:focus-visible {
+  outline: 0.2rem solid rgba(124, 58, 237, 0.3);
+  outline-offset: 0.15rem;
+}
+
+.prompt-message-content {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--bs-font-monospace);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
 .funding-logo {
   display: block;
   width: auto;
@@ -83,5 +145,9 @@
 
   .funding-logo {
     height: 100px;
+  }
+
+  #ask-button {
+    width: 100%;
   }
 }
