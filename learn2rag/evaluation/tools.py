@@ -99,11 +99,16 @@ def read_dataset_qa(file_path: pathlib.Path | str, split: str | None = None) -> 
                 detected_sep = ','
 
         logging.debug(f'load csv file with delimiter: "{detected_sep}"')
-        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path), sep=detected_sep)
+        dataset_dict = datasets.load_dataset(
+            'csv',
+            data_files=target_path.as_posix(),
+            delimiter=detected_sep
+        )
     else:
         logging.debug(f'load HF dataset ')
         dataset_dict = datasets.load_from_disk(str(target_path))
 
+    return dataset_dict[split] if split is not None else dataset_dict
 
 def basic_pipeline(dataset_name: str, question: str) -> dict[str, Any]:
     user_config = {
