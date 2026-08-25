@@ -2,10 +2,12 @@ import argparse
 import logging
 from uuid import uuid4
 import hashlib
-from typing import Any, cast
+from typing import Any, cast, Optional, TYPE_CHECKING
 import numpy as np
 import warnings
 from collections.abc import Iterator
+from collections import deque
+from time import perf_counter
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
@@ -13,6 +15,16 @@ from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
 from .embeddings import create_embeddings
+
+if TYPE_CHECKING:
+    from learn2rag.importer.utils.progress import ImportProgress
+
+
+def _format_hhmmss(total_seconds: float) -> str:
+    seconds = max(0, int(total_seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
 def get_chunks_metadata(chunks: list[Document], item: str) -> Iterator[str]:
@@ -92,20 +104,32 @@ def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -
     )
     qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
 
-def payload(sample: dict[str, Any]) -> dict[str, str]:
-    return {
+def payload(sample: dict[str, Any]) -> dict[str, Any]:
+    meta = sample["metadata"]
+    result: dict[str, Any] = {
         "content": sample["page_content"],
-        "source": sample["metadata"]["source"],
-        "content_hash": sample["metadata"]["content_hash"],
+        "source": meta["source"],
+        "content_hash": meta["content_hash"],
         "chunk_hash": sample["chunk_hash"],
-        "title": sample["metadata"].get("title",""),
-        "uri": sample["metadata"].get("uri",""),
-        "loader_id": sample["metadata"]["loader_id"],
-        "document_id": sample["metadata"].get("document_id", "")
+        "title": meta.get("title") or meta.get("summary", ""),
+        "uri": meta.get("uri", ""),
+        "loader_id": meta["loader_id"],
+        "document_id": meta.get("document_id", ""),
     }
 
+    if meta.get("loader") == "JiraLoader":
+        result["assignee"] = meta.get("assignee", "")
+        result["reporter"] = meta.get("reporter", "")
+        result["status"] = meta.get("status", "")
+        result["labels"] = meta.get("labels", [])
+        result["components"] = meta.get("components", [])
+        result["sprint"] = meta.get("sprints", [])
+        result["story_points"] = meta.get("story_points")
 
-def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
+    return result
+
+
+def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, Any], opt_config: dict[str, Any], progress: Optional["ImportProgress"] = None) -> None:
     """
     Chunk, embed, and bulk-insert a list of documents into Qdrant.
 
@@ -134,10 +158,21 @@ def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, An
         chunk_size=opt_config["chunk_size"], chunk_overlap=opt_config["chunk_overlap"]
     )
     chunks = text_splitter.split_documents(docs)
+    if progress is not None:
+        progress.emit("Phase 3/4 Index", f"Chunking finished | chunks {len(chunks)}", processed=0, total=len(chunks))
 
     ingestion_batch_size = opt_config["ingestion_batch_size"]
+    total_batches = (len(chunks) + ingestion_batch_size - 1) // ingestion_batch_size
+    eta_window_size = 100
+    report_every = 100
+    recent_batch_durations: deque[float] = deque(maxlen=eta_window_size)
+    ingest_start = perf_counter()
+
     logging.info('Creating embeddings and ingesting in batches...')
-    for batch_start in range(0, len(chunks), ingestion_batch_size):
+    total_batches = max(1, (len(chunks) + ingestion_batch_size - 1) // ingestion_batch_size)
+    for batch_idx, batch_start in enumerate(range(0, len(chunks), ingestion_batch_size), start=1):
+        batch_started_at = perf_counter()
+
         batch_chunks = chunks[batch_start:batch_start + ingestion_batch_size]
         batch_content = [chunk.page_content for chunk in batch_chunks]
         # prevent Surrogate Halves errors through invalid UTF-8 characters in the text through replacing
@@ -228,9 +263,43 @@ def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, An
                     insert_multi(qdrant, collection_name, sample)
                 else:
                     insert(qdrant, collection_name, sample)
+        batch_duration = perf_counter() - batch_started_at
+        recent_batch_durations.append(batch_duration)
+
+        if batch_idx % report_every == 0:
+            elapsed = perf_counter() - ingest_start
+            avg_batch_duration = sum(recent_batch_durations) / len(recent_batch_durations)
+            remaining_batches = total_batches - batch_idx
+            eta_seconds = avg_batch_duration * remaining_batches
+            progress_percent = (batch_idx / total_batches) * 100 if total_batches > 0 else 100.0
+
+            logging.info(
+                "Ingestion progress: %d/%d batches (%.2f%%), elapsed=%s, eta in %s",
+                batch_idx,
+                total_batches,
+                progress_percent,
+                _format_hhmmss(elapsed),
+                _format_hhmmss(eta_seconds),
+            )
+        if progress is not None:
+            processed_chunks = min(batch_start + len(batch_chunks), len(chunks))
+            progress.emit(
+                "Phase 3/4 Index",
+                f"Embedding and ingest batch {batch_idx}/{total_batches}",
+                processed=processed_chunks,
+                total=len(chunks),
+            )
+
+    total_elapsed = perf_counter() - ingest_start
+    logging.info(
+        "Ingestion finished: %d/%d batches (100.00%%), total_elapsed=%s",
+        total_batches,
+        total_batches,
+        _format_hhmmss(total_elapsed),
+    )
 
 
-def index(documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
+def index(documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any], progress: Optional["ImportProgress"] = None) -> None:
     """
     Ingest a list of documents — entry point for standalone pipeline operation.
 
@@ -252,4 +321,4 @@ def index(documents: list[Document], user_config: dict[str, Any], opt_config: di
     collection_name = user_config["collection_name"]
     Qdrant.ensure_collection(collection_name=collection_name, opt_config=opt_config)
     qdrant = Qdrant(collection_name=collection_name, opt_config=opt_config)
-    ingest_batch(documents, qdrant, user_config, opt_config)
+    ingest_batch(documents, qdrant, user_config, opt_config, progress=progress)

@@ -1,24 +1,10 @@
-name: import
-label: Start one-time import
+name: optimization
+label: Optimize
 ports:
-  # TODO: UI port is not used; labels in the interface currently assume a specific port order
+  # TODO: labels in the interface currently assume a specific port order
   - ui
   - qdrant_http
 files:
-  - path: '{{storage_path}}/qdrant_config.yml'
-    content: |
-      log_level: ERROR
-      service:
-        api_key: '{{qdrant_api_key}}'
-        grpc_port: null
-        http_port: {{ports.qdrant_http}}
-        host: '127.0.0.1'
-      telemetry_disabled: true
-
-  - path: '{{storage_path}}/opt_config.json'
-    src: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
-    force: false
-
   - path: '{{storage_path}}/importer_config.json'
     content: '{{import_config | tojson}}'
 
@@ -29,14 +15,22 @@ files:
           "imported_documents_file_path": "loaded_documents.json",
           "llm": "{{language_model.model}}"
       }
-
+  - path: '{{storage_path}}/opt_config.json'
+    src: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
+    force: false
+  - path: '{{storage_path}}/qdrant_config.yml'
+    content: |
+      log_level: ERROR
+      service:
+        api_key: '{{qdrant_api_key}}'
+        grpc_port: null
+        http_port: {{ports.qdrant_http}}
+        host: '127.0.0.1'
+      telemetry_disabled: true
   - path: '{{storage_path}}/logging_config.yml'
     content: |
       version: 1
       formatters:
-        status:
-          format: "%(message)s %(asctime)s"
-          datefmt: "%Y-%m-%d %H:%M"
         simple:
           format: "%(asctime)s %(levelname)-8s %(name)s %(message)s"
         colored:
@@ -67,13 +61,6 @@ files:
           formatter: simple
           filename: '{{storage_path}}/logs/error.log'
           encoding: utf-8
-        status_file:
-          class: logging.FileHandler
-          level: INFO
-          formatter: status
-          filename: '{{storage_path}}/logs/status.log'
-          mode: 'w'
-          encoding: utf-8
         {% if debug_logging %}
         debug_file:
           class: logging.FileHandler
@@ -88,10 +75,6 @@ files:
             - profiling_display
             - profiling_file
           propagate: no
-        status:
-          handlers:
-            - status_file
-          propagate: no
       root:
         level: DEBUG
         handlers:
@@ -104,30 +87,50 @@ files:
   - path: '{{storage_path}}/logs/.keep'
     content: ''
 
+  - path: '{{storage_path}}/optimization_registry.json'
+    content: |
+      {
+        "datasets": {
+          "training": {
+            "subdirectory": "", "split": "train",
+            "fields": {"q": "question", "a": "answer", "id": "id"},
+            "path": "{{storage_path}}/training.csv"
+          }
+        },
+        "prompts": {
+          "default":
+              "# Role and Objective\nYou will act as a smart AI chatbot that answers questions only by using the content from the provided information list.\n\n  # Instructions\n- Respond in the language of the question.\n - Answer clear and concise.\n- Only use the provided information.\n        - NEVER use your general knowledge.\n\n # Information:\n{context}"
+          ,
+          "concise":
+              "Answer the question using ONLY the provided information.   Be concise and direct. If the information does not contain the answer, say so.\n\n        Information:\n{context}"
+          ,
+          "detailed":
+              "You are a knowledgeable assistant. Using ONLY the provided information below,        answer the question thoroughly. Cite your sources.         If the information is insufficient, state that clearly.\n\n        Information:\n{context}"
+        }
+      }
+
 services:
-  #!!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
   qdrant:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
       - '{{storage_path}}/qdrant_config.yml'
-  #!!! {% endif %}
   main:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/configurator{% if is_windows %}.exe{% endif %}'
+      - 'learn2rag.optimization'
       - '--logging-config'
       - '{{storage_path}}/logging_config.yml'
-      - 'learn2rag.importer'
-      - '--config'
-      - '{{storage_path}}/importer_config.json'
-      - '--delta'
+      - '--registry-path'
+      - '{{storage_path}}/optimization_registry.json'
+      - '--dataset'
+      - 'training'
+      - '--strategy'
+      - 'baseline'
     environment:
-      DO_NOT_TRACK: 'true'
-      SCARF_NO_ANALYTICS: 'true'
       LEARN2RAG_PATH: '{{learn2rag_path}}'
-      STORAGE_PATH: '{{storage_path}}'
       QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'
       QDRANT_PATH: '{{ pipeline.qdrant_path }}'
       QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'
@@ -137,6 +140,6 @@ services:
       LANGCHAIN_API_KEY: '1'
       LANGCHAIN_TRACING_V2: 'false'
       LLM_API_TYPE: '{{language_model.api}}'
-      LLM_API_URL: '{{ language_model.url }}'
+      LLM_API_URL: '{{language_model.url}}'
       LLM_API_TOKEN: '{{language_model.token}}'
       LLM_API_MODEL: '{{language_model.model}}'
