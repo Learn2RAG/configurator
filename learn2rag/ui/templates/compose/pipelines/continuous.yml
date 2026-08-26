@@ -1,5 +1,6 @@
 name: continuous
 label: Start
+description: "Start the pipeline with continuous data import"
 ports:
   # TODO: labels in the interface currently assume a specific port order
   - ui

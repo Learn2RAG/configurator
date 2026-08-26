@@ -1,7 +1,7 @@
 <div class="accordion" id="accordionCreate">
   <div class="accordion-item">
     <h2 class="accordion-header">
-      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateConnect" aria-expanded="false" aria-controls="collapseCreateConnect">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateConnect" aria-expanded="false" aria-controls="collapseCreateConnect" title="{{ pgettext('tooltip','Expand to connect a third-party language model via API')}}">
         {{pgettext('heading', 'Connect an external language model')}}
       </button>
     </h2>
@@ -14,7 +14,7 @@
           </div>
           <div class="mb-3">
             <label for="api" class="form-label">{{pgettext('form_label', 'API type')}}</label>
-            <select required="required" class="form-select" name="api">
+            <select required="required" class="form-select" name="api" title="{{ pgettext('tooltip','Select the API provider for the language model')}}">
               {% for llm_client in llm.llms.values() %}
               {% if llm_client.LABEL %}
               <option
@@ -36,13 +36,13 @@
           </div>
           <div class="mb-3">
             <label for="token" class="form-label">{{pgettext('form_label', 'Access token')}}</label>
-            <input class="form-control" name="token">
+            <input class="form-control" name="token" title="{{ pgettext('tooltip','Enter access token')}}">
           </div>
           <div class="mb-3">
             <label for="model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
             <input required="required" class="form-control" name="model" title="{{pgettext('tooltip', 'For example: %(model)s', model=firststeps_model.get('config', {}).get('model'))}}">
           </div>
-          <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
+          <button type="submit" class="btn btn-primary" title="{{ pgettext('tooltip','Save these')}}">{{pgettext('button', 'Save')}}</button>
         </form>
       </div>
     </div>
@@ -50,7 +50,7 @@
   {% if suggested_models %}
   <div class="accordion-item">
     <h2 class="accordion-header">
-      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateSuggested" aria-expanded="false" aria-controls="collapseCreateSuggested">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateSuggested" aria-expanded="false" aria-controls="collapseCreateSuggested" title="{{ pgettext('tooltip','Expand to browse and download a local language model')}}">
         {{pgettext('heading', 'Download a language model')}}
       </button>
     </h2>
@@ -123,7 +123,7 @@
   {% if ollama_models %}
   <div class="accordion-item">
     <h2 class="accordion-header">
-      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateOllamaSelect" aria-expanded="false" aria-controls="collapseCreateOllamaSelect">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateOllamaSelect" aria-expanded="false" aria-controls="collapseCreateOllamaSelect" title="{{ pgettext('tooltip','Expand to select a previously downloaded model')}}">
         {{pgettext('heading', 'Use previously downloaded model')}}
       </button>
     </h2>
@@ -136,7 +136,7 @@
           </div>
           <div class="mb-3">
             <label for="ollama_list" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
-            <select class="form-select" name="model">
+            <select class="form-select" name="model" title="{{ pgettext('tooltip','Select an available Ollama language model')}}">
               {% for ollama_model in ollama_models %}
               <option value="{{ ollama_model.model }}">{{ ollama_model.model }}</option>
               {% endfor %}
@@ -144,7 +144,7 @@
           </div>
           <input type="hidden" name="api" value="{{ llm.OllamaClient.ID }}"/>
           <input type="hidden" name="ollama" value="use"/>
-          <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
+          <button type="submit" class="btn btn-primary" title="{{ pgettext('tooltip','save Ollama Language model')}}">{{pgettext('button', 'Save')}}</button>
         </form>
       </div>
     </div>

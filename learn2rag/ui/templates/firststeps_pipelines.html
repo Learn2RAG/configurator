@@ -14,11 +14,11 @@
         {% endfor %}
         <input type="hidden" name="import_schedule_interval_hours" value="12"/>
         <input type="hidden" name="now" value="yes"/>
-        <button type="submit" class="btn btn-primary">🪄 Yes, automatically configure a pipeline</button>
+        <button type="submit" class="btn btn-primary" title="{{ pgettext('tooltip','Start the automated pipeline optimization process')}}">🪄 {{ pgettext('first-step','Yes, automatically configure a pipeline')}}</button>
       </form>
     </div>
     <div class="btn-group me-2" role="group">
-      <a href="{{ url_for('pipelines_list') }}" class="btn btn-link">More options</a>
+      <a href="{{ url_for('pipelines_list') }}" class="btn btn-link" title="View and manage all available pipelines">{{ pgettext('first-step','More options')}}</a>
     </div>
   </div>
 </div>
