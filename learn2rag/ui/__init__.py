@@ -425,7 +425,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
 
         # Format the import config
-        import_config = {
+        import_config: dict[str, Any]  = {
             'loaders': [{
                 'loader_id': name,
                 'loader_type': {
