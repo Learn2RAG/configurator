@@ -31,3 +31,10 @@ def get_entries(root: str, category: str, names: list[str]) -> dict[str, Any]:
 
 def delete_entry(root: str, category: str, name: str) -> None:
     (Path(root) / 'data' / category / (name + '.yml')).unlink()
+
+def update_entry(root: str, category: str, name: str, data: Any) -> None:
+    file_path = Path(root) / 'data' / category / (name + '.yml')
+    if not file_path.exists():
+        raise FileNotFoundError
+    with open(file_path, 'w') as out:
+        yaml.dump(data, out)
