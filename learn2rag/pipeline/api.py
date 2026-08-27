@@ -6,21 +6,22 @@ from typing import (
     Any,
     AsyncGenerator,
     List,
-    Mapping,
     Optional,
 )
 import json
 import logging
 
-from fastapi import APIRouter, Body, Request
+from fastapi import Body, FastAPI, Request
 from fastapi.responses import (
     JSONResponse,
     StreamingResponse,
 )
 from pydantic import BaseModel
 
+from .config import user_config, opt_config
 from .operators import BasicPipeline
 from .operators.base import BaseOperator
+from .qdrant import Qdrant
 from ..userui.constants import SESSION_USER_AUTHS
 
 logger = logging.getLogger(__name__)
@@ -95,18 +96,22 @@ def streaming_response(pipeline: BaseOperator, request: Request, inputs: ChatSta
     )
 
 
-def build_router() -> APIRouter:
-    router = APIRouter()
+def build_app() -> FastAPI:
+    app = FastAPI()
 
     pipeline: BaseOperator = BasicPipeline()
 
-    @router.get('/v1/models')
+    @app.on_event("startup")
+    async def startup_event() -> None:
+        Qdrant.ensure_collection(user_config["collection_name"], opt_config)
+
+    @app.get('/v1/models')
     async def get_models() -> JSONResponse: return JSONResponse({
             'object': 'list',
             'data': [{'id': 'Learn2RAG'}],
     })
 
-    @router.post('/v1/stream')
+    @app.post('/v1/stream')
     async def stream(
             request: Request,
             inputs: ChatState = Body(
@@ -116,7 +121,7 @@ def build_router() -> APIRouter:
     ) -> StreamingResponse:
         return streaming_response(pipeline, request, inputs)
 
-    @router.post('/v1/chat/completions', response_model=None)
+    @app.post('/v1/chat/completions', response_model=None)
     async def chat_completions(
             request: Request,
             inputs: ChatState = Body(
@@ -129,4 +134,4 @@ def build_router() -> APIRouter:
         else:
             return await simple_response(pipeline, request, inputs)
 
-    return router
+    return app

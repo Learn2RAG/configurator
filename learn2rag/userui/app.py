@@ -12,8 +12,7 @@ from . import auth, chat
 from .constants import SESSION_USER_AUTHS
 from ..bootstrap import setup_fastapi as learn2rag_bootstrap_setup
 from ..pipeline import api
-from ..pipeline.config import importer_config, user_config, opt_config
-from ..pipeline.qdrant import Qdrant
+from ..pipeline.config import importer_config
 from ..utils.starlette import PrefixRewriteMiddleware
 
 
@@ -37,7 +36,7 @@ def build_app() -> FastAPI:
     )
 
     api_prefix = '/api'
-    app.include_router(api.build_router(), prefix=api_prefix)
+    app.mount(api_prefix, api.build_app())
 
     chat_prefix = '/chat'
     # llama.cpp UI always uses a relative path
@@ -60,10 +59,6 @@ def build_app() -> FastAPI:
     async def index(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(request, 'index.html', context={
         })
-
-    @app.on_event("startup")
-    async def startup_event() -> None:
-        Qdrant.ensure_collection(user_config["collection_name"], opt_config)
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
