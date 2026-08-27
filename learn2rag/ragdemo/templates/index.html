@@ -84,6 +84,25 @@
           <form id="query-form" novalidate>
             <label for="question-input" class="form-label fw-semibold">Question</label>
             <textarea id="question-input" class="form-control question-input" name="question" rows="3" maxlength="1000" required placeholder="What would you like to know?"></textarea>
+            <fieldset class="retrieval-selector mt-3">
+              <legend class="form-label fw-semibold mb-2">Retrieval method</legend>
+              <div class="retrieval-mode-options">
+                <label class="retrieval-mode-choice">
+                  <input class="form-check-input" type="radio" name="retrieval_mode" value="semantic" checked>
+                  <span>
+                    <strong class="d-block">Semantic vectors</strong>
+                    <span class="small text-body-secondary">Search by meaning, not only exact words.</span>
+                  </span>
+                </label>
+                <label class="retrieval-mode-choice">
+                  <input class="form-check-input" type="radio" name="retrieval_mode" value="keyword">
+                  <span>
+                    <strong class="d-block">Keyword search</strong>
+                    <span class="small text-body-secondary">Match the words you typed.</span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
             <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mt-3">
               <span class="form-text mt-0">Questions are answered using the currently indexed documents.</span>
               <button id="ask-button" class="btn btn-primary btn-lg px-4" type="submit">Ask RAG</button>
@@ -102,10 +121,14 @@
           <div id="query-loading" class="alert alert-primary mt-4 mb-0" role="status" aria-live="polite" hidden>
             Searching the index and generating an answer…
           </div>
+          <div id="retrieval-change-note" class="alert alert-secondary mt-4 mb-0" role="status" aria-live="polite" hidden></div>
 
           <div id="query-results" class="mt-5" hidden>
+            <div id="comparison-actions" class="comparison-actions mb-3" hidden>
+              <button id="compare-retrieval" class="btn btn-sm btn-outline-primary" type="button"></button>
+            </div>
             <section aria-labelledby="answer-heading">
-              <p class="result-kicker mb-2">Answer</p>
+              <p id="answer-kicker" class="result-kicker mb-2">Answer</p>
               <h2 id="answer-heading" class="visually-hidden">Generated answer</h2>
               <div id="answer-container" class="card shadow-sm answer-card">
                 <div id="answer-content" class="card-body answer-content"></div>
@@ -126,6 +149,39 @@
                 </div>
               </div>
               <div id="search-results" class="d-flex flex-column gap-3"></div>
+
+              <div id="visualization-section" class="mt-4" aria-labelledby="visualization-heading">
+                <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-2">
+                  <h3 id="visualization-heading" class="h5 mb-0">
+                    <span id="visualization-label">Explore the embedding space</span>
+                  </h3>
+                  <span id="visualization-technical-label" class="badge text-bg-light border text-secondary">3D PCA projection of dense embeddings</span>
+                </div>
+                <p class="visualization-intro mb-1">Each point represents an indexed chunk. Drag to rotate the space and explore how the Query relates to the retrieved chunks.</p>
+                <p id="visualization-note" class="small text-body-secondary mb-3"></p>
+                <div id="visualization-status" class="alert alert-secondary mb-0" role="status" hidden></div>
+                <div id="visualization-panel" class="card embedding-map-card" hidden>
+                  <div class="card-body p-2 p-md-3">
+                    <div class="embedding-map-toolbar">
+                      <p id="visualization-help" class="small text-body-secondary mb-0">Drag to rotate · Use +/− to zoom · Hover points to inspect</p>
+                      <div class="btn-group btn-group-sm" role="group" aria-label="3D embedding view controls">
+                        <button id="visualization-zoom-out" class="btn btn-outline-secondary" type="button" aria-label="Zoom out of embedding space" title="Zoom out">−</button>
+                        <output id="visualization-zoom-level" class="embedding-zoom-level" aria-live="polite" aria-label="Current embedding space zoom: 100%">100%</output>
+                        <button id="visualization-zoom-in" class="btn btn-outline-secondary" type="button" aria-label="Zoom into embedding space" title="Zoom in">+</button>
+                        <button id="visualization-reset" class="btn btn-outline-secondary" type="button" aria-label="Reset embedding space view">Reset view</button>
+                      </div>
+                    </div>
+                    <div id="visualization-canvas" class="embedding-map-canvas" aria-describedby="visualization-help">
+                      <div id="visualization-tooltip" class="embedding-map-tooltip" role="status" aria-live="polite" hidden></div>
+                    </div>
+                    <div class="embedding-map-legend" aria-label="Embedding map legend">
+                      <span><span class="legend-symbol legend-query" aria-hidden="true"></span>Query</span>
+                      <span><span class="legend-symbol legend-retrieved" aria-hidden="true"></span>Retrieved chunks</span>
+                      <span><span class="legend-symbol legend-indexed" aria-hidden="true"></span>Other indexed chunks</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </section>
 
             <section class="mt-5" aria-labelledby="prompt-heading">

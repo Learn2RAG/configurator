@@ -31,6 +31,9 @@ templates = Jinja2Templates(directory=_BASE_DIR / "templates")
 
 router = APIRouter()
 demo_search_operator = SearchOperator()
+# The supplemental explorer and demo-local keyword retrieval share this
+# read-only boundary; deployment must aim it at the dedicated public demo index.
+demo_qdrant_reader = Qdrant.client
 
 
 @router.get("/test")
@@ -114,6 +117,9 @@ async def query_api(query: QueryRequest) -> QueryResponse | JSONResponse:
             demo_search_operator,
             query.question,
             opt_config,
+            retrieval_mode=query.retrieval_mode,
+            qdrant_reader=demo_qdrant_reader,
+            collection_name=user_config.get("collection_name"),
         )
     except Exception:
         logger.exception("Unable to execute the RAG Demo query pipeline")
