@@ -2,11 +2,12 @@ import os
 
 import uvicorn
 
-from .app import app
+from .app import build_app
 
 
 def main() -> None:
     # TODO use uvicorn.config.Config
+    app = build_app()
     uvicorn.run(
         app,
         host='0.0.0.0',  # FIXME: use learn2rag config value
