@@ -204,7 +204,7 @@ services:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/configurator{% if is_windows %}.exe{% endif %}'
-      - 'learn2rag.pipeline'
+      - 'learn2rag.userui'
       - '--logging-config'
       - '{{storage_path}}/logging_config.yml'
     environment:

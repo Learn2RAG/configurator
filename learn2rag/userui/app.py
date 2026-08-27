@@ -8,14 +8,14 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import api
-from .config import importer_config, user_config, opt_config
-from .qdrant import Qdrant
-from .operators import BasicPipeline
-from .operators.base import BaseOperator
+from . import auth, chat
+from .constants import SESSION_USER_AUTHS
 from ..bootstrap import setup_fastapi as learn2rag_bootstrap_setup
-from ..userui import auth, chat
-from ..userui.constants import SESSION_USER_AUTHS
+from ..pipeline import api
+from ..pipeline.config import importer_config, user_config, opt_config
+from ..pipeline.operators import BasicPipeline
+from ..pipeline.operators.base import BaseOperator
+from ..pipeline.qdrant import Qdrant
 from ..utils.starlette import PrefixRewriteMiddleware
 
 pipeline: BaseOperator = BasicPipeline()
