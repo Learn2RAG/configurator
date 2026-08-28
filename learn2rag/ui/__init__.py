@@ -32,6 +32,7 @@ from ..utils import (
     normalize_path,
     open_web_browser,
     save_data_path,
+    get_default_rag_dir,
 )
 
 from datetime import datetime
@@ -183,6 +184,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'debug_logging': config.get('logging', {}).get('debug', False),
             'current_timestamp': math.floor(time.time()),
             'llm': learn2rag.pipeline.llm,
+            'default_rag_dir': get_default_rag_dir(),
         }
 
     @app.context_processor

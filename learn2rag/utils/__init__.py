@@ -117,3 +117,22 @@ def waitUntil(
             if timed_out():
                 raise TimeoutError(timeout_msg)
         sleep(10)
+
+
+def get_default_rag_dir() -> str:
+    """Returns the default directory for RAG documents based on OS."""
+    if is_windows():
+        user_profile = os.getenv('USERPROFILE')
+        assert user_profile is not None, "USERPROFILE environment variable is missing"
+        return os.path.join(user_profile, 'Documents', 'RAG')
+    else:
+        try:
+            import xdg.userdirs # type: ignore[import-not-found]
+            docs_dir = xdg.userdirs.get_userdir("DOCUMENTS")
+            if docs_dir:
+                return os.path.join(docs_dir, 'RAG')
+        except (ImportError, AttributeError):
+            pass
+
+        # Fallback
+        return str(Path.home() / 'Documents' / 'RAG')
