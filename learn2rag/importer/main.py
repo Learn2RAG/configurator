@@ -6,9 +6,9 @@ This is the main script of the learn2rag-importer project, which is designed to 
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.6
+Version: 0.0.7
 Creation Date: June 10, 2025
-Last Modified: August 13, 2026
+Last Modified: August 31, 2026
 """
 
 import argparse
@@ -17,7 +17,8 @@ import os
 import logging
 import sys
 import importlib.resources
-import warnings  
+import warnings
+from datetime import datetime, timezone
 from pathlib import Path
 from .config.config_constants import LOGS_DIR, VERSION
 from .utils.logging_setup import setup_logging
@@ -148,16 +149,43 @@ def main(args: argparse.Namespace) -> None:
                     progress=progress,
                 )
                 progress.finish_import()
+                succeeded_count = progress.total_loaders - len(progress.failed_loaders)
+                if progress.failed_loaders:
+                    logger.error(
+                        "Import completed: %d succeeded, %d failed loader(s): %s",
+                        succeeded_count,
+                        len(progress.failed_loaders),
+                        ", ".join(f"{loader_id} ({error})" for loader_id, error in progress.failed_loaders),
+                    )
+                    sys.exit(3)
+                else:
+                    logger.info("Import completed: all %d loader(s) succeeded.", succeeded_count)
             else:
                 # full import: all documents load and directly ingest in Qdrant
                 logger.info("Running full import")
-                all_documents = process_configuration_entries(config.get("loaders", []), progress=progress)
-                logger.debug(f"Total documents loaded: {len(all_documents)}")
-                progress.start_indexing(len(all_documents))
-                index(all_documents, user_config, opt_config, progress=progress)
+                
+                # Record import start time for all loaders
+                import_start = datetime.now(timezone.utc)
                 for entry in config.get("loaders", []):
                     loader_id = entry.get("loader_id")
                     if loader_id:
+                        import_state.record_import_start(loader_id, import_start)
+                
+                all_documents = process_configuration_entries(
+                    config.get("loaders", []),
+                    progress=progress,
+                    import_state=import_state,
+                    user_config=user_config,
+                    opt_config=opt_config,
+                )
+                logger.debug(f"Total documents loaded: {len(all_documents)}")
+                progress.start_indexing(len(all_documents))
+                index(all_documents, user_config, opt_config, progress=progress)
+                # Only save success for loaders that didn't fail
+                failed_loader_ids = {loader_id for loader_id, _ in progress.failed_loaders}
+                for entry in config.get("loaders", []):
+                    loader_id = entry.get("loader_id")
+                    if loader_id and loader_id not in failed_loader_ids:
                         import_state.save_success(loader_id)
                         logger.info(f"Updated import state timestamp for loader '{loader_id}'")
 
@@ -169,6 +197,17 @@ def main(args: argparse.Namespace) -> None:
                     logger.debug('Documents saved to: %s', output_path)
 
                 progress.finish_import(total_documents=len(all_documents))
+                succeeded_count = progress.total_loaders - len(progress.failed_loaders)
+                if progress.failed_loaders:
+                    logger.error(
+                        "Import completed: %d succeeded, %d failed loader(s): %s",
+                        succeeded_count,
+                        len(progress.failed_loaders),
+                        ", ".join(f"{loader_id} ({error})" for loader_id, error in progress.failed_loaders),
+                    )
+                    sys.exit(3)
+                else:
+                    logger.info("Import completed: all %d loader(s) succeeded.", succeeded_count)
         else:
             logger.error("Configuration validation failed. No documents were processed.")
             progress.fail_import("Configuration validation failed")

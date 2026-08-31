@@ -6,9 +6,9 @@ This module processes configuration entries and delegates loading to specific lo
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.9
+Version: 0.0.10
 Creation Date: June 10, 2025
-Last Modified: August 13, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
@@ -19,7 +19,8 @@ if TYPE_CHECKING:
     from learn2rag.importer.utils.import_state import ImportState
     from learn2rag.importer.utils.progress import ImportProgress
 from learn2rag.pipeline.ingestion import index
-from learn2rag.pipeline.store import get_documents, delete_documents, update_documents
+from learn2rag.pipeline.store import get_documents, delete_documents, delete_collection, update_documents
+from ..config.config_constants import DEFAULT_FAILURE_THRESHOLD
 from ..globals import stop_loading
 from langchain_core.documents import Document
 from .directory_loader import load_from_directory
@@ -38,6 +39,36 @@ from .mediawiki_loader import (
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
 
+
+def _purge_if_threshold_exceeded(
+    loader_id: str,
+    entry: Dict[str, Any],
+    import_state: "ImportState",
+    user_config: Optional[Dict[str, Any]],
+    opt_config: Optional[Dict[str, Any]],
+    progress: Optional["ImportProgress"] = None,
+) -> None:
+    """Delete all indexed documents for a loader once its consecutive-failure threshold is reached."""
+    threshold = int(entry.get("failure_threshold", DEFAULT_FAILURE_THRESHOLD))
+    failures = import_state.get_consecutive_failures(loader_id)
+    if failures < threshold:
+        return
+    if user_config is None or opt_config is None:
+        logger.warning(
+            f"Loader '{loader_id}' reached failure threshold ({failures}/{threshold}) but no "
+            "user_config/opt_config was provided; skipping Qdrant purge."
+        )
+        return
+    message = (
+        f"Loader '{loader_id}' reached failure threshold ({failures}/{threshold}); "
+        "purging all its documents from Qdrant."
+    )
+    logger.error(message)
+    if progress is not None:
+        progress.emit("Phase 2/4 Load", message)
+    delete_collection(loader_id, user_config, opt_config)
+
+
 def _entry_source(entry: Dict[str, Any]) -> str:
     return str(
         entry.get("path")
@@ -50,12 +81,24 @@ def _entry_source(entry: Dict[str, Any]) -> str:
     )
 
 
-def process_configuration_entries(config_entries: List[Dict[str, Any]], progress: Optional["ImportProgress"] = None) -> List[Document]:
+def process_configuration_entries(
+    config_entries: List[Dict[str, Any]],
+    progress: Optional["ImportProgress"] = None,
+    import_state: Optional["ImportState"] = None,
+    user_config: Optional[Dict[str, Any]] = None,
+    opt_config: Optional[Dict[str, Any]] = None,
+) -> List[Document]:
     """
     Process configuration entries and load documents based on loader type.
 
     Args:
         config_entries (list): List of configuration entries.
+        import_state (Optional[ImportState]): If given, loader failures increment
+                                              the per-loader consecutive-failure counter.
+        user_config (Optional[Dict[str, Any]]): Required together with opt_config to purge a
+                                                loader's documents from Qdrant once its
+                                                failure_threshold is reached.
+        opt_config (Optional[Dict[str, Any]]): See user_config.
 
     Returns:
         list: List of loaded documents.
@@ -247,7 +290,10 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]], progress
         except Exception as e:
             logger.error(f"Error processing entry {entry}: {e}")
             if progress is not None:
-                progress.emit("Phase 2/4 Load", f"Loader failed | error {e}")
+                progress.record_loader_failure(loader_id, str(e))
+            if import_state is not None and loader_id:
+                import_state.record_failure(loader_id)
+                _purge_if_threshold_exceeded(loader_id, entry, import_state, user_config, opt_config, progress=progress)
 
     return all_documents
 
@@ -687,7 +733,9 @@ def process_delta_imports(
         except Exception as e:
             logger.error(f"process_delta_imports: error processing loader '{loader_id}': {e}", exc_info=True)
             if progress is not None:
-                progress.emit("Phase 2/4 Load", f"Loader failed | error {e}")
+                progress.record_loader_failure(loader_id, str(e))
+            import_state.record_failure(loader_id)
+            _purge_if_threshold_exceeded(loader_id, entry, import_state, user_config, opt_config, progress=progress)
 
 
 def _delta_by_source(

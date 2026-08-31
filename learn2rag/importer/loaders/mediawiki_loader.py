@@ -8,9 +8,9 @@ pagination, and incremental loading based on recent changes.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.2
+Version: 0.0.3
 Creation Date: August 12, 2026
-Last Modified: August 13, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
@@ -22,6 +22,7 @@ import requests
 from langchain_core.documents import Document
 
 from ..globals import stop_loading
+from ..loaders.errors import LoaderAccessError
 
 if TYPE_CHECKING:
     from ..utils.progress import ImportProgress
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("Learn2RAGImporter")
 
 
-class MediaWikiSourceUnavailable(RuntimeError):
+class MediaWikiSourceUnavailable(LoaderAccessError):
     """Raised when MediaWiki cannot be reached or returns unusable responses."""
 
 

@@ -6,9 +6,9 @@ This module provides a function to load configuration files (e.g., JSON, YAML) f
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.6
+Version: 0.0.7
 Creation Date: June 10, 2025
-Last Modified: August 13,2026
+Last Modified: August 31, 2026
 """
 
 import json
@@ -99,9 +99,17 @@ def validate_config_entry(entry: Dict[str, Any]) -> bool:
             raise ValueError("'page_size' for 'MediaWikiLoader' must be an integer.")
         if parsed_page_size < 1:
             raise ValueError("'page_size' for 'MediaWikiLoader' must be greater than 0.")
-     
-    else:
-        raise ValueError(f"Unknown 'loader_type': {loader_type}")
+
+    if "failure_threshold" in entry:
+        threshold = entry.get("failure_threshold")
+        if threshold is None:
+            raise ValueError("'failure_threshold' must be a positive integer.")
+        try:
+            parsed_threshold = int(threshold)
+        except (TypeError, ValueError):
+            raise ValueError("'failure_threshold' must be a positive integer.")
+        if parsed_threshold < 1:
+            raise ValueError("'failure_threshold' must be a positive integer.")
 
     # ToDo: Add further validation for other loader types as needed
     return True

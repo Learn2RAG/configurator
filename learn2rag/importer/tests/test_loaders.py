@@ -20,6 +20,8 @@ from ..loaders.mediawiki_loader import (
     get_all_mediawiki_document_ids,
     load_from_mediawiki,
 )
+from ..loaders.errors import LoaderAccessError
+from ..utils.import_state import ImportState
 
 # Set RUN_INTEGRATION_TESTS=1 to run tests that require network access.
 _RUN_INTEGRATION: bool = os.environ.get("RUN_INTEGRATION_TESTS", "0") == "1"
@@ -126,6 +128,26 @@ class ImporterLoadersTestCase(unittest.TestCase):
                 )
         else:
             print("\n[SKIP_HASH_ASSERT=1] Hash assertion skipped.")
+
+
+class LoaderFailureHandlingTestCase(unittest.TestCase):
+    """Regression tests for access errors and import-state thresholds."""
+
+    def test_directory_loader_raises_loader_access_error_for_missing_path(self) -> None:
+        with self.assertRaises(LoaderAccessError):
+            load_from_directory("/definitely/not/here", recursive=False, loader_id="missing_dir")
+
+    def test_import_state_tracks_consecutive_failures(self) -> None:
+        temp_state = pathlib.Path(tempfile.mkdtemp(prefix="learn2rag_import_state_")) / "import_state.json"
+        state = ImportState(str(temp_state))
+        state.record_import_start("loader_1", datetime(2026, 8, 1, tzinfo=timezone.utc))
+        state.save_success("loader_1")
+
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 0)
+        self.assertEqual(state.record_failure("loader_1"), 1)
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 1)
+        state.reset_failures("loader_1")
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 0)
 
 
 class AllFileTypesTestCase(unittest.TestCase):

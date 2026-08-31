@@ -6,14 +6,15 @@ This module handles loading documents from CSV files.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.2
+Version: 0.0.3
 Creation Date: June 10, 2025
-Last Modified: February 20, 2026
+Last Modified: August 31, 2026
 """
 from datetime import datetime
 from typing import List, cast
 from langchain_community.document_loaders import CSVLoader
 from langchain_core.documents import Document
+from ..loaders.errors import LoaderAccessError
 
 def load_from_csv(path: str) -> List[Document]:
     """
@@ -27,9 +28,12 @@ def load_from_csv(path: str) -> List[Document]:
     """
 
     loader = CSVLoader(file_path=path)
-    documents = loader.load()
+    try:
+        documents = loader.load()
+    except Exception as e:
+        raise LoaderAccessError(f"Error loading documents from CSV file '{path}': {e}") from e
     if not documents:
-        raise ValueError(f"No document found in CSV file: {path}")
+        raise LoaderAccessError(f"No document found in CSV file: {path}")
 
     # Set metadata for each document
     for doc in documents:

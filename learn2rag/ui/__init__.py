@@ -355,6 +355,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
         if 'depth' in data:
             data['depth'] = int(data['depth'])
+        if 'failure_threshold' in data and data['failure_threshold'] not in (None, ''):
+            data['failure_threshold'] = int(data['failure_threshold'])
         if 'object_ids' in data:
             data['object_ids'] = request.form.getlist('object_ids')
         learn2rag.data.create_entry(app.instance_path, 'sources', data)

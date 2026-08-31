@@ -680,3 +680,8 @@ where
 - v0.1.1
   - added MediaWikiLoader
   - always store last index time (also for full imports)
+- v0.1.2
+  - added exit code 3 on failed loaders, exit code 2 on config error
+  - added `failure_threshold` (default = 5) as a configuration option to all loaders, after which documents are to be purged
+  - added: once a loader's `consecutive_failures` reaches `failure_threshold`, all of its documents are purged from Qdrant with an explicit error log message
+  - added: import summary now also logs the number of succeeded loaders and failed loaders
