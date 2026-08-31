@@ -45,7 +45,7 @@ files:
       handlers:
         display:
           class: logging.StreamHandler
-          level: INFO
+          level: {% if debug_logging %}DEBUG{% else %}INFO{% endif %}
           formatter: colored
           stream: ext://sys.stderr
         profiling_display:
