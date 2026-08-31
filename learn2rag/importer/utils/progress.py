@@ -6,15 +6,15 @@ This module provides progress tracking for the import process.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.1
+Version: 0.0.2
 Creation Date: June 29, 2026
-Last Modified: June 29, 2026
+Last Modified: August 31, 2026
 """
 
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List, Tuple
 
 
 statusLogger = logging.getLogger("status")
@@ -42,6 +42,7 @@ class ImportProgress:
     current_loader_index: Optional[int] = None
     current_loader_type: Optional[str] = None
     current_source: Optional[str] = None
+    failed_loaders: List[Tuple[str, str]] = field(default_factory=list)
 
     def elapsed_seconds(self) -> float:
         return time.perf_counter() - self.started_at
@@ -99,10 +100,17 @@ class ImportProgress:
     def start_indexing(self, document_count: int) -> None:
         self.emit("Phase 3/4 Index", f"Indexing started | documents {document_count}")
 
+    def record_loader_failure(self, loader_id: str, error: str) -> None:
+        self.failed_loaders.append((loader_id, error))
+        self.emit("Phase 2/4 Load", f"Loader failed | loader {loader_id} | error {error}", source=self.current_source)
+
     def finish_import(self, total_documents: Optional[int] = None) -> None:
         details = "Import finished"
         if total_documents is not None:
             details += f" | documents {total_documents}"
+        if self.failed_loaders:
+            failures = ", ".join(f"{loader_id} ({error})" for loader_id, error in self.failed_loaders)
+            details += f" | failed loaders {len(self.failed_loaders)} | {failures}"
         self.emit("Phase 4/4 Done", details)
 
     def fail_import(self, reason: str = "Import failed") -> None:

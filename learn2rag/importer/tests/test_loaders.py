@@ -15,6 +15,13 @@ from .generate_test_documents import create_test_documents
 from ..loaders.directory_loader import load_from_directory
 from ..loaders.html_loader import load_html_content, _is_same_site
 from ..loaders.jira_loader import load_from_jira, get_all_jira_document_ids
+from ..loaders.mediawiki_loader import (
+    MediaWikiSourceUnavailable,
+    get_all_mediawiki_document_ids,
+    load_from_mediawiki,
+)
+from ..loaders.errors import LoaderAccessError
+from ..utils.import_state import ImportState
 
 # Set RUN_INTEGRATION_TESTS=1 to run tests that require network access.
 _RUN_INTEGRATION: bool = os.environ.get("RUN_INTEGRATION_TESTS", "0") == "1"
@@ -121,6 +128,26 @@ class ImporterLoadersTestCase(unittest.TestCase):
                 )
         else:
             print("\n[SKIP_HASH_ASSERT=1] Hash assertion skipped.")
+
+
+class LoaderFailureHandlingTestCase(unittest.TestCase):
+    """Regression tests for access errors and import-state thresholds."""
+
+    def test_directory_loader_raises_loader_access_error_for_missing_path(self) -> None:
+        with self.assertRaises(LoaderAccessError):
+            load_from_directory("/definitely/not/here", recursive=False, loader_id="missing_dir")
+
+    def test_import_state_tracks_consecutive_failures(self) -> None:
+        temp_state = pathlib.Path(tempfile.mkdtemp(prefix="learn2rag_import_state_")) / "import_state.json"
+        state = ImportState(str(temp_state))
+        state.record_import_start("loader_1", datetime(2026, 8, 1, tzinfo=timezone.utc))
+        state.save_success("loader_1")
+
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 0)
+        self.assertEqual(state.record_failure("loader_1"), 1)
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 1)
+        state.reset_failures("loader_1")
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 0)
 
 
 class AllFileTypesTestCase(unittest.TestCase):
@@ -821,3 +848,213 @@ class JiraLoaderUnitTestCase(unittest.TestCase):
         params = kwargs.get("params", {})
         jql_query = params.get("jql", "")
         self.assertIn("updated >= \"2026-05-18 08:30\"", jql_query)
+
+
+class MediaWikiLoaderUnitTestCase(unittest.TestCase):
+    """Unit tests for MediaWiki loader with mocked HTTP session."""
+
+    @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
+    @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")
+    def test_load_from_mediawiki_maps_pages_to_documents(
+        self,
+        mock_resolve_api: MagicMock,  # 1. Argument (unten)
+        mock_session_cls: MagicMock,  # 2. Argument (oben)
+    ) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        allpages_page_1 = _make_json_response(
+            {
+                "query": {"allpages": [{"pageid": 1, "title": "Page One"}]},
+                "continue": {"apcontinue": "Page_Two"},
+            }
+        )
+        allpages_page_2 = _make_json_response(
+            {
+                "query": {"allpages": [{"pageid": 2, "title": "Page Two"}]},
+            }
+        )
+        pages_payload = _make_json_response(
+            {
+                "query": {
+                    "pages": [
+                        {
+                            "pageid": 1,
+                            "ns": 0,
+                            "title": "Page One",
+                            "extract": "First page content",
+                            "revisions": [{"timestamp": "2026-08-10T11:00:00Z"}],
+                        },
+                        {
+                            "pageid": 2,
+                            "ns": 0,
+                            "title": "Page Two",
+                            "extract": "Second page content",
+                            "revisions": [{"timestamp": "2026-08-10T12:00:00Z"}],
+                        },
+                    ]
+                }
+            }
+        )
+        mock_session.get.side_effect = [allpages_page_1, allpages_page_2, pages_payload]
+
+        docs = load_from_mediawiki(
+            base_url="https://wiki.example.com",
+            loader_id="wiki_test",
+            auth_type="none",
+            namespaces=[0],
+            page_size=50,
+        )
+
+        self.assertEqual(len(docs), 2)
+        sources = {doc.metadata.get("source") for doc in docs}
+        self.assertIn("https://wiki.example.com/?curid=1", sources)
+        self.assertIn("https://wiki.example.com/?curid=2", sources)
+        self.assertTrue(all(doc.metadata.get("loader") == "MediaWikiLoader" for doc in docs))
+        self.assertTrue(all("content_hash" in doc.metadata for doc in docs))
+
+    @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
+    @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")
+    def test_get_all_mediawiki_document_ids_with_pagination(
+        self,
+        mock_resolve_api: MagicMock,  # 1. Argument entspricht dem unteren Patch
+        mock_session_cls: MagicMock,  # 2. Argument entspricht dem oberen Patch
+    ) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        mock_session.get.side_effect = [
+            _make_json_response(
+                {
+                    "query": {"allpages": [{"pageid": 10, "title": "Alpha"}]},
+                    "continue": {"apcontinue": "Beta"},
+                }
+            ),
+            _make_json_response(
+                {
+                    "query": {"allpages": [{"pageid": 11, "title": "Beta"}]},
+                }
+            ),
+        ]
+
+        ids = get_all_mediawiki_document_ids(
+            base_url="https://wiki.example.com",
+            auth_type="none",
+            namespaces=[0],
+            page_size=1,
+        )
+
+        self.assertEqual(
+            ids,
+            [
+                "https://wiki.example.com/?curid=10",
+                "https://wiki.example.com/?curid=11",
+            ],
+        )
+
+    @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")
+    @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
+    def test_load_from_mediawiki_applies_since_filter(self, mock_session_cls: MagicMock, mock_resolve_api: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_session.get.return_value = _make_json_response({"query": {"recentchanges": []}})
+
+        since = datetime(2026, 8, 10, 9, 30, tzinfo=timezone.utc)
+        docs = load_from_mediawiki(
+            base_url="https://wiki.example.com",
+            auth_type="none",
+            namespaces=[0],
+            since=since,
+        )
+
+        self.assertEqual(docs, [])
+        self.assertTrue(mock_session.get.called)
+        _, kwargs = mock_session.get.call_args
+        params = kwargs.get("params", {})
+        self.assertEqual(params.get("list"), "recentchanges")
+        self.assertEqual(params.get("rcstart"), "2026-08-10T09:30:00Z")
+
+
+class MediaWikiDeltaFailSafeTestCase(unittest.TestCase):
+    """Ensure MediaWiki delta mode does not alter index on source outages."""
+
+    @patch("learn2rag.importer.loaders.process_loaders.index")
+    @patch("learn2rag.importer.loaders.process_loaders.delete_documents")
+    @patch("learn2rag.importer.loaders.process_loaders.load_from_mediawiki")
+    @patch("learn2rag.importer.loaders.process_loaders.get_all_mediawiki_document_ids")
+    @patch("learn2rag.importer.loaders.process_loaders.get_documents")
+    def test_empty_snapshot_skips_delta_without_index_changes(
+        self,
+        mock_get_documents: MagicMock,
+        mock_get_all_ids: MagicMock,
+        mock_load_from_mediawiki: MagicMock,
+        mock_delete_documents: MagicMock,
+        mock_index: MagicMock,
+    ) -> None:
+        from ..loaders.process_loaders import process_delta_imports
+
+        mock_get_documents.return_value = {"https://wiki.example.com/?curid=1": "hash1"}
+        mock_get_all_ids.return_value = []
+
+        import_state = MagicMock()
+        import_state.get_last_import_time.return_value = datetime(2026, 8, 1, tzinfo=timezone.utc)
+
+        process_delta_imports(
+            config_entries=[
+                {
+                    "loader_type": "MediaWikiLoader",
+                    "loader_id": "wiki_loader",
+                    "base_url": "https://wiki.example.com",
+                    "auth_type": "none",
+                    "namespaces": [0],
+                }
+            ],
+            user_config=_USER_CONFIG,
+            opt_config=_OPT_CONFIG,
+            import_state=import_state,
+            progress=None,
+        )
+
+        mock_delete_documents.assert_not_called()
+        mock_load_from_mediawiki.assert_not_called()
+        mock_index.assert_not_called()
+        import_state.save_success.assert_not_called()
+
+    @patch("learn2rag.importer.loaders.process_loaders.index")
+    @patch("learn2rag.importer.loaders.process_loaders.delete_documents")
+    @patch("learn2rag.importer.loaders.process_loaders.get_all_mediawiki_document_ids")
+    @patch("learn2rag.importer.loaders.process_loaders.get_documents")
+    def test_source_unavailable_skips_delta_without_index_changes(
+        self,
+        mock_get_documents: MagicMock,
+        mock_get_all_ids: MagicMock,
+        mock_delete_documents: MagicMock,
+        mock_index: MagicMock,
+    ) -> None:
+        from ..loaders.process_loaders import process_delta_imports
+
+        mock_get_documents.return_value = {"https://wiki.example.com/?curid=1": "hash1"}
+        mock_get_all_ids.side_effect = MediaWikiSourceUnavailable("unreachable")
+
+        import_state = MagicMock()
+        import_state.get_last_import_time.return_value = datetime(2026, 8, 1, tzinfo=timezone.utc)
+
+        process_delta_imports(
+            config_entries=[
+                {
+                    "loader_type": "MediaWikiLoader",
+                    "loader_id": "wiki_loader",
+                    "base_url": "https://wiki.example.com",
+                    "auth_type": "none",
+                    "namespaces": [0],
+                }
+            ],
+            user_config=_USER_CONFIG,
+            opt_config=_OPT_CONFIG,
+            import_state=import_state,
+            progress=None,
+        )
+
+        mock_delete_documents.assert_not_called()
+        mock_index.assert_not_called()
+        import_state.save_success.assert_not_called()

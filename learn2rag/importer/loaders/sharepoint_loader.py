@@ -7,10 +7,10 @@ It includes robust handling for App-Only Authentication (Client Credentials)
 and Site-Specific contexts.
 
 Author: Kyrill Meyer
-Version: 0.0.8
+Version: 0.0.9
 Institution: IFDT
 Creation Date: January 14, 2026
-Last Modified: June 29, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
@@ -24,6 +24,7 @@ from langchain_community.document_loaders import UnstructuredFileLoader, TextLoa
 from langchain_core.documents import Document
 from O365 import Account, FileSystemTokenBackend  # type: ignore
 from ..globals import stop_loading
+from ..loaders.errors import LoaderAccessError
 
 if TYPE_CHECKING:
     from ..utils.progress import ImportProgress
@@ -437,13 +438,13 @@ def get_all_sharepoint_document_ids(
             _authenticate_directly_with_o365(client_id, client_secret, tenant_id)
         else:
             logger.error("get_all_sharepoint_document_ids: No valid authentication method available.")
-            return []
+            raise LoaderAccessError("SharePointLoader could not authenticate using the provided client credentials.")
 
     account = Account((client_id, client_secret), token_backend=token_backend)
 
     if not account.is_authenticated:
         logger.error("get_all_sharepoint_document_ids: Authentication failed.")
-        return []
+        raise LoaderAccessError("SharePointLoader authentication failed.")
 
     try:
         if site_id:
@@ -456,7 +457,7 @@ def get_all_sharepoint_document_ids(
         drive = storage.get_drive(document_library_id)
         if drive is None:
             logger.error(f"get_all_sharepoint_document_ids: Drive not found: {document_library_id}")
-            return []
+            raise LoaderAccessError(f"SharePoint document library '{document_library_id}' could not be accessed.")
 
         # Optionaler Unterordner-Start
         effective_folder_id = folder_id
@@ -472,14 +473,14 @@ def get_all_sharepoint_document_ids(
                     root = found
                 else:
                     logger.warning(f"get_all_sharepoint_document_ids: folder part '{part}' not found")
-                    return []
+                    raise LoaderAccessError(f"SharePoint folder path '{folder_path}' could not be resolved.")
             effective_folder_id = root.object_id
 
         return _list_items_web_urls(drive, folder_id=effective_folder_id, recursive=recursive)
 
     except Exception as e:
         logger.error(f"get_all_sharepoint_document_ids: error: {e}")
-        return []
+        raise LoaderAccessError(f"SharePointLoader could not list document IDs: {e}") from e
 
 
 def load_from_sharepoint(client_id: str, client_secret: str, document_library_id: str, 
@@ -518,7 +519,7 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
             auth_with_token = True
         else:
             logger.warning("No Tenant ID provided or Tenant ID is 'common'.")
-            auth_with_token = False
+            raise LoaderAccessError("SharePointLoader could not authenticate using the provided credentials.")
     else:
         logger.info(f"Using existing O365 token found at: {token_path}")
         logger.info("To force a new authentication (e.g., if token expired), set 'reset_token': 'True' in your configuration.")
@@ -534,6 +535,7 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
         if not account.is_authenticated:
             # Fallback 
              logger.warning("Account seemingly not authenticated in main load logic. Check logs.")
+             raise LoaderAccessError("SharePointLoader authentication failed during document load.")
 
         drive = None
         
@@ -550,7 +552,7 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
             drive = site.get_document_library(document_library_id)
         
         if not drive:
-            raise Exception(f"Drive/Library not found with ID {document_library_id}")
+            raise LoaderAccessError(f"Drive/Library not found with ID {document_library_id}")
 
         logger.info(f"Successfully connected to Library: {drive.name}")
         progress_source = folder_path or drive.name or document_library_id
@@ -576,6 +578,7 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
 
     except Exception as e:
         logger.error(f"Error loading documents from SharePoint: {e}")
+        raise LoaderAccessError(f"SharePointLoader could not load documents: {e}") from e
         
         # --- Diagnosis Helper ---
         err_str = str(e)

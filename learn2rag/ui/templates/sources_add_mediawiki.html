@@ -1,17 +1,15 @@
 <form method="POST">
-  <input type="hidden" name="type" value="drupal"/>
+  <input type="hidden" name="type" value="mediawiki"/>
   <div class="mb-3">
     <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
     <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
   </div>
   <div class="mb-3">
     <label for="path" class="form-label">{{pgettext('form_label', 'Base URL')}}</label>
-    <input class="form-control" name="base_url" required="required" title="{{pgettext('tooltip', 'For example: %(example)s', example='')}}"/>
+    <input class="form-control" name="base_url" required="required" title="{{pgettext('tooltip', 'For example: %(example)s', example='https://www.mediawiki.org/api.php')}}"/>
   </div>
-  <div class="mb-3">
-    <label for="path" class="form-label">{{pgettext('form_label', 'Content types')}}</label>
-    <input class="form-control" name="content_types" required="required" value="{{example_drupal_content_types}}"/>
-  </div>
+  <!-- TODO namespaces -->
+  <!-- TODO page_size -->
   <div class="mb-3">
     <label for="auth_type" class="form-label">{{pgettext('form_label', 'Authentication')}}</label>
     <select required="required" class="form-select" name="auth_type">
