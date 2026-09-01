@@ -1,10 +1,8 @@
 import os
 from typing import Any
-
+import logging
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, SparseVectorParams, SparseIndexParams, MultiVectorComparator, MultiVectorConfig
-
-from .config import user_config
 
 # FIXME: when running a Windows package,
 # this import causes segmentation fault if done after creating QdrantClient.
@@ -28,6 +26,7 @@ class Qdrant:
 
 
     def __init__(self, collection_name: str, opt_config: dict[str, Any]) -> None:
+        logging.debug("init Qdrant")
         self.collection_name = collection_name
         self.vector_size = opt_config["vector_size"][opt_config["embedding_model"]]
         self.search_mode = opt_config["search_mode"]
