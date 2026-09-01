@@ -11,9 +11,9 @@ Drupal requirements:
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.3
+Version: 0.0.4
 Creation Date: March 17, 2026
-Last Modified: June 29, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
@@ -24,6 +24,7 @@ from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 import requests
 from ..globals import stop_loading
+from ..loaders.errors import LoaderAccessError
 
 if TYPE_CHECKING:
     from ..utils.progress import ImportProgress
@@ -239,9 +240,13 @@ def load_from_drupal(
                 data = response.json()
             except requests.exceptions.HTTPError as e:
                 logger.error(f"DrupalLoader: HTTP error for content type '{content_type}': {e}")
+                if page_count == 0:
+                    raise LoaderAccessError(f"DrupalLoader could not access '{base_url}' for content type '{content_type}': {e}") from e
                 break
             except requests.exceptions.RequestException as e:
                 logger.error(f"DrupalLoader: Request failed for content type '{content_type}': {e}")
+                if page_count == 0:
+                    raise LoaderAccessError(f"DrupalLoader request failed for '{base_url}' and content type '{content_type}': {e}") from e
                 break
 
             items = data.get("data", [])
@@ -409,6 +414,8 @@ def get_all_drupal_document_ids(
                 data = response.json()
             except requests.exceptions.RequestException as e:
                 logger.error(f"get_all_drupal_document_ids: Request failed for '{content_type}': {e}")
+                if page_count == 0:
+                    raise LoaderAccessError(f"DrupalLoader could not list document IDs for '{base_url}' / '{content_type}': {e}") from e
                 break
 
             items = data.get("data", [])

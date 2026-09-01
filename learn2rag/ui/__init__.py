@@ -77,38 +77,46 @@ def stop_project(name: str) -> None:
     assert project is not None, 'project should not be None'
     project.stop()
 
-def find_free_ports(n: int, *, configured_ports: list[int]=[], preferred_ports: list[int]=[]) -> list[int]:
+def find_free_ports(n: int, *, configured_ports: list[int] | None = None, preferred_ports: list[int] | None = None) -> list[int]:
     """
     Finds n free ports. Prioritizes preferred_ports if provided.
     """
+    configured_ports = configured_ports or []
+    preferred_ports = preferred_ports or []
+
     ports = [*configured_ports]
 
     # 1. Try preferred ports first
     for p in filter(lambda p: p not in ports, preferred_ports):
         if len(ports) >= n:
             break
+        logging.debug('Checking if preferred port %d is available...', p)
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 # Set REUSEADDR to handle ports in TIME_WAIT state
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind(('', p))
+                logging.debug('Port %d is free. Allocating.', p)
                 ports.append(p)
         except OSError:
+            logging.warning('Port %d is busy. Trying next...', p)
             continue  # Port is taken, skip to next or fallback
 
     # 2. Fallback to OS-assigned random ports if we still need more
     remaining = n - len(ports)
     if remaining > 0:
+        logging.debug('Still need %d ports. Falling back to OS-assigned random ports.', remaining)
         temp_sockets = []
         for _ in range(remaining):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.bind(('', 0))
             ports.append(s.getsockname()[1])
+            logging.info('OS assigned random port %d.', s.getsockname()[1])
             temp_sockets.append(s)
 
         for s in temp_sockets:
             s.close()
-
+    logging.debug('Final allocated ports: %s', ports)
     return ports
 
 
@@ -357,6 +365,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
         if 'depth' in data:
             data['depth'] = int(data['depth'])
+        if 'failure_threshold' in data and data['failure_threshold'] not in (None, ''):
+            data['failure_threshold'] = int(data['failure_threshold'])
         if 'object_ids' in data:
             data['object_ids'] = request.form.getlist('object_ids')
         learn2rag.data.create_entry(app.instance_path, 'sources', data)
@@ -437,6 +447,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     'sharepoint': 'SharepointLoader',
                     'drupal': 'DrupalLoader',
                     'jira': 'JiraLoader',
+                    'mediawiki': 'MediaWikiLoader',
                 }.get(source.get(
                     'type',
                     'local'  # FIXME: remove this later and throw Exception

@@ -127,7 +127,7 @@ def _rerank_points_with_colbert(
     colbert_query = colbert_vecs[0] if len(colbert_vecs) > 0 else []
 
     candidate_ids = [p.id for p in points]
-    results = qdrant.client.query_points(
+    results = qdrant.get_client().query_points(
         collection_name=collection_name,
         query_filter=models.Filter(
             must=[
@@ -309,7 +309,6 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
         extra={'activity': '_collect_query_points', 'request_id': request_id},
     )
     collection_name = user_config["collection_name"]
-
     if opt_config["fusion_mode"] == "RRF":
         fusion_mode = models.Fusion.RRF
     if opt_config["fusion_mode"] == "DBSF":
@@ -353,9 +352,8 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
             query_embedding = np.concatenate(vecs_to_concat, axis=0)
     else:
         query_embedding = create_embeddings([query], opt_config["embedding_model"])
-
     if opt_config["search_mode"] == "dense":
-        results = qdrant.client.query_points(
+        results = qdrant.get_client().query_points(
             collection_name=collection_name,
             query=query_embedding, # type: ignore[arg-type, unused-ignore]
             using="dense",
@@ -365,7 +363,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
     elif opt_config["search_mode"] == "sparse":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()]  # type: ignore[union-attr]
         values = [float(v) for v in query_embedding["lexical_weights"].values()]  # type: ignore[union-attr]
-        results = qdrant.client.query_points(
+        results = qdrant.get_client().query_points(
             collection_name=collection_name,
             query=models.SparseVector(indices=indices, values=values),
             using="sparse",
@@ -375,7 +373,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
     elif opt_config["search_mode"] == "dense_sparse":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()] # type: ignore[union-attr]
         values = [float(v) for v in query_embedding["lexical_weights"].values()] # type: ignore[union-attr]
-        results = qdrant.client.query_points(
+        results = qdrant.get_client().query_points(
             collection_name=collection_name,
             prefetch=[
                 models.Prefetch(
@@ -397,7 +395,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
     elif opt_config["search_mode"] == "dense_sparse_colbert":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()] # type: ignore[union-attr]
         values = [float(v) for v in query_embedding["lexical_weights"].values()] # type: ignore[union-attr]
-        results = qdrant.client.query_points(
+        results = qdrant.get_client().query_points(
             collection_name=collection_name,
             prefetch=[
                 models.Prefetch(
@@ -422,7 +420,7 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
         )
 
     elif opt_config["search_mode"] == "multi_search":
-        results = qdrant.client.query_points(
+        results = qdrant.get_client().query_points(
             collection_name=collection_name,
             query=query_embedding, # type: ignore[arg-type, unused-ignore]
             using="multi",
@@ -456,7 +454,7 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
     if opt_config["search_mode"] != "dense":
         warnings.warn(f"Search mode {opt_config["search_mode"]} for multimodal vector is not implemented yet. Using dense.")
 
-    results = qdrant.client.query_points(
+    results = qdrant.get_client().query_points(
         collection_name=collection_name,
         query=query_embedding, # type: ignore[arg-type, unused-ignore]
         using="multi",
@@ -466,10 +464,8 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
     return results
 
 
-
 async def search_authorized(question: str, user: str, *, request_id: str | None = None, user_config: dict[str, Any] = user_config, opt_config: dict[str, Any] = opt_config) -> List[ScoredPoint]:
     points = _collect_query_points(question, user_config, opt_config, request_id=request_id)
-
     query_response = QueryResponse(points=points)
     authorized_points = await filter_authorized(user, query_response)
     # keep deterministic order after auth filter

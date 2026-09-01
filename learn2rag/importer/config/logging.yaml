@@ -1,27 +1,35 @@
 version: 1
+disable_existing_loggers: False
+
 formatters:
   simple:
     format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  colored:
-    class: colorlog.ColoredFormatter
-    format: "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
 handlers:
   console:
     class: logging.StreamHandler
     level: INFO
-    formatter: colored
+    formatter: simple
     stream: ext://sys.stdout
+
   file:
     class: logging.FileHandler
     level: DEBUG
-    formatter: colored
+    formatter: simple
     filename: logs/app.log
     encoding: utf-8
+
 loggers:
+  learn2rag:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: no
+
   Learn2RAGImporter:
     level: DEBUG
     handlers: [console, file]
     propagate: no
+
 root:
-  level: WARNING
+  level: INFO
   handlers: [console]

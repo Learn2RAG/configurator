@@ -6,9 +6,9 @@ This module processes configuration entries and delegates loading to specific lo
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.8
+Version: 0.0.10
 Creation Date: June 10, 2025
-Last Modified: June 29, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
@@ -19,7 +19,8 @@ if TYPE_CHECKING:
     from learn2rag.importer.utils.import_state import ImportState
     from learn2rag.importer.utils.progress import ImportProgress
 from learn2rag.pipeline.ingestion import index
-from learn2rag.pipeline.store import get_documents, delete_documents, update_documents
+from learn2rag.pipeline.store import get_documents, delete_documents, delete_collection, update_documents
+from ..config.config_constants import DEFAULT_FAILURE_THRESHOLD
 from ..globals import stop_loading
 from langchain_core.documents import Document
 from .directory_loader import load_from_directory
@@ -28,10 +29,45 @@ from .html_loader import load_html_content
 from .sharepoint_loader import load_from_sharepoint, get_all_sharepoint_document_ids
 from .drupal_loader import load_from_drupal, get_all_drupal_document_ids
 from .jira_loader import load_from_jira, get_all_jira_document_ids
+from .mediawiki_loader import (
+    load_from_mediawiki,
+    get_all_mediawiki_document_ids,
+    MediaWikiSourceUnavailable,
+)
 
 #
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
+
+
+def _purge_if_threshold_exceeded(
+    loader_id: str,
+    entry: Dict[str, Any],
+    import_state: "ImportState",
+    user_config: Optional[Dict[str, Any]],
+    opt_config: Optional[Dict[str, Any]],
+    progress: Optional["ImportProgress"] = None,
+) -> None:
+    """Delete all indexed documents for a loader once its consecutive-failure threshold is reached."""
+    threshold = int(entry.get("failure_threshold", DEFAULT_FAILURE_THRESHOLD))
+    failures = import_state.get_consecutive_failures(loader_id)
+    if failures < threshold:
+        return
+    if user_config is None or opt_config is None:
+        logger.warning(
+            f"Loader '{loader_id}' reached failure threshold ({failures}/{threshold}) but no "
+            "user_config/opt_config was provided; skipping Qdrant purge."
+        )
+        return
+    message = (
+        f"Loader '{loader_id}' reached failure threshold ({failures}/{threshold}); "
+        "purging all its documents from Qdrant."
+    )
+    logger.error(message)
+    if progress is not None:
+        progress.emit("Phase 2/4 Load", message)
+    delete_collection(loader_id, user_config, opt_config)
+
 
 def _entry_source(entry: Dict[str, Any]) -> str:
     return str(
@@ -45,12 +81,24 @@ def _entry_source(entry: Dict[str, Any]) -> str:
     )
 
 
-def process_configuration_entries(config_entries: List[Dict[str, Any]], progress: Optional["ImportProgress"] = None) -> List[Document]:
+def process_configuration_entries(
+    config_entries: List[Dict[str, Any]],
+    progress: Optional["ImportProgress"] = None,
+    import_state: Optional["ImportState"] = None,
+    user_config: Optional[Dict[str, Any]] = None,
+    opt_config: Optional[Dict[str, Any]] = None,
+) -> List[Document]:
     """
     Process configuration entries and load documents based on loader type.
 
     Args:
         config_entries (list): List of configuration entries.
+        import_state (Optional[ImportState]): If given, loader failures increment
+                                              the per-loader consecutive-failure counter.
+        user_config (Optional[Dict[str, Any]]): Required together with opt_config to purge a
+                                                loader's documents from Qdrant once its
+                                                failure_threshold is reached.
+        opt_config (Optional[Dict[str, Any]]): See user_config.
 
     Returns:
         list: List of loaded documents.
@@ -206,6 +254,31 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]], progress
                     max_issues=max_issues,
                 )
                 logger.info(f"Loaded {len(documents)} documents from Jira ({base_url}) using {loader_type}.")
+            elif loader_type == "MediaWikiLoader":
+                base_url = str(entry.get("base_url", ""))
+                auth_type = str(entry.get("auth_type", "none"))
+                username = str(entry.get("username", ""))
+                password = str(entry.get("password", ""))
+                token = str(entry.get("token", ""))
+                namespaces = entry.get("namespaces", [0])
+                page_size = int(entry.get("page_size", 50))
+
+                if not base_url:
+                    logger.error(f"Invalid configuration for MediaWikiLoader: Missing 'base_url'. Entry: {entry}")
+                    continue
+
+                documents = load_from_mediawiki(
+                    base_url=base_url,
+                    loader_id=loader_id,
+                    auth_type=auth_type,
+                    username=username,
+                    password=password,
+                    token=token,
+                    namespaces=list(namespaces) if isinstance(namespaces, list) else [0],
+                    page_size=page_size,
+                    progress=progress,
+                )
+                logger.info(f"Loaded {len(documents)} documents from MediaWiki ({base_url}) using {loader_type}.")
             else:
                 logger.error(f"Unknown loader type: {loader_type}")
                 continue
@@ -217,7 +290,10 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]], progress
         except Exception as e:
             logger.error(f"Error processing entry {entry}: {e}")
             if progress is not None:
-                progress.emit("Phase 2/4 Load", f"Loader failed | error {e}")
+                progress.record_loader_failure(loader_id, str(e))
+            if import_state is not None and loader_id:
+                import_state.record_failure(loader_id)
+                _purge_if_threshold_exceeded(loader_id, entry, import_state, user_config, opt_config, progress=progress)
 
     return all_documents
 
@@ -485,6 +561,110 @@ def process_delta_imports(
                     index(changed_docs, user_config, opt_config)
                     logger.info(f"Jira '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
 
+            elif loader_type == "MediaWikiLoader":
+                base_url = str(entry.get("base_url", ""))
+                auth_type = str(entry.get("auth_type", "none"))
+                username = str(entry.get("username", ""))
+                password = str(entry.get("password", ""))
+                token = str(entry.get("token", ""))
+                namespaces = entry.get("namespaces", [0])
+                page_size = int(entry.get("page_size", 100))
+                safe_namespaces = list(namespaces) if isinstance(namespaces, list) else [0]
+
+                if is_initial or last_import_time is None:
+                    logger.info(f"MediaWiki '{loader_id}': full load (initial={is_initial})")
+                    all_docs = load_from_mediawiki(
+                        base_url=base_url,
+                        loader_id=loader_id,
+                        auth_type=auth_type,
+                        username=username,
+                        password=password,
+                        token=token,
+                        namespaces=safe_namespaces,
+                        page_size=page_size,
+                        progress=progress,
+                    )
+                    loaded_document_count = len(all_docs)
+                    if is_initial:
+                        if progress is not None:
+                            progress.start_indexing(len(all_docs))
+                        index(all_docs, user_config, opt_config, progress=progress)
+                    else:
+                        _delta_by_source(all_docs, existing_map, loader_id, user_config, opt_config, progress=progress)
+                else:
+                    logger.info(f"MediaWiki '{loader_id}': 2-pass delta since {last_import_time.isoformat()}")
+                    try:
+                        current_ids = set(get_all_mediawiki_document_ids(
+                            base_url=base_url,
+                            auth_type=auth_type,
+                            username=username,
+                            password=password,
+                            token=token,
+                            namespaces=safe_namespaces,
+                            page_size=page_size,
+                        ))
+
+                        # Fail-safe: avoid mass deletions if source snapshot is unexpectedly empty.
+                        if existing_map and not current_ids:
+                            logger.error(
+                                "MediaWiki '%s': ID snapshot is empty while %s indexed docs exist. "
+                                "Skipping delta run to protect index.",
+                                loader_id,
+                                len(existing_map),
+                            )
+                            if progress is not None:
+                                progress.emit(
+                                    "Phase 2/4 Load",
+                                    "MediaWiki source unavailable or inconsistent; delta skipped to protect index",
+                                    source=base_url,
+                                )
+                            continue
+
+                        changed_docs = load_from_mediawiki(
+                            base_url=base_url,
+                            loader_id=loader_id,
+                            auth_type=auth_type,
+                            username=username,
+                            password=password,
+                            token=token,
+                            namespaces=safe_namespaces,
+                            page_size=page_size,
+                            since=last_import_time,
+                            progress=progress,
+                        )
+                    except MediaWikiSourceUnavailable as exc:
+                        logger.error(
+                            "MediaWiki '%s': source unavailable; skipping delta run without index changes: %s",
+                            loader_id,
+                            exc,
+                        )
+                        if progress is not None:
+                            progress.emit(
+                                "Phase 2/4 Load",
+                                "MediaWiki source unavailable; no index changes applied",
+                                source=base_url,
+                            )
+                        continue
+
+                    loaded_document_count = len(changed_docs)
+                    deleted_paths = [p for p in existing_map if p not in current_ids]
+                    if deleted_paths:
+                        logger.info(f"MediaWiki '{loader_id}': deleting {len(deleted_paths)} removed documents")
+                        delete_documents(loader_id, deleted_paths, user_config, opt_config)
+
+                    sources_to_delete = [doc.metadata.get("source", "") for doc in changed_docs]
+                    if sources_to_delete:
+                        delete_documents(loader_id, sources_to_delete, user_config, opt_config)
+                    if progress is not None:
+                        progress.start_indexing(len(changed_docs))
+                    index(changed_docs, user_config, opt_config, progress=progress)
+                    logger.info(f"MediaWiki '{loader_id}': {len(deleted_paths)} deleted, {len(changed_docs)} updated")
+                    if progress is not None:
+                        progress.emit(
+                            "Phase 2/4 Load",
+                            f"Delta applied | deleted {len(deleted_paths)} | updated {len(changed_docs)}",
+                        )
+
             # ----------------------------------------------------------------
             # NORMAL LOADERS: Directory / HTML / CSV — hash comparison
             # ----------------------------------------------------------------
@@ -553,7 +733,9 @@ def process_delta_imports(
         except Exception as e:
             logger.error(f"process_delta_imports: error processing loader '{loader_id}': {e}", exc_info=True)
             if progress is not None:
-                progress.emit("Phase 2/4 Load", f"Loader failed | error {e}")
+                progress.record_loader_failure(loader_id, str(e))
+            import_state.record_failure(loader_id)
+            _purge_if_threshold_exceeded(loader_id, entry, import_state, user_config, opt_config, progress=progress)
 
 
 def _delta_by_source(
