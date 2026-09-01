@@ -17,7 +17,6 @@ class Qdrant:
 
     _client =  None
     def __init__(self, collection_name: str, opt_config: dict[str, Any]) -> None:
-        logging.debug("init Qdrant")
         self.collection_name = collection_name
         self.vector_size = opt_config["vector_size"][opt_config["embedding_model"]]
         self.search_mode = opt_config["search_mode"]
