@@ -17,7 +17,6 @@ from itertools import islice
 from babel import negotiate_locale
 from flask import Flask, Response, flash, redirect as flask_redirect, render_template, request, make_response, url_for
 from flask_babel import Babel, gettext, ngettext, pgettext  # type: ignore[import-untyped]
-from pygtail import Pygtail
 import flask.logging
 import ollama
 import uvicorn
@@ -34,6 +33,7 @@ from ..utils import (
     open_web_browser,
     save_data_path,
 )
+from ..utils.flask import tail_sse_response
 
 from datetime import datetime
 
@@ -128,6 +128,17 @@ def merge(source: dict[str, Any], destination: dict[str, Any]) -> dict[str, Any]
         else:
             destination[key] = value
     return destination
+
+
+def pipeline_status_file(pipeline: dict[str, Any]) -> Path:
+    return normalize_path(Path(pipeline['storage_path'])) / 'logs' / 'status.log'
+
+
+def pipeline_status_message(pipeline: dict[str, Any]) -> str:
+    try:
+        return pipeline_status_file(pipeline).read_text().splitlines()[-1]
+    except (FileNotFoundError, IndexError):
+        return ''
 
 
 def create_app(config: dict[str, Any]={}) -> Flask:
@@ -390,10 +401,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def pipelines_list() -> 'str | werkzeug.wrappers.response.Response':
         pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
         for pipeline in pipelines.values():
-            try:
-                pipeline['status_message'] = (Path(pipeline['storage_path']) / 'logs' / 'status.log').read_text().splitlines()[-1]
-            except (FileNotFoundError, IndexError):
-                pipeline['status_message'] = ''
+            pipeline['status_message'] = pipeline_status_message(pipeline)
         context = {
             'pipelines': pipelines,
             'projects': Project.get_all(),
@@ -572,14 +580,21 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     content=content,
                     file=file,
                 )
-            else:  # text/event-stream
-                def as_sse(data: str) -> str:
-                    return '\n'.join(map(lambda line: 'data: ' + line, data.split('\n'))) + '\n\n'
-                def stream():
-                    tail = Pygtail(str(log_file))
-                    for line in tail:
-                        yield line
-                return Response(map(as_sse, stream()), mimetype='text/event-stream')
+            elif request.accept_mimetypes.find('text/event-stream') != -1:
+                return tail_sse_response(log_file)
+        return redirect(url_for('pipelines_list'))
+
+    @app.get('/pipelines/<name>/status')
+    def pipeline_status(name: str) -> 'str | werkzeug.wrappers.response.Response':
+        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        if pipeline is None:
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+            return redirect(url_for('pipelines_list'))
+        else:
+            if request.accept_mimetypes.accept_html:
+                return pipeline_status_message(pipeline)
+            elif request.accept_mimetypes.find('text/event-stream') != -1:
+                return tail_sse_response(pipeline_status_file(pipeline))
         return redirect(url_for('pipelines_list'))
 
     @app.get('/ps')

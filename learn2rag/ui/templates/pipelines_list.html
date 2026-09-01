@@ -143,7 +143,7 @@
     </tr>
     <tr>
       <td colspan="6">
-        {{ pipeline.status_message }}
+        <div hx-ext="sse" sse-connect="{{ url_for('pipeline_status', name=name) }}" sse-swap="message">{{ pipeline.status_message }}</div>
       </td>
     </tr>
     </tr>

@@ -2017,7 +2017,7 @@ requires-dist = [
     { name = "pydantic", specifier = "==2.11.7" },
     { name = "pydantic-core", specifier = "==2.33.2" },
     { name = "pydantic-settings", specifier = "==2.10.1" },
-    { name = "pygtail", specifier = "==0.6.1" },
+    { name = "pygtail", specifier = "==0.14.0" },
     { name = "pypandoc", specifier = "==1.15" },
     { name = "pyparsing", specifier = "==3.2.3" },
     { name = "pypdf", specifier = "==5.9.0" },
@@ -3558,9 +3558,12 @@ wheels = [
 
 [[package]]
 name = "pygtail"
-version = "0.6.1"
+version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/32/31/21057f7f488cff3ef2069c7529e129cd452bb810c04fb226714dbdae5bf5/pygtail-0.6.1.tar.gz", hash = "sha256:4d71af37337bc96c6c0cbb4218aadde5c0d3120e642ca7f943784cb2878f516c", size = 5087, upload-time = "2015-11-06T04:17:05.35Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b0/89/437120e303d5d2c81107ed3415d5f3c9975f7dfdeef9e4440cef364e3bf9/pygtail-0.14.0.tar.gz", hash = "sha256:55616d31a081eaaeb069d0946f2bc7e530ebf505d4c3c050f8e941786a3449d3", size = 13509, upload-time = "2022-11-06T14:54:28.816Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/43/77/5558c3904229d2e320722ec58d38b82f9ff3063b7eeda49a8821b5595de1/pygtail-0.14.0-py3-none-any.whl", hash = "sha256:3d8e847d4d5c56e3cece1f65577562e63f8b75af7b93bf21b71c3213d369c2a9", size = 14319, upload-time = "2022-11-06T14:54:26.714Z" },
+]
 
 [[package]]
 name = "pyjwt"
