@@ -13,19 +13,20 @@ logger = logging.getLogger(__name__)
 
 def discover_applications(import_config: Mapping[str, Any]) -> Generator[tuple[str, str, dict[str, Any]], None, None]:
     for loader_config in import_config['loaders']:
-        name = loader_config['loader_id']
-        client_id = loader_config.get('oauth_client_id', '')
-        client_secret = loader_config.get('oauth_client_secret', '')
-        base_url = loader_config.get('base_url', '')
-        if client_id != '' and client_secret != '' and base_url != '':
-            logger.info('Discovered OAuth application: %s (%s), client_id=%s)', name, base_url, client_id)
-            yield name, base_url, {
-                'client_id': client_id,
-                'client_secret': client_secret,
-                'authorize_url': base_url + '/oauth/authorize',
-                'access_token_url': base_url + '/oauth/token',
-                'client_kwargs': {'scope': 'authenticated'},
-            }
+        if loader_config.get('user_auth_type', 'none') == 'oauth':
+            name = loader_config['loader_id']
+            client_id = loader_config.get('oauth_client_id', '')
+            client_secret = loader_config.get('oauth_client_secret', '')
+            base_url = loader_config.get('base_url', '')
+            if client_id != '' and client_secret != '' and base_url != '':
+                logger.info('Discovered OAuth application: %s (%s), client_id=%s)', name, base_url, client_id)
+                yield name, base_url, {
+                    'client_id': client_id,
+                    'client_secret': client_secret,
+                    'authorize_url': base_url + '/oauth/authorize',
+                    'access_token_url': base_url + '/oauth/token',
+                    'client_kwargs': {'scope': 'authenticated'},
+                }
 
 
 class OAuthRouter(AuthImplRouter):
