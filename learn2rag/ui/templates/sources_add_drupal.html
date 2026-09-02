@@ -53,5 +53,9 @@
       <input name="oauth_client_secret" type="text" class="form-control" aria-label="client_secret">
     </div>
   </fieldset>
+  <div class="mb-3">
+    <label for="failure_threshold" class="form-label">{{ pgettext('form_label', 'Failure threshold') }}</label>
+    <input type="number" min="1" step="1" class="form-control" name="failure_threshold" value="5">
+  </div>
   <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
 </form>

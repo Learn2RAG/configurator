@@ -15,7 +15,7 @@ import psutil
 import yaml
 
 logger = logging.getLogger(__name__)
-
+active_popens: dict[int, subprocess.Popen[Any]] = {}
 # FIXME
 # remove child processes immediately when they exit
 import platform
@@ -23,7 +23,7 @@ import signal
 
 
 exit_statuses = {}
-
+# Windows does not support SIGCHLD
 if hasattr(signal, "SIGCHLD"):
     def handle_SIGCHLD(signum: int, frame: Optional[Any]) -> None:
         with contextlib.suppress(ChildProcessError):
@@ -55,9 +55,39 @@ CREATE TABLE IF NOT EXISTS services (
 
 def kill_process(pid: int) -> None:
     if hasattr(os, 'killpg'):
+        logger.debug('Using os.killpg for process group %s', pid)
         os.killpg(os.getpgid(pid), signal.SIGTERM)
     else:
-        os.kill(pid, signal.SIGTERM)
+        try:
+            parent = psutil.Process(pid)
+            procs = parent.children(recursive=True)
+            procs.append(parent)
+
+            logger.debug('Found process tree for %s with %d processes', pid, len(procs))
+
+            for p in procs:
+                try:
+                    logger.debug('Terminating process %s', p.pid)
+                    p.terminate()
+                except psutil.NoSuchProcess:
+                    pass
+
+            logger.debug('Waiting up to 5 seconds for processes to terminate and release ports...')
+            gone, alive = psutil.wait_procs(procs, timeout=5)
+
+            if alive:
+                logger.warning('%d processes refused to terminate gracefully. Forcing kill.', len(alive))
+                for p in alive:
+                    try:
+                        logger.debug('Force killing process %s', p.pid)
+                        p.kill()
+                    except psutil.NoSuchProcess:
+                        pass
+            else:
+                logger.debug('All processes in tree %s terminated gracefully.', pid)
+
+        except psutil.NoSuchProcess:
+            logger.debug('Process %s already stopped, nothing to kill.', pid)
 
 
 def init_db(con: sqlite3.Connection) -> None:
@@ -70,18 +100,20 @@ def init_db(con: sqlite3.Connection) -> None:
 
 
 def process_running(pid: int) -> bool:
-    # if process := popens.get(pid):
-    #     returncode = process.poll()
-    #     print(returncode)
-    #     return returncode == None
+    # I comment it because it seems for windows kill(pid,0) does not work
+    # try:
+    #     process = psutil.Process(pid)
+    #     os.kill(pid, 0)
+    # except psutil.NoSuchProcess:
+    #     return False
+    # else:
+    #     return process.is_running()
     try:
         process = psutil.Process(pid)
-        os.kill(pid, 0)
     except psutil.NoSuchProcess:
         return False
     else:
         return process.is_running()
-
 
 def healthy(value: list[str]) -> bool:
     assert len(value) == 4
@@ -151,16 +183,31 @@ class Project():
             project.healthcheck()
 
         return project
-
+    # TODO : check for memory leak
+    # If a process stops on its own, check() runs and cleans up the dictionary. But if a user manually stops a project (triggering Project.stop() directly), check() never runs. The processes are killed, but their handles stay in active_popens forever, causing a memory leak
     def check(self) -> None:
         cur = con.cursor()
         cur.row_factory = sqlite3.Row  # type: ignore[assignment]
         cur.execute('SELECT * FROM services WHERE project = :project', {'project': self.name})
         rows = cur.fetchall()
         cur.close()
+
+        if not hasattr(signal, "SIGCHLD"):
+            for row in rows:
+                pid = row['pid']
+                if pid in active_popens:
+                    ret = active_popens[pid].poll()
+                    if ret is not None:
+                        exit_statuses[pid] = ret
+
         if stopped := list(filter(lambda row: not process_running(row['pid']), rows)):
             logger.info('Stopping project %s due to stopped services: %s', self.name, [row['name'] for row in stopped])
             self.stop(stopped=stopped)
+
+            for process in stopped:
+                pid = process['pid']
+                if pid in active_popens:
+                    del active_popens[pid]
 
     def healthcheck(self) -> None:
         # what it should be when there are no healthchecks defined?
@@ -206,8 +253,15 @@ class Project():
         try:
             for file in self.content.get('files', []):
                 file_path = Path(file['path']).expanduser().absolute()
-                file_path.parent.mkdir(parents=True, exist_ok=True)
-                file_path.write_text(file['content'])
+                if not file_path.exists() or file.get('force', True):
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    if 'content' in file:
+                        content = file['content']
+                    elif 'src' in file:
+                        content = Path(file['src']).read_text()
+                    else:
+                        raise NotImplementedError(file)
+                    file_path.write_text(content)
         except Exception as e:
             con.rollback()
             raise e
@@ -239,12 +293,14 @@ class Project():
                 con.rollback()
                 raise e
             self.services.append(proc)
+            active_popens[proc.pid] = proc
             cur.execute('INSERT INTO services (project, name, pid) VALUES (:project, :name, :pid)', {
                 'project': self.name,
                 'name': name,
                 'pid': proc.pid,
             })
-            del proc
+            # we dont delete because for windows we need to retrive the exit code
+            # del proc
             # what if insert failed?
         con.commit()
         cur.close()
@@ -271,7 +327,7 @@ class Project():
                 try:
                     kill_process(row['pid'])
                     # TODO wait for services to actually terminate
-                except ProcessLookupError:
+                except (ProcessLookupError, OSError):
                     logger.debug('Attempted to stop a process which does not exist: %s', dict(row))
                 except Exception as e:
                     logger.debug('Attempted to stop a process but got exception: %s, %s', dict(row), e)

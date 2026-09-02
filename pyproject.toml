@@ -102,6 +102,7 @@ dependencies = [
     "omegaconf==2.3.0",
     "onnx==1.18.0",
     "onnxruntime==1.22.1",
+    "openai==2.33.0",
     "opencv-python==4.12.0.88",
     "openpyxl==3.1.5",
     "orjson==3.11.1",
@@ -183,6 +184,22 @@ dependencies = [
     "wrapt==1.17.2",
     "yarl==1.20.1",
     "zstandard==0.23.0",
+    "o365==2.1.9",
+    "azure-identity==1.25.3",
+    "msal==1.35.1",
+    "openpyxl==3.1.5",
+    "types-psutil==7.2.2.20260130",
+    "types-pyxdg==0.28.0.20251115",
+    "types-requests==2.32.4.20260324",
+    "pandas-stubs==3.0.0.260204",
+    "python-pptx==1.0.2",
+    "msoffcrypto-tool==6.0.0",
+    "ebooklib==0.20",
+    "apscheduler==3.11.2",
+    "ConfigSpace==1.2.2",
+    "smac==2.4.0",
+    "bert-score==0.3.13",
+    "scikit-learn==1.8.0",
 ]
 description = ""
 license = "MIT"
@@ -199,18 +216,22 @@ build-backend = "setuptools.build_meta"
 requires = ["setuptools >= 77.0.3"]
 [tool.mypy]
 files = "learn2rag"
-exclude = [
-    "^learn2rag/pipeline/scripts/",
-    "^learn2rag/pipeline/main\\.py$",
-]
+exclude = ["^learn2rag/pipeline/scripts/",
+    "^learn2rag/pipeline/debug\\.py$",
+    "^learn2rag/optimization/contrastive_optimization.py",
+"generate_contrastive_answers.py",
+"self_judge_optimization.py",
+"tool_read_data_set.py"]
 strict = true
 [[tool.mypy.overrides]]
 module = [
-    "datasets.*",
+    "datasets",
+    "datasets.*"
 ]
 ignore_missing_imports = true
+follow_imports = "skip"
 [[tool.mypy.overrides]]
-module = ["learn2rag.pipeline.main"]
+module = ["learn2rag.pipeline.debug"]
 ignore_errors = true
 [tool.pytest.ini_options]
 log_cli = true

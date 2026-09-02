@@ -6,9 +6,9 @@ This module handles loading documents from HTML sources.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.7
+Version: 0.0.9
 Creation Date: July 28, 2025
-Last Modified: May 05, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
@@ -19,17 +19,22 @@ from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from datetime import datetime
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-from typing import List, Optional, Set
+from typing import List, Optional, Set, TYPE_CHECKING
 from urllib.parse import urlparse, urljoin
 from ..globals import stop_loading
 from langchain_community.document_loaders import UnstructuredHTMLLoader
 from langchain_core.documents import Document
+from ..loaders.errors import LoaderAccessError
 import logging
 import requests
+
+if TYPE_CHECKING:
+    from ..utils.progress import ImportProgress
 
 
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
+statusLogger = logging.getLogger('status')
 
 
 def _is_same_site(url: str, base_url: str) -> bool:
@@ -44,7 +49,7 @@ def _is_same_site(url: str, base_url: str) -> bool:
     return not base_path or parsed_url.path.startswith(base_path)
 
 
-def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = None, loader_id: str = "N/A", _base_url: Optional[str] = None, skipped: Optional[Set[str]] = None) -> List[Document]:
+def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = None, loader_id: str = "N/A", _base_url: Optional[str] = None, skipped: Optional[Set[str]] = None, progress: Optional["ImportProgress"] = None) -> List[Document]:
     """
     Load HTML content from a URL and optionally follow links recursively.
 
@@ -74,10 +79,21 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
 
     visited.add(url)
     documents = []
+    if progress is not None:
+        progress.emit(
+            "Phase 2/4 Load",
+            f"Crawling URL | depth {depth} | skipped {len(skipped)}",
+            processed=len(visited),
+            source=url,
+        )
     try:
         # Load the main page content
         response = requests.get(url)
         response.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        raise LoaderAccessError(f"HTML source '{url}' is not reachable or returned an error: {exc}") from exc
+
+    try:
 
         # Save the HTML content to a temporary file for UnstructuredHTMLLoader
         with tempfile.NamedTemporaryFile(mode="w", suffix=".html", encoding="utf-8", delete=False) as f:
@@ -121,6 +137,15 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
                 documents.append(merged_doc)
 
         logger.info(f"Loaded content from {url}")
+        if progress is not None:
+            progress.emit(
+                "Phase 2/4 Load",
+                "Loaded URL content",
+                processed=len(visited),
+                source=url,
+            )
+        else:
+            statusLogger.info('Importing, URLs found: %i', len(visited))
 
         # If depth > 0 or depth == -1, extract links and process them recursively
         if depth > 0 or depth == -1:
@@ -137,9 +162,9 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
                         if not _is_same_site(absolute_link, _base_url):
                             skipped.add(absolute_link)
                             continue
-                        documents.extend(load_html_content(absolute_link, depth=-1, visited=visited, loader_id=loader_id, _base_url=_base_url, skipped=skipped))
+                        documents.extend(load_html_content(absolute_link, depth=-1, visited=visited, loader_id=loader_id, _base_url=_base_url, skipped=skipped, progress=progress))
                     else:
-                        documents.extend(load_html_content(absolute_link, depth=depth - 1, visited=visited, loader_id=loader_id, _base_url=_base_url, skipped=skipped))
+                        documents.extend(load_html_content(absolute_link, depth=depth - 1, visited=visited, loader_id=loader_id, _base_url=_base_url, skipped=skipped, progress=progress))
 
     except Exception as e:
         logger.error(f"Error loading content from {url}: {e}")
