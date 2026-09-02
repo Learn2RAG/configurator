@@ -35,5 +35,9 @@
     <label for="token" class="form-label">{{pgettext('form_label', 'Access token')}}</label>
     <input class="form-control" name="token"/>
   </div>
+  <div class="mb-3">
+    <label for="failure_threshold" class="form-label">{{ pgettext('form_label', 'Failure threshold') }}</label>
+    <input type="number" min="1" step="1" class="form-control" name="failure_threshold" value="5">
+  </div>
   <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
 </form>

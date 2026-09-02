@@ -11,21 +11,27 @@ Drupal requirements:
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.2
+Version: 0.0.4
 Creation Date: March 17, 2026
-Last Modified: April 24, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 import requests
 from ..globals import stop_loading
+from ..loaders.errors import LoaderAccessError
+
+if TYPE_CHECKING:
+    from ..utils.progress import ImportProgress
 
 logger = logging.getLogger("Learn2RAGImporter")
+
+_DRUPAL_STATUS_INTERVAL = 25
 
 # JSON:API index paths to probe (in order) when auto-discovering endpoints
 _JSONAPI_INDEX_CANDIDATES = ["/jsonapi", "/en/jsonapi", "/de/jsonapi"]
@@ -142,6 +148,7 @@ def load_from_drupal(
     page_size: int = 50,
     language: str = "",
     since: Optional[datetime] = None,
+    progress: Optional["ImportProgress"] = None,
 ) -> List[Document]:
     """
     Load documents from a Drupal instance via the JSON:API.
@@ -179,6 +186,14 @@ def load_from_drupal(
         if stop_loading:
             logger.info("Loading process stopped by user.")
             break
+
+        if progress is not None:
+            progress.emit(
+                "Phase 2/4 Load",
+                f"Drupal content type started | page size {page_size}",
+                processed=len(all_documents),
+                source=f"{base_url.rstrip('/')}/jsonapi/node/{content_type}",
+            )
 
         resource_key = f"node--{content_type}"
         if resource_key in endpoint_map:
@@ -225,9 +240,13 @@ def load_from_drupal(
                 data = response.json()
             except requests.exceptions.HTTPError as e:
                 logger.error(f"DrupalLoader: HTTP error for content type '{content_type}': {e}")
+                if page_count == 0:
+                    raise LoaderAccessError(f"DrupalLoader could not access '{base_url}' for content type '{content_type}': {e}") from e
                 break
             except requests.exceptions.RequestException as e:
                 logger.error(f"DrupalLoader: Request failed for content type '{content_type}': {e}")
+                if page_count == 0:
+                    raise LoaderAccessError(f"DrupalLoader request failed for '{base_url}' and content type '{content_type}': {e}") from e
                 break
 
             items = data.get("data", [])
@@ -307,8 +326,22 @@ def load_from_drupal(
 
             page_count += 1
             logger.debug(f"DrupalLoader: fetched page {page_count} for '{content_type}', {len(items)} items")
+            if progress is not None:
+                progress.emit(
+                    "Phase 2/4 Load",
+                    f"Drupal page {page_count} loaded | content type {content_type}",
+                    processed=len(all_documents),
+                    source=f"{base_url.rstrip('/')}/jsonapi/node/{content_type}",
+                )
 
         logger.info(f"DrupalLoader: loaded {len(all_documents)} documents total so far after content type '{content_type}'")
+        if progress is not None:
+            progress.emit(
+                "Phase 2/4 Load",
+                f"Drupal content type finished | {content_type}",
+                processed=len(all_documents),
+                source=f"{base_url.rstrip('/')}/jsonapi/node/{content_type}",
+            )
 
     logger.info(f"DrupalLoader: finished. Total documents loaded: {len(all_documents)}")
     return all_documents
@@ -381,6 +414,8 @@ def get_all_drupal_document_ids(
                 data = response.json()
             except requests.exceptions.RequestException as e:
                 logger.error(f"get_all_drupal_document_ids: Request failed for '{content_type}': {e}")
+                if page_count == 0:
+                    raise LoaderAccessError(f"DrupalLoader could not list document IDs for '{base_url}' / '{content_type}': {e}") from e
                 break
 
             items = data.get("data", [])

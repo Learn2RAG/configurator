@@ -5,16 +5,43 @@ import shutil
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from collections import defaultdict
-from typing import Any, ClassVar, DefaultDict, List, Optional, Set
+from typing import Any, ClassVar, DefaultDict, Dict, List, Optional, Set
 from unittest.mock import patch, MagicMock
 
 from langchain_core.documents import Document
+from .generate_test_documents import create_test_documents
 from ..loaders.directory_loader import load_from_directory
 from ..loaders.html_loader import load_html_content, _is_same_site
+from ..loaders.jira_loader import load_from_jira, get_all_jira_document_ids
+from ..loaders.mediawiki_loader import (
+    MediaWikiSourceUnavailable,
+    get_all_mediawiki_document_ids,
+    load_from_mediawiki,
+)
+from ..loaders.errors import LoaderAccessError
+from ..utils.import_state import ImportState
 
 # Set RUN_INTEGRATION_TESTS=1 to run tests that require network access.
 _RUN_INTEGRATION: bool = os.environ.get("RUN_INTEGRATION_TESTS", "0") == "1"
+
+# Ensure test documents are generated at module load time
+_TEST_DATA_DIR = pathlib.Path(__file__).parent / "data"
+
+
+def setUpModule() -> None:
+    """
+    Module-level setup: Generate test documents once before all tests.
+    This ensures all test data is available before any test runs.
+    """
+    try:
+        create_test_documents(_TEST_DATA_DIR)
+        print(f"\n✓ Test documents generated/verified in {_TEST_DATA_DIR}")
+    except Exception as e:
+        print(f"Warning: Could not generate test documents: {e}")
+        raise RuntimeError(f"Failed to set up test environment: {e}")
+
 
 class ImporterLoadersTestCase(unittest.TestCase):
     """Tests for directory and HTML loaders. Runs fully offline without Qdrant."""
@@ -103,6 +130,271 @@ class ImporterLoadersTestCase(unittest.TestCase):
             print("\n[SKIP_HASH_ASSERT=1] Hash assertion skipped.")
 
 
+class LoaderFailureHandlingTestCase(unittest.TestCase):
+    """Regression tests for access errors and import-state thresholds."""
+
+    def test_directory_loader_raises_loader_access_error_for_missing_path(self) -> None:
+        with self.assertRaises(LoaderAccessError):
+            load_from_directory("/definitely/not/here", recursive=False, loader_id="missing_dir")
+
+    def test_import_state_tracks_consecutive_failures(self) -> None:
+        temp_state = pathlib.Path(tempfile.mkdtemp(prefix="learn2rag_import_state_")) / "import_state.json"
+        state = ImportState(str(temp_state))
+        state.record_import_start("loader_1", datetime(2026, 8, 1, tzinfo=timezone.utc))
+        state.save_success("loader_1")
+
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 0)
+        self.assertEqual(state.record_failure("loader_1"), 1)
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 1)
+        state.reset_failures("loader_1")
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 0)
+
+
+class AllFileTypesTestCase(unittest.TestCase):
+    """
+    Comprehensive test case for all supported file types across loaders.
+    Tests DirectoryLoader with various file formats and verifies proper parsing.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Ensure test documents exist in the data directory."""
+        # Generate test documents (should be redundant due to setUpModule, but ensures safety)
+        create_test_documents(_TEST_DATA_DIR)
+        
+        # Verify all required files are present
+        required_files = {
+            "sample.txt", "sample.csv", "product_inventory.csv",
+            "event_logs.csv", "sample.md", "advanced.md", "simple.md",
+            "sample.html", "sample.pdf", "sample.docx", "sample.xlsx", "sample.pptx"
+        }
+        existing_files = {f.name for f in _TEST_DATA_DIR.glob("*") if f.is_file()}
+        missing = required_files - existing_files
+
+        if missing:
+            raise RuntimeError(
+                f"❌ Missing test files: {missing}\n"
+                f"   Expected files in: {_TEST_DATA_DIR}\n"
+                f"   Found: {existing_files}\n"
+                f"   Call create_test_documents() or run setUpModule()"
+            )
+
+    def test_all_supported_file_types_present(self) -> None:
+        """Verify that all expected test documents exist."""
+        expected_files = {
+            "sample.txt": "Text document",
+            "sample.csv": "CSV spreadsheet",
+            "product_inventory.csv": "CSV with product data",
+            "event_logs.csv": "CSV with event logs",
+            "sample.md": "Markdown document",
+            "advanced.md": "Advanced markdown with tables",
+            "simple.md": "Simple markdown",
+            "sample.html": "HTML document",
+            "sample.pdf": "PDF document",
+            "sample.docx": "Word document",
+            "sample.xlsx": "Excel spreadsheet",
+            "sample.pptx": "PowerPoint presentation",
+        }
+
+        for filename, description in expected_files.items():
+            file_path = _TEST_DATA_DIR / filename
+            self.assertTrue(
+                file_path.exists(),
+                f"Missing test file: {filename} ({description})"
+            )
+            self.assertGreater(
+                file_path.stat().st_size, 0,
+                f"Test file is empty: {filename}"
+            )
+
+    def test_load_all_file_types(self) -> None:
+        """Load all test documents using DirectoryLoader and verify extraction."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="all_types_test")
+
+        # Organize by file type
+        by_extension: DefaultDict[str, List[Document]] = defaultdict(list)
+        for doc in docs:
+            source = doc.metadata.get("source", "")
+            ext = source.split(".")[-1].lower() if "." in source else "unknown"
+            by_extension[ext].append(doc)
+
+        print(f"\n=== Loaded {len(docs)} documents ===")
+        for ext in sorted(by_extension.keys()):
+            docs_of_type = by_extension[ext]
+            print(f"\n.{ext}: {len(docs_of_type)} document(s)")
+            for i, doc in enumerate(docs_of_type, 1):
+                source = doc.metadata.get("source", "unknown")
+                content_length = len(doc.page_content)
+                print(f"  [{i}] {source}")
+                print(f"      Content length: {content_length} chars")
+                print(f"      Hash: {doc.metadata.get('content_hash', 'N/A')[:16]}...")
+                if doc.page_content:
+                    first_line = doc.page_content.split('\n')[0][:60]
+                    print(f"      First line: {first_line}...")
+
+        # Verify document counts
+        self.assertGreater(len(docs), 0, "No documents loaded")
+
+        # Each supported file type should have been loaded
+        supported_extensions = {"txt", "csv", "md", "html", "pdf", "docx", "xlsx", "pptx"}
+        loaded_extensions = set(by_extension.keys())
+        self.assertTrue(
+            supported_extensions.issubset(loaded_extensions),
+            f"Not all file types loaded. Missing: {supported_extensions - loaded_extensions}"
+        )
+
+    def test_text_file_parsing(self) -> None:
+        """Verify text files are parsed correctly."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="txt_test")
+        txt_docs = [d for d in docs if d.metadata.get("source", "").endswith(".txt")]
+
+        self.assertGreater(len(txt_docs), 0, "No TXT files loaded")
+        for doc in txt_docs:
+            self.assertGreater(len(doc.page_content), 0, "TXT document has no content")
+            self.assertIn("plain text", doc.page_content.lower(), "Expected content not found in TXT")
+
+    def test_csv_file_parsing(self) -> None:
+        """Verify CSV files are parsed correctly."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="csv_test")
+        csv_docs = [d for d in docs if d.metadata.get("source", "").endswith(".csv")]
+
+        self.assertGreater(len(csv_docs), 0, "No CSV files loaded")
+        
+        # Should have at least 2 CSV files (basic + variants)
+        self.assertGreaterEqual(len(csv_docs), 2, "Expected multiple CSV files")
+        
+        for doc in csv_docs:
+            self.assertGreater(len(doc.page_content), 0, "CSV document has no content")
+
+    def test_csv_product_inventory(self) -> None:
+        """Verify product inventory CSV parsing."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="csv_product_test")
+        product_docs = [d for d in docs if "product_inventory" in d.metadata.get("source", "")]
+
+        self.assertEqual(len(product_docs), 1, "Product inventory CSV not found")
+        doc = product_docs[0]
+        self.assertIn("product", doc.page_content.lower(), "Expected product data not found")
+        self.assertIn("electronics", doc.page_content.lower(), "Expected category not found")
+
+    def test_csv_event_logs(self) -> None:
+        """Verify event logs CSV parsing."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="csv_events_test")
+        event_docs = [d for d in docs if "event_logs" in d.metadata.get("source", "")]
+
+        self.assertEqual(len(event_docs), 1, "Event logs CSV not found")
+        doc = event_docs[0]
+        self.assertIn("login", doc.page_content.lower(), "Expected event type not found")
+        self.assertIn("2026", doc.page_content, "Expected timestamp not found")
+
+    def test_markdown_file_parsing(self) -> None:
+        """Verify Markdown files are parsed correctly."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="md_test")
+        md_docs = [d for d in docs if d.metadata.get("source", "").endswith(".md")]
+
+        self.assertGreater(len(md_docs), 0, "No MD files loaded")
+        
+        # Should have multiple Markdown files (basic + variants)
+        self.assertGreaterEqual(len(md_docs), 2, "Expected multiple Markdown files")
+        
+        for doc in md_docs:
+            self.assertGreater(len(doc.page_content), 0, "Markdown document has no content")
+
+    def test_markdown_advanced_features(self) -> None:
+        """Verify advanced markdown features are parsed."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="md_advanced_test")
+        advanced_docs = [d for d in docs if "advanced" in d.metadata.get("source", "")]
+
+        self.assertEqual(len(advanced_docs), 1, "Advanced markdown file not found")
+        doc = advanced_docs[0]
+        # Verify content - HTML tags should be stripped but content preserved
+        self.assertIn("markdown", doc.page_content.lower(), "Expected markdown content not found")
+
+    def test_markdown_simple_variant(self) -> None:
+        """Verify simple markdown variant parsing."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="md_simple_test")
+        simple_docs = [d for d in docs if "simple" in d.metadata.get("source", "") and d.metadata.get("source", "").endswith(".md")]
+
+        self.assertEqual(len(simple_docs), 1, "Simple markdown file not found")
+        doc = simple_docs[0]
+        self.assertIn("simple", doc.page_content.lower(), "Expected 'simple' keyword in content")
+
+    def test_html_file_parsing(self) -> None:
+        """Verify HTML files are parsed correctly (HTML tags removed)."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="html_test")
+        html_docs = [d for d in docs if d.metadata.get("source", "").endswith(".html")]
+
+        self.assertGreater(len(html_docs), 0, "No HTML files loaded")
+        for doc in html_docs:
+            self.assertGreater(len(doc.page_content), 0, "HTML document has no content")
+            # Verify that HTML tags have been stripped
+            self.assertNotIn("<html", doc.page_content.lower(), "HTML tags not stripped")
+            self.assertIn("document", doc.page_content.lower(), "Expected content not found in HTML")
+
+    def test_pdf_file_parsing(self) -> None:
+        """Verify PDF files are parsed correctly."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="pdf_test")
+        pdf_docs = [d for d in docs if d.metadata.get("source", "").endswith(".pdf")]
+
+        self.assertGreater(len(pdf_docs), 0, "No PDF files loaded")
+        for doc in pdf_docs:
+            self.assertGreater(len(doc.page_content), 0, "PDF document has no content")
+
+    def test_docx_file_parsing(self) -> None:
+        """Verify DOCX (Word) files are parsed correctly."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="docx_test")
+        docx_docs = [d for d in docs if d.metadata.get("source", "").endswith(".docx")]
+
+        self.assertGreater(len(docx_docs), 0, "No DOCX files loaded")
+        for doc in docx_docs:
+            self.assertGreater(len(doc.page_content), 0, "DOCX document has no content")
+
+    def test_xlsx_file_parsing(self) -> None:
+        """Verify XLSX (Excel) files are parsed correctly."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="xlsx_test")
+        xlsx_docs = [d for d in docs if d.metadata.get("source", "").endswith(".xlsx")]
+
+        self.assertGreater(len(xlsx_docs), 0, "No XLSX files loaded")
+        for doc in xlsx_docs:
+            self.assertGreater(len(doc.page_content), 0, "XLSX document has no content")
+
+    def test_pptx_file_parsing(self) -> None:
+        """Verify PPTX (PowerPoint) files are parsed correctly."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="pptx_test")
+        pptx_docs = [d for d in docs if d.metadata.get("source", "").endswith(".pptx")]
+
+        self.assertGreater(len(pptx_docs), 0, "No PPTX files loaded")
+        for doc in pptx_docs:
+            self.assertGreater(len(doc.page_content), 0, "PPTX document has no content")
+
+    def test_metadata_consistency(self) -> None:
+        """Verify that all loaded documents have consistent metadata."""
+        docs = load_from_directory(str(_TEST_DATA_DIR), recursive=False, loader_id="metadata_test")
+
+        required_metadata_fields = {
+            "source",
+            "content_hash",
+            "file_extension",
+            "loader_type",
+            "loader_id",
+        }
+
+        for doc in docs:
+            doc_source = doc.metadata.get("source", "unknown")
+            for field in required_metadata_fields:
+                self.assertIn(
+                    field, doc.metadata,
+                    f"Missing metadata field '{field}' in {doc_source}"
+                )
+            self.assertEqual(
+                doc.metadata.get("loader_type"), "DirectoryLoader",
+                f"Unexpected loader_type for {doc_source}"
+            )
+            self.assertEqual(
+                doc.metadata.get("loader_id"), "metadata_test",
+                f"Unexpected loader_id for {doc_source}"
+            )
+
+
 @unittest.skipUnless(_RUN_INTEGRATION, "Set RUN_INTEGRATION_TESTS=1 to run")
 class HtmlLoaderLearn2RagFullCrawlTestCase(unittest.TestCase):
     """Integration test: full site crawl of https://learn2rag.de with depth=-1."""
@@ -180,6 +472,15 @@ def _make_response(text: str, status_code: int = 200) -> MagicMock:
     resp.status_code = status_code
     resp.text = text
     resp.raise_for_status = MagicMock()
+    return resp
+
+
+def _make_json_response(payload: Dict[str, Any], status_code: int = 200) -> MagicMock:
+    """Helper: creates a fake JSON response."""
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.raise_for_status = MagicMock()
+    resp.json = MagicMock(return_value=payload)
     return resp
 
 
@@ -275,6 +576,7 @@ _OPT_CONFIG: dict[str, Any] = {}
 # ---------------------------------------------------------------------------
 # _delta_by_source unit tests (no Qdrant required)
 # ---------------------------------------------------------------------------
+
 
 class DeltaBySourceTestCase(unittest.TestCase):
     """Unit tests for _delta_by_source.
@@ -399,3 +701,360 @@ class DeltaBySourceTestCase(unittest.TestCase):
         deleted = self.mock_delete.call_args[0][1]
         self.assertCountEqual(deleted, ["a.txt", "b.txt"])
         self.mock_update.assert_not_called()
+
+
+class JiraLoaderUnitTestCase(unittest.TestCase):
+    """Unit tests for Jira loader with mocked HTTP session."""
+
+    @patch("learn2rag.importer.loaders.jira_loader.requests.Session")
+    def test_load_from_jira_maps_issue_to_document(self, mock_session_cls: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        issue_payload = {
+            "issues": [
+                {
+                    "id": "10001",
+                    "key": "DEMO-1",
+                    "fields": {
+                        "summary": "Demo issue",
+                        "description": {
+                            "type": "doc",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Description text"}],
+                                }
+                            ],
+                        },
+                        "status": {"name": "In Progress"},
+                        "assignee": {"displayName": "Alice"},
+                        "labels": ["backend", "priority-high"],
+                        "updated": "2026-05-18T10:00:00.000+0000",
+                        "created": "2026-05-17T09:00:00.000+0000",
+                        "project": {"key": "DEMO", "name": "Demo Project"},
+                        "comment": {
+                            "comments": [
+                                {
+                                    "author": {"displayName": "Bob"},
+                                    "body": {
+                                        "type": "doc",
+                                        "content": [
+                                            {
+                                                "type": "paragraph",
+                                                "content": [{"type": "text", "text": "Looks good"}],
+                                            }
+                                        ],
+                                    },
+                                }
+                            ]
+                        },
+                    },
+                }
+            ],
+            "total": 1,
+            "startAt": 0,
+            "maxResults": 50,
+        }
+
+        # Simulate a Jira Server without the new POST /search/jql endpoint so the loader falls back to GET.
+        mock_session.post.return_value = _make_response("", status_code=404)
+        mock_session.get.return_value = _make_json_response(issue_payload)
+
+        docs = load_from_jira(
+            base_url="https://jira.example.com",
+            loader_id="jira_test",
+            auth_type="basic",
+            username="user@example.com",
+            password="token123",
+            jql="project = DEMO ORDER BY updated DESC",
+            include_comments=True,
+        )
+
+        self.assertEqual(len(docs), 1)
+        doc = docs[0]
+        self.assertEqual(doc.metadata.get("loader_id"), "jira_test")
+        self.assertEqual(doc.metadata.get("loader"), "JiraLoader")
+        self.assertEqual(doc.metadata.get("issue_key"), "DEMO-1")
+        self.assertEqual(doc.metadata.get("source"), "https://jira.example.com/browse/DEMO-1")
+        self.assertIn("content_hash", doc.metadata)
+        self.assertIn("Description text", doc.page_content)
+        self.assertIn("Bob: Looks good", doc.page_content)
+
+    @patch("learn2rag.importer.loaders.jira_loader.requests.Session")
+    def test_get_all_jira_document_ids_pages_results(self, mock_session_cls: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        first_page = _make_json_response(
+            {
+                "issues": [{"id": "10001", "key": "DEMO-1"}],
+                "total": 2,
+                "startAt": 0,
+                "maxResults": 1,
+            }
+        )
+        second_page = _make_json_response(
+            {
+                "issues": [{"id": "10002", "key": "DEMO-2"}],
+                "total": 2,
+                "startAt": 1,
+                "maxResults": 1,
+            }
+        )
+        mock_session.post.return_value = _make_response("", status_code=404)
+        mock_session.get.side_effect = [first_page, second_page]
+
+        ids = get_all_jira_document_ids(
+            base_url="https://jira.example.com",
+            auth_type="token",
+            token="abc",
+            projects=["DEMO"],
+            page_size=1,
+        )
+
+        self.assertEqual(
+            ids,
+            [
+                "https://jira.example.com/browse/DEMO-1",
+                "https://jira.example.com/browse/DEMO-2",
+            ],
+        )
+
+    @patch("learn2rag.importer.loaders.jira_loader.requests.Session")
+    def test_load_from_jira_applies_since_filter_to_jql(self, mock_session_cls: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_session.post.return_value = _make_response("", status_code=404)
+        mock_session.get.return_value = _make_json_response(
+            {
+                "issues": [],
+                "total": 0,
+                "startAt": 0,
+                "maxResults": 50,
+            }
+        )
+
+        since = datetime(2026, 5, 18, 8, 30, tzinfo=timezone.utc)
+        load_from_jira(
+            base_url="https://jira.example.com",
+            auth_type="none",
+            jql="project = DEMO",
+            since=since,
+        )
+
+        self.assertTrue(mock_session.get.called)
+        _, kwargs = mock_session.get.call_args
+        params = kwargs.get("params", {})
+        jql_query = params.get("jql", "")
+        self.assertIn("updated >= \"2026-05-18 08:30\"", jql_query)
+
+
+class MediaWikiLoaderUnitTestCase(unittest.TestCase):
+    """Unit tests for MediaWiki loader with mocked HTTP session."""
+
+    @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
+    @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")
+    def test_load_from_mediawiki_maps_pages_to_documents(
+        self,
+        mock_resolve_api: MagicMock,  # 1. Argument (unten)
+        mock_session_cls: MagicMock,  # 2. Argument (oben)
+    ) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        allpages_page_1 = _make_json_response(
+            {
+                "query": {"allpages": [{"pageid": 1, "title": "Page One"}]},
+                "continue": {"apcontinue": "Page_Two"},
+            }
+        )
+        allpages_page_2 = _make_json_response(
+            {
+                "query": {"allpages": [{"pageid": 2, "title": "Page Two"}]},
+            }
+        )
+        pages_payload = _make_json_response(
+            {
+                "query": {
+                    "pages": [
+                        {
+                            "pageid": 1,
+                            "ns": 0,
+                            "title": "Page One",
+                            "extract": "First page content",
+                            "revisions": [{"timestamp": "2026-08-10T11:00:00Z"}],
+                        },
+                        {
+                            "pageid": 2,
+                            "ns": 0,
+                            "title": "Page Two",
+                            "extract": "Second page content",
+                            "revisions": [{"timestamp": "2026-08-10T12:00:00Z"}],
+                        },
+                    ]
+                }
+            }
+        )
+        mock_session.get.side_effect = [allpages_page_1, allpages_page_2, pages_payload]
+
+        docs = load_from_mediawiki(
+            base_url="https://wiki.example.com",
+            loader_id="wiki_test",
+            auth_type="none",
+            namespaces=[0],
+            page_size=50,
+        )
+
+        self.assertEqual(len(docs), 2)
+        sources = {doc.metadata.get("source") for doc in docs}
+        self.assertIn("https://wiki.example.com/?curid=1", sources)
+        self.assertIn("https://wiki.example.com/?curid=2", sources)
+        self.assertTrue(all(doc.metadata.get("loader") == "MediaWikiLoader" for doc in docs))
+        self.assertTrue(all("content_hash" in doc.metadata for doc in docs))
+
+    @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
+    @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")
+    def test_get_all_mediawiki_document_ids_with_pagination(
+        self,
+        mock_resolve_api: MagicMock,  # 1. Argument entspricht dem unteren Patch
+        mock_session_cls: MagicMock,  # 2. Argument entspricht dem oberen Patch
+    ) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        mock_session.get.side_effect = [
+            _make_json_response(
+                {
+                    "query": {"allpages": [{"pageid": 10, "title": "Alpha"}]},
+                    "continue": {"apcontinue": "Beta"},
+                }
+            ),
+            _make_json_response(
+                {
+                    "query": {"allpages": [{"pageid": 11, "title": "Beta"}]},
+                }
+            ),
+        ]
+
+        ids = get_all_mediawiki_document_ids(
+            base_url="https://wiki.example.com",
+            auth_type="none",
+            namespaces=[0],
+            page_size=1,
+        )
+
+        self.assertEqual(
+            ids,
+            [
+                "https://wiki.example.com/?curid=10",
+                "https://wiki.example.com/?curid=11",
+            ],
+        )
+
+    @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")
+    @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
+    def test_load_from_mediawiki_applies_since_filter(self, mock_session_cls: MagicMock, mock_resolve_api: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_session.get.return_value = _make_json_response({"query": {"recentchanges": []}})
+
+        since = datetime(2026, 8, 10, 9, 30, tzinfo=timezone.utc)
+        docs = load_from_mediawiki(
+            base_url="https://wiki.example.com",
+            auth_type="none",
+            namespaces=[0],
+            since=since,
+        )
+
+        self.assertEqual(docs, [])
+        self.assertTrue(mock_session.get.called)
+        _, kwargs = mock_session.get.call_args
+        params = kwargs.get("params", {})
+        self.assertEqual(params.get("list"), "recentchanges")
+        self.assertEqual(params.get("rcstart"), "2026-08-10T09:30:00Z")
+
+
+class MediaWikiDeltaFailSafeTestCase(unittest.TestCase):
+    """Ensure MediaWiki delta mode does not alter index on source outages."""
+
+    @patch("learn2rag.importer.loaders.process_loaders.index")
+    @patch("learn2rag.importer.loaders.process_loaders.delete_documents")
+    @patch("learn2rag.importer.loaders.process_loaders.load_from_mediawiki")
+    @patch("learn2rag.importer.loaders.process_loaders.get_all_mediawiki_document_ids")
+    @patch("learn2rag.importer.loaders.process_loaders.get_documents")
+    def test_empty_snapshot_skips_delta_without_index_changes(
+        self,
+        mock_get_documents: MagicMock,
+        mock_get_all_ids: MagicMock,
+        mock_load_from_mediawiki: MagicMock,
+        mock_delete_documents: MagicMock,
+        mock_index: MagicMock,
+    ) -> None:
+        from ..loaders.process_loaders import process_delta_imports
+
+        mock_get_documents.return_value = {"https://wiki.example.com/?curid=1": "hash1"}
+        mock_get_all_ids.return_value = []
+
+        import_state = MagicMock()
+        import_state.get_last_import_time.return_value = datetime(2026, 8, 1, tzinfo=timezone.utc)
+
+        process_delta_imports(
+            config_entries=[
+                {
+                    "loader_type": "MediaWikiLoader",
+                    "loader_id": "wiki_loader",
+                    "base_url": "https://wiki.example.com",
+                    "auth_type": "none",
+                    "namespaces": [0],
+                }
+            ],
+            user_config=_USER_CONFIG,
+            opt_config=_OPT_CONFIG,
+            import_state=import_state,
+            progress=None,
+        )
+
+        mock_delete_documents.assert_not_called()
+        mock_load_from_mediawiki.assert_not_called()
+        mock_index.assert_not_called()
+        import_state.save_success.assert_not_called()
+
+    @patch("learn2rag.importer.loaders.process_loaders.index")
+    @patch("learn2rag.importer.loaders.process_loaders.delete_documents")
+    @patch("learn2rag.importer.loaders.process_loaders.get_all_mediawiki_document_ids")
+    @patch("learn2rag.importer.loaders.process_loaders.get_documents")
+    def test_source_unavailable_skips_delta_without_index_changes(
+        self,
+        mock_get_documents: MagicMock,
+        mock_get_all_ids: MagicMock,
+        mock_delete_documents: MagicMock,
+        mock_index: MagicMock,
+    ) -> None:
+        from ..loaders.process_loaders import process_delta_imports
+
+        mock_get_documents.return_value = {"https://wiki.example.com/?curid=1": "hash1"}
+        mock_get_all_ids.side_effect = MediaWikiSourceUnavailable("unreachable")
+
+        import_state = MagicMock()
+        import_state.get_last_import_time.return_value = datetime(2026, 8, 1, tzinfo=timezone.utc)
+
+        process_delta_imports(
+            config_entries=[
+                {
+                    "loader_type": "MediaWikiLoader",
+                    "loader_id": "wiki_loader",
+                    "base_url": "https://wiki.example.com",
+                    "auth_type": "none",
+                    "namespaces": [0],
+                }
+            ],
+            user_config=_USER_CONFIG,
+            opt_config=_OPT_CONFIG,
+            import_state=import_state,
+            progress=None,
+        )
+
+        mock_delete_documents.assert_not_called()
+        mock_index.assert_not_called()
+        import_state.save_success.assert_not_called()

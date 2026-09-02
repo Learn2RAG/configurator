@@ -6,9 +6,9 @@ This is the main script of the learn2rag-importer project, which is designed to 
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.4
+Version: 0.0.7
 Creation Date: June 10, 2025
-Last Modified: May 20, 2026
+Last Modified: August 31, 2026
 """
 
 import argparse
@@ -17,13 +17,15 @@ import os
 import logging
 import sys
 import importlib.resources
-import warnings  
+import warnings
+from datetime import datetime, timezone
 from pathlib import Path
 from .config.config_constants import LOGS_DIR, VERSION
 from .utils.logging_setup import setup_logging
 from .utils.config_loader import load_json_config, validate_config_entry
 from .loaders.process_loaders import process_configuration_entries, process_delta_imports
 from .utils.import_state import ImportState
+from .utils.progress import ImportProgress
 from learn2rag.pipeline.ingestion import index
 
 
@@ -101,10 +103,14 @@ def init(args: argparse.Namespace) -> None:
 
 #main function to run the application
 def main(args: argparse.Namespace) -> None:
-    statusLogger.info('Import started')
     try:
         config = load_json_config(args.config)
         logger.debug("Configuration loaded successfully, starting validation...")
+        progress = ImportProgress(
+            total_loaders=len(config.get("loaders", [])),
+            mode="delta" if args.delta else "full",
+        )
+        progress.start_import()
 
         # load pipeline configuration for user and opt settings, needed for delta-import and indexing
         user_config_path = os.environ.get("PIPELINE_USER_CONFIG", "learn2rag/pipeline/user_config.json")
@@ -140,13 +146,48 @@ def main(args: argparse.Namespace) -> None:
                     user_config=user_config,
                     opt_config=opt_config,
                     import_state=import_state,
+                    progress=progress,
                 )
+                progress.finish_import()
+                succeeded_count = progress.total_loaders - len(progress.failed_loaders)
+                if progress.failed_loaders:
+                    logger.error(
+                        "Import completed: %d succeeded, %d failed loader(s): %s",
+                        succeeded_count,
+                        len(progress.failed_loaders),
+                        ", ".join(f"{loader_id} ({error})" for loader_id, error in progress.failed_loaders),
+                    )
+                    sys.exit(3)
+                else:
+                    logger.info("Import completed: all %d loader(s) succeeded.", succeeded_count)
             else:
                 # full import: all documents load and directly ingest in Qdrant
                 logger.info("Running full import")
-                all_documents = process_configuration_entries(config.get("loaders", []))
+                
+                # Record import start time for all loaders
+                import_start = datetime.now(timezone.utc)
+                for entry in config.get("loaders", []):
+                    loader_id = entry.get("loader_id")
+                    if loader_id:
+                        import_state.record_import_start(loader_id, import_start)
+                
+                all_documents = process_configuration_entries(
+                    config.get("loaders", []),
+                    progress=progress,
+                    import_state=import_state,
+                    user_config=user_config,
+                    opt_config=opt_config,
+                )
                 logger.debug(f"Total documents loaded: {len(all_documents)}")
-                index(all_documents, user_config, opt_config)
+                progress.start_indexing(len(all_documents))
+                index(all_documents, user_config, opt_config, progress=progress)
+                # Only save success for loaders that didn't fail
+                failed_loader_ids = {loader_id for loader_id, _ in progress.failed_loaders}
+                for entry in config.get("loaders", []):
+                    loader_id = entry.get("loader_id")
+                    if loader_id and loader_id not in failed_loader_ids:
+                        import_state.save_success(loader_id)
+                        logger.info(f"Updated import state timestamp for loader '{loader_id}'")
 
                 # JSON-Dump für Rückwärtskompatibilität (nur mit --save-documents)
                 if args.save_documents:
@@ -155,14 +196,28 @@ def main(args: argparse.Namespace) -> None:
                         json.dump([{"metadata": doc.metadata, "content": doc.page_content} for doc in all_documents], f, ensure_ascii=False, indent=4)
                     logger.debug('Documents saved to: %s', output_path)
 
-            statusLogger.info('Import finished')
+                progress.finish_import(total_documents=len(all_documents))
+                succeeded_count = progress.total_loaders - len(progress.failed_loaders)
+                if progress.failed_loaders:
+                    logger.error(
+                        "Import completed: %d succeeded, %d failed loader(s): %s",
+                        succeeded_count,
+                        len(progress.failed_loaders),
+                        ", ".join(f"{loader_id} ({error})" for loader_id, error in progress.failed_loaders),
+                    )
+                    sys.exit(3)
+                else:
+                    logger.info("Import completed: all %d loader(s) succeeded.", succeeded_count)
         else:
             logger.error("Configuration validation failed. No documents were processed.")
-            statusLogger.error('Import failed')
+            progress.fail_import("Configuration validation failed")
             sys.exit(1)
 
     except Exception:
-        statusLogger.error('Import failed')
+        if 'progress' in locals():
+            progress.fail_import()
+        else:
+            statusLogger.error('Import failed')
         raise
 
 

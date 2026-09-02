@@ -7,10 +7,10 @@ It includes robust handling for App-Only Authentication (Client Credentials)
 and Site-Specific contexts.
 
 Author: Kyrill Meyer
-Version: 0.0.7
+Version: 0.0.9
 Institution: IFDT
 Creation Date: January 14, 2026
-Last Modified Date: May 18, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
@@ -19,14 +19,20 @@ import tempfile
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional, Any, Union
+from typing import List, Optional, Any, Union, TYPE_CHECKING
 from langchain_community.document_loaders import UnstructuredFileLoader, TextLoader, UnstructuredExcelLoader, PyPDFLoader
 from langchain_core.documents import Document
 from O365 import Account, FileSystemTokenBackend  # type: ignore
 from ..globals import stop_loading
+from ..loaders.errors import LoaderAccessError
+
+if TYPE_CHECKING:
+    from ..utils.progress import ImportProgress
 
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
+
+_SHAREPOINT_STATUS_INTERVAL = 25
 
 def _parse_file(file_path: Path, original_item: Any, loader_id: str = "N/A") -> List[Document]:
     """
@@ -242,7 +248,7 @@ def _list_available_drives(account: Account, search_term: Optional[str] = None) 
     except Exception as e:
         logger.error(f"Error while listing available drives: {e}")
 
-def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, recursive: bool = True, loader_id: str = "N/A", since: Optional[datetime] = None) -> List[Document]:
+def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, recursive: bool = True, loader_id: str = "N/A", since: Optional[datetime] = None, progress: Optional["ImportProgress"] = None, progress_source: Optional[str] = None) -> List[Document]:
     """
     Internal helper to manually traverse and load items into Document objects.
     This bypasses LangChain's internal 'storage()' call which fails in App-Only context.
@@ -277,6 +283,13 @@ def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, re
 
                 if item.is_folder and recursive:
                     try:
+                        if progress is not None:
+                            progress.emit(
+                                "Phase 2/4 Load",
+                                f"SharePoint folder | {item.name}",
+                                processed=len(documents),
+                                source=progress_source,
+                            )
                         # Recursive call for folders
                         _process_folder_items(item.get_items())
                     except Exception as e:
@@ -306,6 +319,13 @@ def _load_items_manual_traversal(drive: Any, folder_id: Optional[str] = None, re
                                 logger.info(f"Parsing with Unstructured: {item.name} ...")
                                 parsed_docs = _parse_file(local_file_path, item, loader_id=loader_id)
                                 documents.extend(parsed_docs)
+                                if progress is not None and len(documents) % _SHAREPOINT_STATUS_INTERVAL == 0:
+                                    progress.emit(
+                                        "Phase 2/4 Load",
+                                        "SharePoint files processed",
+                                        processed=len(documents),
+                                        source=progress_source,
+                                    )
                                 
                                 # Clean up immediately to save space
                                 local_file_path.unlink()
@@ -418,13 +438,13 @@ def get_all_sharepoint_document_ids(
             _authenticate_directly_with_o365(client_id, client_secret, tenant_id)
         else:
             logger.error("get_all_sharepoint_document_ids: No valid authentication method available.")
-            return []
+            raise LoaderAccessError("SharePointLoader could not authenticate using the provided client credentials.")
 
     account = Account((client_id, client_secret), token_backend=token_backend)
 
     if not account.is_authenticated:
         logger.error("get_all_sharepoint_document_ids: Authentication failed.")
-        return []
+        raise LoaderAccessError("SharePointLoader authentication failed.")
 
     try:
         if site_id:
@@ -437,7 +457,7 @@ def get_all_sharepoint_document_ids(
         drive = storage.get_drive(document_library_id)
         if drive is None:
             logger.error(f"get_all_sharepoint_document_ids: Drive not found: {document_library_id}")
-            return []
+            raise LoaderAccessError(f"SharePoint document library '{document_library_id}' could not be accessed.")
 
         # Optionaler Unterordner-Start
         effective_folder_id = folder_id
@@ -453,14 +473,14 @@ def get_all_sharepoint_document_ids(
                     root = found
                 else:
                     logger.warning(f"get_all_sharepoint_document_ids: folder part '{part}' not found")
-                    return []
+                    raise LoaderAccessError(f"SharePoint folder path '{folder_path}' could not be resolved.")
             effective_folder_id = root.object_id
 
         return _list_items_web_urls(drive, folder_id=effective_folder_id, recursive=recursive)
 
     except Exception as e:
         logger.error(f"get_all_sharepoint_document_ids: error: {e}")
-        return []
+        raise LoaderAccessError(f"SharePointLoader could not list document IDs: {e}") from e
 
 
 def load_from_sharepoint(client_id: str, client_secret: str, document_library_id: str, 
@@ -469,12 +489,20 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
                          auth_with_token: bool = True, load_extended_metadata: bool = True,
                          reset_token: bool = False, tenant_id: str = "common",
                          site_id: Optional[str] = None, loader_id: str = "N/A",
-                         since: Optional[datetime] = None) -> List[Document]:
+                         since: Optional[datetime] = None, progress: Optional["ImportProgress"] = None) -> List[Document]:
     """
     Load documents from SharePoint and set metadata.
     """
 
     documents: List[Document] = []
+    progress_source = folder_path or document_library_id
+
+    if progress is not None:
+        progress.emit(
+            "Phase 2/4 Load",
+            f"SharePoint load started | recursive {recursive}",
+            source=progress_source,
+        )
 
     # Reset token if requested
     if reset_token:
@@ -491,7 +519,7 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
             auth_with_token = True
         else:
             logger.warning("No Tenant ID provided or Tenant ID is 'common'.")
-            auth_with_token = False
+            raise LoaderAccessError("SharePointLoader could not authenticate using the provided credentials.")
     else:
         logger.info(f"Using existing O365 token found at: {token_path}")
         logger.info("To force a new authentication (e.g., if token expired), set 'reset_token': 'True' in your configuration.")
@@ -507,6 +535,7 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
         if not account.is_authenticated:
             # Fallback 
              logger.warning("Account seemingly not authenticated in main load logic. Check logs.")
+             raise LoaderAccessError("SharePointLoader authentication failed during document load.")
 
         drive = None
         
@@ -523,15 +552,23 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
             drive = site.get_document_library(document_library_id)
         
         if not drive:
-            raise Exception(f"Drive/Library not found with ID {document_library_id}")
+            raise LoaderAccessError(f"Drive/Library not found with ID {document_library_id}")
 
         logger.info(f"Successfully connected to Library: {drive.name}")
+        progress_source = folder_path or drive.name or document_library_id
         
         # Load documents using internal helper function
         # Use folder_id if provided, otherwise use Root of the Drive
-        loaded_docs = _load_items_manual_traversal(drive, folder_id=folder_id, recursive=recursive, loader_id=loader_id, since=since)
+        loaded_docs = _load_items_manual_traversal(drive, folder_id=folder_id, recursive=recursive, loader_id=loader_id, since=since, progress=progress, progress_source=progress_source)
         
         logger.info(f"Found {len(loaded_docs)} documents.")
+        if progress is not None:
+            progress.emit(
+                "Phase 2/4 Load",
+                "SharePoint load finished",
+                processed=len(loaded_docs),
+                source=progress_source,
+            )
 
         for doc in loaded_docs:
             if stop_loading:
@@ -541,6 +578,7 @@ def load_from_sharepoint(client_id: str, client_secret: str, document_library_id
 
     except Exception as e:
         logger.error(f"Error loading documents from SharePoint: {e}")
+        raise LoaderAccessError(f"SharePointLoader could not load documents: {e}") from e
         
         # --- Diagnosis Helper ---
         err_str = str(e)
