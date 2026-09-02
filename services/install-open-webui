@@ -1,6 +1,6 @@
 #!/bin/bash
 set -eux
-npm install
+npm install --no-engine-strict
 npm run build
 uv venv .venv --clear --python 3.11 --seed
 uv run .venv/bin/pip install .

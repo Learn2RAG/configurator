@@ -1,3 +1,14 @@
 mkdir -p qdrant
-wget --continue -O qdrant/qdrant-linux-v1.17.1.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-x86_64-unknown-linux-musl.tar.gz
-tar -C qdrant -xzvf qdrant/qdrant-linux-v1.17.1.tar.gz
+if [ "$(uname -s)" = "Darwin" ]; then
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "arm64" ]; then
+        QDRANT_ARCH=aarch64-apple-darwin
+    else
+        QDRANT_ARCH=x86_64-apple-darwin
+    fi
+    wget --continue -O qdrant/qdrant-darwin-v1.17.1.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-${QDRANT_ARCH}.tar.gz
+    tar -C qdrant -xzvf qdrant/qdrant-darwin-v1.17.1.tar.gz
+else
+    wget --continue -O qdrant/qdrant-linux-v1.17.1.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-x86_64-unknown-linux-musl.tar.gz
+    tar -C qdrant -xzvf qdrant/qdrant-linux-v1.17.1.tar.gz
+fi
