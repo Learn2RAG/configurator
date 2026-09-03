@@ -130,6 +130,17 @@ def merge(source: dict[str, Any], destination: dict[str, Any]) -> dict[str, Any]
     return destination
 
 
+def pipeline_status_file(pipeline: dict[str, Any]) -> Path:
+    return normalize_path(Path(pipeline['storage_path'])) / 'logs' / 'status.log'
+
+
+def pipeline_status_message(pipeline: dict[str, Any]) -> str:
+    try:
+        return pipeline_status_file(pipeline).read_text().splitlines()[-1]
+    except (FileNotFoundError, IndexError):
+        return ''
+
+
 def create_app(config: dict[str, Any]={}) -> Flask:
     # create and configure the app
     default_instance_path = save_data_path('Learn2RAG', 'instance')
@@ -392,10 +403,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def pipelines_list() -> 'str | werkzeug.wrappers.response.Response':
         pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
         for pipeline in pipelines.values():
-            try:
-                pipeline['status_message'] = (Path(pipeline['storage_path']) / 'logs' / 'status.log').read_text().splitlines()[-1]
-            except (FileNotFoundError, IndexError):
-                pipeline['status_message'] = ''
+            pipeline['status_message'] = pipeline_status_message(pipeline)
         context = {
             'pipelines': pipelines,
             'projects': Project.get_all(),
@@ -417,7 +425,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
             assert pipeline is not None
             start_pipeline(name, pipeline, 'continuous')
-        return redirect(url_for('pipelines_list'))
+        return redirect(url_for('pipeline_details', name=name))
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
         has_ssl = bool(app.config.get("TLS"))
@@ -498,10 +506,12 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/pipelines/<name>')
     def pipeline_details(name: str) -> 'str | werkzeug.wrappers.response.Response':
-        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
-        if pipeline is None:
+        try:
+            pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        except FileNotFoundError:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
             return redirect(url_for('pipelines_list'))
+        pipeline['status_message'] = pipeline_status_message(pipeline)
         storage_path = Path(pipeline['storage_path'])
         try:
             training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
@@ -543,6 +553,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             if ok:
                 learn2rag.data.delete_entry(app.instance_path, 'pipelines', name)
                 flash(pgettext('flash', 'Removed pipeline: %(label)s', label=pipeline['label']))
+                return redirect(url_for('pipelines_list'))
         elif request.form['action'].startswith('start:'):
             start_pipeline(name, pipeline, request.form['action'].split(':', 2)[1])
         elif request.form['action'] == 'stop':
@@ -553,7 +564,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                 app.logger.exception(e)
                 app.logger.error('Could not stop the pipeline')
                 flash(pgettext('flash', 'Could not stop the pipeline: %(message)s', message=e), 'error')
-        return redirect(url_for('pipelines_list'))
+        return redirect(url_for('pipeline_details', name=name))
 
     @app.get('/pipelines/<name>/logs/<file>')
     def pipeline_logs(name: str, file: str) -> 'str | werkzeug.wrappers.response.Response':
