@@ -1,11 +1,11 @@
 import os
+
 from typing import Any, Optional
+
 import logging
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, SparseVectorParams, SparseIndexParams, MultiVectorComparator, MultiVectorConfig
 from qdrant_client.http.exceptions import UnexpectedResponse
-
-from .config import user_config
 
 # FIXME: when running a Windows package,
 # this import causes segmentation fault if done after creating QdrantClient.
