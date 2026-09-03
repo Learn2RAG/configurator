@@ -1,3 +1,10 @@
 mkdir -p ollama
-wget --continue -O ollama/ollama-linux.tgz https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-linux-amd64.tgz
-tar -C ollama -xzvf ollama/ollama-linux.tgz
+if [ "$(uname -s)" = "Darwin" ]; then
+    wget --continue -O ollama/ollama-darwin.zip https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-darwin.zip
+    unzip -o ollama/ollama-darwin.zip -d ollama
+    mkdir -p ollama/bin
+    ln -sf ../Ollama.app/Contents/Resources/ollama ollama/bin/ollama
+else
+    wget --continue -O ollama/ollama-linux.tgz https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-linux-amd64.tgz
+    tar -C ollama -xzvf ollama/ollama-linux.tgz
+fi

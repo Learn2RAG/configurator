@@ -1,0 +1,33 @@
+#!/bin/bash
+set -eu
+
+ARCH=$(uname -m)
+if [ "$ARCH" = "arm64" ]; then
+    CARGO_BUILD_TARGET=aarch64-apple-darwin
+    QDRANT_ARCH=aarch64-apple-darwin
+else
+    CARGO_BUILD_TARGET=x86_64-apple-darwin
+    QDRANT_ARCH=x86_64-apple-darwin
+fi
+BIN_SUFFIX=""
+
+. ./package-common
+
+wget --continue -O $BUNDLE_DIR/ollama-darwin.zip https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-darwin.zip
+mkdir -p $BUNDLE/services/ollama
+unzip -o $BUNDLE_DIR/ollama-darwin.zip -d $BUNDLE/services/ollama
+mkdir -p $BUNDLE/services/ollama/bin
+ln -sf ../Ollama.app/Contents/Resources/ollama $BUNDLE/services/ollama/bin/ollama
+
+wget --continue -O $BUNDLE_DIR/qdrant-darwin-v1.17.1.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-${QDRANT_ARCH}.tar.gz
+mkdir -p $BUNDLE/services/qdrant
+tar -C $BUNDLE/services/qdrant -xzvf $BUNDLE_DIR/qdrant-darwin-v1.17.1.tar.gz
+
+cp start.macos $BUNDLE/start
+cp uninstall.macos $BUNDLE/uninstall
+chmod +x $BUNDLE/start $BUNDLE/uninstall
+
+xattr -cr $BUNDLE 2>/dev/null || true
+
+# https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables
+[ -z "${GITHUB_ACTIONS-}" ] && (cd $BUNDLE_DIR; zip -r $BUNDLE_NAME $BUNDLE_NAME)
