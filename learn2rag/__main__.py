@@ -82,6 +82,10 @@ if __name__ == '__main__':
         module_args = (
             config,
         )
+    elif args.module == 'learn2rag.userui':
+        module_args = (
+            module.ArgumentParser().parse_args(rest),
+        )
 
 
     if args.schedule_interval:

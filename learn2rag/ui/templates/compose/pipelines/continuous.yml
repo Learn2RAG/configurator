@@ -213,9 +213,12 @@ services:
       - 'learn2rag.userui'
       - '--logging-config'
       - '{{storage_path}}/logging_config.yml'
+      - '--host'
+      - '{{config.get("CHAT", {}).get("host") or config.get("UI", {}).get("host") or "127.0.0.1"}}'
+      - '--port'
+      - '{{ports.pipeline}}'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
-      LEARN2RAG_PIPELINE_PORT: '{{ports.pipeline}}'
       QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'
       QDRANT_PATH: '{{ pipeline.qdrant_path }}'
       QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'
