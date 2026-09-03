@@ -1,3 +1,9 @@
+{% macro pipeline_start(name, project, label, description) %}
+<form class="mb-2" method="POST" action="{{ url_for('pipeline_action', name=name) }}">
+  <button class="btn btn-primary" type="submit" name="action" value="start:{{ project.name }}" title="{{description}}">{{label}}</button>
+</form>
+{% endmacro %}
+
 {% extends 'base.html' %}
 
 {% block header %}
@@ -5,8 +11,109 @@
 {% endblock %}
 
 {% block content %}
+<div id="status_cards" hx-get="" hx-swap-oob="true" hx-trigger="every 15s" hx-swap="none">
+{% if projects[name] and not projects[name].running %}
+{% if projects[name].succeeded %}
+<div class="card w-100 mb-3 shadow text-bg-success">
+  <div class="card-body">
+    <h5 class="card-title">{{pgettext('status', 'Last run succeeded')}}</h5>
+    <p class="card-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{{ pipeline.status_message }}</p>
+  </div>
+</div>
+{% endif %}
+{% if projects[name].failed %}
+<div class="card w-100 mb-3 shadow text-bg-danger">
+  <div class="card-body">
+    <h5 class="card-title">{{pgettext('status', 'Last run failed')}}</h5>
+    <p class="card-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{{ pipeline.status_message }}</p>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+{% if projects[name] and projects[name].running %}
+<div class="card w-100 mb-3 shadow text-bg-info">
+  <div class="card-body">
+    <h5 class="card-title">{{pgettext('status', 'Currently running: %(pipeline)s', pipeline=projects[name].content.get('label', gettext('running')))}}</h5>
+    <p class="card-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{{ pipeline.status_message }}</p>
+  </div>
+</div>
+{% endif %}
+{% if projects[name] and projects[name].running %}
+<div class="card float-end ms-3 mb-3 shadow text-center">
+  <div class="card-body">
+    {% if 'ui_url' in projects[name].content %}
+    <a
+      class="btn {% if projects[name].health %}btn-primary{% else %}btn-secondary{% endif %} mb-2"
+      {% if not projects[name].health %}style="cursor: not-allowed;"{% endif %}
+      href="{{ projects[name].content['ui_url'] }}"
+      role="button"
+      target="_blank"
+      >
+      {% if projects[name].health %}
+      {{pgettext('button', 'Open AI chat')}}
+      {% else %}
+      <div class="spinner-border spinner-border-sm"></div>
+      {% endif %}
+    </a>
+    {% else %}
+    <div class="spinner-border spinner-border-sm mb-2"></div>
+    {% endif %}
+    <form class="mb-2" method="POST" action="{{ url_for('pipeline_action', name=name) }}">
+      <button type="submit" class="btn btn-warning" name="action" value="stop">
+        {{pgettext('button', 'Stop')}}
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% if not projects[name] or not projects[name].running %}
+<div class="card float-end ms-3 mb-3 shadow text-center">
+  <div class="card-body">
+    {{ pipeline_start(name, compose_templates['continuous'], pgettext('button', 'Start'), pgettext('tooltip', 'Start periodic import and the AI chat')) }}
+    {{ pipeline_start(name, compose_templates['import'], pgettext('button', 'One time import'), pgettext('tooltip', 'Do the import once and stop')) }}
+    {{ pipeline_start(name, compose_templates['pipeline'], pgettext('button', 'Start only the AI chat'), pgettext('tooltip', 'Start the AI chat. Requires import to be already completed')) }}
+  </div>
+</div>
+{% endif %}
+</div>
+
+<h2>{{pgettext('header', 'Storage directory path')}}</h2>
+<section><code>{{ pipeline.storage_path }}</code></section>
+
+<hr/>
+<h2>{{pgettext('header', 'Language model')}}</h2>
+<section>
+  {{ models[pipeline.language_model].label }}
+</section>
+
+<hr/>
+<h2>{{pgettext('header', 'Ports')}}</h2>
+<section>
+  <ul class="list-group">
+    {% for port in pipeline.ports %}
+    <li class="list-group-item">{{ port }}</li>
+    {% endfor %}
+  </ul>
+  {% if not pipeline.ports %}
+  {{gettext('Ports are not configured and would be chosen automatically.')}}
+  {% endif %}
+</section>
+
+<hr/>
 <h2>{{pgettext('header', 'Details')}}</h2>
-{{pipeline.label}}
+<section>
+  <dl class="row">
+    <dt class="col-sm-3">ID</dt>
+    <dd class="col-sm-9"><code>{{name}}</code></dd>
+  </dl>
+  {% if projects[name] and projects[name].content['ui_url'] %}
+  <dl class="row">
+    <dt class="col-sm-3">API URL</dt>
+    <dd class="col-sm-9"><code>{{projects[name].content['ui_url']}}api/v1</code></dd>
+  </dl>
+  {% endif %}
+</section>
+
 <hr/>
 <h2>{{pgettext('header', 'Optimization')}}</h2>
 {% if training_dataset %}
@@ -51,4 +158,40 @@
     <button type="submit" class="btn btn-primary">{{pgettext('label', 'Save')}}</button>
   </div>
 </form>
+
+<hr/>
+<h2>{{pgettext('header', 'Logs')}}</h2>
+<ul>
+  {% if debug_logging %}
+  <li><a href="{{ url_for('pipeline_logs', name=name, file='debug.log') }}">
+      {{pgettext('button', 'Show debug log')}}
+  </a></li>
+  {% endif %}
+  <li>
+    <a href="{{ url_for('pipeline_logs', name=name, file='error.log') }}">
+      {{pgettext('button', 'Show error log')}}
+    </a>
+  </li>
+</ul>
+
+<hr/>
+<h2>{{pgettext('header', 'Remove')}}</h2>
+<section>
+  <p>
+    <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove all data stored for this pipeline: %(label)s?', label=pipeline.label)}}">
+      <input type="hidden" name="action" value="clean"/>
+      <button type="submit" class="btn btn-danger">
+        {{pgettext('button', 'Remove the stored data')}}
+      </button>
+    </form>
+  </p>
+  <p>
+    <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this pipeline configuration and all its stored data: %(label)s?', label=pipeline.label)}}">
+      <input type="hidden" name="action" value="delete"/>
+      <button type="submit" class="btn btn-danger">
+        {{pgettext('button', 'Remove the stored data and the pipeline')}}
+      </button>
+    </form>
+  </p>
+</section>
 {% endblock %}
