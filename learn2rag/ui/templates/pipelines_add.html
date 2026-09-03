@@ -17,10 +17,10 @@
   </div>
   <div class="mb-3">
     {{pgettext('form_label', 'Data sources')}}
-    <button class="btn btn-secondary select-sources" data-value="1">
+    <button type="button" class="btn btn-secondary select-sources" data-value="1">
       {{pgettext('button', 'Select all')}}
     </button>
-    <button class="btn btn-secondary select-sources" data-value="0">
+    <button type="button" class="btn btn-secondary select-sources" data-value="0">
       {{pgettext('button', 'Unselect all')}}
     </button>
     {% for name, source in sources.items() %}
