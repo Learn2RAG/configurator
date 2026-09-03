@@ -217,6 +217,12 @@ services:
       - '{{config.get("CHAT", {}).get("host") or config.get("UI", {}).get("host") or "127.0.0.1"}}'
       - '--port'
       - '{{ports.pipeline}}'
+      #!!! {% if config.get("TLS") %}
+      - '--tls-certfile'
+      - '{{ config["TLS"]["CERTFILE"] }}'
+      - '--tls-keyfile'
+      - '{{ config["TLS"]["KEYFILE"] }}'
+      #!!! {% endif %}
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'

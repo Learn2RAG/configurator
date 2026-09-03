@@ -10,6 +10,8 @@ class ArgumentParser(argparse.ArgumentParser):
         super().__init__()
         self.add_argument('--host', type=str, default='127.0.0.1')
         self.add_argument('--port', type=int, default=9001)
+        self.add_argument('--tls-certfile', default=None)
+        self.add_argument('--tls-keyfile', default=None)
 
 
 def main(args: argparse.Namespace) -> None:
@@ -19,5 +21,7 @@ def main(args: argparse.Namespace) -> None:
         app,
         host=args.host,
         port=args.port,
+        ssl_certfile=args.tls_certfile,
+        ssl_keyfile=args.tls_keyfile,
         log_level='debug',
     )

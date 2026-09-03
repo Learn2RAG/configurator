@@ -185,6 +185,12 @@ services:
       - '{{config.get("CHAT", {}).get("host") or config.get("UI", {}).get("host") or "127.0.0.1"}}'
       - '--port'
       - '{{ports.pipeline}}'
+      #!!! {% if config.get("TLS") %}
+      - '--tls-certfile'
+      - '{{ config["TLS"]["CERTFILE"] }}'
+      - '--tls-keyfile'
+      - '{{ config["TLS"]["KEYFILE"] }}'
+      #!!! {% endif %}
     environment:
       DO_NOT_TRACK: 'true'
       SCARF_NO_ANALYTICS: 'true'
