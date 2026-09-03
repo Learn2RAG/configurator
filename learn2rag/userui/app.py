@@ -26,13 +26,17 @@ def build_app() -> FastAPI:
     # required by oauth library
     app.add_middleware(SessionMiddleware, secret_key="FIXME")
 
-    def token_handler(request: Request, name: str, token: str) -> None:
+    auth_prefix = '/auth'
+    def login_handler(request: Request, name: str, token: str) -> None:
         if SESSION_USER_AUTHS not in request.session:
             request.session[SESSION_USER_AUTHS] = {}
         request.session[SESSION_USER_AUTHS][name] = {'token': token}
+    def logout_handler(request: Request, name: str) -> None:
+        del request.session[SESSION_USER_AUTHS][name]
+    auth_router = auth.build_router(importer_config, login_handler, logout_handler)
     app.include_router(
-        auth.build_router(importer_config, token_handler),
-        prefix='/auth',
+        auth_router,
+        prefix=auth_prefix,
     )
 
     api_prefix = '/api'
@@ -58,6 +62,9 @@ def build_app() -> FastAPI:
     @app.get('/')
     async def index(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(request, 'index.html', context={
+            'auth_prefix': auth_prefix,
+            'auth_routers': auth_router.auth_routers,
+            'user_auths': request.session.get(SESSION_USER_AUTHS, {}),
         })
 
     @app.exception_handler(RequestValidationError)

@@ -3,7 +3,7 @@ import logging
 import secrets
 
 from authlib.integrations.starlette_client import OAuth
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 
 from .utils import AuthImplRouter
@@ -20,7 +20,7 @@ def discover_applications(import_config: Mapping[str, Any]) -> Generator[tuple[s
             base_url = loader_config.get('base_url', '')
             if client_id != '' and client_secret != '' and base_url != '':
                 logger.info('Discovered OAuth application: %s (%s), client_id=%s)', name, base_url, client_id)
-                yield name, base_url, {
+                yield name, f'OAuth ({base_url})', {
                     'client_id': client_id,
                     'client_secret': client_secret,
                     'authorize_url': base_url + '/oauth/authorize',
@@ -38,7 +38,7 @@ class OAuthRouter(AuthImplRouter):
         return self.applications
 
 
-def build_router(import_config: Mapping[str, Any], token_handler: Callable[[Request, str, str], None]) -> AuthImplRouter:
+def build_router(import_config: Mapping[str, Any], login_handler: Callable[[Request, str, str], None], logout_handler: Callable[[Request, str], None]) -> AuthImplRouter:
     router = OAuthRouter()
 
     oauth = OAuth()
@@ -46,7 +46,7 @@ def build_router(import_config: Mapping[str, Any], token_handler: Callable[[Requ
         oauth.register(name, **kwargs)
         router.applications[name] = label
 
-    @router.get('/{name}/login')
+    @router.post('/{name}/login')
     async def login(name: str, request: Request) -> Any:
         provider = getattr(oauth, name)
         redirect_uri = request.url_for('oauth_callback')
@@ -63,8 +63,15 @@ def build_router(import_config: Mapping[str, Any], token_handler: Callable[[Requ
             logger.error('OAuth authentication failed', e)
             raise HTTPException(status_code=400, detail='Callback failed') from e
         logger.info('OAuth authentication succeeded')
-        token_handler(request, name, token)
-        return RedirectResponse('..')
-        return {'status': 'success', 'token': token}
+        login_handler(request, name, token)
+        return RedirectResponse('../..')
+
+    @router.post('/{name}/logout')
+    async def logout(name: str, request: Request) -> Any:
+        logout_handler(request, name)
+        return RedirectResponse(
+            '../../..',
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
 
     return router
