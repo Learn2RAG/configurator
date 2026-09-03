@@ -8,3 +8,7 @@ class AuthImplRouter(ABC, APIRouter):
     @abstractmethod
     def registered_applications(self) -> Mapping[str, str]:
         raise NotImplementedError()
+
+
+class AuthRouter(ABC, APIRouter):
+    auth_routers: dict[str, AuthImplRouter]
