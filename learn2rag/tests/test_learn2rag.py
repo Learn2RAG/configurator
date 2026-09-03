@@ -1,6 +1,7 @@
 import logging
 import shutil
 from pathlib import Path
+import time
 from unittest import TestCase
 from typing import Any
 
@@ -36,7 +37,7 @@ class Learn2RAGTestCase(TestCase):
         self.storage_path = Path(save_data_path('Learn2RAG', 'tests'))
         self.storage_path.mkdir(parents=True, exist_ok=True)
         self.openai_client = OpenAI(
-            api_key='',
+            api_key='fakekey',
             base_url=f'http://localhost:{self.rag_port}',
             max_retries=0,
         )
@@ -52,6 +53,7 @@ class Learn2RAGTestCase(TestCase):
             if project.running:
                 project.stop()
             project.remove()
+        (data_dir / 'dog.txt').unlink(missing_ok=True)
 
     def test_learn2rag(self) -> None:
         template_context = {
@@ -96,7 +98,7 @@ class Learn2RAGTestCase(TestCase):
         project.start()
         assert project.running
 
-        def check_rag() -> None:
+        def check_rag_rabit() -> None:
             try:
                 completion = self.openai_client.chat.completions.create(
                     model='learn2rag',
@@ -112,7 +114,105 @@ class Learn2RAGTestCase(TestCase):
                 assert 'Lagomorpha' in content, 'specific text from a test file'
             except APIConnectionError:
                 assert False
-        waitUntil(check_rag, timeout=1 * 60 * 1000)
+        waitUntil(check_rag_rabit, timeout=1 * 60 * 1000)
+        project.stop()
+        time.sleep(1)
+        project.remove()
+
+        dog_text = """Dogs (Canis familiaris or Canis lupus familiaris) are domesticated descendants of the wolf.
+        Also called the domestic dog, it is derived from the extinct Pleistocene wolf, and the modern
+        wolf is the dog's nearest living relative. Dogs were the first species to be domesticated by
+        hunter-gatherers over 15,000 years ago, well before the development of agriculture. Due to
+        their long association with humans, dogs have expanded to a large number of domestic breeds
+        and gained the ability to thrive on a starch-rich diet that would be inadequate for other canids.
+
+        The dog has been selectively bred over millennia for various behaviors, sensory capabilities,
+        and physical attributes. Dog breeds vary widely in shape, size, and color. They perform many
+        roles for humans, such as hunting, herding, pulling loads, protection, assisting police and
+        military, companionship, therapy, and aiding disabled people. This influence on human society
+        has given them the sobriquet of "man's best friend"."""
+
+
+        logging.info(f"add document about dogs at {data_dir}")
+
+        (data_dir / 'dog.txt').write_text(dog_text, encoding='utf-8')
+        project = Project.create(template_dir / 'import.yml', self.project_name, template=True,
+                                 template_context=template_context)
+        assert project is not None, 'project should not be None'
+        project.start()
+        assert project.running
+
+
+        waitUntil(check_import, timeout=1 * 60 * 1000)
+
+
+        time.sleep(1)
+        project.remove()
+
+        project = Project.create(template_dir / 'pipeline.yml', self.project_name, template=True,
+                                 template_context=template_context)
+        assert project is not None, 'project should not be None'
+        project.start()
+        assert project.running
+        logging.info("ask about DOGs")
+        def check_rag_dog() -> None:
+            try:
+                completion = self.openai_client.chat.completions.create(
+                    model='learn2rag',
+                    messages=[
+                        {'role': 'user', 'content': f'What are dogs?'},
+                    ],
+                )
+                content = completion.choices[-1].message.content
+                logger.debug('Response content: %s', content)
+                assert 'descendants of the wolf' in content
+            except APIConnectionError:
+                assert False
+
+        waitUntil(check_rag_dog, timeout=1 * 60 * 1000)
+
+        project.stop()
+        time.sleep(1)
+        project.remove()
+
+        dog_file = data_dir / 'dog.txt'
+        dog_file.unlink(missing_ok=True)
+
+        project = Project.create(template_dir / 'import.yml', self.project_name, template=True,
+                                 template_context=template_context)
+        assert project is not None, 'project should not be None'
+        project.start()
+        assert project.running
+
+        waitUntil(check_import, timeout=1 * 60 * 1000)
+
+        time.sleep(1)
+        project.remove()
+
+        project = Project.create(template_dir / 'pipeline.yml', self.project_name, template=True,
+                                 template_context=template_context)
+        assert project is not None, 'project should not be None'
+        project.start()
+        assert project.running
+        logging.info("ask about DOGs")
+
+        def check_rag_dog_when_not_exist() -> None:
+            try:
+                completion = self.openai_client.chat.completions.create(
+                    model='learn2rag',
+                    messages=[
+                        {'role': 'user', 'content': f'What are dogs?'},
+                    ],
+                )
+                content = completion.choices[-1].message.content
+                logger.debug('Response content: %s', content)
+                assert "Information:\\n" in content, 'contains the prompt'
+                assert not content.endswith("Information:\\n"), 'contains any document chunks in the prompt'
+                assert 'descendants of the wolf' not in content
+            except APIConnectionError:
+                assert False
+
+        waitUntil(check_rag_dog_when_not_exist, timeout=1 * 60 * 1000)
 
     def test_optimization(self) -> None:
         template_context = {
@@ -184,7 +284,6 @@ class Learn2RAGTestCase(TestCase):
 
         initial_mtime = results_file.stat().st_mtime if results_file.exists() else 0.0
 
-
         mock_registry = {
             "datasets": {
                 dataset_name: {
@@ -200,17 +299,15 @@ class Learn2RAGTestCase(TestCase):
         }
 
         best_cfg, history, importance = run(
-            dataset_name=dataset_name ,
+            dataset_name=dataset_name,
             max_questions=2,
             n_trials=2,
             output_dir=opt_out_dir,
             registry_path=mock_registry
         )
 
-
         assert best_cfg is not None, "Optimization should return a valid configuration"
         assert len(history) == 2, "History length should match n_trials"
-
 
         assert results_file.exists(), "Optimization output JSON was not created"
         current_mtime = results_file.stat().st_mtime
