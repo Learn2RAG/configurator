@@ -16,5 +16,12 @@
   </div>
 </div>
 
+<script type="text/javascript">
+  document.querySelector('#firststeps_models_more')?.addEventListener('click', event => {
+      event.preventDefault();
+      document.querySelector('[data-bs-target="#collapseCreate"]').click();
+  });
+</script>
+
 {% include 'models_list.html' %}
 {% endblock %}

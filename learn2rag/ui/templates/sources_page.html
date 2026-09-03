@@ -16,5 +16,12 @@
   </div>
 </div>
 
+<script type="text/javascript">
+  document.querySelector('#firststeps_sources_more')?.addEventListener('click', event => {
+      event.preventDefault();
+      document.querySelector('[data-bs-target="#collapseCreate"]').click();
+  });
+</script>
+
 {% include 'sources_list.html' %}
 {% endblock %}
