@@ -42,7 +42,8 @@ This document describes all keys present in:
 | `prefetch_limit_colbert` | `int` | Positive integer                                                                                                     | Used in hybrid search (if `search_mode` is `dense_sparse_colbert`) to define number of ColBERT prefetch results.                                                                                                                   |
 | `query_mode` | `string` | Implemented options: `single`, `multi` (special handling). Other values than `multi` follow single-query defaults.   | `multi` activates multi-vector ingestion schema                                                                                                                                                                                    |
 | `multi_search` | `list[string]` | List of metadata fields (for example `title`, `summary`, `source_path`)                                              | In multi-query mode, embeddings are concatenated for `content + each listed field` during ingestion/search. Missing metadata fields are replaced with empty strings.                                                               |
-| `prompt` | `string` | System prompt template (expects `{context}` placeholder in current design).                    | Used to build system message for answer generation.                                                                                                                                                                                |
+| `prompt` | `string` | System prompt template (expects `{context}` placeholder in current design).                    | Used to build system message for answer generation. The recent conversation history is added as separate messages between system message and Current Question, see `history_length`.                                                                                                                                                                                |
+| `history_length` | `int` | Non-negative integer. A missing key defaults to `5`.                                                                 | Number of previous answers of the pipeline that are put into the prompt, each together with the question it belongs to. `0` disables the conversation history. Applied in `generate.py`.<sup>5)</sup>                                |
 
 ### Notes:
 
@@ -72,6 +73,13 @@ This document describes all keys present in:
 - `keywords`: generates keywords and searches them with forced sparse mode. Only possible if sparse vectors exist in used Qdrant collection.
 - `subqueries_keywords`: combines both rewriting behaviors.
 - Prompts for subquery/keywords generation can be modified in `rewrite.py`.
+
+#### 5) `history_length`
+
+- Clients of the OpenAI API (for example Open WebUI) send the whole conversation with every request. `history_length` limits how much of it reaches the model, because how much history a model can handle depends on the model.
+- Counted in answers of the pipeline. The question belonging to an answer is always kept as well, so a value of `5` results in up to 10 messages.
+- Only the roles `user` and `assistant` (also accepted: `model`) are used. Any other role in the request is dropped, so that a client cannot inject system instructions through the history.
+- Retrieval is not affected: the search always uses the Current Question, and every request is filtered by the authorization of the user again.
 
 ### Known Implementation Caveats:
 
