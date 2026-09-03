@@ -11,6 +11,12 @@ import pytest
 from openai import APIConnectionError, OpenAI
 from _pytest.logging import LogCaptureFixture
 
+# for test the resource delete
+
+from unittest.mock import patch
+from learn2rag.ui import create_app
+import learn2rag.data
+
 logger = logging.getLogger(__name__)
 
 template_dir = Path(__file__).resolve().parent.parent / 'ui' / 'templates' / 'compose' / 'pipelines'
@@ -220,3 +226,53 @@ class Learn2RAGTestCase(TestCase):
             results_data = json.load(f)
             assert "best_config" in results_data
             assert "top_k" in results_data["best_config"], "Optimization failed to output expected parameters"
+
+    def test_pipeline_source_delete(self) -> None:
+        # Setup Flask App for testing
+        app_config = {'flask': {'instance_path': str(self.storage_path)}}
+        app = create_app(config=app_config)
+        client = app.test_client()
+
+        # Seed required database entries
+        model_id = learn2rag.data.create_entry(
+            str(self.storage_path), 'models',
+            {'label': 'dummy', 'url': 'http://localhost', 'api': 'ChatFake'}
+        )
+        source_id = learn2rag.data.create_entry(
+            str(self.storage_path), 'sources',
+            {'label': 'Test Source', 'type': 'local', 'path': '/tmp'}
+        )
+        pipeline_id = learn2rag.data.create_entry(
+            str(self.storage_path), 'pipelines',
+            {
+                'label': 'Test Pipeline',
+                'storage_path': str(self.storage_path / 'test_pipeline'),
+                'sources': [source_id],
+                'language_model': model_id,
+                'ports': []
+            }
+        )
+
+        #  Patch start_project
+        with patch('learn2rag.ui.start_project') as mock_start_project:
+            #  Execute the exact DELETE route specified in the ticket
+            response = client.delete(f'/pipelines/{pipeline_id}/sources/{source_id}')
+
+            assert response.status_code == 302
+
+            # Was the source removed from the pipeline config in the DB?
+            updated_pipeline = learn2rag.data.get_entry(str(self.storage_path), 'pipelines', pipeline_id)
+            assert source_id not in updated_pipeline['sources']
+
+            # Was the cleanup job triggered?
+            mock_start_project.assert_called_once()
+            args, kwargs = mock_start_project.call_args
+
+            # Extract the render_context passed to the template
+            render_context = kwargs.get('render_context', args[3] if len(args) > 3 else {})
+            import_config = render_context.get('import_config', {})
+
+            # Was the IMPORTER_DELETE_LOADER_ID environment variable injected?
+            assert 'environment' in import_config, "Environment variable block missing from import config"
+            assert import_config['environment'].get(
+                'IMPORTER_DELETE_LOADER_ID') == source_id, "Deletion ID not injected"

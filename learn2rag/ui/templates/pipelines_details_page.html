@@ -51,4 +51,37 @@
     <button type="submit" class="btn btn-primary">{{pgettext('label', 'Save')}}</button>
   </div>
 </form>
+
+<hr/>
+<h2>{{pgettext('header', 'Data Sources')}}</h2>
+{% if pipeline_sources %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th scope="col">{{pgettext('header', 'Source Name')}}</th>
+        <th scope="col" class="text-end">{{pgettext('header', 'Actions')}}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for source in pipeline_sources %}
+      <tr>
+        <td>{{ source.label or source.id }}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-danger"
+                  hx-delete="{{ url_for('pipeline_source_delete', pipeline_name=name, source_name=source.id) }}"
+                  hx-headers='{"HX-Boosted": "true"}'
+                  hx-confirm="{{gettext('Are you sure you want to remove this data source configuration: %(label)s?', label=source.label or source.id)}}">
+            {{pgettext('button', 'Remove')}}
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-muted">{{gettext('No data sources attached to this pipeline.')}}</p>
+{% endif %}
+
 {% endblock %}
