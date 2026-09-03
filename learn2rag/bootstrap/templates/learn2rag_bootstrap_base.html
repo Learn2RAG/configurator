@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en" style="height: 100%;">
+  <head>
+    <title>{% block title %}{% endblock %} — Learn2RAG</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+
+    <link href="{{ url_for('learn2rag_bootstrap_static', path='bootstrap.css') }}" rel="stylesheet" />
+    <script src="{{ url_for('learn2rag_bootstrap_static', path='bootstrap.bundle.js') }}"></script>
+    <link href="{{ url_for('learn2rag_bootstrap_static', path='main.css') }}" rel="stylesheet" />
+    {% block head %}{% endblock %}
+  </head>
+
+  <body class="d-flex flex-column min-vh-100">
+    <!-- Gradient Navbar -->
+    <nav class="navbar navbar-expand-lg gradient-header">
+      <div class="container d-flex align-items-center justify-content-between flex-wrap">
+
+        <!-- Logo & Title -->
+        <div class="d-flex align-items-center me-4">
+          <a class="navbar-brand d-flex align-items-center" href="/">
+            <img src="{{ url_for('learn2rag_bootstrap_static', path='images/logo_learn2rag_logo.png') }}" alt="Learn2RAG Logo">
+            <div class="navbar-brand-text">
+              <strong class="d-block">Learn2RAG</strong>
+              <small class="d-block">RAG-Systeme in Unternehmen</small>
+            </div>
+          </a>
+        </div>
+
+        <!-- Nav Links -->
+        <div class="d-flex justify-content-start">
+          {% block nav %}{% endblock %}
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow-1" id="main">
+      <section class="container my-4">
+        {% block main %}{% endblock %}
+      </section>
+    </main>
+
+    <!-- Footer -->
+    {% include 'footer.html' %}
+
+    {% block endofbody %}{% endblock %}
+  </body>
+</html>

@@ -161,6 +161,19 @@ wheels = [
 ]
 
 [[package]]
+name = "authlib"
+version = "1.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "joserfc" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/36/98/7d93f30d029643c0275dbc0bd6d5a6f670661ee6c9a94d93af7ab4887600/authlib-1.7.2.tar.gz", hash = "sha256:2cea25fefcd4e7173bdf1372c0afc265c8034b23a8cd5dcb6a9164b826c64231", size = 176511, upload-time = "2026-05-06T08:10:23.116Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/95/adcb68e20c34162e9135f370d6e31737719c2b6f94bc953fe7ed1f10fe21/authlib-1.7.2-py2.py3-none-any.whl", hash = "sha256:3e1faedc9d87e7d56a164eca3ccb6ace0d61b94abe83e92242f8dc8bba9b4a9f", size = 259548, upload-time = "2026-05-06T08:10:21.436Z" },
+]
+
+[[package]]
 name = "azure-core"
 version = "1.41.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1351,6 +1364,18 @@ wheels = [
 ]
 
 [[package]]
+name = "joserfc"
+version = "1.7.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c7/e0/27a6a081ae25420eda6768ceae05d7022a7f2447f420588843f2a44e4298/joserfc-1.7.4.tar.gz", hash = "sha256:b3bc561672ae541b17a9237053b48a03dacddd92d68047b3ecdfb4b5714a88ed", size = 234027, upload-time = "2026-07-19T15:43:02.739Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/bf/249dcd99b3376375910b7fa922383b57792975c8758f50d44612e749226c/joserfc-1.7.4-py3-none-any.whl", hash = "sha256:32d46c2cd5e3203c13e87a6c61333cab310b1ba80cd54b4c4f386a848a122463", size = 71000, upload-time = "2026-07-19T15:43:01.299Z" },
+]
+
+[[package]]
 name = "jq"
 version = "1.11.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1711,6 +1736,7 @@ dependencies = [
     { name = "anyio" },
     { name = "apscheduler" },
     { name = "attrs" },
+    { name = "authlib" },
     { name = "azure-identity" },
     { name = "backoff" },
     { name = "beautifulsoup4" },
@@ -1866,6 +1892,7 @@ dependencies = [
     { name = "torchvision" },
     { name = "tqdm" },
     { name = "transformers" },
+    { name = "types-authlib" },
     { name = "types-psutil" },
     { name = "types-pyxdg" },
     { name = "types-pyyaml" },
@@ -1903,6 +1930,7 @@ requires-dist = [
     { name = "anyio", specifier = "==4.10.0" },
     { name = "apscheduler", specifier = "==3.11.2" },
     { name = "attrs", specifier = "==25.3.0" },
+    { name = "authlib", specifier = "==1.7.2" },
     { name = "azure-identity", specifier = "==1.25.3" },
     { name = "backoff", specifier = "==2.2.1" },
     { name = "beautifulsoup4", specifier = "==4.14.3" },
@@ -2058,6 +2086,7 @@ requires-dist = [
     { name = "torchvision", specifier = "==0.23.0" },
     { name = "tqdm", specifier = "==4.67.3" },
     { name = "transformers", specifier = "==4.55.0" },
+    { name = "types-authlib", specifier = "==1.7.2.20260723" },
     { name = "types-psutil", specifier = "==7.2.2.20260130" },
     { name = "types-pyxdg", specifier = "==0.28.0.20251115" },
     { name = "types-pyyaml", specifier = "==6.0.12.20250915" },
@@ -7032,6 +7061,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ae/40/4a3db7990d1f62a53182aa96eaef57aeb2886a27f90a195bc66713565d31/typer-0.27.1.tar.gz", hash = "sha256:a79bef8469a79c45498e7b814ecf8d603cc7644e9acbd9e19cac0334240b18df", size = 203994, upload-time = "2026-08-03T14:41:03.438Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/43/89/9518bc0c3929bee36b3a4a8e3daddd6e03f92f9961c66d4983b837160543/typer-0.27.1-py3-none-any.whl", hash = "sha256:53150287edd11baeb4e4722c8e394fcdf8181c0ae89485cba8d25c778d5edd56", size = 122874, upload-time = "2026-08-03T14:41:04.391Z" },
+]
+
+[[package]]
+name = "types-authlib"
+version = "1.7.2.20260723"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ef/84/9e8b097b426acc2d2b8cbbcadb44a56ad8619fe3f3a7d4a6483199718801/types_authlib-1.7.2.20260723.tar.gz", hash = "sha256:c0e447ac2b2661a6df3debbe5600d43cfcf48e7e6c4c06e680cb9cc1afa96c78", size = 49427, upload-time = "2026-07-23T05:12:39.204Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/55/416f4391dfb1dd2754a65eabd696affae5a96622432abebbc622dd4a17c1/types_authlib-1.7.2.20260723-py3-none-any.whl", hash = "sha256:eeac694c7e94aabf66ee05c6822adb25a655430eeee80c53529907d64c100354", size = 109354, upload-time = "2026-07-23T05:12:38.127Z" },
 ]
 
 [[package]]

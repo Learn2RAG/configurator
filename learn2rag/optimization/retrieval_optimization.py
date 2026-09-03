@@ -307,7 +307,7 @@ def run_with_watchdog(args: argparse.Namespace, final_output_dir: pathlib.Path) 
 def run_search(question: str, user_config: Dict[str, Any], working_config: Dict[str, Any]) -> Tuple[List[Any], float]:
     _touch_run_search_heartbeat()
     t0 = time.time()
-    docs = asyncio.run(learn2rag.pipeline.search.search_authorized(question, user="anonymous", request_id=None, user_config=user_config, opt_config=working_config))
+    docs = asyncio.run(learn2rag.pipeline.search.search_authorized(question, user_auths={}, request_id=None, user_config=user_config, opt_config=working_config))
     search_time = time.time() - t0
     source_list = [point.payload['source'] for point in docs if point.payload is not None and "source" in point.payload]
     return source_list, search_time

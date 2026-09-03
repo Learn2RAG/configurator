@@ -6,7 +6,7 @@ ports:
   - qdrant_http
   - pipeline
   - open_webui_pipelines
-ui_url: '{{ pipeline.chat_proxy_url or learn2rag_scheme ~ "://" ~ learn2rag_hostname ~ ":" ~ ports.ui ~ "/" }}'
+ui_url: '{{ pipeline.chat_proxy_url or learn2rag_scheme ~ "://" ~ learn2rag_hostname ~ ":" ~ ports.pipeline ~ "/" }}'
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |
@@ -52,7 +52,7 @@ files:
       handlers:
         display:
           class: logging.StreamHandler
-          level: INFO
+          level: {% if debug_logging %}DEBUG{% else %}INFO{% endif %}
           formatter: colored
           stream: ext://sys.stderr
         profiling_display:
@@ -124,7 +124,7 @@ services:
       DEFAULT_LOCALE: 'de'
       ENABLE_OLLAMA_API: 'False'
       ENABLE_OPENAI_API: 'True'
-      OPENAI_API_BASE_URL: http://127.0.0.1:{{ports.pipeline}}
+      OPENAI_API_BASE_URL: http://127.0.0.1:{{ports.pipeline}}/api/v1
       OPENAI_API_KEY: '0p3n-w3bu!'
       ENABLE_AUTOCOMPLETE_GENERATION: 'False'
       ENABLE_CODE_EXECUTION: 'False'
@@ -210,12 +210,25 @@ services:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/configurator{% if is_windows %}.exe{% endif %}'
-      - 'learn2rag.pipeline'
+      - 'learn2rag.userui'
       - '--logging-config'
       - '{{storage_path}}/logging_config.yml'
+      - '--host'
+      - '{{config.get("CHAT", {}).get("host") or config.get("UI", {}).get("host") or "127.0.0.1"}}'
+      - '--port'
+      - '{{ports.pipeline}}'
+      #!!! {% if config.get("TLS") %}
+      - '--tls-certfile'
+      - '{{ config["TLS"]["CERTFILE"] }}'
+      - '--tls-keyfile'
+      - '{{ config["TLS"]["KEYFILE"] }}'
+      #!!! {% endif %}
+      - '--basic-username'
+      - '{{ config.get("CHAT", {}).get("username", config.get("SIMPLE_AUTH", {}).get("username", "")) }}'
+      - '--basic-password'
+      - '{{ config.get("CHAT", {}).get("password", config.get("SIMPLE_AUTH", {}).get("password", "")) }}'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
-      LEARN2RAG_PIPELINE_PORT: '{{ports.pipeline}}'
       QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'
       QDRANT_PATH: '{{ pipeline.qdrant_path }}'
       QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'

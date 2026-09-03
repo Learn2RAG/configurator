@@ -1,5 +1,10 @@
 import warnings
-from typing import List, Any, cast
+from typing import (
+    cast,
+    Any,
+    List,
+    Mapping,
+)
 import logging
 import copy
 from functools import lru_cache
@@ -464,9 +469,9 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
     return results
 
 
-async def search_authorized(question: str, user: str, *, request_id: str | None = None, user_config: dict[str, Any] = user_config, opt_config: dict[str, Any] = opt_config) -> List[ScoredPoint]:
+async def search_authorized(question: str, user_auths: Mapping[str, Any], *, request_id: str | None = None, user_config: dict[str, Any] = user_config, opt_config: dict[str, Any] = opt_config) -> List[ScoredPoint]:
     points = _collect_query_points(question, user_config, opt_config, request_id=request_id)
     query_response = QueryResponse(points=points)
-    authorized_points = await filter_authorized(user, query_response)
+    authorized_points = await filter_authorized(user_auths, query_response)
     # keep deterministic order after auth filter
     return _sort_and_deduplicate(list(authorized_points))

@@ -1,96 +1,68 @@
-<!doctype html>
-<html lang="en" style="height: 100%;">
-  <head>
-    <title>{% block title %}{% endblock %} — Learn2RAG</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+{% extends 'learn2rag_bootstrap_base.html' %}
 
-    <script src="{{ url_for('static', filename='htmx.js') }}"></script>
-    <link href="{{ url_for('static', filename='bootstrap.css') }}" rel="stylesheet" />
-    <script src="{{ url_for('static', filename='bootstrap.bundle.js') }}"></script>
-    <link href="{{ url_for('static', filename='main.css') }}" rel="stylesheet" />
-  </head>
 
-  <body class="d-flex flex-column min-vh-100">
-    <!-- Gradient Navbar -->
-    <nav class="navbar navbar-expand-lg gradient-header">
-      <div class="container d-flex align-items-center justify-content-between flex-wrap">
+{% block head %}
+<script src="{{ url_for('static', filename='htmx.js') }}"></script>
+{% endblock %}
 
-        <!-- Logo & Title -->
-        <div class="d-flex align-items-center me-4">
-          <a class="navbar-brand d-flex align-items-center" href="/">
-            <img src="{{ url_for('static', filename='images/logo_learn2rag_logo.png') }}" alt="Learn2RAG Logo">
-            <div class="navbar-brand-text">
-              <strong class="d-block">Learn2RAG</strong>
-              <small class="d-block">RAG-Systeme in Unternehmen</small>
-            </div>
-          </a>
-        </div>
 
-        <!-- Nav Links -->
-        <div class="d-flex justify-content-start">
-          <ul class="navbar-nav d-flex flex-row">
-            <li class="nav-item"><a class="nav-link" href="/models" accesskey="1">{{pgettext('nav', 'Language models')}}</a></li>
-            <li class="nav-item"><a class="nav-link" href="/sources" accesskey="2">{{pgettext('nav', 'Data sources')}}</a></li>
-            <li class="nav-item"><a class="nav-link" href="/pipelines" accesskey="3">{{pgettext('nav', 'Pipelines')}}</a></li>
-            <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                {{pgettext('nav', 'More')}}
-              </a>
-              <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="/ps">Active processes</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><form action="{{url_for('shutdown_request')}}" method="POST"><button class="dropdown-item">{{pgettext('nav', 'Shutdown Learn2RAG')}}</button></form></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="https://docs.learn2rag.de/" target="_blank">{{pgettext('nav', 'Online documentation')}}</a></li>
-                <li><a class="dropdown-item" href="https://learn2rag.de/" target="_blank">{{pgettext('nav', 'Learn2RAG website')}}</a></li>
-              </ul>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </nav>
+{% block nav %}
+<ul class="navbar-nav d-flex flex-row">
+  <li class="nav-item"><a class="nav-link" href="/models" accesskey="1">{{pgettext('nav', 'Language models')}}</a></li>
+  <li class="nav-item"><a class="nav-link" href="/sources" accesskey="2">{{pgettext('nav', 'Data sources')}}</a></li>
+  <li class="nav-item"><a class="nav-link" href="/pipelines" accesskey="3">{{pgettext('nav', 'Pipelines')}}</a></li>
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+      {{pgettext('nav', 'More')}}
+    </a>
+    <ul class="dropdown-menu">
+      <li><a class="dropdown-item" href="/ps">Active processes</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><form action="{{url_for('shutdown_request')}}" method="POST"><button class="dropdown-item">{{pgettext('nav', 'Shutdown Learn2RAG')}}</button></form></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item" href="https://docs.learn2rag.de/" target="_blank">{{pgettext('nav', 'Online documentation')}}</a></li>
+      <li><a class="dropdown-item" href="https://learn2rag.de/" target="_blank">{{pgettext('nav', 'Learn2RAG website')}}</a></li>
+    </ul>
+  </li>
+</ul>
+{% endblock %}
 
-    <!-- Main Content -->
-    <main class="flex-grow-1" id="main">
-      <section class="container my-4">
-        {% if debug_logging %}
-        <div class="alert alert-warning">{{gettext('Debug logging is enabled in config file <code>%(file)s</code>. It might capture sensitive information.', file='config.yml')}}</div>
-        {% endif %}
-        <div id="flashed_messages">
-          {% for category, message in get_flashed_messages(with_categories=True) %}
-          {% if category == 'error' %}
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-              {{ message }}
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-          {% else %}
-            <div class="alert alert-primary  alert-dismissible fade show" role="alert">
-              {{ message }}
-              <button type="button" class="btn-close float-right" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-          {% endif %}
-          {% endfor %}
-        </div>
 
-        <div id="connection_indicator">
-        </div>
+{% block main %}
+{% if debug_logging %}
+<div class="alert alert-warning">{{gettext('Debug logging is enabled in config file <code>%(file)s</code>. It might capture sensitive information.', file='config.yml')}}</div>
+{% endif %}
+<div id="flashed_messages">
+  {% for category, message in get_flashed_messages(with_categories=True) %}
+  {% if category == 'error' %}
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  {% else %}
+  <div class="alert alert-primary  alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close float-right" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
 
-        {% include 'firststeps.html' %}
+<div id="connection_indicator">
+</div>
 
-        <header>
-          {% block header %}{% endblock %}
-        </header>
+{% include 'firststeps.html' %}
 
-        {% block content %}{% endblock %}
-      </section>
-    </main>
+<header>
+  {% block header %}{% endblock %}
+</header>
 
-    <!-- Footer -->
-    {% include 'footer.html' %}
+{% block content %}{% endblock %}
+{% endblock %}
 
-    <script type="text/javascript">
+
+{% block endofbody %}
+        <script type="text/javascript">
       document.body.addEventListener('htmx:afterRequest', event => {
           if (event.detail.successful) {
               document.querySelector('#communication_error')?.remove();
@@ -103,5 +75,4 @@
           }
       });
     </script>
-  </body>
-</html>
+{% endblock %}

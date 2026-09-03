@@ -12,29 +12,47 @@
     <label for="path" class="form-label">{{pgettext('form_label', 'Content types')}}</label>
     <input class="form-control" name="content_types" required="required" value="{{example_drupal_content_types}}"/>
   </div>
-  <div class="mb-3">
-    <label for="auth_type" class="form-label">{{pgettext('form_label', 'Authentication')}}</label>
-    <select required="required" class="form-select" name="auth_type">
-      <option value="none">{{pgettext('form_auth_option', 'None')}}</option>
-      <option value="basic">{{pgettext('form_auth_option', 'Username and password')}}</option>
-      <option value="token">{{pgettext('form_auth_option', 'Access token')}}</option>
-    </select>
-  </div>
-  <div class="mb-3">
-    <label for="path" class="form-label">{{pgettext('form_label', 'Username')}}</label>
-    <input class="form-control" name="username"/>
-  </div>
-  <div class="mb-3">
-    <label for="path" class="form-label">{{pgettext('form_label', 'Password')}}</label>
-    <input type="password" class="form-control" name="password"/>
-    <div class="alert alert-warning">
-      {{gettext('This password would be saved in plain text in the configuration.')}}
+  <fieldset>
+    <legend>{{pgettext('form_label', 'Import authenticaton')}}</legend>
+    <div class="mb-3">
+      <select required="required" class="form-select" name="auth_type">
+        <option value="none">{{pgettext('form_auth_option', 'None')}}</option>
+        <option value="basic">{{pgettext('form_auth_option', 'Username and password')}}</option>
+        <option value="token">{{pgettext('form_auth_option', 'Access token')}}</option>
+      </select>
     </div>
-  </div>
-  <div class="mb-3">
-    <label for="token" class="form-label">{{pgettext('form_label', 'Access token')}}</label>
-    <input class="form-control" name="token"/>
-  </div>
+    <div class="mb-3">
+      <label for="path" class="form-label">{{pgettext('form_label', 'Username')}}</label>
+      <input class="form-control" name="username"/>
+    </div>
+    <div class="mb-3">
+      <label for="path" class="form-label">{{pgettext('form_label', 'Password')}}</label>
+      <input type="password" class="form-control" name="password"/>
+      <div class="alert alert-warning">
+        {{gettext('This password would be saved in plain text in the configuration.')}}
+      </div>
+    </div>
+    <div class="mb-3">
+      <label for="token" class="form-label">{{pgettext('form_label', 'Access token')}}</label>
+      <input class="form-control" name="token"/>
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>{{pgettext('form_label', 'User authentication')}}</legend>
+    <div class="mb-3">
+      <select required="required" class="form-select" name="user_auth_type">
+        <option value="none">{{pgettext('form_auth_option', 'None (all users will be provided access to all data)')}}</option>
+        <option value="oauth">{{pgettext('form_auth_option', 'OAuth')}}</option>
+      </select>
+    </div>
+    <div class="input-group mb-3">
+      <span class="input-group-text">OAuth</span>
+      <span class="input-group-text"><code>client_id</code></span>
+      <input name="oauth_client_id" type="text" class="form-control" aria-label="client_id">
+      <span class="input-group-text"><code>client_secret</code></span>
+      <input name="oauth_client_secret" type="text" class="form-control" aria-label="client_secret">
+    </div>
+  </fieldset>
   <div class="mb-3">
     <label for="failure_threshold" class="form-label">{{ pgettext('form_label', 'Failure threshold') }}</label>
     <input type="number" min="1" step="1" class="form-control" name="failure_threshold" value="5">
