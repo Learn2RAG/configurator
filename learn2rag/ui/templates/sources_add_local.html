@@ -7,7 +7,7 @@
   <div class="mb-3">
     <input type="hidden" name="type" value="local"/>
     <label for="path" class="form-label">{{pgettext('form_label', 'Path on the local filesystem')}}</label>
-    <input class="form-control" name="path" required="required"
+    <input type="text" pattern="\S(?:.*\S)?" class="form-control" name="path" required="required"
            {% if is_windows %}
            title="{{pgettext('tooltip', 'For example: %(path)s', example_local_path)}}"
            {% else %}

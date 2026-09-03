@@ -5,7 +5,7 @@
   </div>
   <div class="mb-3">
     <label for="url" class="form-label">{{pgettext('form_label', 'Storage directory path')}}</label>
-    <input required="required" class="form-control" name="storage_path" value="{{default_storage_prefix}}{{current_timestamp}}" data-default-prefix="{{default_storage_prefix}}"/>
+    <input type="text" pattern="\S(?:.*\S)?" required="required" class="form-control" name="storage_path" value="{{default_storage_prefix}}{{current_timestamp}}" data-default-prefix="{{default_storage_prefix}}"/>
   </div>
   <div class="mb-3">
     <label for="language_model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
