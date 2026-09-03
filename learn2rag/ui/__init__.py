@@ -28,6 +28,9 @@ from learn2rag.evaluation.tools import read_dataset_qa
 import learn2rag.data
 import learn2rag.pipeline.llm
 from ..bootstrap import setup_flask as learn2rag_bootstrap_setup
+from ..importer.utils.import_state import ImportState
+
+
 from ..utils import (
     is_windows,
     normalize_path,
@@ -513,6 +516,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             return redirect(url_for('pipelines_list'))
         pipeline['status_message'] = pipeline_status_message(pipeline)
         storage_path = Path(pipeline['storage_path'])
+        import_state = ImportState(storage_path / 'import_state.json')
         try:
             training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
         except FileNotFoundError:
@@ -521,6 +525,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'pipelines_details_page.html',
             name=name,
             pipeline=pipeline,
+            import_state=import_state,
             training_dataset=training_dataset,
             projects=Project.get_all(),
         )

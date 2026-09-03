@@ -87,6 +87,39 @@
 </section>
 
 <hr/>
+<h2>{{pgettext('header', 'Sources')}}</h2>
+<section>
+  <table class="table" id="pipeline_details_sources_list" hx-swap-oob="true">
+    <tr>
+      <th scope="col">{{pgettext('column_heading', 'Label')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Last successful import')}}</th>
+      <th scope="col">{{pgettext('column_heading', 'Consecutive failures')}}</th>
+    </tr>
+    {% for source in pipeline.sources %}
+    <tr
+      class="
+             {% if import_state.get_consecutive_failures(source) == 0 %}
+             {% if import_state.get_last_import_time(source) %}
+             table-success
+             {% endif %}
+             {% else %}
+             table-danger
+             {% endif %}
+             "
+      >
+      <th>{{ sources[source].label }}</th>
+      <td>
+        {{ import_state.get_last_import_time(source) }}
+      </td>
+      <td>
+        {{ import_state.get_consecutive_failures(source) }}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<hr/>
 <h2>{{pgettext('header', 'Ports')}}</h2>
 <section>
   <ul class="list-group">
