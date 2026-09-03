@@ -643,9 +643,9 @@ def main(config: dict[str, Any]) -> None:
     protocol = 'https' if use_https else 'http'
     url = f"{protocol}://localhost:{port}"
     open_web_browser(url)
-    logging.info('*' * 40)
+    logging.info('*' * 60)
     logging.info('Learn2RAG: ' + url)
-    logging.info('*' * 40)
+    logging.info('*' * 60)
 
     uvicorn_kwargs: dict[str, Any] = {
         "app": app,
@@ -659,4 +659,13 @@ def main(config: dict[str, Any]) -> None:
         uvicorn_kwargs["ssl_keyfile"] = ssl_key
         uvicorn_kwargs["ssl_certfile"] = ssl_cert
 
-    uvicorn.run(**uvicorn_kwargs)
+    try:
+        uvicorn.run(**uvicorn_kwargs)
+    except SystemExit as e:
+        if e.code == 1:
+            # FIXME: the previous message with URL is already printed; delay it until further?
+            logging.warning('*' * 60)
+            logging.warning('It looks like the port is already in use')
+            logging.warning('See how to change configuration: https://docs.learn2rag.de/')
+            logging.warning('*' * 60)
+        raise
