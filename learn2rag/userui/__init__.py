@@ -12,11 +12,16 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument('--port', type=int, default=9001)
         self.add_argument('--tls-certfile', default=None)
         self.add_argument('--tls-keyfile', default=None)
+        self.add_argument('--basic-username', type=str, default='')
+        self.add_argument('--basic-password', type=str, default='')
 
 
 def main(args: argparse.Namespace) -> None:
     # TODO use uvicorn.config.Config
-    app = build_app()
+    app = build_app(
+        basic_username=args.basic_username,
+        basic_password=args.basic_password,
+    )
     uvicorn.run(
         app,
         host=args.host,

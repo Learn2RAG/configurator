@@ -223,6 +223,10 @@ services:
       - '--tls-keyfile'
       - '{{ config["TLS"]["KEYFILE"] }}'
       #!!! {% endif %}
+      - '--basic-username'
+      - '{{ config.get("CHAT", {}).get("username", config.get("SIMPLE_AUTH", {}).get("username", "")) }}'
+      - '--basic-password'
+      - '{{ config.get("CHAT", {}).get("password", config.get("SIMPLE_AUTH", {}).get("password", "")) }}'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
       QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'

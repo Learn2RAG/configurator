@@ -1,7 +1,7 @@
 from pathlib import Path
 import logging
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -13,6 +13,7 @@ from .constants import SESSION_USER_AUTHS
 from ..bootstrap import setup_fastapi as learn2rag_bootstrap_setup
 from ..pipeline import api
 from ..pipeline.config import importer_config
+from ..utils.fastapi import require_basic_auth
 from ..utils.starlette import PrefixRewriteMiddleware
 
 
@@ -20,8 +21,19 @@ class TestResponse(BaseModel):
     message: str
 
 
-def build_app() -> FastAPI:
-    app = FastAPI()
+def build_app(
+        *,
+        basic_username: str = '',
+        basic_password: str = '',
+) -> FastAPI:
+    dependencies = []
+    if basic_username != '' and basic_password != '':
+        dependencies += [
+            Depends(require_basic_auth(basic_username, basic_password)),
+        ]
+    app = FastAPI(
+        dependencies=dependencies,
+    )
 
     # required by oauth library
     app.add_middleware(SessionMiddleware, secret_key="FIXME")
