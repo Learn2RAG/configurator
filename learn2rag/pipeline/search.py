@@ -470,8 +470,42 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
 
 
 async def search_authorized(question: str, user_auths: Mapping[str, Any], *, request_id: str | None = None, user_config: dict[str, Any] = user_config, opt_config: dict[str, Any] = opt_config) -> List[ScoredPoint]:
-    points = _collect_query_points(question, user_config, opt_config, request_id=request_id)
-    query_response = QueryResponse(points=points)
-    authorized_points = await filter_authorized(user_auths, query_response)
-    # keep deterministic order after auth filter
-    return _sort_and_deduplicate(list(authorized_points))
+    max_retries = opt_config.get("max_auth_retries", 3)
+    target_k = opt_config.get("top_k", 10)
+    current_multiplier = opt_config.get("auth_oversample_start", 2)
+    step_multiplier = opt_config.get("auth_oversample_step", 2)
+    deduplicated: list[ScoredPoint] = []
+    for attempt in range(max_retries):
+        local_opt = copy.deepcopy(opt_config)
+        local_opt["top_k"] = target_k * current_multiplier
+        if "top_k_reranker" in local_opt:
+            local_opt["top_k_reranker"] = local_opt["top_k_reranker"] * current_multiplier
+        if "top_k_subqueries" in local_opt:
+            local_opt["top_k_subqueries"] = local_opt["top_k_subqueries"] * current_multiplier
+        if "top_k_keywords" in local_opt:
+            local_opt["top_k_keywords"] = local_opt["top_k_keywords"] * current_multiplier
+
+        for key in ["prefetch_limit_sparse", "prefetch_limit_dense", "prefetch_limit_colbert"]:
+            if key in local_opt:
+                local_opt[key] = local_opt[key] * current_multiplier
+
+        profilingLogger.info(
+                "authorized_search_attempt attempt=%d/%d multiplier=%d target_k=%d",
+                attempt + 1,
+                max_retries,
+                current_multiplier,
+                target_k,
+                extra={'activity': 'search_authorized', 'request_id': request_id},
+        )
+
+        points = _collect_query_points(question, user_config, local_opt, request_id=request_id)
+        query_response = QueryResponse(points=points)
+
+        authorized_points = await filter_authorized(user_auths, query_response)
+        deduplicated = _sort_and_deduplicate(list(authorized_points))
+
+        if len(deduplicated) >= target_k:
+            return deduplicated[:target_k]
+        current_multiplier += step_multiplier
+    # If all retries are exhausted, return whatever we managed to authorize
+    return deduplicated[:target_k]
