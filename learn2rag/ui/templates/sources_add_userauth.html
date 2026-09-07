@@ -1,0 +1,16 @@
+<fieldset class="border p-3 mb-3">
+  <legend>{{pgettext('form_label', 'User authentication')}}</legend>
+  <div class="mb-3">
+    <select required="required" class="form-select" name="user_auth_type">
+      <option value="none">{{pgettext('form_auth_option', 'None (all users will be provided access to all data)')}}</option>
+      <option value="oauth">{{pgettext('form_auth_option', 'OAuth')}}</option>
+    </select>
+  </div>
+  <div class="input-group mb-3">
+    <span class="input-group-text">OAuth</span>
+    <span class="input-group-text"><code>client_id</code></span>
+    <input name="oauth_client_id" type="text" class="form-control" aria-label="client_id">
+    <span class="input-group-text"><code>client_secret</code></span>
+    <input name="oauth_client_secret" type="text" class="form-control" aria-label="client_secret">
+  </div>
+</fieldset>
