@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from qdrant_client.models import ScoredPoint
 
 from . import ingestion
+from .chat import Message
 from .config import user_config, opt_config
 from .qdrant import Qdrant
 from .search import search_authorized
@@ -30,11 +31,6 @@ class QuestionInput(BaseModel):
     user: str
 
 
-class Message(BaseModel):
-    role: str
-    content: str
-
-
 class ChatState(BaseModel):
     messages: List[Message]
     stream: Optional[bool] = False
@@ -42,13 +38,6 @@ class ChatState(BaseModel):
 
 class TestResponse(BaseModel):
     message: str
-
-async def simple_chatbot_response(input: QuestionInput) -> Any:
-    return itemgetter('answer')(await pipeline(inputs={
-        'question': input.question,
-        'user': input.user,
-    }))
-
 
 example_query = "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
 example_messages = {
@@ -75,21 +64,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     logging.error(f"validation_exception_handler: {message}")
     content = {'message': message}
     return JSONResponse(content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
-
-
-@app.post("/qanda")
-async def qanda(
-        input: QuestionInput = Body(
-            ...,
-            example={
-                "question": example_query,
-                "user": "d56d14d0-79c7-4c49-9499-07634a2610c2"
-            }
-        )
-) -> ChatState:
-    answer = await simple_chatbot_response(input)
-    
-    return ChatState(messages=[Message(content=answer, role="model")])
 
 
 @app.get("/models")  # OpenAI API for Open WebUI
@@ -129,6 +103,7 @@ async def run_pipeline(chat_state: ChatState) -> Any:
     return await pipeline(inputs={
         'question': chat_state.messages[-1].content,
         'user': chat_state.user,
+        'history': chat_state.messages[:-1],
     })
 
 
@@ -167,19 +142,6 @@ def streaming_response(inputs: ChatState) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )
-
-
-@app.post("/search")
-async def search(
-        input: QuestionInput = Body(
-            ...,
-            example={
-                "question": example_query,
-                "user": "d56d14d0-79c7-4c49-9499-07634a2610c2"
-            }
-        )
-) -> List[ScoredPoint]:
-    return await search_authorized(user=input.user, question=input.question)
 
 
 @app.get("/test")
