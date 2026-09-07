@@ -1,7 +1,7 @@
 import sys
 import inspect
 import unittest
-from typing import Any
+from typing import Any, cast
 
 from qdrant_client.http.models import ScoredPoint
 
@@ -36,28 +36,28 @@ class SearchAuthorizedTestCase(unittest.IsolatedAsyncioTestCase):
 
         # Store original functions to restore them cleanly after tests
         self.originals = {
-            mod: (mod._collect_query_points, getattr(mod, 'filter_authorized', None))
+            mod: (getattr(mod, '_collect_query_points'), getattr(mod, 'filter_authorized', None))
             for mod in self.search_modules
         }
 
-        self.collect_calls = []
+        self.collect_calls: list[dict[str, Any]] = []
         self.filter_call_count = 0
 
     def tearDown(self) -> None:
         # Restore all original functions to memory
         for mod, (orig_collect, orig_filter) in self.originals.items():
-            mod._collect_query_points = orig_collect
+            setattr(mod, '_collect_query_points', orig_collect)
             if orig_filter:
-                mod.filter_authorized = orig_filter
+                setattr(mod, 'filter_authorized', orig_filter)
 
         search_authorized.__globals__['_collect_query_points'] = self.originals[self.search_modules[0]][0]
         search_authorized.__globals__['filter_authorized'] = self.originals[self.search_modules[0]][1]
 
-    def _apply_patches(self, fake_collect, fake_filter):
+    def _apply_patches(self, fake_collect: Any, fake_filter: Any) -> None:
         """Inject our fakes into every possible memory space where the code might execute"""
         for mod in self.search_modules:
-            mod._collect_query_points = fake_collect
-            mod.filter_authorized = fake_filter
+            setattr(mod, '_collect_query_points', fake_collect)
+            setattr(mod, 'filter_authorized', fake_filter)
 
         # Also patch the direct function globals as a fallback
         search_authorized.__globals__['_collect_query_points'] = fake_collect
@@ -73,17 +73,18 @@ class SearchAuthorizedTestCase(unittest.IsolatedAsyncioTestCase):
             ) for i in range(n)
         ]
 
-    def _extract_opt(self, args, kwargs) -> dict:
+    def _extract_opt(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
         if len(args) >= 3:
-            return args[2]
-        return kwargs.get('opt_config', kwargs.get('local_opt', {}))
+            return cast(dict[str, Any], args[2])
+        opt = kwargs.get('opt_config', kwargs.get('local_opt', {}))
+        return cast(dict[str, Any], opt)
 
     async def test_success_on_first_attempt(self) -> None:
-        def fake_collect(*args, **kwargs):
+        def fake_collect(*args: Any, **kwargs: Any) -> list[ScoredPoint]:
             self.collect_calls.append(self._extract_opt(args, kwargs))
             return self._make_mock_points(6)
 
-        async def fake_filter(*args, **kwargs):
+        async def fake_filter(*args: Any, **kwargs: Any) -> list[ScoredPoint]:
             self.filter_call_count += 1
             return self._make_mock_points(4)
 
@@ -99,11 +100,11 @@ class SearchAuthorizedTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.collect_calls[0]["top_k_reranker"], 6)
 
     async def test_success_on_second_attempt_after_scaling(self) -> None:
-        def fake_collect(*args, **kwargs):
+        def fake_collect(*args: Any, **kwargs: Any) -> list[ScoredPoint]:
             self.collect_calls.append(self._extract_opt(args, kwargs))
             return self._make_mock_points(12)
 
-        async def fake_filter(*args, **kwargs):
+        async def fake_filter(*args: Any, **kwargs: Any) -> list[ScoredPoint]:
             self.filter_call_count += 1
             if self.filter_call_count == 1:
                 return self._make_mock_points(1)  # Fail first try
@@ -120,11 +121,11 @@ class SearchAuthorizedTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.collect_calls[1]["top_k"], 12)
 
     async def test_max_retries_exhausted(self) -> None:
-        def fake_collect(*args, **kwargs):
+        def fake_collect(*args: Any, **kwargs: Any) -> list[ScoredPoint]:
             self.collect_calls.append(self._extract_opt(args, kwargs))
             return self._make_mock_points(12)
 
-        async def fake_filter(*args, **kwargs):
+        async def fake_filter(*args: Any, **kwargs: Any) -> list[ScoredPoint]:
             return self._make_mock_points(1)  # Always drop all but 1
 
         self._apply_patches(fake_collect, fake_filter)
@@ -138,11 +139,11 @@ class SearchAuthorizedTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(results), 1, "Should return what it managed to find")
 
     async def test_maintains_original_opt_config_immutability(self) -> None:
-        def fake_collect(*args, **kwargs):
+        def fake_collect(*args: Any, **kwargs: Any) -> list[ScoredPoint]:
             self.collect_calls.append(self._extract_opt(args, kwargs))
             return self._make_mock_points(12)
 
-        async def fake_filter(*args, **kwargs):
+        async def fake_filter(*args: Any, **kwargs: Any) -> list[ScoredPoint]:
             self.filter_call_count += 1
             if self.filter_call_count == 1:
                 return self._make_mock_points(1)
