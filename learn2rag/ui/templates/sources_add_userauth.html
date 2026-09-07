@@ -6,11 +6,26 @@
       <option value="oauth">{{pgettext('form_auth_option', 'OAuth')}}</option>
     </select>
   </div>
-  <div class="input-group mb-3">
-    <span class="input-group-text">OAuth</span>
-    <span class="input-group-text"><code>client_id</code></span>
-    <input name="oauth_client_id" type="text" class="form-control" aria-label="client_id">
-    <span class="input-group-text"><code>client_secret</code></span>
-    <input name="oauth_client_secret" type="text" class="form-control" aria-label="client_secret">
-  </div>
+  <fieldset class="border p-3 mb-3">
+    <legend>OAuth</legend>
+    <div class="alert alert-info">
+      {{gettext('Consult the administrator or documentation of the corresponding system to find the required configuration values.')}}
+    </div>
+    <div class="mb-3">
+      <label for="path" class="form-label"><code>client_id</code></label>
+      <input class="form-control" name="oauth_client_id"/>
+    </div>
+    <div class="mb-3">
+      <label for="path" class="form-label"><code>client_secret</code></label>
+      <input class="form-control" name="oauth_client_secret"/>
+    </div>
+    <div class="mb-3">
+      <label for="path" class="form-label"><code>authorize_url</code></label>
+      <input class="form-control" name="oauth_authorize_url" data-update-attr="placeholder" data-update-attr-from="[name=base_url]" data-update-attr-suffix="/oauth/authorize">
+    </div>
+    <div class="mb-3">
+      <label for="path" class="form-label"><code>access_token_url</code></label>
+      <input class="form-control" name="oauth_access_token_url" data-update-attr="placeholder" data-update-attr-from="[name=base_url]" data-update-attr-suffix="/oauth/token">
+    </div>
+  </fieldset>
 </fieldset>

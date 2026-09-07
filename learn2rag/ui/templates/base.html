@@ -75,4 +75,14 @@
           }
       });
     </script>
+<script type="text/javascript">
+  document.querySelectorAll('[data-update-attr]').forEach(target => {
+      const source = document.querySelector(target.dataset.updateAttrFrom);
+      const handler = event => {
+          target.setAttribute(target.dataset.updateAttr, source.value + target.dataset.updateAttrSuffix);
+      };
+      source.addEventListener('input', handler);
+      source.addEventListener('change', handler);
+  });
+</script>
 {% endblock %}

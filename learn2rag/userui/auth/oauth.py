@@ -18,13 +18,15 @@ def discover_applications(import_config: Mapping[str, Any]) -> Generator[tuple[s
             client_id = loader_config.get('oauth_client_id', '')
             client_secret = loader_config.get('oauth_client_secret', '')
             base_url = loader_config.get('base_url', '')
+            authorize_url = loader_config.get('oauth_authorize_url', base_url + '/oauth/authorize')
+            access_token_url = loader_config.get('oauth_access_token_url', base_url + '/oauth/token')
             if client_id != '' and client_secret != '' and base_url != '':
                 logger.info('Discovered OAuth application: %s (%s), client_id=%s)', name, base_url, client_id)
                 yield name, f'OAuth ({base_url})', {
                     'client_id': client_id,
                     'client_secret': client_secret,
-                    'authorize_url': base_url + '/oauth/authorize',
-                    'access_token_url': base_url + '/oauth/token',
+                    'authorize_url': authorize_url,
+                    'access_token_url': access_token_url,
                     'client_kwargs': {'scope': 'authenticated'},
                 }
 
