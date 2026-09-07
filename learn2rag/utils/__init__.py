@@ -24,7 +24,9 @@ def normalize_path(path: Path) -> Path:
 def open_web_browser(url: str) -> None:
     'Tries to open the specified URL in a web browser'
     try:
-        if not is_windows():
+        if platform.system() == 'Darwin':
+            subprocess.Popen(['open', url])
+        elif not is_windows():
             subprocess.Popen(['xdg-open', url])
         else:
             subprocess.Popen(['explorer', url])

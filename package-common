@@ -21,8 +21,17 @@ export PYAPP_DISTRIBUTION_EMBED=true
 export PYAPP_FULL_ISOLATION=false
 export PYAPP_EXPOSE_ALL_COMMANDS=true
 
+CARGO_CMD="${CARGO_CMD:-}"
+if [ -z "$CARGO_CMD" ]; then
+    if command -v cross >/dev/null 2>&1; then
+        CARGO_CMD="cross"
+    else
+        CARGO_CMD="cargo"
+    fi
+fi
+
 echo "Clearing Cargo cache..."
-(cd pyapp && cross clean)
+(cd pyapp && $CARGO_CMD clean)
 
 # Bake the relative offline path directly into the binaries
 OFFLINE_ARGS="--no-index --find-links=./services/wheels"
@@ -36,7 +45,7 @@ cp dist/learn2rag-$VERSION-py3-none-any.whl pyapp
     PYAPP_DISTRIBUTION_EMBED=true \
     PYAPP_FULL_ISOLATION=false \
     PYAPP_EXPOSE_ALL_COMMANDS=true \
-    cross build --release --target $CARGO_BUILD_TARGET)
+    $CARGO_CMD build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp$BIN_SUFFIX $BUNDLE/configurator$BIN_SUFFIX
 
 cp services/open-webui/dist/open_webui-0.8.12-py3-none-any.whl pyapp
@@ -48,7 +57,7 @@ touch pyapp/src/main.rs 2>/dev/null || true
     PYAPP_PROJECT_PATH=open_webui-0.8.12-py3-none-any.whl \
     PYAPP_EXEC_SPEC=open_webui:app \
     PYAPP_PIP_EXTRA_ARGS="$OFFLINE_ARGS" \
-    cross build --release --target $CARGO_BUILD_TARGET)
+    $CARGO_CMD build --release --target $CARGO_BUILD_TARGET)
 cp pyapp/target/$CARGO_BUILD_TARGET/release/pyapp$BIN_SUFFIX $BUNDLE/services/start-open-webui$BIN_SUFFIX
 
 while read -u 100 file; do
@@ -117,7 +126,7 @@ if [[ "$CARGO_BUILD_TARGET" == *"windows"* ]]; then
         --platform win_amd64 --python-version 3.11 --implementation cp --abi cp311 \
         --no-deps wheel setuptools -d $WHEELS_DIR
 else
-    echo "Downloading dependencies for Native Linux target..."
+    echo "Downloading dependencies for $CARGO_BUILD_TARGET target..."
 
     $BUNDLE_DIR/venv311/bin/python -m pip download wheel setuptools -d $WHEELS_DIR
 
