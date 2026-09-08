@@ -87,6 +87,7 @@ class TestDrupal():
         template_context = {
             'is_windows': is_windows(),
             'learn2rag_path': Path('.').absolute(),
+            'config': {},
             'storage_path': self.storage_path,
             'ports': {
                 'pipeline': self.rag_port,
