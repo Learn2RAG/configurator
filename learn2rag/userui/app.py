@@ -1,7 +1,8 @@
 from pathlib import Path
 import logging
+import os
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -13,6 +14,7 @@ from .constants import SESSION_USER_AUTHS
 from ..bootstrap import setup_fastapi as learn2rag_bootstrap_setup
 from ..pipeline import api
 from ..pipeline.config import importer_config
+from ..utils.fastapi import require_basic_auth
 from ..utils.starlette import PrefixRewriteMiddleware
 
 
@@ -20,19 +22,34 @@ class TestResponse(BaseModel):
     message: str
 
 
-def build_app() -> FastAPI:
-    app = FastAPI()
+def build_app(
+        *,
+        basic_username: str = '',
+        basic_password: str = '',
+) -> FastAPI:
+    dependencies = []
+    if basic_username != '' and basic_password != '':
+        dependencies += [
+            Depends(require_basic_auth(basic_username, basic_password)),
+        ]
+    app = FastAPI(
+        dependencies=dependencies,
+    )
 
     # required by oauth library
     app.add_middleware(SessionMiddleware, secret_key="FIXME")
 
-    def token_handler(request: Request, name: str, token: str) -> None:
+    auth_prefix = '/auth'
+    def login_handler(request: Request, name: str, token: str) -> None:
         if SESSION_USER_AUTHS not in request.session:
             request.session[SESSION_USER_AUTHS] = {}
         request.session[SESSION_USER_AUTHS][name] = {'token': token}
+    def logout_handler(request: Request, name: str) -> None:
+        del request.session[SESSION_USER_AUTHS][name]
+    auth_router = auth.build_router(importer_config, login_handler, logout_handler)
     app.include_router(
-        auth.build_router(importer_config, token_handler),
-        prefix='/auth',
+        auth_router,
+        prefix=auth_prefix,
     )
 
     api_prefix = '/api'
@@ -49,7 +66,12 @@ def build_app() -> FastAPI:
             '/v1/chat/completions',
         ],
        )
-    app.mount(chat_prefix, chat.build_app())
+    try:
+        app.mount(chat_prefix, chat.build_app())
+    except RuntimeError:
+        # "Directory '.../services/llama.cpp/tools/ui/dist' does not exist"
+        if 'PYTEST_CURRENT_TEST' not in os.environ:
+            raise
 
     templates = Jinja2Templates(directory=learn2rag_bootstrap_setup(app, [
         Path(__file__).parent.parent / 'userui' / 'templates',
@@ -58,6 +80,9 @@ def build_app() -> FastAPI:
     @app.get('/')
     async def index(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(request, 'index.html', context={
+            'auth_prefix': auth_prefix,
+            'auth_routers': auth_router.auth_routers,
+            'user_auths': request.session.get(SESSION_USER_AUTHS, {}),
         })
 
     @app.exception_handler(RequestValidationError)

@@ -1,0 +1,31 @@
+<fieldset class="border p-3 mb-3">
+  <legend>{{pgettext('form_label', 'User authentication')}}</legend>
+  <div class="mb-3">
+    <select required="required" class="form-select" name="user_auth_type">
+      <option value="none">{{pgettext('form_auth_option', 'None (all users will be provided access to all data)')}}</option>
+      <option value="oauth">{{pgettext('form_auth_option', 'OAuth')}}</option>
+    </select>
+  </div>
+  <fieldset class="border p-3 mb-3">
+    <legend>OAuth</legend>
+    <div class="alert alert-info">
+      {{gettext('Consult the administrator or documentation of the corresponding system to find the required configuration values.')}}
+    </div>
+    <div class="mb-3">
+      <label for="path" class="form-label"><code>client_id</code></label>
+      <input class="form-control" name="oauth_client_id"/>
+    </div>
+    <div class="mb-3">
+      <label for="path" class="form-label"><code>client_secret</code></label>
+      <input class="form-control" name="oauth_client_secret"/>
+    </div>
+    <div class="mb-3">
+      <label for="path" class="form-label"><code>authorize_url</code></label>
+      <input class="form-control" name="oauth_authorize_url" data-update-attr="placeholder" data-update-attr-from="[name=base_url]" data-update-attr-suffix="/oauth/authorize">
+    </div>
+    <div class="mb-3">
+      <label for="path" class="form-label"><code>access_token_url</code></label>
+      <input class="form-control" name="oauth_access_token_url" data-update-attr="placeholder" data-update-attr-from="[name=base_url]" data-update-attr-suffix="/oauth/token">
+    </div>
+  </fieldset>
+</fieldset>

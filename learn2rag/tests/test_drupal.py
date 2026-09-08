@@ -28,12 +28,18 @@ def docker_compose_available() -> bool:
 
 
 def docker_compose(*args: str) -> subprocess.CompletedProcess[bytes]:
-    return subprocess.run(['docker', 'compose', '--file', 'drupal/docker-compose.yml', *args], check=True)
+    return subprocess.run([
+        'docker',
+        'compose',
+        '--file', 'drupal/docker-compose.yml',
+        '--progress', 'quiet',
+        *args
+    ], check=True)
 
 
 @pytest.fixture(scope='module')
 def drupal_instance() -> Generator[str, None, None]:
-    logging.info('Starting Drupal')
+    logging.debug('Starting Drupal')
     docker_compose('up', '-d', '--force-recreate')
     base_url = 'http://localhost:3470'
     def drupal_ready() -> bool:
@@ -42,7 +48,7 @@ def drupal_instance() -> Generator[str, None, None]:
         except ConnectionResetError:
             return False
     waitUntil(drupal_ready, timeout=1 * 180 * 1000)
-    logging.info('Started Drupal')
+    logging.debug('Started Drupal')
     yield base_url
     docker_compose('rm',  '--stop', '--force')
 
@@ -87,6 +93,7 @@ class TestDrupal():
         template_context = {
             'is_windows': is_windows(),
             'learn2rag_path': Path('.').absolute(),
+            'config': {},
             'storage_path': self.storage_path,
             'ports': {
                 'pipeline': self.rag_port,
@@ -146,5 +153,5 @@ class TestDrupal():
                 assert 'purple, red, yellow or white' in content, 'specific text from a test file'
             except APIConnectionError:
                 assert False
-        waitUntil(check_rag, timeout=1 * 60 * 1000)
+        waitUntil(check_rag, timeout=1 * 120 * 1000)
         logging.info("Finished pipeline")

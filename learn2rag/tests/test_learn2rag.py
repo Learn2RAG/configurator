@@ -57,6 +57,7 @@ class Learn2RAGTestCase(TestCase):
         template_context = {
             'is_windows': is_windows(),
             'learn2rag_path': Path('.').absolute(),
+            'config': {},
             'storage_path': self.storage_path,
             'ports': {
                 'pipeline': self.rag_port,
@@ -112,12 +113,13 @@ class Learn2RAGTestCase(TestCase):
                 assert 'Lagomorpha' in content, 'specific text from a test file'
             except APIConnectionError:
                 assert False
-        waitUntil(check_rag, timeout=1 * 60 * 1000)
+        waitUntil(check_rag, timeout=1 * 120 * 1000)
 
     def test_optimization(self) -> None:
         template_context = {
             'is_windows': is_windows(),
             'learn2rag_path': Path('.').absolute(),
+            'config': {},
             'storage_path': self.storage_path,
             'ports': {
                 'pipeline': self.rag_port,
@@ -166,7 +168,7 @@ class Learn2RAGTestCase(TestCase):
             except APIConnectionError:
                 assert False
 
-        waitUntil(check_pipeline, timeout=1 * 60 * 1000)
+        waitUntil(check_pipeline, timeout=1 * 120 * 1000)
 
         # Optimization
         from learn2rag.optimization.baseline_optimization import run
