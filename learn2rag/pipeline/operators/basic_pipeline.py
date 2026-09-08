@@ -1,5 +1,5 @@
 from operator import itemgetter
-from typing import Any, TypedDict
+from typing import Any, Mapping, TypedDict
 
 from ..prov import Prov
 from .base import BaseOperator
@@ -8,7 +8,7 @@ from .generation import GenerationOperator
 
 Inputs = TypedDict('Inputs', {
     'question': str,
-    'user': str | None,
+    'user_auths': Mapping[str, Any] | None,
 }, total=True)
 
 Outputs = TypedDict('Outputs', {
@@ -22,7 +22,7 @@ class BasicPipeline(BaseOperator):
         documents = itemgetter('documents')(await SearchOperator()(
             inputs={
                 'question': inputs['question'],
-                'user': inputs['user'],
+                'user_auths': inputs.get('user_auths', {}),
             },
             prov=prov,
         ))

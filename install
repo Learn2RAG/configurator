@@ -19,5 +19,6 @@ echo ">>> Root Python installed."
 (cd services/open-webui &&  bash -eu ../install-open-webui)
 (cd services &&  bash -eu ./install-ollama)
 (cd services &&  bash -eu ./install-qdrant)
+(cd services &&  bash -eu ./install-llamacpp)
 
 echo ">>> All services installed!"

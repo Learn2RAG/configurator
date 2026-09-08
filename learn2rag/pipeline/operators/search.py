@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, TypedDict
+from typing import Any, Mapping, TypedDict
 import asyncio
 
 from ..prov import Prov
@@ -8,7 +8,7 @@ from ..search import search_authorized
 
 Inputs = TypedDict('Inputs', {
     'question': str,
-    'user': str,
+    'user_auths': Mapping[str, Any],
 }, total=True)
 
 Outputs = TypedDict('Outputs', {
@@ -18,7 +18,7 @@ Outputs = TypedDict('Outputs', {
 
 class SearchOperator(BaseOperator):
     async def run(self, inputs: Inputs, prov: Prov) -> Outputs:
-        documents = await search_authorized(question=inputs['question'], user=inputs['user'])
+        documents = await search_authorized(question=inputs['question'], user_auths=inputs['user_auths'])
         return {
             'documents': documents,
         }
