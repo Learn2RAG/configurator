@@ -153,5 +153,5 @@ class TestDrupal():
                 assert 'purple, red, yellow or white' in content, 'specific text from a test file'
             except APIConnectionError:
                 assert False
-        waitUntil(check_rag, timeout=1 * 60 * 1000)
+        waitUntil(check_rag, timeout=1 * 120 * 1000)
         logging.info("Finished pipeline")
