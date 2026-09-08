@@ -28,12 +28,18 @@ def docker_compose_available() -> bool:
 
 
 def docker_compose(*args: str) -> subprocess.CompletedProcess[bytes]:
-    return subprocess.run(['docker', 'compose', '--file', 'drupal/docker-compose.yml', *args], check=True)
+    return subprocess.run([
+        'docker',
+        'compose',
+        '--file', 'drupal/docker-compose.yml',
+        '--progress', 'quiet',
+        *args
+    ], check=True)
 
 
 @pytest.fixture(scope='module')
 def drupal_instance() -> Generator[str, None, None]:
-    logging.info('Starting Drupal')
+    logging.debug('Starting Drupal')
     docker_compose('up', '-d', '--force-recreate')
     base_url = 'http://localhost:3470'
     def drupal_ready() -> bool:
@@ -42,7 +48,7 @@ def drupal_instance() -> Generator[str, None, None]:
         except ConnectionResetError:
             return False
     waitUntil(drupal_ready, timeout=1 * 180 * 1000)
-    logging.info('Started Drupal')
+    logging.debug('Started Drupal')
     yield base_url
     docker_compose('rm',  '--stop', '--force')
 
