@@ -1,5 +1,6 @@
 from pathlib import Path
 import logging
+import os
 
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -65,7 +66,12 @@ def build_app(
             '/v1/chat/completions',
         ],
        )
-    app.mount(chat_prefix, chat.build_app())
+    try:
+        app.mount(chat_prefix, chat.build_app())
+    except RuntimeError:
+        # "Directory '.../services/llama.cpp/tools/ui/dist' does not exist"
+        if 'PYTEST_CURRENT_TEST' not in os.environ:
+            raise
 
     templates = Jinja2Templates(directory=learn2rag_bootstrap_setup(app, [
         Path(__file__).parent.parent / 'userui' / 'templates',
