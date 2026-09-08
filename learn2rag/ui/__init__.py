@@ -516,7 +516,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             return redirect(url_for('pipelines_list'))
         pipeline['status_message'] = pipeline_status_message(pipeline)
         storage_path = Path(pipeline['storage_path'])
-        import_state = ImportState(storage_path / 'import_state.json')
+        import_state = ImportState(str(storage_path / 'import_state.json'))
         try:
             training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
         except FileNotFoundError:
