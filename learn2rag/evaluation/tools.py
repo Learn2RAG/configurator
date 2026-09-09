@@ -10,7 +10,6 @@ from typing import Any, Callable, cast
 import pandas as pd
 
 import learn2rag.pipeline.ingestion
-from learn2rag.pipeline.config import opt_config
 
 
 def key_document(key: str) -> Callable[[Any], Any]:
@@ -117,9 +116,10 @@ def basic_pipeline(dataset_name: str, question: str) -> dict[str, Any]:
         'imported_documents_file_path': None,
         'llm': None,
     }
-    documents = learn2rag.pipeline.search.search(question, user_config, opt_config)
-    answer = learn2rag.pipeline.generate.generate(question, documents.points, opt_config)
-    return {
-        'documents': documents,
-        'answer': answer,
-    }
+    raise NotImplementedError()
+    # documents = learn2rag.pipeline.search.search(question, user_config, opt_config)
+    # answer = learn2rag.pipeline.generate.generate(question, documents.points, opt_config)
+    # return {
+    #     'documents': documents,
+    #     'answer': answer,
+    # }
