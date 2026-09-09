@@ -18,6 +18,7 @@ from fastapi.responses import (
 )
 from pydantic import BaseModel
 
+from .chat import Message
 from .config import user_config, opt_config
 from .operators import BasicPipeline
 from .operators.base import BaseOperator
@@ -41,11 +42,6 @@ class QuestionInput(BaseModel):
     question: str
 
 
-class Message(BaseModel):
-    role: str
-    content: str
-
-
 class ChatState(BaseModel):
     messages: List[Message]
     stream: Optional[bool] = False
@@ -55,6 +51,7 @@ async def run_pipeline(pipeline: BaseOperator, request: Request, chat_state: Cha
     return await pipeline(inputs={
         'question': chat_state.messages[-1].content,
         'user_auths': request.session.get(SESSION_USER_AUTHS, {}),
+        'history': chat_state.messages[:-1],
     })
 
 
