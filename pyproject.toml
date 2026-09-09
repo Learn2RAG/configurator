@@ -224,7 +224,7 @@ strict = true
 [[tool.mypy.overrides]]
 module = [
     "datasets",
-    "datasets.*"
+    "datasets.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"
