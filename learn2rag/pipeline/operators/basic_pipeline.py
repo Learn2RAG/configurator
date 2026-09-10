@@ -26,7 +26,8 @@ class BasicPipeline(BaseOperator):
         documents = itemgetter('documents')(await SearchOperator()(
             inputs={
                 'question': inputs['question'],
-                'user_auths': inputs.get('user_auths', {}),
+                'user_auths': inputs.get('user_auths') or {},
+                'history': inputs.get('history', ()),
             },
             prov=prov,
         ))
