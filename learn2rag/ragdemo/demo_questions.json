@@ -1,0 +1,37 @@
+{
+  "display_count": 3,
+  "question_sets": [
+    {
+      "id": "berlin_process",
+      "questions": [
+        "What are the four declared objectives of the Berlin Process?",
+        "Why do the authors argue that the Berlin Process has achieved limited progress?",
+        "What changes do the authors recommend to improve the Berlin Process?",
+        "Why should EU member states increase their commitment to the Western Balkans?",
+        "What progress was reported at the 2022 Berlin Process summit?"
+      ]
+    },
+    {
+      "id": "berlin_tourism",
+      "questions": [
+        "What are the top five sights recommended in the Berlin guide?",
+        "What does the Berlin WelcomeCard offer visitors?",
+        "How does Berlin's public transport system work and what do fare zones A, B and C mean?",
+        "Which places does the guide recommend for learning about the Berlin Wall?",
+        "What major Berlin events take place in September?",
+        "What can visitors experience at Berlin's TV Tower?"
+      ]
+    },
+    {
+      "id": "climate_neutral_berlin",
+      "questions": [
+        "What CO2 reduction targets does Berlin set for 2020, 2030 and 2050?",
+        "What are the main fields of action in the Berlin Energy and Climate Protection Programme?",
+        "Why are buildings central to Berlin's climate-neutrality goal?",
+        "What three strategies are recommended for climate-protecting traffic?",
+        "What changes are recommended for Berlin's energy supply?",
+        "What are the estimated costs and economic benefits of Berlin's climate protection measures?"
+      ]
+    }
+  ]
+}

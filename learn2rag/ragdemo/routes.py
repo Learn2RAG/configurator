@@ -1,4 +1,5 @@
 import logging
+from asyncio import to_thread
 from datetime import date
 from pathlib import Path
 
@@ -12,13 +13,20 @@ from learn2rag.pipeline.operators.search import SearchOperator
 from learn2rag.pipeline.qdrant import Qdrant
 
 from .models import (
+    IndexedDocumentChunksResponse,
     IndexErrorResponse,
     IndexResponse,
+    PublicExampleQuestions,
     QueryErrorResponse,
     QueryRequest,
     QueryResponse,
 )
-from .service import execute_query, inspect_index
+from .service import (
+    execute_query,
+    inspect_document_chunks,
+    inspect_index,
+    load_public_example_questions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +112,46 @@ async def index_api() -> IndexResponse | JSONResponse:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content=error.model_dump(),
         )
+
+
+@router.get(
+    "/api/examples",
+    response_model=PublicExampleQuestions,
+    responses={503: {"model": IndexErrorResponse}},
+)
+async def examples_api() -> PublicExampleQuestions | JSONResponse:
+    try:
+        return load_public_example_questions()
+    except Exception:
+        logger.exception("Unable to load demo examples")
+        return JSONResponse(status_code=503, content=IndexErrorResponse(
+            message="Example questions are temporarily unavailable."
+        ).model_dump())
+
+
+@router.get(
+    "/api/index/{document_id}/chunks",
+    response_model=IndexedDocumentChunksResponse,
+    responses={404: {"model": IndexErrorResponse}, 503: {"model": IndexErrorResponse}},
+)
+async def document_chunks_api(document_id: str) -> IndexedDocumentChunksResponse | JSONResponse:
+    try:
+        collection_name = user_config["collection_name"]
+        if not isinstance(collection_name, str) or not collection_name.strip():
+            raise ValueError("A valid collection_name is required")
+        result = await to_thread(
+            inspect_document_chunks, demo_qdrant_reader, collection_name, document_id
+        )
+        if result is not None:
+            return result
+        return JSONResponse(status_code=404, content=IndexErrorResponse(
+            message="The indexed document was not found."
+        ).model_dump())
+    except Exception:
+        logger.exception("Unable to inspect demo document chunks")
+        return JSONResponse(status_code=503, content=IndexErrorResponse(
+            message="Document chunks are temporarily unavailable. Please try again shortly."
+        ).model_dump())
 
 
 @router.post(

@@ -16,7 +16,7 @@ import math
 import re
 from collections import Counter
 from dataclasses import dataclass
-from pathlib import PurePosixPath, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Literal, Mapping, Protocol, Sequence, cast
 from urllib.parse import unquote, urlsplit
 
@@ -31,8 +31,14 @@ from learn2rag.pipeline.embeddings import create_embeddings
 from learn2rag.pipeline.generate import build_prompt_messages, invoke_prompt_messages
 
 from .models import (
+    ExampleQuestions,
+    IndexedChunk,
+    IndexedDocumentChunksResponse,
+    MAX_PUBLIC_CHUNK_CHARS,
     IndexedDocument,
     IndexResponse,
+    PublicExampleQuestions,
+    PublicExampleQuestionSet,
     QueryPromptMessage,
     QueryPromptResponse,
     QueryResponse,
@@ -48,6 +54,8 @@ logger = logging.getLogger(__name__)
 
 SCROLL_PAGE_SIZE = 256
 MAX_CHUNKS = 10_000
+MAX_DOCUMENT_CHUNKS = 100
+_QUESTIONS_PATH = Path(__file__).resolve().with_name("demo_questions.json")
 MAX_VISUALIZATION_CHUNKS = 2_000
 MAX_KEYWORD_SEARCH_CHUNKS = 2_000
 DEFAULT_KEYWORD_TOP_K = 5
@@ -140,6 +148,112 @@ class _VisualizationChunk:
 class _QueryRetrieval:
     points: list[Any]
     matched_terms_by_id: Mapping[str, tuple[str, ...]]
+
+
+def load_example_questions() -> ExampleQuestions:
+    """Read only the packaged config; callers cannot choose a filesystem path."""
+    return ExampleQuestions.model_validate_json(_QUESTIONS_PATH.read_text(encoding="utf-8"))
+
+
+def load_public_example_questions() -> PublicExampleQuestions:
+    config = load_example_questions()
+    return PublicExampleQuestions(
+        display_count=config.display_count,
+        question_sets=[
+            PublicExampleQuestionSet(questions=question_set.questions)
+            for question_set in config.question_sets
+        ],
+    )
+
+
+def inspect_document_chunks(
+    client: QdrantReader,
+    collection_name: str,
+    document_id: str,
+    *,
+    page_size: int = SCROLL_PAGE_SIZE,
+    max_chunks: int = MAX_CHUNKS,
+    max_document_chunks: int = MAX_DOCUMENT_CHUNKS,
+) -> IndexedDocumentChunksResponse | None:
+    """Resolve a public document ID without accepting private lookup metadata.
+
+    Scan at most MAX_CHUNKS points and return at most MAX_DOCUMENT_CHUNKS.
+    Ingestion persists no chunk position. Sorting by the shared public chunk ID
+    is deterministic for an unchanged index, NOT original document order.
+    ``truncated`` also indicates incomplete scans, even if all matches seen fit.
+    """
+    if not re.fullmatch(r"[0-9a-f]{24}", document_id):
+        return None
+    if not (1 <= page_size <= SCROLL_PAGE_SIZE and 1 <= max_chunks <= MAX_CHUNKS
+            and 1 <= max_document_chunks <= MAX_DOCUMENT_CHUNKS):
+        raise ValueError("Invalid inspection bounds")
+    if not client.collection_exists(collection_name):
+        return None
+
+    chunks: dict[str, IndexedChunk] = {}
+    document_name: str | None = None
+    offset: qdrant_types.PointId | None = None
+    seen_offsets: set[qdrant_types.PointId] = set()
+    scanned = 0
+    truncated = False
+    while scanned < max_chunks:
+        limit = min(page_size, max_chunks - scanned)
+        points, next_offset = client.scroll(
+            collection_name=collection_name,
+            limit=limit,
+            offset=offset,
+            with_payload=KEYWORD_PAYLOAD_FIELDS,
+            with_vectors=False,
+        )
+        if len(points) > limit:
+            raise ValueError("Backend exceeded inspection page limit")
+        for point in points:
+            payload = point.payload if isinstance(point.payload, Mapping) else {}
+            if _opaque_id(_grouping_key(payload, point.id)) != document_id:
+                continue
+            name, _ = _display_metadata(payload)
+            document_name = min(document_name, name) if document_name else name
+            content = payload.get("content")
+            if not isinstance(content, str):
+                raise ValueError("Indexed content must be text")
+            chunk_id = _chunk_display_id(point, payload)
+            # Keep the smallest IDs, independent of backend page order, without
+            # holding an entire document's text in memory.
+            if len(chunks) >= max_document_chunks and chunk_id not in chunks:
+                truncated = True
+                if chunk_id > max(chunks):
+                    continue
+                del chunks[max(chunks)]
+            public_content = _sanitize_answer(content, [point])
+            chunks[chunk_id] = IndexedChunk(
+                id=chunk_id,
+                content=public_content[:MAX_PUBLIC_CHUNK_CHARS],
+                display_order=1,
+                truncated=len(public_content) > MAX_PUBLIC_CHUNK_CHARS,
+            )
+        scanned += len(points)
+        if next_offset is None:
+            break
+        if not points or next_offset in seen_offsets or scanned >= max_chunks:
+            truncated = True
+            break
+        seen_offsets.add(next_offset)
+        offset = next_offset
+
+    if document_name is None:
+        if truncated:
+            # An incomplete scan cannot establish that the document is absent.
+            raise ValueError("Document lookup scan incomplete")
+        return None
+    ordered = sorted(chunks.values(), key=lambda chunk: chunk.id)
+    for display_order, chunk in enumerate(ordered, start=1):
+        chunk.display_order = display_order
+    return IndexedDocumentChunksResponse(
+        document_id=document_id,
+        document_name=document_name,
+        chunks=ordered,
+        truncated=truncated or any(chunk.truncated for chunk in ordered),
+    )
 
 
 def inspect_index(

@@ -14,7 +14,7 @@ from qdrant_client.http.models import ScoredPoint
 import learn2rag.pipeline.generate as pipeline_generate
 from learn2rag.ragdemo import router
 from learn2rag.ragdemo import routes, service
-from learn2rag.ragdemo.models import QueryRequest, QuerySearchResult
+from learn2rag.ragdemo.models import ExampleQuestions, QueryRequest, QuerySearchResult
 from learn2rag.ragdemo.service import DEMO_USER, build_query_visualization, inspect_index
 
 
@@ -35,6 +35,10 @@ def _app() -> FastAPI:
     app = FastAPI()
     app.include_router(router, prefix="/ragdemo")
     return app
+
+
+async def _run_inline(function: Any, *args: Any) -> Any:
+    return function(*args)
 
 
 def _point(point_id: str, **payload: Any) -> SimpleNamespace:
@@ -232,62 +236,259 @@ def test_public_demo_collection_scope_is_documented() -> None:
     assert "arbitrary private production collection" in service_source
 
 
-def test_visualization_frontend_uses_safe_dom_and_shared_chunk_ids() -> None:
+def test_visualization_frontend_has_one_coordinate_graph_stage() -> None:
+    ragdemo_dir = Path(__file__).resolve().parents[1]
+    template = (ragdemo_dir / "templates" / "index.html").read_text(encoding="utf-8")
+    stylesheet = (ragdemo_dir / "static" / "ragdemo.css").read_text(encoding="utf-8")
+
+    assert template.count('id="visualization-panel"') == 1
+    assert 'id="visualization-panel" class="embedding-map-stage"' in template
+    assert "card embedding-map-card" not in template
+    assert template.count('class="embedding-map-stage"') == 1
+    assert 'id="visualization-canvas" class="embedding-map-canvas"' in template
+    assert 'id="visualization-inspector" class="embedding-map-inspector"' in template
+    assert 'id="visualization-inspector-close"' in template
+    assert ".embedding-map-canvas" in stylesheet
+    assert "height: clamp(38.75rem, 72vh, 45rem);" in stylesheet
+    assert "height: clamp(28rem, 68vh, 36rem);" in stylesheet
+    stage_rule = stylesheet[
+        stylesheet.index(".embedding-map-stage {"):
+        stylesheet.index(".visualization-intro")
+    ]
+    assert stage_rule.count("border:") == 1
+    assert "width: calc(100% + 3rem);" in stage_rule
+    assert ".embedding-map-background {\n  fill: transparent;\n}" in stylesheet
+    assert "X/Y/Z show the first three PCA components" in template
+    assert "Retrieval itself uses the full-dimensional embeddings." in template
+    assert "Query vector" in template
+    assert "Retrieved chunks" in template
+    assert "Other indexed chunks" in template
+    assert "Query → retrieved link" in template
+    assert 'id="visualization-expand"' in template
+    assert 'id="visualization-restore"' in template
+    assert 'id="visualization-expanded-close"' in template
+    assert "Top-ranked chunks retrieved as a set" in template
+    assert "Retrieved chunks added to the prompt" in template
+
+
+def test_visualization_uses_data_focused_fit_and_decorations_do_not_shrink_it() -> None:
     javascript = (
         Path(__file__).resolve().parents[1] / "static" / "ragdemo.js"
     ).read_text(encoding="utf-8")
+    geometry = javascript[
+        javascript.index("function buildSceneGeometry"):
+        javascript.index("function computeFittedSceneScale")
+    ]
+    fit = javascript[
+        javascript.index("function computeFittedSceneScale"):
+        javascript.index("function safePointPreview")
+    ]
 
-    assert "document.createElementNS" in javascript
+    assert "const dataAnchors = numericCoordinates.concat({ x: 0, y: 0, z: 0 });" in geometry
+    assert "point.x - dataCenter.x" in geometry
+    assert "point.y - dataCenter.y" in geometry
+    assert "point.z - dataCenter.z" in geometry
+    assert "numericCoordinates.concat(axisEndpoints" not in geometry
+    assert "gridCorners" not in geometry
+    assert "state.cuboid" not in fit
+    assert "sceneGeometry.cuboid" not in fit
+    assert "axisRanges[" not in fit
+    assert "gridLines" not in fit
+    assert "Math.min(safeWidth, safeHeight) / 2" in fit
+    assert "const scenePadding = 12;" in javascript
+    assert "const maximumMarkerExtent = 30;" in javascript
+    assert "world.x - state.sceneCenterWorld.x" in javascript
+
+
+def test_visualization_builds_one_cuboid_and_three_reference_planes() -> None:
+    static_dir = Path(__file__).resolve().parents[1] / "static"
+    javascript = (static_dir / "ragdemo.js").read_text(encoding="utf-8")
+    stylesheet = (static_dir / "ragdemo.css").read_text(encoding="utf-8")
+
+    assert javascript.count('svgElement("g", "embedding-cuboid")') == 1
+    assert 'svgElement("circle", "embedding-cuboid-corner")' in javascript
+    assert 'svgElement("line", "embedding-cuboid-edge")' in javascript
+    assert "const cuboidEdgeIndices = [" in javascript
+    assert "coordinateRanges[dimension].minimum" in javascript
+    assert "coordinateRanges[dimension].maximum" in javascript
+    assert "state.cuboid.edges.forEach" in javascript
+    assert "projectWorldPoint(corner.world, state)" in javascript
+    assert '"xy"' in javascript
+    assert '"xz"' in javascript
+    assert '"yz"' in javascript
+    assert ".embedding-cuboid-edge" in stylesheet
+    assert '.embedding-grid-line[data-plane="xz"]' in stylesheet
+    assert '.embedding-grid-line[data-plane="yz"]' in stylesheet
+
+
+def test_visualization_presentation_mode_reuses_graph_state() -> None:
+    ragdemo_dir = Path(__file__).resolve().parents[1]
+    template = (ragdemo_dir / "templates" / "index.html").read_text(encoding="utf-8")
+    javascript = (ragdemo_dir / "static" / "ragdemo.js").read_text(encoding="utf-8")
+    stylesheet = (ragdemo_dir / "static" / "ragdemo.css").read_text(encoding="utf-8")
+    presentation = javascript[
+        javascript.index("function setPresentationMode"):
+        javascript.index("function renderVisualization")
+    ]
+    expanded_rule = stylesheet[
+        stylesheet.index(".embedding-map-stage.is-expanded {"):
+        stylesheet.index("body:has")
+    ]
+
+    assert "position: fixed;" in expanded_rule
+    assert "inset: clamp(0.75rem, 2vw, 1.5rem);" in expanded_rule
+    assert "z-index: 1080;" in expanded_rule
+    assert "grid-template-rows: auto auto minmax(0, 1fr) auto;" in expanded_rule
+    assert 'visualizationPanel.classList.toggle("is-expanded", expanded);' in presentation
+    assert "resizeViewerToCanvas(viewerState);" in presentation
+    assert "viewerState =" not in presentation
+    assert ".rotation =" not in presentation
+    assert ".zoom =" not in presentation
+    assert "pinnedChunkId =" not in presentation
+    assert 'expandViewButton.addEventListener("click", () => setPresentationMode(true));' in javascript
+    assert 'restoreViewButton.addEventListener("click", () => setPresentationMode(false));' in javascript
+    assert 'closeExpandedViewButton.addEventListener("click", () => setPresentationMode(false));' in javascript
+    assert "Question embedded" in template
+    assert "Top-ranked chunks retrieved as a set" in template
+    assert "Retrieved chunks added to the prompt" in template
+    assert "Model generates the answer" in template
+
+
+def test_visualization_hides_only_the_redundant_success_note() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "ragdemo.js"
+    ).read_text(encoding="utf-8")
+    note_filter = javascript[
+        javascript.index("function visualizationDisplayNote"):
+        javascript.index("function renderVisualization")
+    ]
+
+    assert 'if (message === redundantVisualizationNote)' in note_filter
+    assert 'return "";' in note_filter
+    assert 'message.startsWith(`${redundantVisualizationNote} `)' in note_filter
+    assert "message.slice(redundantVisualizationNote.length).trim()" in note_filter
+    assert "return message;" in note_filter
+    assert "visualizationNote.hidden = !canRender || !displayNote;" in javascript
+
+
+def test_process_summary_matches_ranked_set_retrieval_and_prompt_assembly() -> None:
+    ragdemo_dir = Path(__file__).resolve().parents[1]
+    javascript = (ragdemo_dir / "static" / "ragdemo.js").read_text(encoding="utf-8")
+    service_source = (ragdemo_dir / "service.py").read_text(encoding="utf-8")
+    generate_source = (
+        ragdemo_dir.parent / "pipeline" / "generate.py"
+    ).read_text(encoding="utf-8")
+
+    assert "points = retrieval.points" in service_source
+    assert "for rank, point in enumerate(points, start=1):" in service_source
+    assert "build_prompt_messages(" in service_source
+    assert "answer = invoke_prompt_messages(messages)" in service_source
+    assert 'context = "\\n\\n".join(context_parts)' in generate_source
+    assert "state.connections.set(point.id, connection);" in javascript
+    assert "previousChunk" not in javascript
+    assert "chunk-to-chunk" not in javascript
+
+
+def test_visualization_frontend_builds_axes_origin_query_vector_and_retrieval_links() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "ragdemo.js"
+    ).read_text(encoding="utf-8")
+    scene_render = javascript[
+        javascript.index("function renderViewerScene"):
+        javascript.index("function installCameraInteraction")
+    ]
+    retrieved_branch = javascript[
+        javascript.index('      if (point.retrieved) {\n        const rank'):
+        javascript.index("      const entry = {", javascript.index('      if (point.retrieved) {\n        const rank'))
+    ]
+
+    assert '["x", "y", "z"].forEach((dimension) =>' in javascript
+    assert "embedding-axis-negative" in javascript
+    assert "embedding-axis-positive" in javascript
+    assert 'label.textContent = dimension.toUpperCase();' in javascript
+    assert 'originLabel.textContent = "O";' in javascript
+    assert "embedding-grid-origin-line" in javascript
+    assert "sceneGeometry.ticks.x.values.forEach" in javascript
+    assert "sceneGeometry.ticks.y.values.forEach" in javascript
+    assert "sceneGeometry.ticks.z.values.forEach" in javascript
+    assert 'svgElement("line", "embedding-axis-tick")' in javascript
+    assert 'svgElement("text", "embedding-axis-tick-label")' in javascript
+    assert "formatTickValue(tick.value" in javascript
+    assert "sceneGeometry.origin" in javascript
+    assert "setProjectedLine(axis.visual.negativeLine, projectedOrigin" in scene_render
+    assert "setProjectedLine(axis.visual.positiveLine, projectedOrigin" in scene_render
+    assert 'svgElement("line", "query-vector")' in javascript
+    assert 'queryVector.setAttribute("marker-end", "url(#query-vector-arrowhead)")' in javascript
+    assert "shortenProjectedLineEnd" in scene_render
+    assert "setProjectedLine(state.query.visual.vector, projectedOrigin, projectedVectorEnd)" in scene_render
+    assert "world: sceneGeometry.points[visualization.points.length]" in javascript
+    assert 'queryLabel.textContent = "Q";' in javascript
+
+    assert "visualization.points.forEach((point, index) =>" in javascript
+    assert 'rank.textContent = `#${point.rank}`;' in retrieved_branch
+    assert 'svgElement("line", "query-retrieval-connection")' in retrieved_branch
+    assert "state.connections.set(point.id, connection);" in retrieved_branch
+    assert "state.connections.forEach((connection, chunkId) =>" in scene_render
+    assert "setProjectedLine(connection, projectedQuery, projectedChunk);" in scene_render
+    assert 'connection.classList.toggle("is-active", chunkId === activeId);' in scene_render
+    assert 'svgElement("line", "query-retrieval-connection")' not in javascript[
+        javascript.index("visualization.points.forEach((point, index) =>"):
+        javascript.index('      if (point.retrieved) {\n        const rank')
+    ]
+    assert "rank.textContent" not in javascript[
+        javascript.index("visualization.points.forEach((point, index) =>"):
+        javascript.index('      if (point.retrieved) {\n        const rank')
+    ]
+
+
+def test_visualization_frontend_uses_safe_linked_coordinate_tooltips() -> None:
+    static_dir = Path(__file__).resolve().parents[1] / "static"
+    javascript = (static_dir / "ragdemo.js").read_text(encoding="utf-8")
+    stylesheet = (static_dir / "ragdemo.css").read_text(encoding="utf-8")
+
     assert "card.dataset.chunkId = result.id;" in javascript
     assert "group.dataset.chunkId = point.id;" in javascript
+    assert "visualizationPointByChunkId.set(point.id, group);" in javascript
+    assert "setHoveredChunk(point.id);" in javascript
+    assert "setFocusedChunk(point.id)" in javascript
+    assert "togglePinnedChunk(point.id);" in javascript
+    assert 'event.key === "Enter" || event.key === " "' in javascript
+    assert 'point.classList.toggle("is-linked", chunkId === activeId);' in javascript
+    assert 'card.classList.toggle("is-linked", chunkId === activeId);' in javascript
+
+    assert "function renderQueryHoverLabel(query, projected, state)" in javascript
+    assert "function renderChunkHoverLabel(point, projected, state)" in javascript
+    assert "appendHoverCoordinates(visualizationTooltip, query);" in javascript
+    assert "appendHoverCoordinates(visualizationTooltip, point);" in javascript
+    hover_renderer = javascript[
+        javascript.index("function renderChunkHoverLabel"):
+        javascript.index("function clearPointTooltip")
+    ]
+    assert "safePointPreview" not in hover_renderer
+    assert "preview" not in hover_renderer
+    assert "function renderPinnedInspector()" in javascript
+    assert "visualizationInspectorTitle.textContent = \"Query\";" in javascript
+    assert "preview.textContent = previewText;" in javascript
+    assert "source.textContent = point.source" in javascript
+    assert "appendCoordinateReadout(visualizationInspectorContent" in javascript
+    assert 'visualizationInspectorClose.addEventListener("click", clearPinnedSelection);' in javascript
+    assert "visualizationInspector.style" not in javascript
+    inspector_rule = stylesheet[
+        stylesheet.index(".embedding-map-inspector {"):
+        stylesheet.index(".embedding-inspector-header")
+    ]
+    assert "position: absolute;" in inspector_rule
+    assert "right: 0.9rem;" in inspector_rule
+    assert "bottom: 0.9rem;" in inspector_rule
+    assert '["X", "Y", "Z"].forEach((label) =>' in javascript
+    assert "heading.textContent = point.retrieved" in javascript
     assert "nativeTooltip.textContent" in javascript
-    assert "rank.textContent = String(point.rank);" in javascript
-    assert "content.textContent = preview;" in javascript
-    assert 'document.createElement("mark")' in javascript
-    assert "document.createTextNode" in javascript
-    assert "highlight.textContent = token;" in javascript
-    assert "chunk.textContent = result.content;" in javascript
-    assert "retrieval_mode: retrievalMode" in javascript
-    assert "visualizationSection.hidden = !isSemantic;" in javascript
+    assert "point.vector" not in javascript
+    assert "visualization.vector" not in javascript
     assert "innerHTML" not in javascript
 
 
-def test_visualization_frontend_has_native_3d_interaction_and_no_external_dependency() -> None:
-    static_dir = Path(__file__).resolve().parents[1] / "static"
-    javascript = (static_dir / "ragdemo.js").read_text(encoding="utf-8")
-    template = (
-        Path(__file__).resolve().parents[1] / "templates" / "index.html"
-    ).read_text(encoding="utf-8")
-    service_source = (
-        Path(__file__).resolve().parents[1] / "service.py"
-    ).read_text(encoding="utf-8")
-
-    assert 'svg.addEventListener("pointerdown"' in javascript
-    assert 'svg.addEventListener("pointermove"' in javascript
-    assert "svg.setPointerCapture(event.pointerId);" in javascript
-    assert 'addEventListener("wheel"' not in javascript
-    assert "event.deltaY" not in javascript
-    assert "minimumZoom = 0.55" in javascript
-    assert "maximumZoom = 2.6" in javascript
-    assert "clamp(viewerState.zoom * factor, minimumZoom, maximumZoom)" in javascript
-    assert 'zoomOutButton.addEventListener("click", () => zoomViewer(1 / 1.12));' in javascript
-    assert 'zoomInButton.addEventListener("click", () => zoomViewer(1.12));' in javascript
-    assert "resetViewButton.addEventListener" in javascript
-    assert "rotationX: initialCamera.rotationX" in javascript
-    assert 'svgElement("line", "query-connection")' in javascript
-    assert "showConnectionLine(state.connectionLine" in javascript
-    assert "togglePinnedChunk(point.id);" in javascript
-    assert 'event.key === "Enter" || event.key === " "' in javascript
-    assert "projectWorldPoint" in javascript
-    assert "projected.depth - second.projected.depth" in javascript
-    assert "Drag to rotate · Use +/− to zoom · Hover points to inspect" in template
-    assert "Scroll to zoom" not in template
-    assert "query_points" not in service_source
-    for external_library in ("three.js", "plotly", "d3.js", "babylon", "cdnjs"):
-        assert external_library not in template.casefold()
-
-
-def test_visualization_frontend_fits_rotation_and_preserves_system_cursor() -> None:
+def test_visualization_frontend_uses_one_stable_scene_and_free_trackball_rotation() -> None:
     static_dir = Path(__file__).resolve().parents[1] / "static"
     javascript = (static_dir / "ragdemo.js").read_text(encoding="utf-8")
     stylesheet = (static_dir / "ragdemo.css").read_text(encoding="utf-8")
@@ -299,69 +500,64 @@ def test_visualization_frontend_fits_rotation_and_preserves_system_cursor() -> N
         javascript.index("function renderViewerScene"):
         javascript.index("function installCameraInteraction")
     ]
-    viewer_reset = javascript[
-        javascript.index("function resetViewer"):
-        javascript.index("function renderVisualization")
-    ]
 
-    assert "function normalizeWorldScene(coordinates)" in javascript
-    assert "Math.hypot(point.x, point.y, point.z)" in javascript
-    assert "point.x / normalizationRadius" in javascript
-    assert "point.y / normalizationRadius" in javascript
-    assert "point.z / normalizationRadius" in javascript
-    assert "function computeFittedSceneScale(plotWidth, plotHeight)" in javascript
-    assert "const edgePadding = plotPadding + maximumMarkerExtent;" in javascript
-    assert "plotWidth - 2 * edgePadding" in javascript
-    assert "plotHeight - 2 * edgePadding" in javascript
-    assert "Math.min(safeWidth, safeHeight) / 2" in javascript
-    assert "const plotBounds = Object.freeze" in javascript
-    assert "width: width - plotInset * 2" in javascript
-    assert "height: height - plotInset * 2" in javascript
-    assert "computeFittedSceneScale(plotBounds.width, plotBounds.height)" in javascript
-    assert 'background.setAttribute("width", String(plotBounds.width));' in javascript
-    assert 'background.setAttribute("height", String(plotBounds.height));' in javascript
+    assert "function buildSceneGeometry(coordinates)" in javascript
+    assert "numericCoordinates.map(toWorld)" in javascript
+    assert "Number(point.x) / normalizationRadius" in javascript
+    assert "Number(point.y) / normalizationRadius" in javascript
+    assert "Number(point.z) / normalizationRadius" in javascript
+    assert "const dataCenter" in javascript
+    assert "sceneCenter: toWorld(dataCenter)" in javascript
+    assert "const sceneBounds = Object.freeze" in javascript
+    assert "computeFittedSceneScale(sceneBounds.width, sceneBounds.height)" in javascript
+    assert "const edgePadding = Math.max(scenePadding, maximumMarkerExtent);" in javascript
+    assert "const maximumMarkerExtent = 30;" in javascript
+    assert "sceneWidth - 2 * edgePadding" in javascript
+    assert "resizeViewerToCanvas" in javascript
+    assert "visualizationCanvas.getBoundingClientRect()" in javascript
     assert "state.fittedSceneScale * state.zoom" in projection
-    assert "rotatedX * sceneScale" in projection
-    assert "rotatedY * sceneScale" in projection
+    assert "rotateWorldPoint(centered, state.rotation)" in projection
     assert "perspective" not in projection
     assert "x: clamp(" not in projection
     assert "y: clamp(" not in projection
-    assert "computeFittedSceneScale" not in scene_render
-
-    assert "depth: rotatedZ" in projection
-    assert "depthRatio:" in projection
+    assert "projectWorldPoint(state.origin.world, state)" in scene_render
+    assert "projectWorldPoint(state.query.world, state)" in scene_render
+    assert "projectWorldPoint(entry.world, state)" in scene_render
+    assert "projectWorldPoint(axis.negativeWorld, state)" in scene_render
     assert "projected.depth - second.projected.depth" in scene_render
     assert "const depthScale" in scene_render
     assert "projected.depthRatio" in scene_render
-    assert "showConnectionLine(state.connectionLine, projectedQuery, activePoint.projected)" in scene_render
+    assert "state.gridLines.forEach" in scene_render
+    assert "axis.ticks.forEach" in scene_render
+    assert "state.pointLayer.appendChild(activePoint.entry.visual.group);" in scene_render
+    assert "entry.world" not in javascript[
+        javascript.index("const activePoint ="):
+        javascript.index("state.query.visual.group.setAttribute")
+    ]
+    previous_fit = (600 - 2 * max(18, 34)) / 2
+    current_fit = (600 - 2 * max(12, 30)) / 2
+    assert current_fit > previous_fit
 
-    assert "zoom: 1" in javascript
-    assert "minimumZoom = 0.55" in javascript
-    assert "maximumZoom = 2.6" in javascript
-    assert "clamp(viewerState.zoom * factor, minimumZoom, maximumZoom)" in javascript
-    assert "state.zoom = state.initialCamera.zoom;" in viewer_reset
-    assert "state.fittedSceneScale =" not in viewer_reset
-
-    assert 'document.querySelector("#visualization-zoom-level")' in javascript
-    assert "function updateZoomControls(state)" in javascript
-    assert "Math.round(state.zoom * 100)" in javascript
-    assert 'zoomLevel.textContent = `${percentage}%`;' in javascript
-    assert "updateZoomControls(viewerState);" in javascript
-    assert "updateZoomControls(state);" in viewer_reset
-
-    assert "function positionPointTooltip(projected, state)" in javascript
-    assert "visualizationCanvas.getBoundingClientRect()" in javascript
-    assert "state.svg.getBoundingClientRect()" in javascript
-    assert "const tooltipLeft = clamp(" in javascript
-    assert "const tooltipTop = clamp(" in javascript
-    assert "positionPointTooltip(projected, state);" in javascript
-
+    assert "function trackballVector(event, svg)" in javascript
+    assert "function quaternionBetween(first, second)" in javascript
+    assert "state.rotation = quaternionMultiply(deltaRotation, state.rotation);" in javascript
+    assert 'svg.addEventListener("pointerdown"' in javascript
+    assert 'svg.addEventListener("pointermove"' in javascript
+    assert 'svg.addEventListener("pointerup", endDrag);' in javascript
+    assert 'svg.addEventListener("pointercancel", endDrag);' in javascript
+    assert 'svg.addEventListener("lostpointercapture", endDrag);' in javascript
+    assert "svg.setPointerCapture(event.pointerId);" in javascript
+    assert "state.pointerId = null;" in javascript
+    assert "state.lastTrackballVector = null;" in javascript
+    assert "touch-action: none" in stylesheet
+    assert "user-select: none" in stylesheet
     assert "cursor: grab" not in stylesheet
     assert "cursor: grabbing" not in stylesheet
-    assert ".embedding-map.is-dragging .embedding-map-background" in stylesheet
+    for external_library in ("three.js", "plotly", "d3.js", "babylon", "cdnjs"):
+        assert external_library not in javascript.casefold()
 
 
-def test_visualization_reset_clears_svg_line_camera_and_interaction_state() -> None:
+def test_visualization_zoom_reset_and_semantic_visibility_are_preserved() -> None:
     javascript = (
         Path(__file__).resolve().parents[1] / "static" / "ragdemo.js"
     ).read_text(encoding="utf-8")
@@ -373,40 +569,49 @@ def test_visualization_reset_clears_svg_line_camera_and_interaction_state() -> N
         javascript.index("function resetViewer"):
         javascript.index("function renderVisualization")
     ]
+    camera_reset = javascript[
+        javascript.index("function resetViewer"):
+        javascript.index("function resizeViewerToCanvas")
+    ]
 
-    assert "function hideConnectionLine(line)" in javascript
-    assert 'line.setAttribute("visibility", "hidden");' in javascript
-    assert 'line.setAttribute("visibility", "visible");' in javascript
-    assert '["x1", "y1", "x2", "y2"].forEach' in javascript
-    assert "line.removeAttribute(attribute)" in javascript
-    assert "connectionLine.hidden" not in javascript
-    assert "state.connectionLine.hidden" not in javascript
-    assert "hideConnectionLine(connectionLine);" in javascript
+    assert "zoom: 1" in javascript
+    assert "minimumZoom = 0.55" in javascript
+    assert "maximumZoom = 2.6" in javascript
+    assert "clamp(viewerState.zoom * factor, minimumZoom, maximumZoom)" in javascript
+    assert 'svg.addEventListener("wheel", (event) =>' in javascript
+    assert "{ passive: false }" in javascript
+    assert "event.deltaY < 0 ? wheelZoomFactor : 1 / wheelZoomFactor" in javascript
+    assert "event.preventDefault();" in javascript[
+        javascript.index('svg.addEventListener("wheel"'):
+        javascript.index('svg.addEventListener("pointerdown"')
+    ]
+    assert 'zoomOutButton.addEventListener("click", () => zoomViewer(1 / 1.12));' in javascript
+    assert 'zoomInButton.addEventListener("click", () => zoomViewer(1.12));' in javascript
+    assert "resetViewButton.addEventListener" in javascript
+    assert 'zoomLevel.textContent = `${percentage}%`;' in javascript
 
     assert "const initialCamera = Object.freeze" in javascript
-    assert "initialCamera," in javascript
-    assert "rotationX: initialCamera.rotationX" in javascript
-    assert "rotationY: initialCamera.rotationY" in javascript
-    assert "zoom: initialCamera.zoom" in javascript
-    assert "state.rotationX = state.initialCamera.rotationX;" in viewer_reset
-    assert "state.rotationY = state.initialCamera.rotationY;" in viewer_reset
+    assert "state.rotation = { ...state.initialCamera.rotation };" in viewer_reset
     assert "state.zoom = state.initialCamera.zoom;" in viewer_reset
-
     assert "hoveredChunkId = null;" in viewer_reset
     assert "focusedChunkId = null;" in viewer_reset
     assert "pinnedChunkId = null;" in viewer_reset
+    assert "pinnedQuery = false;" in viewer_reset
+    assert "state.hoveredScenePointId = null;" in viewer_reset
+    assert "state.queryHovered = false;" in viewer_reset
+    assert "state.queryFocused = false;" in viewer_reset
     assert "resetPointerInteraction(state);" in viewer_reset
     assert "state.svg.releasePointerCapture(capturedPointerId);" in pointer_reset
-    assert "state.pointerId = null;" in pointer_reset
-    assert "state.lastPointerX = 0;" in pointer_reset
-    assert "state.lastPointerY = 0;" in pointer_reset
-    assert "state.dragMoved = false;" in pointer_reset
     assert 'state.svg.classList.remove("is-dragging");' in pointer_reset
-    assert "activeElement.blur();" in viewer_reset
     assert "clearPointTooltip();" in viewer_reset
-    assert "hideConnectionLine(state.connectionLine);" in viewer_reset
+    assert "renderPinnedInspector();" in viewer_reset
     assert "updateLinkedInteraction(false);" in viewer_reset
     assert "renderViewerScene();" in viewer_reset
+    assert "setPresentationMode" not in camera_reset
+
+    assert "visualizationSection.hidden = !isSemantic;" in javascript
+    assert 'const isSemantic = searchMode === "semantic";' in javascript
+    assert "visualizationPanel.hidden = !canRender;" in javascript
 
 
 @pytest.mark.anyio
@@ -1483,3 +1688,871 @@ async def test_missing_collection_name_returns_generic_structured_error(monkeypa
         "message": "The RAG index is temporarily unavailable. Please try again shortly.",
     }
     assert "collection_name" not in response.text
+
+
+# Phase 8: example questions and read-only document/chunk inspection.
+def test_packaged_examples_and_html_separation() -> None:
+    config = service.load_example_questions()
+    assert config.display_count == 3
+    assert [question_set.id for question_set in config.question_sets] == [
+        "berlin_process",
+        "berlin_tourism",
+        "climate_neutral_berlin",
+    ]
+    questions = [
+        question
+        for question_set in config.question_sets
+        for question in question_set.questions
+    ]
+    assert [len(question_set.questions) for question_set in config.question_sets] == [5, 6, 6]
+    assert len(questions) == 17
+    template = (Path(__file__).resolve().parents[1] / "templates/index.html").read_text()
+    assert all(question not in template for question in questions)
+    assert "data-question=" not in template
+    assert 'id="refresh-examples"' in template
+    assert 'type="button" disabled>Refresh examples' in template
+
+
+@pytest.mark.parametrize("questions", [
+    [], None, "Question?", {}, [None], [123], [True], [""], [" \n\t "],
+    ["x" * 501], [f"Question {i}" for i in range(51)],
+])
+def test_example_config_rejects_invalid_questions(questions: Any) -> None:
+    with pytest.raises(ValidationError):
+        ExampleQuestions.model_validate({
+            "display_count": 1,
+            "question_sets": [{"id": "topic", "questions": questions}],
+        })
+
+
+@pytest.mark.parametrize("display_count", [0, -1, 3, True, 1.5, "1", None])
+def test_example_config_rejects_invalid_display_count(display_count: Any) -> None:
+    with pytest.raises(ValidationError):
+        ExampleQuestions.model_validate({
+            "display_count": display_count,
+            "question_sets": [{"id": "topic", "questions": ["A", "B"]}],
+        })
+
+
+@pytest.mark.parametrize("question_sets", [
+    [], None, "topic", {},
+    [{"id": f"topic_{index}", "questions": [str(index)]} for index in range(21)],
+    [{"id": "unsafe-id", "questions": ["Question?"]}],
+    [{"id": "x" * 41, "questions": ["Question?"]}],
+])
+def test_example_config_rejects_invalid_question_sets(question_sets: Any) -> None:
+    with pytest.raises(ValidationError):
+        ExampleQuestions.model_validate({"display_count": 1, "question_sets": question_sets})
+
+
+def test_example_config_normalizes_ids_and_trims_questions() -> None:
+    config = ExampleQuestions.model_validate({
+        "display_count": 2,
+        "question_sets": [
+            {"id": "  FIRST_TOPIC ", "questions": ["  What is RAG?  "]},
+            {"id": "second_topic", "questions": [" Another?\n"]},
+        ],
+    })
+    assert [question_set.id for question_set in config.question_sets] == [
+        "first_topic", "second_topic",
+    ]
+    assert [question_set.questions for question_set in config.question_sets] == [
+        ["What is RAG?"], ["Another?"],
+    ]
+    assert len(ExampleQuestions.model_validate({
+        "display_count": 1,
+        "question_sets": [{"id": "topic", "questions": ["x" * 500]}],
+    }).question_sets[0].questions[0]) == 500
+
+
+def test_example_config_rejects_duplicate_normalized_set_ids() -> None:
+    with pytest.raises(ValidationError, match="unique"):
+        ExampleQuestions.model_validate({
+            "display_count": 1,
+            "question_sets": [
+                {"id": " Topic ", "questions": ["First?"]},
+                {"id": "TOPIC", "questions": ["Second?"]},
+            ],
+        })
+
+
+def test_example_config_rejects_duplicate_questions_across_sets() -> None:
+    with pytest.raises(ValidationError, match="unique across all sets"):
+        ExampleQuestions.model_validate({
+            "display_count": 1,
+            "question_sets": [
+                {"id": "first", "questions": ["What is RAG?"]},
+                {"id": "second", "questions": ["  what  IS rag?  "]},
+            ],
+        })
+
+
+def test_example_config_enforces_global_question_limit() -> None:
+    with pytest.raises(ValidationError, match="50 questions in total"):
+        ExampleQuestions.model_validate({
+            "display_count": 1,
+            "question_sets": [
+                {"id": "first", "questions": [f"First {index}" for index in range(30)]},
+                {"id": "second", "questions": [f"Second {index}" for index in range(21)]},
+            ],
+        })
+
+
+def test_example_config_allows_fifty_questions_across_sets() -> None:
+    config = ExampleQuestions.model_validate({
+        "display_count": 50,
+        "question_sets": [
+            {"id": "first", "questions": [f"First {index}" for index in range(25)]},
+            {"id": "second", "questions": [f"Second {index}" for index in range(25)]},
+        ],
+    })
+    assert sum(len(question_set.questions) for question_set in config.question_sets) == 50
+
+
+@pytest.mark.anyio
+async def test_examples_api_only_returns_packaged_public_data() -> None:
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://testserver") as client:
+        response = await client.get("/ragdemo/api/examples?path=/private/config.json")
+    assert response.status_code == 200
+    assert response.json() == service.load_public_example_questions().model_dump()
+    assert set(response.json()) == {"display_count", "question_sets"}
+    assert all(set(question_set) == {"questions"} for question_set in response.json()["question_sets"])
+    assert "berlin_process" not in response.text
+    assert "/private" not in response.text
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "contents",
+    [None, "{invalid json", '{"display_count": 1, "question_sets": []}'],
+)
+async def test_examples_api_safe_error_for_unavailable_or_invalid_config(
+    monkeypatch: Any, tmp_path: Path, contents: str | None,
+) -> None:
+    config_path = tmp_path / "private-config.json"
+    if contents is not None:
+        config_path.write_text(contents)
+    monkeypatch.setattr(service, "_QUESTIONS_PATH", config_path)
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://testserver") as client:
+        response = await client.get("/ragdemo/api/examples")
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "unavailable", "message": "Example questions are temporarily unavailable."
+    }
+    assert str(tmp_path) not in response.text
+
+
+def _document_public_id(point: SimpleNamespace) -> str:
+    return inspect_index(_client(([point], None)), "demo").documents[0].id
+
+
+@pytest.mark.anyio
+async def test_chunks_endpoint_uses_index_id_and_shared_chunk_id(monkeypatch: Any) -> None:
+    monkeypatch.setattr(routes, "to_thread", _run_inline)
+    point = _vector_point(
+        "private-point-id", [0.1, 0.2], content="An actual chunk.",
+        source="/home/private/guide.txt", loader_id="private-loader",
+        document_id="private-document", content_hash="private-content-hash",
+        chunk_hash="private-chunk-hash", credentials="private-secret",
+    )
+    point.score = 0.7
+    index = inspect_index(_client(([point], None)), "demo")
+    assert set(index.model_dump()) == {
+        "collection", "status", "document_count", "chunk_count", "documents", "truncated"
+    }
+    assert set(index.documents[0].model_dump()) == {"id", "name", "chunk_count", "source_type"}
+    public_id = index.documents[0].id
+    reader = _client(([point], None))
+    monkeypatch.setattr(routes, "demo_qdrant_reader", reader)
+    monkeypatch.setattr(routes, "user_config", {"collection_name": "configured-demo"})
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://testserver") as client:
+        response = await client.get(f"/ragdemo/api/index/{public_id}/chunks?collection_name=private")
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {"document_id", "document_name", "chunks", "truncated"}
+    assert body["document_id"] == public_id
+    assert body["document_name"] == "guide.txt"
+    assert body["truncated"] is False
+    chunk = body["chunks"][0]
+    assert set(chunk) == {"id", "content", "display_order", "truncated"}
+    assert chunk["content"] == "An actual chunk."
+    assert chunk["display_order"] == 1
+    assert len(chunk["id"]) == 24
+    assert set(chunk["id"]) <= set("0123456789abcdef")
+    assert chunk["id"] == service._public_search_result(point, 1).id
+    assert chunk["id"] == service._point_display_id(point)  # Explorer's identity helper.
+    for forbidden in ("/home/", "private-", "loader_id", "content_hash", "chunk_hash", "vector", "credentials"):
+        assert forbidden not in response.text
+    call = reader.scroll.call_args.kwargs
+    assert call["collection_name"] == "configured-demo"
+    assert call["with_vectors"] is False
+    assert set(call["with_payload"]) == set(service.KEYWORD_PAYLOAD_FIELDS)
+    assert call["limit"] == service.SCROLL_PAGE_SIZE
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("public_id", ["0" * 24, "raw-qdrant-id", "raw-loader-id"])
+async def test_chunks_endpoint_unknown_ids_are_safe(monkeypatch: Any, public_id: str) -> None:
+    monkeypatch.setattr(routes, "to_thread", _run_inline)
+    reader = _client(([], None))
+    monkeypatch.setattr(routes, "demo_qdrant_reader", reader)
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://testserver") as client:
+        response = await client.get(f"/ragdemo/api/index/{public_id}/chunks")
+    assert response.status_code == 404
+    assert response.json()["message"] == "The indexed document was not found."
+    assert public_id not in response.text
+    if len(public_id) != 24:
+        reader.scroll.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_chunks_endpoint_failure_is_generic(monkeypatch: Any) -> None:
+    monkeypatch.setattr(routes, "to_thread", _run_inline)
+    reader = _client()
+    reader.scroll.side_effect = RuntimeError("secret /home/private collection=private")
+    monkeypatch.setattr(routes, "demo_qdrant_reader", reader)
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://testserver") as client:
+        response = await client.get(f"/ragdemo/api/index/{'0' * 24}/chunks")
+    assert response.status_code == 503
+    assert response.json()["message"] == "Document chunks are temporarily unavailable. Please try again shortly."
+    assert "secret" not in response.text
+    assert "/home" not in response.text
+
+
+def test_document_chunks_pagination_grouping_order_and_bounds() -> None:
+    points = [_point(str(i), source="/private/doc.txt", content=f"Text {i}") for i in range(4)]
+    other = _point("other", source="/private/other.txt", content="Unrelated")
+    public_id = _document_public_id(points[0])
+    reader = _client(([points[0], other], "offset-1"), (points[1:3], "offset-2"), ([points[3]], None))
+    result = service.inspect_document_chunks(reader, "demo", public_id, page_size=2)
+    assert result is not None and result.truncated is False
+    assert [chunk.display_order for chunk in result.chunks] == [1, 2, 3, 4]
+    assert [chunk.id for chunk in result.chunks] == sorted(service._point_display_id(p) for p in points)
+    assert all(chunk.content != "Unrelated" for chunk in result.chunks)
+    assert [call.kwargs["offset"] for call in reader.scroll.call_args_list] == [None, "offset-1", "offset-2"]
+    assert all(call.kwargs["limit"] == 2 and call.kwargs["with_vectors"] is False for call in reader.scroll.call_args_list)
+    reverse = service.inspect_document_chunks(_client((list(reversed(points)), None)), "demo", public_id)
+    assert reverse == result
+    limited = service.inspect_document_chunks(
+        _client((points, None)), "demo", public_id, max_document_chunks=2,
+    )
+    assert limited is not None and limited.truncated
+    assert limited.chunks == result.chunks[:2]
+    reader = _client((points[:2], "next"), ([points[2]], "more"))
+    scanned = service.inspect_document_chunks(reader, "demo", public_id, page_size=2, max_chunks=3)
+    assert scanned is not None and scanned.truncated
+    assert len(scanned.chunks) == 3
+    assert [call.kwargs["limit"] for call in reader.scroll.call_args_list] == [2, 1]
+
+
+@pytest.mark.parametrize("second_page", [[], [_point("1", source="/private/doc.txt", content="Text")]])
+def test_document_chunks_stops_empty_or_repeated_cursor(second_page: list[SimpleNamespace]) -> None:
+    point = _point("1", source="/private/doc.txt", content="Text")
+    reader = _client(([point], "repeat"), (second_page, "repeat"))
+    result = service.inspect_document_chunks(reader, "demo", _document_public_id(point))
+    assert result is not None and result.truncated
+    assert reader.scroll.call_count == 2
+    assert len(result.chunks) == 1
+
+
+def test_document_chunks_incomplete_unknown_lookup_and_oversized_page_fail() -> None:
+    point = _point("1", source="/private/doc.txt", content="Text")
+    with pytest.raises(ValueError, match="incomplete"):
+        service.inspect_document_chunks(_client(([point], "next")), "demo", "0" * 24, max_chunks=1)
+    with pytest.raises(ValueError, match="page limit"):
+        service.inspect_document_chunks(_client(([point, point], None)), "demo", "0" * 24, page_size=1)
+    missing = _client()
+    missing.collection_exists.return_value = False
+    assert service.inspect_document_chunks(missing, "demo", "0" * 24) is None
+    missing.scroll.assert_not_called()
+
+
+@pytest.mark.parametrize("length", [8_000, 8_001, 20_000])
+def test_document_chunk_content_is_bounded_and_marked(length: int) -> None:
+    point = _point("1", source="/private/doc.txt", content="x" * length)
+    result = service.inspect_document_chunks(_client(([point], None)), "demo", _document_public_id(point))
+    assert result is not None
+    assert len(result.chunks[0].content) == min(length, 8_000)
+    assert result.chunks[0].truncated == (length > 8_000)
+    assert result.truncated == (length > 8_000)
+
+
+def test_document_chunk_reproduced_source_is_sanitized() -> None:
+    source = "https://user:secret@example.com/doc.txt?token=private"
+    point = _point("1", source=source, content=f"See {source}")
+    result = service.inspect_document_chunks(_client(([point], None)), "demo", _document_public_id(point))
+    assert result is not None
+    assert result.chunks[0].content == "See doc.txt — example.com"
+    assert "secret" not in result.model_dump_json()
+
+
+def test_phase8_frontend_interactions_execute_in_node() -> None:
+    """Run the actual script with a small DOM/fetch double; no JS dependency."""
+    import subprocess
+
+    javascript_path = Path(__file__).resolve().parents[1] / "static/ragdemo.js"
+    assert "innerHTML" not in javascript_path.read_text()
+    harness = r'''
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+class Element {
+  constructor(tag = "div") {
+    this.tag = tag; this.children = []; this.events = {}; this.attrs = {};
+    this.dataset = {}; this.hidden = false; this.disabled = false; this.value = "";
+    this.className = ""; this._text = "";
+  }
+  set textContent(value) { this._text = value; this.children = []; }
+  get textContent() { return this._text + this.children.map(c => c.textContent).join(""); }
+  appendChild(child) {
+    if (child.parent) child.parent.children = child.parent.children.filter(candidate => candidate !== child);
+    this.children.push(child); child.parent = this; return child;
+  }
+  append(...children) { children.forEach(c => this.appendChild(c)); }
+  replaceChildren() { this.children = []; this._text = ""; }
+  setAttribute(key, value) { this.attrs[key] = value; }
+  addEventListener(event, fn) { this.events[event] = fn; }
+  querySelectorAll(selector) {
+    return this.children.filter(c => selector === ".example-question" && c.className.includes("example-question"));
+  }
+  focus() { this.focused = true; }
+  requestSubmit() { throw new Error("Unexpected RAG submit"); }
+  click() { if (!this.disabled) return this.events.click?.(); }
+}
+(async () => {
+  const elements = new Map();
+  const get = selector => {
+    if (!elements.has(selector)) elements.set(selector, new Element());
+    return elements.get(selector);
+  };
+  const semanticInput = new Element("input");
+  semanticInput.value = "semantic";
+  semanticInput.checked = true;
+  const keywordInput = new Element("input");
+  keywordInput.value = "keyword";
+  keywordInput.checked = false;
+  const retrievalInputs = [semanticInput, keywordInput];
+  const calls = [];
+  let resolveChunks;
+  let examplesRequestCount = 0;
+  let chunkARequestCount = 0;
+  const chunkData = {document_id: "a", document_name: "Doc A", truncated: true,
+    chunks: [{id: "safe-chunk", content: "<script>untrusted text</script>", display_order: 1, truncated: true}]};
+  const initialExamples = {display_count: 3, question_sets: [
+    {questions: ["Process A?", "Process B?"]},
+    {questions: ["Tourism A?", "Tourism B?"]},
+    {questions: ["Climate A?", "Climate B?"]},
+  ]};
+  const refreshedExamples = {display_count: 3, question_sets: [
+    {questions: ["New process?"]},
+    {questions: ["New tourism?"]},
+    {questions: ["New climate?"]},
+  ]};
+  const context = {
+    document: {
+      querySelector: get,
+      querySelectorAll: selector => selector === "input[name='retrieval_mode']" ? retrievalInputs : [],
+      createElement: tag => new Element(tag),
+    },
+    Math: Object.assign(Object.create(Math), {random: () => 0.5}),
+    fetch: async url => {
+      calls.push(url);
+      if (url === "./api/examples") {
+        examplesRequestCount += 1;
+        if (examplesRequestCount === 1) return {ok: true, json: async () => initialExamples};
+        if (examplesRequestCount === 2) return {ok: true, json: async () => refreshedExamples};
+        return {ok: false};
+      }
+      if (url === "./api/index") return {ok: true, json: async () => ({document_count: 2, chunk_count: 2, truncated: false,
+        documents: [{id: "a", name: "Doc A", chunk_count: 1}, {id: "b", name: "Doc B", chunk_count: 1}]})};
+      if (url === "./api/index/a/chunks") {
+        chunkARequestCount += 1;
+        if (chunkARequestCount === 1) return await new Promise(resolve => { resolveChunks = resolve; });
+        return {ok: true, json: async () => chunkData};
+      }
+      if (url === "./api/index/b/chunks") return {ok: false};
+      throw new Error("Unexpected request " + url);
+    },
+  };
+  vm.runInNewContext(fs.readFileSync(process.argv[1], "utf8"), context);
+  const flush = () => new Promise(resolve => setImmediate(resolve));
+  await flush();
+  assert.deepEqual(calls.sort(), ["./api/examples", "./api/index"]);
+  const examples = get("#example-questions");
+  const examplesStatus = get("#examples-status");
+  assert.equal(examples.children.length, 3);
+  assert.deepEqual(
+    examples.children.map(c => c.textContent.split(" ")[0]).sort(),
+    ["Climate", "Process", "Tourism"],
+  );
+  assert.equal(examplesStatus.hidden, true);
+  assert.equal(examplesStatus.textContent, "");
+  ["curated", "static", "hardcoded", "generated"].forEach(word => {
+    assert(!examplesStatus.textContent.toLowerCase().includes(word));
+  });
+  const original = examples.children.map(c => c.textContent).sort().join();
+  const question = get("#question-input");
+  question.value = "  My typed question\n";
+  semanticInput.checked = false;
+  keywordInput.checked = true;
+  get("#query-results").hidden = false;
+  get("#answer-content").textContent = "Existing answer";
+  get("#search-results").textContent = "Existing search";
+  get("#visualization-canvas").textContent = "Existing visualization";
+  get("#prompt-messages").textContent = "Existing prompt";
+  const exampleRefresh = get("#refresh-examples").click();
+  assert.equal(get("#refresh-examples").disabled, true);
+  await exampleRefresh;
+  assert.equal(get("#refresh-examples").disabled, false);
+  assert.equal(examples.children.length, 3);
+  assert.notEqual(examples.children.map(c => c.textContent).sort().join(), original);
+  assert.deepEqual(
+    examples.children.map(c => c.textContent).sort(),
+    ["New climate?", "New process?", "New tourism?"],
+  );
+  assert.equal(examplesRequestCount, 2);
+  assert.equal(question.value, "  My typed question\n");
+  assert.equal(semanticInput.checked, false);
+  assert.equal(keywordInput.checked, true);
+  assert.equal(get("#query-results").hidden, false);
+  assert.equal(get("#answer-content").textContent, "Existing answer");
+  assert.equal(get("#search-results").textContent, "Existing search");
+  assert.equal(get("#visualization-canvas").textContent, "Existing visualization");
+  assert.equal(get("#prompt-messages").textContent, "Existing prompt");
+  assert.equal(examplesStatus.hidden, true);
+  assert.equal(examplesStatus.textContent, "");
+  const visibleBeforeFailure = examples.children.map(c => c.textContent);
+  await get("#refresh-examples").click();
+  assert.equal(examplesRequestCount, 3);
+  assert.equal(examplesStatus.hidden, false);
+  assert.equal(examplesStatus.textContent, "Example questions are temporarily unavailable.");
+  assert.deepEqual(examples.children.map(c => c.textContent), visibleBeforeFailure);
+  assert(examples.children.every(c => c.type === "button"));
+  await examples.children[0].click();
+  assert.equal(question.value, examples.children[0].textContent);
+  assert.equal(question.focused, true);
+  const cards = get("#document-list").children.map(column => column.children[0].children[0]);
+  const firstButton = cards[0].children.find(c => c.tag === "button");
+  const firstChunks = cards[0].children.at(-1);
+  const otherButton = cards[1].children.find(c => c.tag === "button");
+  const otherChunks = cards[1].children.at(-1);
+  assert.equal(firstChunks.parent, cards[0]);
+  assert.equal(firstChunks.hidden, true);
+  assert.equal(firstButton.textContent, "Show chunks");
+  assert.equal(firstButton.type, "button");
+  const pending = firstButton.click();
+  assert.equal(firstButton.disabled, true);
+  assert.equal(firstChunks.textContent, "Loading chunks…");
+  await firstButton.click();
+  await otherButton.click();
+  assert.match(otherChunks.textContent, /could not be loaded/);
+  assert.equal(otherButton.disabled, false);
+  resolveChunks({ok: true, json: async () => chunkData});
+  await pending;
+  assert.equal(firstButton.disabled, false);
+  assert.equal(firstButton.textContent, "Hide chunks");
+  assert.equal(firstButton.attrs["aria-expanded"], "true");
+  const chunk = firstChunks.children.find(c => c.tag === "article");
+  assert.equal(chunk.dataset.chunkId, "safe-chunk");
+  assert.equal(chunk.children[1].textContent, "<script>untrusted text</script>");
+  assert.equal(chunk.children[1].children.length, 0);
+  assert.match(firstChunks.textContent, /shortened/);
+  assert.match(firstChunks.textContent, /limited preview/);
+  assert.match(firstChunks.textContent, /display order/);
+  await firstButton.click();
+  assert.equal(firstChunks.hidden, true);
+  await firstButton.click();
+  assert.equal(firstChunks.hidden, false);
+  assert.equal(calls.filter(url => url.endsWith("/a/chunks")).length, 1);
+  await get("#refresh-index").click();
+  const rebuilt = get("#document-list").children[0].children[0].children[0];
+  await rebuilt.children.find(c => c.tag === "button").click();
+  assert.equal(calls.filter(url => url.endsWith("/a/chunks")).length, 2);
+  await otherButton.click();
+  await otherButton.click();
+  assert.equal(calls.filter(url => url.endsWith("/b/chunks")).length, 2);
+  assert(!calls.includes("./api/query"));
+})().catch(error => { console.error(error); process.exitCode = 1; });
+'''
+    result = subprocess.run(
+        ["node", "-e", harness, str(javascript_path)], capture_output=True, text=True, timeout=15,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_phase9_coordinate_graph_executes_in_node() -> None:
+    """Exercise the actual Phase 9 renderer and controls with a small DOM double."""
+    import subprocess
+
+    javascript_path = Path(__file__).resolve().parents[1] / "static/ragdemo.js"
+    harness = r'''
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+class ClassList {
+  constructor(owner) { this.owner = owner; }
+  values() { return new Set(this.owner.className.split(/\s+/).filter(Boolean)); }
+  write(values) { this.owner.className = [...values].join(" "); }
+  add(name) { const values = this.values(); values.add(name); this.write(values); }
+  remove(name) { const values = this.values(); values.delete(name); this.write(values); }
+  contains(name) { return this.values().has(name); }
+  toggle(name, force) {
+    const values = this.values();
+    const enabled = force === undefined ? !values.has(name) : Boolean(force);
+    if (enabled) values.add(name); else values.delete(name);
+    this.write(values);
+    return enabled;
+  }
+}
+
+class Element {
+  constructor(tag = "div", ownerDocument = null) {
+    this.tag = tag; this.ownerDocument = ownerDocument; this.children = [];
+    this.events = {}; this.eventOptions = {}; this.attrs = {}; this.dataset = {}; this.style = {
+      removeProperty: key => { delete this.style[key]; },
+    };
+    this.hidden = false; this.disabled = false; this.value = ""; this.checked = false;
+    this.className = ""; this._text = ""; this.classList = new ClassList(this);
+    this.capturedPointers = new Set();
+  }
+  set textContent(value) { this._text = String(value); this.children = []; }
+  get textContent() { return this._text + this.children.map(child => child.textContent).join(""); }
+  appendChild(child) {
+    if (child.parent) child.parent.children = child.parent.children.filter(candidate => candidate !== child);
+    this.children.push(child); child.parent = this; return child;
+  }
+  append(...children) { children.forEach(child => this.appendChild(child)); }
+  insertBefore(child, reference) {
+    const index = this.children.indexOf(reference);
+    if (index < 0) return this.appendChild(child);
+    this.children.splice(index, 0, child); child.parent = this; return child;
+  }
+  replaceChildren(...children) { this.children = []; this._text = ""; this.append(...children); }
+  setAttribute(key, value) {
+    this.attrs[key] = String(value);
+    if (key === "class") this.className = String(value);
+  }
+  removeAttribute(key) { delete this.attrs[key]; }
+  addEventListener(name, handler, options) {
+    (this.events[name] ||= []).push(handler);
+    (this.eventOptions[name] ||= []).push(options);
+  }
+  async dispatch(name, event = {}) {
+    event.preventDefault ||= () => { event.defaultPrevented = true; };
+    event.stopPropagation ||= () => { event.propagationStopped = true; };
+    for (const handler of this.events[name] || []) await handler(event);
+  }
+  click() { if (!this.disabled) return this.dispatch("click"); }
+  focus() { this.ownerDocument.activeElement = this; return this.dispatch("focus"); }
+  blur() { this.ownerDocument.activeElement = null; return this.dispatch("blur"); }
+  contains(candidate) {
+    return candidate === this || this.children.some(child => child.contains(candidate));
+  }
+  querySelectorAll(selector) {
+    return walk(this).filter(child => selector === ".example-question"
+      && child.classList.contains("example-question"));
+  }
+  getBoundingClientRect() {
+    if (this.classList.contains("embedding-map-tooltip")) {
+      return {left: 0, top: 0, width: 180, height: 42};
+    }
+    if (this.selector === "#visualization-canvas"
+        && this.ownerDocument.querySelector("#visualization-panel").classList.contains("is-expanded")) {
+      return {left: 0, top: 0, width: 1400, height: 800};
+    }
+    return {left: 0, top: 0, width: 960, height: 600};
+  }
+  setPointerCapture(pointerId) { this.capturedPointers.add(pointerId); }
+  hasPointerCapture(pointerId) { return this.capturedPointers.has(pointerId); }
+  releasePointerCapture(pointerId) { this.capturedPointers.delete(pointerId); }
+}
+
+const walk = root => root.children.flatMap(child => [child, ...walk(child)]);
+const byClass = (root, name) => walk(root).filter(child => child.classList.contains(name));
+const geometry = element => ({...element.attrs, transform: element.attrs.transform || ""});
+
+(async () => {
+  const elements = new Map();
+  const document = {
+    activeElement: null,
+    querySelector(selector) {
+      if (!elements.has(selector)) {
+        const element = new Element("div", document);
+        element.selector = selector;
+        elements.set(selector, element);
+      }
+      return elements.get(selector);
+    },
+    querySelectorAll(selector) {
+      return selector === "input[name='retrieval_mode']" ? retrievalInputs : [];
+    },
+    createElement(tag) { return new Element(tag, document); },
+    createElementNS(_namespace, tag) { return new Element(tag, document); },
+    createTextNode(text) { const node = new Element("#text", document); node.textContent = text; return node; },
+  };
+  const semantic = new Element("input", document);
+  semantic.value = "semantic"; semantic.checked = true;
+  const keyword = new Element("input", document);
+  keyword.value = "keyword";
+  const retrievalInputs = [semantic, keyword];
+  const semanticResponse = {
+    answer: "Safe answer",
+    search: {mode: "semantic", label: "Search", technical_label: "Dense", score_label: "Score", results: [
+      {id: "one", rank: 1, source: "one.pdf", score: 0.9, content: "First safe chunk", matched_terms: []},
+      {id: "two", rank: 2, source: "two.pdf", score: 0.8, content: "Second safe chunk", matched_terms: []},
+    ]},
+    visualization: {status: "ready", label: "Explore the embedding space", technical_label: "3D PCA", note: "This is a 3D PCA projection. Retrieval itself uses the full-dimensional dense embedding space.", points: [
+      {id: "one", source: "one.pdf", x: -2, y: 1, z: 0.5, retrieved: true, rank: 1, preview: "First safe chunk"},
+      {id: "two", source: "two.pdf", x: 1, y: 2, z: -1, retrieved: true, rank: 2, preview: "Second safe chunk"},
+      {id: "other", source: "other.pdf", x: 3, y: -1, z: 2, retrieved: false, rank: null, preview: "Background chunk"},
+    ], query: {x: 0.75, y: -0.5, z: 1.25}},
+    prompt: {label: "Prompt", technical_label: "Messages", note: "Safe", messages: [
+      {role: "user", content: "Question"},
+    ]},
+  };
+  const keywordResponse = {
+    ...semanticResponse,
+    search: {...semanticResponse.search, mode: "keyword"},
+    visualization: {status: "unsupported", label: "", technical_label: "", note: "", points: [], query: null},
+  };
+  const context = {
+    document,
+    fetch: async (url, options = {}) => {
+      if (url === "./api/examples") return {ok: true, json: async () => ({display_count: 1, question_sets: [{questions: ["Example?"]}]})};
+      if (url === "./api/index") return {ok: true, json: async () => ({document_count: 0, chunk_count: 0, truncated: false, documents: []})};
+      if (url === "./api/query") {
+        const request = JSON.parse(options.body);
+        return {ok: true, json: async () => request.retrieval_mode === "keyword" ? keywordResponse : semanticResponse};
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    },
+  };
+  vm.runInNewContext(fs.readFileSync(process.argv[1], "utf8"), context);
+  await new Promise(resolve => setImmediate(resolve));
+
+  const question = document.querySelector("#question-input");
+  question.value = "Where is the evidence?";
+  await document.querySelector("#query-form").dispatch("submit");
+  const canvas = document.querySelector("#visualization-canvas");
+  const svg = canvas.children.find(child => child.tag === "svg");
+  assert(svg);
+  assert.equal(document.querySelector("#visualization-panel").hidden, false);
+  assert.equal(document.querySelector("#visualization-note").hidden, true);
+  assert.equal(document.querySelector("#visualization-note").textContent, "");
+  assert.equal(byClass(svg, "embedding-axis").length, 3);
+  assert.equal(byClass(svg, "embedding-origin").length, 1);
+  assert.equal(byClass(svg, "embedding-point").length, 3);
+  assert.equal(byClass(svg, "retrieved-point").length, 2);
+  assert.equal(byClass(svg, "indexed-point").length, 1);
+  assert.deepEqual(byClass(svg, "embedding-rank").map(rank => rank.textContent).sort(), ["#1", "#2"]);
+  assert.equal(byClass(svg, "query-vector").length, 1);
+  assert.equal(byClass(svg, "query-retrieval-connection").length, 2);
+  assert.deepEqual(byClass(svg, "query-retrieval-connection").map(line => line.dataset.chunkId), ["one", "two"]);
+  assert(!byClass(svg, "query-retrieval-connection").some(line => line.dataset.chunkId === "other"));
+  const cuboids = byClass(svg, "embedding-cuboid");
+  assert.equal(cuboids.length, 1);
+  const cuboid = cuboids[0];
+  const cuboidCorners = byClass(cuboid, "embedding-cuboid-corner");
+  const cuboidEdges = byClass(cuboid, "embedding-cuboid-edge");
+  assert.equal(cuboidCorners.length, 8);
+  assert.equal(cuboidEdges.length, 12);
+  assert.equal(new Set(cuboidCorners.map(corner => `${corner.dataset.x},${corner.dataset.y},${corner.dataset.z}`)).size, 8);
+  assert.notEqual(Math.abs(Number(cuboid.dataset.xMinimum)), Math.abs(Number(cuboid.dataset.xMaximum)));
+  [semanticResponse.visualization.query, ...semanticResponse.visualization.points].forEach(point => {
+    assert(point.x >= Number(cuboid.dataset.xMinimum) && point.x <= Number(cuboid.dataset.xMaximum));
+    assert(point.y >= Number(cuboid.dataset.yMinimum) && point.y <= Number(cuboid.dataset.yMaximum));
+    assert(point.z >= Number(cuboid.dataset.zMinimum) && point.z <= Number(cuboid.dataset.zMaximum));
+  });
+  const gridLines = byClass(svg, "embedding-grid-line");
+  const tickLabels = byClass(svg, "embedding-axis-tick-label");
+  assert(gridLines.length >= 20);
+  assert.deepEqual([...new Set(gridLines.map(line => line.dataset.plane))].sort(), ["xy", "xz", "yz"]);
+  assert(byClass(svg, "embedding-grid-origin-line").length >= 2);
+  assert(tickLabels.length >= 9 && tickLabels.length <= 18);
+  assert(tickLabels.every(label => /^-?\d+(\.\d{1,4})?$/.test(label.textContent)));
+
+  const axisLines = byClass(svg, "embedding-axis-line");
+  const origin = byClass(svg, "embedding-origin")[0];
+  const query = byClass(svg, "embedding-query-point")[0];
+  const queryVector = byClass(svg, "query-vector")[0];
+  const initialAxes = axisLines.map(geometry);
+  const initialGrid = gridLines.map(geometry);
+  const initialCuboid = [...cuboidEdges, ...cuboidCorners].map(geometry);
+  const initialPoints = byClass(svg, "embedding-point").map(geometry);
+  const initialQueryVector = geometry(queryVector);
+  assert(axisLines.every(line => line.attrs.x1 === queryVector.attrs.x1 && line.attrs.y1 === queryVector.attrs.y1));
+  assert.match(origin.attrs.transform, /^translate\(/);
+  const translatedPoint = element => element.attrs.transform.match(/^translate\(([^ ]+) ([^)]+)/).slice(1).map(Number);
+  const originPosition = translatedPoint(origin);
+  assert.notDeepEqual(originPosition, [480, 300]);
+  const queryPosition = translatedPoint(query);
+  const vectorEnd = [Number(queryVector.attrs.x2), Number(queryVector.attrs.y2)];
+  assert(Math.hypot(vectorEnd[0] - originPosition[0], vectorEnd[1] - originPosition[1])
+    < Math.hypot(queryPosition[0] - originPosition[0], queryPosition[1] - originPosition[1]));
+  assert.equal(queryVector.attrs["marker-end"], "url(#query-vector-arrowhead)");
+  const lineContainsPoint = (line, point) => {
+    const start = [Number(line.attrs.x1), Number(line.attrs.y1)];
+    const end = [Number(line.attrs.x2), Number(line.attrs.y2)];
+    const cross = (point[0] - start[0]) * (end[1] - start[1])
+      - (point[1] - start[1]) * (end[0] - start[0]);
+    const dot = (point[0] - start[0]) * (end[0] - start[0])
+      + (point[1] - start[1]) * (end[1] - start[1]);
+    const squaredLength = (end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2;
+    return Math.abs(cross) <= Math.sqrt(squaredLength) * 1e-8
+      && dot >= -1e-8 && dot <= squaredLength + 1e-8;
+  };
+  assert(byClass(svg, "embedding-grid-origin-line").some(
+    line => line.dataset.plane === "xy" && lineContainsPoint(line, originPosition),
+  ));
+
+  const projectedCoordinates = () => {
+    return [origin, query, ...byClass(svg, "embedding-point")].map(translatedPoint);
+  };
+  const assertSafeBounds = () => projectedCoordinates().forEach(([x, y]) => {
+    assert(x >= 29.9 && x <= 930.1, `x ${x} outside rotation-safe data bounds`);
+    assert(y >= 29.9 && y <= 570.1, `y ${y} outside rotation-safe data bounds`);
+  });
+  assertSafeBounds();
+  const initialCoordinates = projectedCoordinates();
+  const initialSpan = Math.max(
+    Math.max(...initialCoordinates.map(([x]) => x)) - Math.min(...initialCoordinates.map(([x]) => x)),
+    Math.max(...initialCoordinates.map(([, y]) => y)) - Math.min(...initialCoordinates.map(([, y]) => y)),
+  );
+  assert(initialSpan / (600 - 2 * 30) >= 0.72, `100% data span ${initialSpan} is still too compact`);
+
+  await query.dispatch("mouseenter");
+  const tooltip = document.querySelector("#visualization-tooltip");
+  assert.equal(tooltip.hidden, false);
+  assert.match(tooltip.textContent, /Query/);
+  assert.match(tooltip.textContent, /X 0.750/);
+  assert.match(tooltip.textContent, /Y -0.500/);
+  assert.match(tooltip.textContent, /Z 1.250/);
+  assert(tooltip.textContent.length < 80);
+  await query.dispatch("click");
+  const inspector = document.querySelector("#visualization-inspector");
+  const inspectorTitle = document.querySelector("#visualization-inspector-title");
+  const inspectorContent = document.querySelector("#visualization-inspector-content");
+  assert.equal(inspector.hidden, false);
+  assert.equal(inspectorTitle.textContent, "Query");
+  assert.match(inspectorContent.textContent, /X0.750/);
+  assert.match(inspectorContent.textContent, /Y-0.500/);
+  assert.match(inspectorContent.textContent, /Z1.250/);
+  await query.dispatch("mouseleave");
+  assert.equal(inspector.hidden, false);
+  await document.querySelector("#visualization-inspector-close").click();
+  assert.equal(inspector.hidden, true);
+
+  const retrieved = byClass(svg, "retrieved-point").find(point => point.dataset.chunkId === "one");
+  await retrieved.dispatch("mouseenter");
+  const linkedCard = walk(document.querySelector("#search-results"))
+    .find(child => child.dataset.chunkId === "one");
+  assert(linkedCard.classList.contains("is-linked"));
+  assert(retrieved.classList.contains("is-linked"));
+  assert(byClass(svg, "query-retrieval-connection")[0].classList.contains("is-active"));
+  assert.match(tooltip.textContent, /#1 · one\.pdf/);
+  assert.doesNotMatch(tooltip.textContent, /First safe chunk/);
+  assert.match(tooltip.textContent, /X -2\.0/);
+  assert(tooltip.textContent.length < 90);
+  await retrieved.dispatch("click");
+  assert(retrieved.classList.contains("is-pinned"));
+  assert.equal(inspector.hidden, false);
+  assert.equal(inspectorTitle.textContent, "#1");
+  assert.match(inspectorContent.textContent, /one\.pdf/);
+  assert.match(inspectorContent.textContent, /First safe chunk/);
+  assert.match(inspectorContent.textContent, /X-2\.0/);
+  assert.deepEqual(
+    byClass(svg, "query-retrieval-connection").filter(line => line.classList.contains("is-active")).map(line => line.dataset.chunkId),
+    ["one"],
+  );
+  await retrieved.dispatch("mouseleave");
+
+  await svg.dispatch("pointerdown", {button: 0, pointerId: 7, clientX: 480, clientY: 300});
+  await svg.dispatch("pointermove", {pointerId: 7, clientX: 690, clientY: 130});
+  assert.notDeepEqual(axisLines.map(geometry), initialAxes);
+  assert.notDeepEqual(gridLines.map(geometry), initialGrid);
+  assert.notDeepEqual([...cuboidEdges, ...cuboidCorners].map(geometry), initialCuboid);
+  assert.notDeepEqual(byClass(svg, "embedding-point").map(geometry), initialPoints);
+  assert.notDeepEqual(geometry(queryVector), initialQueryVector);
+  assertSafeBounds();
+  await svg.dispatch("pointercancel", {pointerId: 7});
+  assert.equal(svg.classList.contains("is-dragging"), false);
+  assert.equal(svg.hasPointerCapture(7), false);
+  await svg.dispatch("pointerdown", {button: 0, pointerId: 8, clientX: 180, clientY: 470});
+  await svg.dispatch("pointermove", {pointerId: 8, clientX: 760, clientY: 420});
+  assertSafeBounds();
+  await svg.dispatch("pointerup", {pointerId: 8});
+
+  assert.equal(svg.eventOptions.wheel.length, 1);
+  assert.equal(svg.eventOptions.wheel[0].passive, false);
+  const wheelIn = {deltaY: -100};
+  await svg.dispatch("wheel", wheelIn);
+  assert.equal(wheelIn.defaultPrevented, true);
+  assert.equal(document.querySelector("#visualization-zoom-level").textContent, "109%");
+  const panel = document.querySelector("#visualization-panel");
+  const rotatedAt109 = axisLines.map(geometry);
+  await document.querySelector("#visualization-expand").click();
+  assert(panel.classList.contains("is-expanded"));
+  assert.equal(document.querySelector("#visualization-expand").hidden, true);
+  assert.equal(document.querySelector("#visualization-restore").hidden, false);
+  assert.equal(document.querySelector("#visualization-expanded-close").hidden, false);
+  assert.equal(document.querySelector("#visualization-zoom-level").textContent, "109%");
+  assert(retrieved.classList.contains("is-pinned"));
+  assert.equal(inspector.hidden, false);
+  assert.notDeepEqual(axisLines.map(geometry), rotatedAt109);
+  await document.querySelector("#visualization-restore").click();
+  assert.equal(panel.classList.contains("is-expanded"), false);
+  assert.deepEqual(axisLines.map(geometry), rotatedAt109);
+  assert.equal(document.querySelector("#visualization-zoom-level").textContent, "109%");
+  assert(retrieved.classList.contains("is-pinned"));
+
+  await document.querySelector("#visualization-expand").click();
+  await svg.dispatch("wheel", {deltaY: -100});
+  assert.equal(document.querySelector("#visualization-zoom-level").textContent, "119%");
+  await document.querySelector("#visualization-expanded-close").click();
+  assert.equal(panel.classList.contains("is-expanded"), false);
+  assert.equal(document.querySelector("#visualization-zoom-level").textContent, "119%");
+  assert(retrieved.classList.contains("is-pinned"));
+
+  await document.querySelector("#visualization-expand").click();
+  await document.querySelector("#visualization-reset").click();
+  assert(panel.classList.contains("is-expanded"));
+  assert.equal(document.querySelector("#visualization-zoom-level").textContent, "100%");
+  assert.equal(inspector.hidden, true);
+  assert.equal(retrieved.classList.contains("is-pinned"), false);
+  await document.querySelector("#visualization-expanded-close").click();
+  assert.equal(panel.classList.contains("is-expanded"), false);
+  assert.deepEqual(axisLines.map(geometry), initialAxes);
+  assert.deepEqual(gridLines.map(geometry), initialGrid);
+  assert.deepEqual([...cuboidEdges, ...cuboidCorners].map(geometry), initialCuboid);
+  assert.deepEqual(byClass(svg, "embedding-point").map(geometry), initialPoints);
+  assert.deepEqual(geometry(queryVector), initialQueryVector);
+  assert.equal(tooltip.hidden, true);
+  assert(byClass(svg, "query-retrieval-connection").every(line => !line.classList.contains("is-active")));
+
+  const backgroundPoint = byClass(svg, "indexed-point")[0];
+  const backgroundGeometry = geometry(backgroundPoint);
+  await backgroundPoint.dispatch("click");
+  assert.equal(inspectorTitle.textContent, "Indexed chunk");
+  assert.match(inspectorContent.textContent, /other\.pdf/);
+  assert.match(inspectorContent.textContent, /Background chunk/);
+  assert.equal(geometry(backgroundPoint).transform, backgroundGeometry.transform);
+  assert(byClass(svg, "query-retrieval-connection").every(line => !line.classList.contains("is-active")));
+  await document.querySelector("#visualization-inspector-close").click();
+
+  semanticResponse.visualization.status = "partial";
+  semanticResponse.visualization.note = "This is a 3D PCA projection. Retrieval itself uses the full-dimensional dense embedding space. The bounded display shows a partial index snapshot.";
+  await document.querySelector("#query-form").dispatch("submit");
+  assert.equal(document.querySelector("#visualization-note").hidden, false);
+  assert.equal(document.querySelector("#visualization-note").textContent, "The bounded display shows a partial index snapshot.");
+
+  semantic.checked = false; keyword.checked = true;
+  await document.querySelector("#query-form").dispatch("submit");
+  assert.equal(document.querySelector("#visualization-section").hidden, true);
+  assert.equal(document.querySelector("#visualization-panel").hidden, true);
+})().catch(error => { console.error(error); process.exitCode = 1; });
+'''
+    result = subprocess.run(
+        ["node", "-e", harness, str(javascript_path)], capture_output=True, text=True, timeout=15,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

@@ -111,10 +111,9 @@
 
           <div class="mt-4" aria-label="Example questions">
             <p class="small text-uppercase text-body-secondary fw-semibold mb-2">Try an example</p>
-            <div class="d-flex flex-column flex-lg-row gap-2">
-              <button class="btn btn-outline-secondary example-question" type="button" data-question="Where is the Learn2RAG interactive RAG demo intended to be shown?">Where is the interactive RAG demo intended to be shown?</button>
-              <button class="btn btn-outline-secondary example-question" type="button" data-question="Which retrieval approaches should the interactive demonstration compare?">Which retrieval approaches should the demonstration compare?</button>
-            </div>
+            <div id="example-questions" class="d-flex flex-column flex-lg-row gap-2"></div>
+            <p id="examples-status" class="small text-body-secondary mt-2 mb-0" role="status">Loading examples…</p>
+            <button id="refresh-examples" class="btn btn-sm btn-outline-secondary mt-2" type="button" disabled>Refresh examples</button>
           </div>
 
           <div id="query-error" class="alert alert-danger mt-4 mb-0" role="alert" hidden></div>
@@ -157,28 +156,48 @@
                   </h3>
                   <span id="visualization-technical-label" class="badge text-bg-light border text-secondary">3D PCA projection of dense embeddings</span>
                 </div>
-                <p class="visualization-intro mb-1">Each point represents an indexed chunk. Drag to rotate the space and explore how the Query relates to the retrieved chunks.</p>
+                <p class="visualization-intro mb-1">All indexed chunks form the surrounding embedding space. The Query vector and its links identify the chunks selected for the RAG context.</p>
+                <p class="small text-body-secondary mb-1">X/Y/Z show the first three PCA components of the dense embedding space. Retrieval itself uses the full-dimensional embeddings.</p>
                 <p id="visualization-note" class="small text-body-secondary mb-3"></p>
                 <div id="visualization-status" class="alert alert-secondary mb-0" role="status" hidden></div>
-                <div id="visualization-panel" class="card embedding-map-card" hidden>
-                  <div class="card-body p-2 p-md-3">
-                    <div class="embedding-map-toolbar">
-                      <p id="visualization-help" class="small text-body-secondary mb-0">Drag to rotate · Use +/− to zoom · Hover points to inspect</p>
+                <div id="visualization-panel" class="embedding-map-stage" aria-label="Interactive 3D embedding graph" hidden>
+                  <div class="embedding-map-toolbar">
+                    <p id="visualization-help" class="small text-body-secondary mb-0">Drag freely to rotate · Use the wheel or +/− to zoom · Hover for a label · Click to inspect</p>
+                    <div class="embedding-map-controls">
                       <div class="btn-group btn-group-sm" role="group" aria-label="3D embedding view controls">
                         <button id="visualization-zoom-out" class="btn btn-outline-secondary" type="button" aria-label="Zoom out of embedding space" title="Zoom out">−</button>
                         <output id="visualization-zoom-level" class="embedding-zoom-level" aria-live="polite" aria-label="Current embedding space zoom: 100%">100%</output>
                         <button id="visualization-zoom-in" class="btn btn-outline-secondary" type="button" aria-label="Zoom into embedding space" title="Zoom in">+</button>
                         <button id="visualization-reset" class="btn btn-outline-secondary" type="button" aria-label="Reset embedding space view">Reset view</button>
                       </div>
+                      <div class="btn-group btn-group-sm" role="group" aria-label="Embedding graph display mode">
+                        <button id="visualization-expand" class="btn btn-outline-secondary" type="button" aria-label="Expand embedding graph">Expand</button>
+                        <button id="visualization-restore" class="btn btn-outline-secondary" type="button" aria-label="Restore embedded graph" hidden>Restore</button>
+                        <button id="visualization-expanded-close" class="btn btn-outline-secondary" type="button" aria-label="Close expanded graph" hidden>Close</button>
+                      </div>
                     </div>
-                    <div id="visualization-canvas" class="embedding-map-canvas" aria-describedby="visualization-help">
-                      <div id="visualization-tooltip" class="embedding-map-tooltip" role="status" aria-live="polite" hidden></div>
-                    </div>
-                    <div class="embedding-map-legend" aria-label="Embedding map legend">
-                      <span><span class="legend-symbol legend-query" aria-hidden="true"></span>Query</span>
-                      <span><span class="legend-symbol legend-retrieved" aria-hidden="true"></span>Retrieved chunks</span>
-                      <span><span class="legend-symbol legend-indexed" aria-hidden="true"></span>Other indexed chunks</span>
-                    </div>
+                  </div>
+                  <ol class="embedding-process-summary" aria-label="RAG process summary">
+                    <li><span>1</span>Question embedded</li>
+                    <li><span>2</span>Top-ranked chunks retrieved as a set</li>
+                    <li><span>3</span>Retrieved chunks added to the prompt</li>
+                    <li><span>4</span>Model generates the answer</li>
+                  </ol>
+                  <div id="visualization-canvas" class="embedding-map-canvas" aria-describedby="visualization-help">
+                    <div id="visualization-tooltip" class="embedding-map-tooltip" role="status" aria-live="polite" hidden></div>
+                    <aside id="visualization-inspector" class="embedding-map-inspector" aria-label="Pinned embedding point inspector" aria-live="polite" hidden>
+                      <div class="embedding-inspector-header">
+                        <strong id="visualization-inspector-title">Inspector</strong>
+                        <button id="visualization-inspector-close" class="btn-close" type="button" aria-label="Close inspector"></button>
+                      </div>
+                      <div id="visualization-inspector-content" class="embedding-inspector-content"></div>
+                    </aside>
+                  </div>
+                  <div class="embedding-map-legend" aria-label="Embedding map legend">
+                    <span><span class="legend-symbol legend-query-vector" aria-hidden="true"></span>Query vector</span>
+                    <span><span class="legend-symbol legend-retrieved" aria-hidden="true"></span>Retrieved chunks</span>
+                    <span><span class="legend-symbol legend-indexed" aria-hidden="true"></span>Other indexed chunks</span>
+                    <span><span class="legend-symbol legend-connection" aria-hidden="true"></span>Query → retrieved link</span>
                   </div>
                 </div>
               </div>

@@ -34,29 +34,48 @@
   const visualizationPanel = document.querySelector("#visualization-panel");
   const visualizationCanvas = document.querySelector("#visualization-canvas");
   const visualizationTooltip = document.querySelector("#visualization-tooltip");
+  const visualizationInspector = document.querySelector("#visualization-inspector");
+  const visualizationInspectorTitle = document.querySelector("#visualization-inspector-title");
+  const visualizationInspectorContent = document.querySelector("#visualization-inspector-content");
+  const visualizationInspectorClose = document.querySelector("#visualization-inspector-close");
   const zoomOutButton = document.querySelector("#visualization-zoom-out");
   const zoomLevel = document.querySelector("#visualization-zoom-level");
   const zoomInButton = document.querySelector("#visualization-zoom-in");
   const resetViewButton = document.querySelector("#visualization-reset");
+  const expandViewButton = document.querySelector("#visualization-expand");
+  const restoreViewButton = document.querySelector("#visualization-restore");
+  const closeExpandedViewButton = document.querySelector("#visualization-expanded-close");
   const promptLabel = document.querySelector("#prompt-label");
   const promptTechnicalLabel = document.querySelector("#prompt-technical-label");
   const promptNote = document.querySelector("#prompt-note");
   const promptMessages = document.querySelector("#prompt-messages");
-  const exampleButtons = document.querySelectorAll(".example-question");
+  const exampleContainer = document.querySelector("#example-questions");
+  const examplesStatus = document.querySelector("#examples-status");
+  const refreshExamplesButton = document.querySelector("#refresh-examples");
+  let displayedExamples = [];
+  const documentChunksCache = new Map();
   const searchCardByChunkId = new Map();
   const searchResultByChunkId = new Map();
   const visualizationPointByChunkId = new Map();
   const svgNamespace = "http://www.w3.org/2000/svg";
-  const defaultCamera = Object.freeze({ rotationX: -0.38, rotationY: 0.58, zoom: 1 });
+  const defaultCamera = Object.freeze({
+    rotation: Object.freeze(quaternionFromEuler(-0.38, 0.58, 0)),
+    zoom: 1,
+  });
   const minimumZoom = 0.55;
   const maximumZoom = 2.6;
-  const plotPadding = 28;
-  // Includes the Query diamond, its stroke, and the maximum depth emphasis.
+  const wheelZoomFactor = 1.09;
+  const scenePadding = 12;
+  const redundantVisualizationNote =
+    "This is a 3D PCA projection. Retrieval itself uses the full-dimensional dense embedding space.";
+  // Screen-space labels and markers share this edge reserve; it is not added
+  // to the rotation-safe world-space radius.
   const maximumMarkerExtent = 30;
   let viewerState = null;
   let hoveredChunkId = null;
   let focusedChunkId = null;
   let pinnedChunkId = null;
+  let pinnedQuery = false;
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -74,6 +93,165 @@
     statusBox.className = `alert ${isError ? "alert-danger" : "alert-primary"} mt-4 mb-0`;
     statusBox.hidden = false;
     content.hidden = true;
+  }
+
+  function shuffleExamples(values) {
+    const shuffled = [...values];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const other = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[other]] = [shuffled[other], shuffled[index]];
+    }
+    return shuffled;
+  }
+
+  function selectExamples(config) {
+    const sets = shuffleExamples(config.question_sets).map((questionSet) => ({
+      questions: shuffleExamples(questionSet.questions),
+    }));
+    const selected = [];
+    sets.forEach((questionSet, setIndex) => {
+      if (selected.length < config.display_count && questionSet.questions.length > 0) {
+        selected.push({ question: questionSet.questions.shift(), setIndex });
+      }
+    });
+    const remaining = shuffleExamples(sets.flatMap((questionSet, setIndex) => (
+      questionSet.questions.map((question) => ({ question, setIndex }))
+    )));
+    selected.push(...remaining.slice(0, config.display_count - selected.length));
+
+    const selectedQuestions = selected.map((entry) => entry.question);
+    const sameSubset = selectedQuestions.length === displayedExamples.length
+      && selectedQuestions.every((question) => displayedExamples.includes(question));
+    if (sameSubset) {
+      const selectedSet = new Set(selectedQuestions);
+      const replacement = remaining.find((entry) => !selectedSet.has(entry.question));
+      if (replacement) {
+        const sameSetIndex = selected.findIndex((entry) => entry.setIndex === replacement.setIndex);
+        selected[sameSetIndex >= 0 ? sameSetIndex : selected.length - 1] = replacement;
+      }
+    }
+    return selected.map((entry) => entry.question);
+  }
+
+  function renderExamples(selected) {
+    displayedExamples = selected;
+    exampleContainer.replaceChildren();
+    selected.forEach((question) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn-outline-secondary example-question";
+      button.textContent = question;
+      button.disabled = questionInput.disabled;
+      button.addEventListener("click", () => {
+        questionInput.value = question;
+        questionInput.focus();
+      });
+      exampleContainer.appendChild(button);
+    });
+  }
+
+  async function loadExamples() {
+    refreshExamplesButton.disabled = true;
+    examplesStatus.textContent = "Loading examples…";
+    examplesStatus.hidden = false;
+    try {
+      const response = await fetch("./api/examples", { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error("Examples unavailable");
+      const nextConfig = await response.json();
+      const selected = selectExamples(nextConfig);
+      renderExamples(selected);
+      examplesStatus.textContent = "";
+      examplesStatus.hidden = true;
+    } catch (error) {
+      examplesStatus.textContent = "Example questions are temporarily unavailable.";
+      examplesStatus.hidden = false;
+    } finally {
+      refreshExamplesButton.disabled = false;
+    }
+  }
+
+  function renderDocumentChunks(container, data) {
+    container.replaceChildren();
+    const orderNote = document.createElement("p");
+    orderNote.className = "small text-body-secondary";
+    orderNote.textContent = "Chunk numbers indicate display order, which may differ from the original document order.";
+    container.appendChild(orderNote);
+    data.chunks.forEach((chunk) => {
+      const item = document.createElement("article");
+      item.className = "indexed-chunk";
+      item.dataset.chunkId = chunk.id;
+      const heading = document.createElement("h4");
+      heading.className = "h6";
+      heading.textContent = `Chunk ${chunk.display_order}`;
+      const text = document.createElement("p");
+      text.className = "indexed-chunk-content mb-0";
+      text.textContent = chunk.content;
+      item.append(heading, text);
+      if (chunk.truncated) {
+        const note = document.createElement("p");
+        note.className = "small text-body-secondary mt-2 mb-0";
+        note.textContent = "This chunk's text has been shortened for display.";
+        item.appendChild(note);
+      }
+      container.appendChild(item);
+    });
+    if (data.truncated) {
+      const note = document.createElement("p");
+      note.className = "small text-body-secondary mb-0";
+      note.textContent = "This is a limited preview. Some chunks or text may be omitted.";
+      container.appendChild(note);
+    }
+  }
+
+  function addChunkDisclosure(cardBody, indexedDocument) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-sm btn-outline-secondary mt-3";
+    button.textContent = "Show chunks";
+    button.setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-label", `Show chunks for ${indexedDocument.name}`);
+    const container = document.createElement("div");
+    container.id = `document-chunks-${indexedDocument.id}`;
+    container.className = "document-chunks mt-3";
+    container.hidden = true;
+    container.setAttribute("role", "region");
+    container.setAttribute("aria-label", `Chunks from ${indexedDocument.name}`);
+    button.setAttribute("aria-controls", container.id);
+    let loaded = false;
+    let loading = false;
+    button.addEventListener("click", async () => {
+      if (loading) return;
+      const expanding = container.hidden;
+      container.hidden = !expanding;
+      button.setAttribute("aria-expanded", String(expanding));
+      button.textContent = expanding ? "Hide chunks" : "Show chunks";
+      button.setAttribute("aria-label", `${button.textContent} for ${indexedDocument.name}`);
+      if (!expanding || loaded) return;
+      loading = true;
+      button.disabled = true;
+      container.setAttribute("aria-busy", "true");
+      container.textContent = "Loading chunks…";
+      try {
+        let data = documentChunksCache.get(indexedDocument.id);
+        if (!data) {
+          const response = await fetch(`./api/index/${encodeURIComponent(indexedDocument.id)}/chunks`, {
+            headers: { Accept: "application/json" },
+          });
+          if (!response.ok) throw new Error("Chunks unavailable");
+          data = await response.json();
+          documentChunksCache.set(indexedDocument.id, data);
+        }
+        renderDocumentChunks(container, data);
+        loaded = true;
+      } catch (error) {
+        container.textContent = "These chunks could not be loaded. Hide and show chunks to try again.";
+      } finally {
+        loading = false;
+        button.disabled = false;
+        container.setAttribute("aria-busy", "false");
+      }
+    });
+    cardBody.append(button, container);
   }
 
   function renderDocuments(data) {
@@ -119,6 +297,7 @@
         meta.appendChild(sourceType);
       }
       cardBody.appendChild(meta);
+      addChunkDisclosure(cardBody, indexedDocument);
       card.appendChild(cardBody);
       column.appendChild(card);
       documentList.appendChild(column);
@@ -128,7 +307,10 @@
     content.hidden = false;
   }
 
-  async function loadIndex() {
+  async function loadIndex(clearChunkCache = false) {
+    if (clearChunkCache) {
+      documentChunksCache.clear();
+    }
     showState("Loading indexed documents…");
     refreshButton.disabled = true;
     try {
@@ -150,7 +332,7 @@
     questionInput.disabled = isLoading;
     retrievalModeInputs.forEach((input) => { input.disabled = isLoading; });
     askButton.disabled = isLoading;
-    exampleButtons.forEach((button) => { button.disabled = isLoading; });
+    exampleContainer.querySelectorAll(".example-question").forEach((button) => { button.disabled = isLoading; });
     askButton.textContent = isLoading ? "Asking…" : "Ask RAG";
     queryLoading.hidden = !isLoading;
   }
@@ -270,7 +452,7 @@
   }
 
   function activeChunkId() {
-    return hoveredChunkId || focusedChunkId || pinnedChunkId;
+    return pinnedChunkId || focusedChunkId || hoveredChunkId;
   }
 
   function setHoveredChunk(chunkId) {
@@ -299,6 +481,19 @@
 
   function togglePinnedChunk(chunkId) {
     pinnedChunkId = pinnedChunkId === chunkId ? null : chunkId;
+    pinnedQuery = false;
+    updateLinkedInteraction();
+  }
+
+  function togglePinnedQuery() {
+    pinnedQuery = !pinnedQuery;
+    pinnedChunkId = null;
+    updateLinkedInteraction();
+  }
+
+  function clearPinnedSelection() {
+    pinnedChunkId = null;
+    pinnedQuery = false;
     updateLinkedInteraction();
   }
 
@@ -313,6 +508,7 @@
       point.classList.toggle("is-pinned", chunkId === pinnedChunkId);
       point.setAttribute("aria-pressed", String(chunkId === pinnedChunkId));
     });
+    renderPinnedInspector();
     if (viewerState && renderScene) {
       renderViewerScene();
     }
@@ -330,45 +526,211 @@
     return Math.min(maximum, Math.max(minimum, value));
   }
 
-  function normalizeWorldScene(coordinates) {
-    const center = coordinates.reduce(
-      (sum, point) => ({
-        x: sum.x + Number(point.x),
-        y: sum.y + Number(point.y),
-        z: sum.z + Number(point.z),
-      }),
-      { x: 0, y: 0, z: 0 },
-    );
-    center.x /= coordinates.length;
-    center.y /= coordinates.length;
-    center.z /= coordinates.length;
-
-    const centered = coordinates.map((point) => ({
-      x: Number(point.x) - center.x,
-      y: Number(point.y) - center.y,
-      z: Number(point.z) - center.z,
-    }));
-    const sourceRadius = centered.reduce(
-      (maximum, point) => Math.max(maximum, Math.hypot(point.x, point.y, point.z)),
-      0,
-    );
-    const normalizationRadius = sourceRadius || 1;
+  function quaternionNormalize(value) {
+    const length = Math.hypot(value.x, value.y, value.z, value.w) || 1;
     return {
-      points: centered.map((point) => ({
-        x: point.x / normalizationRadius,
-        y: point.y / normalizationRadius,
-        z: point.z / normalizationRadius,
-      })),
-      radius: sourceRadius > 0 ? 1 : 0,
+      x: value.x / length,
+      y: value.y / length,
+      z: value.z / length,
+      w: value.w / length,
     };
   }
 
-  function computeFittedSceneScale(plotWidth, plotHeight) {
-    // Orthographic positioning makes the normalized bounding sphere a strict
-    // rotation-invariant fit; marker space is reserved inside the same SVG rect.
-    const edgePadding = plotPadding + maximumMarkerExtent;
-    const safeWidth = Math.max(2, plotWidth - 2 * edgePadding);
-    const safeHeight = Math.max(2, plotHeight - 2 * edgePadding);
+  function quaternionMultiply(first, second) {
+    return quaternionNormalize({
+      x: first.w * second.x + first.x * second.w + first.y * second.z - first.z * second.y,
+      y: first.w * second.y - first.x * second.z + first.y * second.w + first.z * second.x,
+      z: first.w * second.z + first.x * second.y - first.y * second.x + first.z * second.w,
+      w: first.w * second.w - first.x * second.x - first.y * second.y - first.z * second.z,
+    });
+  }
+
+  function quaternionFromAxisAngle(axis, angle) {
+    const halfAngle = angle / 2;
+    const sine = Math.sin(halfAngle);
+    return quaternionNormalize({
+      x: axis.x * sine,
+      y: axis.y * sine,
+      z: axis.z * sine,
+      w: Math.cos(halfAngle),
+    });
+  }
+
+  function quaternionFromEuler(rotationX, rotationY, rotationZ) {
+    const aroundX = quaternionFromAxisAngle({ x: 1, y: 0, z: 0 }, rotationX);
+    const aroundY = quaternionFromAxisAngle({ x: 0, y: 1, z: 0 }, rotationY);
+    const aroundZ = quaternionFromAxisAngle({ x: 0, y: 0, z: 1 }, rotationZ);
+    return quaternionMultiply(aroundZ, quaternionMultiply(aroundY, aroundX));
+  }
+
+  function rotateWorldPoint(world, rotation) {
+    const vector = { x: rotation.x, y: rotation.y, z: rotation.z };
+    const twiceCross = {
+      x: 2 * (vector.y * world.z - vector.z * world.y),
+      y: 2 * (vector.z * world.x - vector.x * world.z),
+      z: 2 * (vector.x * world.y - vector.y * world.x),
+    };
+    return {
+      x: world.x + rotation.w * twiceCross.x
+        + vector.y * twiceCross.z - vector.z * twiceCross.y,
+      y: world.y + rotation.w * twiceCross.y
+        + vector.z * twiceCross.x - vector.x * twiceCross.z,
+      z: world.z + rotation.w * twiceCross.z
+        + vector.x * twiceCross.y - vector.y * twiceCross.x,
+    };
+  }
+
+  function quaternionBetween(first, second) {
+    const dot = first.x * second.x + first.y * second.y + first.z * second.z;
+    if (dot < -0.9999) {
+      const fallbackAxis = Math.abs(first.x) < 0.8
+        ? { x: 0, y: -first.z, z: first.y }
+        : { x: -first.y, y: first.x, z: 0 };
+      return quaternionFromAxisAngle(fallbackAxis, Math.PI);
+    }
+    return quaternionNormalize({
+      x: first.y * second.z - first.z * second.y,
+      y: first.z * second.x - first.x * second.z,
+      z: first.x * second.y - first.y * second.x,
+      w: 1 + dot,
+    });
+  }
+
+  function trackballVector(event, svg) {
+    const bounds = svg.getBoundingClientRect();
+    const x = (2 * (event.clientX - bounds.left)) / Math.max(bounds.width, 1) - 1;
+    const y = 1 - (2 * (event.clientY - bounds.top)) / Math.max(bounds.height, 1);
+    const distanceSquared = x * x + y * y;
+    if (distanceSquared > 1) {
+      const inverseLength = 1 / Math.sqrt(distanceSquared);
+      return { x: x * inverseLength, y: y * inverseLength, z: 0 };
+    }
+    return { x, y, z: Math.sqrt(1 - distanceSquared) };
+  }
+
+  function niceTickStep(minimum, maximum, targetCount = 5) {
+    const roughStep = Math.max((maximum - minimum) / targetCount, Number.EPSILON);
+    const power = 10 ** Math.floor(Math.log10(roughStep));
+    const normalized = roughStep / power;
+    const multiplier = normalized <= 1.5 ? 1 : normalized <= 3 ? 2 : normalized <= 7 ? 5 : 10;
+    return multiplier * power;
+  }
+
+  function majorTickValues(minimum, maximum) {
+    let step = niceTickStep(minimum, maximum);
+    let values = [];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const first = Math.ceil((minimum - step * 0.000001) / step) * step;
+      values = [];
+      for (let value = first; value <= maximum + step * 0.000001; value += step) {
+        values.push(Math.abs(value) < step * 0.000001 ? 0 : value);
+      }
+      if (values.length <= 6) {
+        break;
+      }
+      step = niceTickStep(0, step * 7, 5);
+    }
+    return { step, values };
+  }
+
+  function buildSceneGeometry(coordinates) {
+    const numericCoordinates = coordinates.map((point) => ({
+      x: Number(point.x),
+      y: Number(point.y),
+      z: Number(point.z),
+    }));
+    const dimensions = ["x", "y", "z"];
+    const dataBounds = Object.fromEntries(dimensions.map((dimension) => [dimension, {
+      minimum: Math.min(0, ...numericCoordinates.map((point) => point[dimension])),
+      maximum: Math.max(0, ...numericCoordinates.map((point) => point[dimension])),
+    }]));
+    const referenceExtent = Math.max(
+      0.000001,
+      ...dimensions.map(
+        (dimension) => dataBounds[dimension].maximum - dataBounds[dimension].minimum,
+      ),
+    );
+    const dataCenter = Object.fromEntries(dimensions.map((dimension) => [
+      dimension,
+      (dataBounds[dimension].minimum + dataBounds[dimension].maximum) / 2,
+    ]));
+    const dataAnchors = numericCoordinates.concat({ x: 0, y: 0, z: 0 });
+    const normalizationRadius = Math.max(
+      ...dataAnchors.map((point) => Math.hypot(
+        point.x - dataCenter.x,
+        point.y - dataCenter.y,
+        point.z - dataCenter.z,
+      )),
+      0.000001,
+    );
+    const toWorld = (point) => ({
+      x: Number(point.x) / normalizationRadius,
+      y: Number(point.y) / normalizationRadius,
+      z: Number(point.z) / normalizationRadius,
+    });
+    // Presentation geometry wraps the data but never participates in the fit.
+    // Each dimension keeps its true asymmetric PCA minimum and maximum.
+    const coordinateRanges = Object.fromEntries(dimensions.map((dimension) => {
+      const span = dataBounds[dimension].maximum - dataBounds[dimension].minimum;
+      const decorationPadding = Math.max(span * 0.035, referenceExtent * 0.0125);
+      return [dimension, {
+        minimum: dataBounds[dimension].minimum - decorationPadding,
+        maximum: dataBounds[dimension].maximum + decorationPadding,
+      }];
+    }));
+    const axisRanges = Object.fromEntries(dimensions.map((dimension) => [dimension, {
+      minimum: coordinateRanges[dimension].minimum / normalizationRadius,
+      maximum: coordinateRanges[dimension].maximum / normalizationRadius,
+    }]));
+    const cornerCoordinates = [];
+    [coordinateRanges.x.minimum, coordinateRanges.x.maximum].forEach((x) => {
+      [coordinateRanges.y.minimum, coordinateRanges.y.maximum].forEach((y) => {
+        [coordinateRanges.z.minimum, coordinateRanges.z.maximum].forEach((z) => {
+          cornerCoordinates.push({ x, y, z });
+        });
+      });
+    });
+    const cuboidEdgeIndices = [
+      [0, 4], [1, 5], [2, 6], [3, 7],
+      [0, 2], [1, 3], [4, 6], [5, 7],
+      [0, 1], [2, 3], [4, 5], [6, 7],
+    ];
+    return {
+      points: numericCoordinates.map(toWorld),
+      origin: Object.freeze({ x: 0, y: 0, z: 0 }),
+      sceneCenter: toWorld(dataCenter),
+      axisRanges,
+      coordinateRanges,
+      cuboid: {
+        corners: cornerCoordinates.map((point, index) => ({
+          index,
+          coordinate: point,
+          world: toWorld(point),
+        })),
+        edgeIndices: cuboidEdgeIndices,
+      },
+      ticks: Object.fromEntries(dimensions.map((dimension) => {
+        const tickSet = majorTickValues(
+          coordinateRanges[dimension].minimum,
+          coordinateRanges[dimension].maximum,
+        );
+        return [dimension, {
+          step: tickSet.step,
+          values: tickSet.values.map((value) => ({
+            value,
+            world: value / normalizationRadius,
+          })),
+        }];
+      })),
+    };
+  }
+
+  function computeFittedSceneScale(sceneWidth, sceneHeight) {
+    // Data points and O are normalized to a unit sphere around sceneCenter.
+    // Decorative axes, grids, ticks, and the cuboid never reduce this scale.
+    const edgePadding = Math.max(scenePadding, maximumMarkerExtent);
+    const safeWidth = Math.max(2, sceneWidth - 2 * edgePadding);
+    const safeHeight = Math.max(2, sceneHeight - 2 * edgePadding);
     return Math.min(safeWidth, safeHeight) / 2;
   }
 
@@ -376,24 +738,103 @@
     const searchResult = searchResultByChunkId.get(point.id);
     const rawPreview = point.preview || (searchResult ? searchResult.content : "");
     const preview = String(rawPreview || "").replace(/\s+/g, " ").trim();
-    return preview.length > 160 ? `${preview.slice(0, 157)}...` : preview;
+    return preview;
+  }
+
+  function formatCoordinate(value) {
+    const number = Number(value);
+    const magnitude = Math.abs(number);
+    if (magnitude >= 10000 || (magnitude > 0 && magnitude < 0.001)) {
+      return number.toExponential(2);
+    }
+    return number.toFixed(3).replace(/\.000$/, ".0");
+  }
+
+  function formatTickValue(value, step) {
+    const rounded = Math.abs(value) < step * 0.000001 ? 0 : value;
+    if (step >= 10000 || step < 0.0001) {
+      return rounded.toExponential(1).replace(/\.0e/, "e");
+    }
+    const decimals = clamp(Math.max(0, -Math.floor(Math.log10(step))), 0, 4);
+    return rounded.toFixed(decimals).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1");
+  }
+
+  function appendCoordinateReadout(container, point) {
+    const readout = document.createElement("dl");
+    readout.className = "embedding-coordinate-readout";
+    ["X", "Y", "Z"].forEach((label) => {
+      const coordinate = document.createElement("div");
+      const term = document.createElement("dt");
+      term.textContent = label;
+      const value = document.createElement("dd");
+      value.textContent = formatCoordinate(point[label.toLowerCase()]);
+      coordinate.append(term, value);
+      readout.appendChild(coordinate);
+    });
+    container.appendChild(readout);
+  }
+
+  function appendHoverCoordinates(container, point) {
+    const coordinates = document.createElement("span");
+    coordinates.className = "embedding-hover-coordinates d-block";
+    coordinates.textContent = ["x", "y", "z"]
+      .map((dimension) => `${dimension.toUpperCase()} ${formatCoordinate(point[dimension])}`)
+      .join(" · ");
+    container.appendChild(coordinates);
+  }
+
+  function renderPinnedInspector() {
+    visualizationInspectorContent.replaceChildren();
+    if (!viewerState || (!pinnedQuery && !pinnedChunkId)) {
+      visualizationInspector.hidden = true;
+      visualizationInspectorTitle.textContent = "Inspector";
+      return;
+    }
+
+    if (pinnedQuery) {
+      visualizationInspectorTitle.textContent = "Query";
+      appendCoordinateReadout(visualizationInspectorContent, viewerState.query.data);
+      visualizationInspector.hidden = false;
+      return;
+    }
+
+    const selected = viewerState.points.find((entry) => entry.data.id === pinnedChunkId);
+    if (!selected) {
+      visualizationInspector.hidden = true;
+      return;
+    }
+    const point = selected.data;
+    visualizationInspectorTitle.textContent = point.retrieved
+      ? `#${point.rank}`
+      : "Indexed chunk";
+    const source = document.createElement("p");
+    source.className = "embedding-inspector-source";
+    source.textContent = point.source || "Unknown source";
+    visualizationInspectorContent.appendChild(source);
+    const previewText = safePointPreview(point);
+    if (previewText) {
+      const preview = document.createElement("p");
+      preview.className = "embedding-inspector-preview";
+      preview.textContent = previewText;
+      visualizationInspectorContent.appendChild(preview);
+    }
+    appendCoordinateReadout(visualizationInspectorContent, point);
+    visualizationInspector.hidden = false;
   }
 
   function projectWorldPoint(world, state) {
-    const cosX = Math.cos(state.rotationX);
-    const sinX = Math.sin(state.rotationX);
-    const cosY = Math.cos(state.rotationY);
-    const sinY = Math.sin(state.rotationY);
-    const rotatedY = world.y * cosX - world.z * sinX;
-    const rotatedZAfterX = world.y * sinX + world.z * cosX;
-    const rotatedX = world.x * cosY + rotatedZAfterX * sinY;
-    const rotatedZ = -world.x * sinY + rotatedZAfterX * cosY;
+    const centered = {
+      x: world.x - state.sceneCenterWorld.x,
+      y: world.y - state.sceneCenterWorld.y,
+      z: world.z - state.sceneCenterWorld.z,
+    };
+    const rotated = rotateWorldPoint(centered, state.rotation);
     const sceneScale = state.fittedSceneScale * state.zoom;
     return {
-      x: state.plotBounds.x + state.plotBounds.width / 2 + rotatedX * sceneScale,
-      y: state.plotBounds.y + state.plotBounds.height / 2 - rotatedY * sceneScale,
-      depth: rotatedZ,
-      depthRatio: clamp((rotatedZ + 1.25) / 2.5, 0, 1),
+      x: state.sceneBounds.x + state.sceneBounds.width / 2 + rotated.x * sceneScale,
+      y: state.sceneBounds.y + state.sceneBounds.height / 2 - rotated.y * sceneScale,
+      depth: rotated.z,
+      depthRatio: clamp((rotated.z + 1) / 2, 0, 1),
     };
   }
 
@@ -435,21 +876,27 @@
     visualizationTooltip.style.top = `${tooltipTop}px`;
   }
 
-  function renderPointTooltip(point, projected, state) {
+  function renderChunkHoverLabel(point, projected, state) {
     visualizationTooltip.replaceChildren();
     const heading = document.createElement("strong");
     heading.className = "d-block";
-    heading.textContent = `#${point.rank} · ${point.source}`;
+    heading.textContent = point.retrieved
+      ? `#${point.rank} · ${point.source}`
+      : point.source || "Indexed chunk";
     visualizationTooltip.appendChild(heading);
-    const preview = safePointPreview(point);
-    if (preview) {
-      const content = document.createElement("span");
-      content.className = "d-block mt-1";
-      content.textContent = preview;
-      visualizationTooltip.appendChild(content);
-    }
+    appendHoverCoordinates(visualizationTooltip, point);
     visualizationTooltip.hidden = false;
-    // Overlay constraints are independent of the projected point geometry.
+    positionPointTooltip(projected, state);
+  }
+
+  function renderQueryHoverLabel(query, projected, state) {
+    visualizationTooltip.replaceChildren();
+    const heading = document.createElement("strong");
+    heading.className = "d-block";
+    heading.textContent = "Query";
+    visualizationTooltip.appendChild(heading);
+    appendHoverCoordinates(visualizationTooltip, query);
+    visualizationTooltip.hidden = false;
     positionPointTooltip(projected, state);
   }
 
@@ -460,19 +907,28 @@
     visualizationTooltip.style.removeProperty("top");
   }
 
-  function hideConnectionLine(line) {
-    // SVG visibility is explicit because HTMLElement.hidden is not reliable on
-    // SVG geometry; removing endpoints also prevents stale lines from returning.
-    line.setAttribute("visibility", "hidden");
-    ["x1", "y1", "x2", "y2"].forEach((attribute) => line.removeAttribute(attribute));
+  function setProjectedLine(line, start, end) {
+    line.setAttribute("x1", String(start.x));
+    line.setAttribute("y1", String(start.y));
+    line.setAttribute("x2", String(end.x));
+    line.setAttribute("y2", String(end.y));
   }
 
-  function showConnectionLine(line, queryPoint, chunkPoint) {
-    line.setAttribute("x1", String(queryPoint.x));
-    line.setAttribute("y1", String(queryPoint.y));
-    line.setAttribute("x2", String(chunkPoint.x));
-    line.setAttribute("y2", String(chunkPoint.y));
-    line.setAttribute("visibility", "visible");
+  function shortenProjectedLineEnd(start, end, distance) {
+    const length = Math.hypot(end.x - start.x, end.y - start.y);
+    if (length <= distance || length === 0) {
+      return end;
+    }
+    const ratio = (length - distance) / length;
+    return {
+      x: start.x + (end.x - start.x) * ratio,
+      y: start.y + (end.y - start.y) * ratio,
+    };
+  }
+
+  function positionSpatialLabel(label, projected, offsetX = 10, offsetY = -10) {
+    label.setAttribute("x", String(projected.x + offsetX));
+    label.setAttribute("y", String(projected.y + offsetY));
   }
 
   function renderViewerScene() {
@@ -481,14 +937,92 @@
       return;
     }
 
+    const projectedOrigin = projectWorldPoint(state.origin.world, state);
     const projectedQuery = projectWorldPoint(state.query.world, state);
     const projectedPoints = state.points.map((entry) => ({
       entry,
       projected: projectWorldPoint(entry.world, state),
     }));
+    const projectedById = new Map(
+      projectedPoints.map(({ entry, projected }) => [entry.data.id, projected]),
+    );
 
-    // SVG has no depth buffer, so far-to-near DOM ordering supplies the small
-    // point cloud with a readable and dependency-free depth cue.
+    const projectedCuboidCorners = state.cuboid.corners.map((corner) => ({
+      corner,
+      projected: projectWorldPoint(corner.world, state),
+    }));
+    state.cuboid.edges.forEach((edge) => {
+      const projectedStart = projectedCuboidCorners[edge.startIndex].projected;
+      const projectedEnd = projectedCuboidCorners[edge.endIndex].projected;
+      setProjectedLine(edge.visual, projectedStart, projectedEnd);
+      edge.visual.style.opacity = String(
+        0.14 + ((projectedStart.depthRatio + projectedEnd.depthRatio) / 2) * 0.16,
+      );
+    });
+    projectedCuboidCorners.forEach(({ corner, projected }) => {
+      corner.visual.setAttribute("transform", `translate(${projected.x} ${projected.y})`);
+      corner.visual.style.opacity = String(0.18 + projected.depthRatio * 0.16);
+    });
+
+    state.gridLines.forEach((gridLine) => {
+      const projectedStart = projectWorldPoint(gridLine.startWorld, state);
+      const projectedEnd = projectWorldPoint(gridLine.endWorld, state);
+      setProjectedLine(gridLine.visual, projectedStart, projectedEnd);
+      gridLine.visual.style.opacity = String(
+        gridLine.baseOpacity
+          + ((projectedStart.depthRatio + projectedEnd.depthRatio) / 2) * gridLine.depthOpacity,
+      );
+    });
+
+    state.axes.forEach((axis) => {
+      const projectedNegative = projectWorldPoint(axis.negativeWorld, state);
+      const projectedPositive = projectWorldPoint(axis.positiveWorld, state);
+      setProjectedLine(axis.visual.negativeLine, projectedOrigin, projectedNegative);
+      setProjectedLine(axis.visual.positiveLine, projectedOrigin, projectedPositive);
+      positionSpatialLabel(axis.visual.label, projectedPositive);
+      axis.ticks.forEach((tick) => {
+        const projectedStart = projectWorldPoint(tick.startWorld, state);
+        const projectedEnd = projectWorldPoint(tick.endWorld, state);
+        const projectedCenter = projectWorldPoint(tick.centerWorld, state);
+        setProjectedLine(tick.visual.line, projectedStart, projectedEnd);
+        positionSpatialLabel(tick.visual.label, projectedCenter, 6, -6);
+      });
+      const axisDepthRatio = clamp(
+        (projectedNegative.depthRatio + projectedPositive.depthRatio) / 2,
+        0,
+        1,
+      );
+      axis.visual.group.style.opacity = String(0.48 + axisDepthRatio * 0.38);
+    });
+
+    state.origin.visual.group.setAttribute(
+      "transform",
+      `translate(${projectedOrigin.x} ${projectedOrigin.y})`,
+    );
+    const queryScale = 0.9 + projectedQuery.depthRatio * 0.25;
+    const projectedVectorEnd = shortenProjectedLineEnd(
+      projectedOrigin,
+      projectedQuery,
+      24 * queryScale,
+    );
+    setProjectedLine(state.query.visual.vector, projectedOrigin, projectedVectorEnd);
+    state.query.visual.vector.style.opacity = String(0.8 + projectedQuery.depthRatio * 0.2);
+
+    const activeId = activeChunkId();
+    state.connections.forEach((connection, chunkId) => {
+      const projectedChunk = projectedById.get(chunkId);
+      if (!projectedChunk) {
+        return;
+      }
+      setProjectedLine(connection, projectedQuery, projectedChunk);
+      connection.classList.toggle("is-active", chunkId === activeId);
+      connection.style.opacity = chunkId === activeId
+        ? "1"
+        : String(0.32 + ((projectedQuery.depthRatio + projectedChunk.depthRatio) / 2) * 0.28);
+    });
+
+    // SVG has no depth buffer, so far-to-near DOM ordering, scale, and opacity
+    // provide consistent depth cues without adding perspective distortion.
     projectedPoints.sort((first, second) => first.projected.depth - second.projected.depth);
     projectedPoints.forEach(({ entry, projected }) => {
       const depthScale = 0.82 + projected.depthRatio * 0.34;
@@ -504,36 +1038,51 @@
       state.pointLayer.appendChild(entry.visual.group);
     });
 
-    const queryScale = 0.9 + projectedQuery.depthRatio * 0.25;
+    const activePoint = projectedPoints.find(({ entry }) => entry.data.id === activeId);
+    if (activePoint) {
+      state.pointLayer.appendChild(activePoint.entry.visual.group);
+    }
+
     state.query.visual.group.setAttribute(
       "transform",
       `translate(${projectedQuery.x} ${projectedQuery.y}) scale(${queryScale})`,
     );
 
-    const activeId = activeChunkId();
-    const activePoint = projectedPoints.find(
-      ({ entry }) => entry.data.retrieved && entry.data.id === activeId,
+    state.query.visual.group.classList.toggle(
+      "is-inspected",
+      state.queryHovered || state.queryFocused || pinnedQuery,
     );
-    if (activePoint) {
-      // This line is a presentation cue between two projected points, not a
-      // retrieval vector, distance, angle, or replacement for the real score.
-      showConnectionLine(state.connectionLine, projectedQuery, activePoint.projected);
-      renderPointTooltip(activePoint.entry.data, activePoint.projected, state);
+    state.query.visual.group.classList.toggle("is-pinned", pinnedQuery);
+    state.query.visual.group.setAttribute("aria-pressed", String(pinnedQuery));
+    if (state.queryHovered || state.queryFocused) {
+      renderQueryHoverLabel(state.query.data, projectedQuery, state);
     } else {
-      hideConnectionLine(state.connectionLine);
-      clearPointTooltip();
+      const tooltipId = activeId || state.hoveredScenePointId;
+      const tooltipPoint = state.points.find((entry) => entry.data.id === tooltipId);
+      const projectedTooltipPoint = tooltipId ? projectedById.get(tooltipId) : null;
+      if (tooltipPoint && projectedTooltipPoint) {
+        renderChunkHoverLabel(tooltipPoint.data, projectedTooltipPoint, state);
+      } else {
+        clearPointTooltip();
+      }
     }
   }
 
   function installCameraInteraction(state) {
     const { svg } = state;
+    svg.addEventListener("wheel", (event) => {
+      if (event.deltaY === 0) {
+        return;
+      }
+      event.preventDefault();
+      zoomViewer(event.deltaY < 0 ? wheelZoomFactor : 1 / wheelZoomFactor);
+    }, { passive: false });
     svg.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) {
         return;
       }
       state.pointerId = event.pointerId;
-      state.lastPointerX = event.clientX;
-      state.lastPointerY = event.clientY;
+      state.lastTrackballVector = trackballVector(event, svg);
       state.dragMoved = false;
       svg.setPointerCapture(event.pointerId);
       svg.classList.add("is-dragging");
@@ -543,15 +1092,18 @@
       if (state.pointerId !== event.pointerId) {
         return;
       }
-      const deltaX = event.clientX - state.lastPointerX;
-      const deltaY = event.clientY - state.lastPointerY;
-      if (Math.abs(deltaX) + Math.abs(deltaY) > 1) {
+      const nextTrackballVector = trackballVector(event, svg);
+      const movement = Math.hypot(
+        nextTrackballVector.x - state.lastTrackballVector.x,
+        nextTrackballVector.y - state.lastTrackballVector.y,
+        nextTrackballVector.z - state.lastTrackballVector.z,
+      );
+      if (movement > 0.002) {
         state.dragMoved = true;
       }
-      state.rotationY += deltaX * 0.008;
-      state.rotationX = clamp(state.rotationX - deltaY * 0.008, -1.45, 1.45);
-      state.lastPointerX = event.clientX;
-      state.lastPointerY = event.clientY;
+      const deltaRotation = quaternionBetween(state.lastTrackballVector, nextTrackballVector);
+      state.rotation = quaternionMultiply(deltaRotation, state.rotation);
+      state.lastTrackballVector = nextTrackballVector;
       renderViewerScene();
       event.preventDefault();
     });
@@ -560,14 +1112,20 @@
       if (state.pointerId !== event.pointerId) {
         return;
       }
-      if (svg.hasPointerCapture(event.pointerId)) {
-        svg.releasePointerCapture(event.pointerId);
+      try {
+        if (svg.hasPointerCapture(event.pointerId)) {
+          svg.releasePointerCapture(event.pointerId);
+        }
+      } catch {
+        // Pointer capture can end before cancellation or a lost-capture event.
       }
       state.pointerId = null;
+      state.lastTrackballVector = null;
       svg.classList.remove("is-dragging");
     };
     svg.addEventListener("pointerup", endDrag);
     svg.addEventListener("pointercancel", endDrag);
+    svg.addEventListener("lostpointercapture", endDrag);
     svg.addEventListener("click", () => {
       if (!state.dragMoved) {
         const activeElement = document.activeElement;
@@ -576,6 +1134,7 @@
         }
         focusedChunkId = null;
         pinnedChunkId = null;
+        pinnedQuery = false;
         updateLinkedInteraction();
       }
       state.dragMoved = false;
@@ -611,8 +1170,7 @@
       }
     }
     state.pointerId = null;
-    state.lastPointerX = 0;
-    state.lastPointerY = 0;
+    state.lastTrackballVector = null;
     state.dragMoved = false;
     state.svg.classList.remove("is-dragging");
   }
@@ -625,33 +1183,94 @@
     hoveredChunkId = null;
     focusedChunkId = null;
     pinnedChunkId = null;
+    pinnedQuery = false;
+    state.hoveredScenePointId = null;
+    state.queryHovered = false;
+    state.queryFocused = false;
     const activeElement = document.activeElement;
     if (activeElement && state.svg.contains(activeElement) && typeof activeElement.blur === "function") {
       activeElement.blur();
     }
     resetPointerInteraction(state);
-    state.rotationX = state.initialCamera.rotationX;
-    state.rotationY = state.initialCamera.rotationY;
+    state.rotation = { ...state.initialCamera.rotation };
     state.zoom = state.initialCamera.zoom;
     updateZoomControls(state);
-    hideConnectionLine(state.connectionLine);
     clearPointTooltip();
+    renderPinnedInspector();
     updateLinkedInteraction(false);
     renderViewerScene();
+  }
+
+  function resizeViewerToCanvas(state) {
+    if (viewerState !== state) {
+      return;
+    }
+    const bounds = visualizationCanvas.getBoundingClientRect();
+    const width = Math.max(320, Math.round(bounds.width || state.width));
+    const height = Math.max(360, Math.round(bounds.height || state.height));
+    if (width === state.width && height === state.height) {
+      return;
+    }
+    state.width = width;
+    state.height = height;
+    state.sceneBounds = Object.freeze({ x: 0, y: 0, width, height });
+    state.fittedSceneScale = computeFittedSceneScale(width, height);
+    state.svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    state.background.setAttribute("width", String(width));
+    state.background.setAttribute("height", String(height));
+    renderViewerScene();
+  }
+
+  function setPresentationMode(expanded, resize = true) {
+    visualizationPanel.classList.toggle("is-expanded", expanded);
+    visualizationPanel.setAttribute("aria-expanded", String(expanded));
+    expandViewButton.hidden = expanded;
+    restoreViewButton.hidden = !expanded;
+    closeExpandedViewButton.hidden = !expanded;
+    if (!resize || !viewerState) {
+      return;
+    }
+    resizeViewerToCanvas(viewerState);
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        if (viewerState) {
+          resizeViewerToCanvas(viewerState);
+        }
+      });
+    }
+  }
+
+  function visualizationDisplayNote(note) {
+    const message = String(note || "").trim();
+    if (message === redundantVisualizationNote) {
+      return "";
+    }
+    if (message.startsWith(`${redundantVisualizationNote} `)) {
+      return message.slice(redundantVisualizationNote.length).trim();
+    }
+    return message;
   }
 
   function renderVisualization(visualization, searchMode) {
     visualizationLabel.textContent = visualization.label;
     visualizationTechnicalLabel.textContent = visualization.technical_label;
-    visualizationNote.textContent = visualization.note;
-    visualizationCanvas.replaceChildren(visualizationTooltip);
+    const displayNote = visualizationDisplayNote(visualization.note);
+    visualizationNote.textContent = displayNote;
+    setPresentationMode(false, false);
+    if (viewerState && viewerState.resizeObserver) {
+      viewerState.resizeObserver.disconnect();
+    }
+    visualizationCanvas.replaceChildren(visualizationTooltip, visualizationInspector);
     visualizationTooltip.hidden = true;
     visualizationTooltip.replaceChildren();
+    visualizationInspector.hidden = true;
+    visualizationInspectorContent.replaceChildren();
     visualizationPointByChunkId.clear();
     viewerState = null;
     hoveredChunkId = null;
     focusedChunkId = null;
     pinnedChunkId = null;
+    pinnedQuery = false;
 
     const isSemantic = searchMode === "semantic";
     visualizationSection.hidden = !isSemantic;
@@ -671,7 +1290,7 @@
       && visualization.query
       && visualization.points.length > 0
       && coordinatesAreFinite;
-    visualizationNote.hidden = !canRender;
+    visualizationNote.hidden = !canRender || !displayNote;
     visualizationStatus.hidden = canRender;
     visualizationPanel.hidden = !canRender;
     if (!canRender) {
@@ -679,61 +1298,259 @@
       return;
     }
 
-    const width = 960;
-    const height = 560;
-    const plotInset = 1;
-    const plotBounds = Object.freeze({
-      x: plotInset,
-      y: plotInset,
-      width: width - plotInset * 2,
-      height: height - plotInset * 2,
+    const canvasBounds = visualizationCanvas.getBoundingClientRect();
+    const width = Math.max(320, Math.round(canvasBounds.width || 960));
+    const height = Math.max(360, Math.round(canvasBounds.height || 600));
+    const sceneBounds = Object.freeze({
+      x: 0,
+      y: 0,
+      width,
+      height,
     });
-    const normalizedScene = normalizeWorldScene(allCoordinates);
-    const fittedSceneScale = computeFittedSceneScale(plotBounds.width, plotBounds.height);
+    const sceneGeometry = buildSceneGeometry(allCoordinates);
+    const fittedSceneScale = computeFittedSceneScale(sceneBounds.width, sceneBounds.height);
     const svg = svgElement("svg", "embedding-map");
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
     svg.setAttribute("role", "group");
     svg.setAttribute("aria-label", "Interactive three-dimensional projection of indexed chunks and the Query");
 
     const background = svgElement("rect", "embedding-map-background");
-    background.setAttribute("x", String(plotBounds.x));
-    background.setAttribute("y", String(plotBounds.y));
-    background.setAttribute("width", String(plotBounds.width));
-    background.setAttribute("height", String(plotBounds.height));
-    background.setAttribute("rx", "12");
+    background.setAttribute("x", "0");
+    background.setAttribute("y", "0");
+    background.setAttribute("width", String(width));
+    background.setAttribute("height", String(height));
     svg.appendChild(background);
 
-    const connectionLine = svgElement("line", "query-connection");
-    hideConnectionLine(connectionLine);
-    svg.appendChild(connectionLine);
+    const definitions = svgElement("defs", "");
+    const axisArrow = svgElement("marker", "");
+    axisArrow.id = "embedding-axis-arrowhead";
+    axisArrow.setAttribute("viewBox", "0 0 10 10");
+    axisArrow.setAttribute("refX", "9");
+    axisArrow.setAttribute("refY", "5");
+    axisArrow.setAttribute("markerWidth", "7");
+    axisArrow.setAttribute("markerHeight", "7");
+    axisArrow.setAttribute("orient", "auto-start-reverse");
+    const axisArrowPath = svgElement("path", "embedding-axis-arrow");
+    axisArrowPath.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    axisArrow.appendChild(axisArrowPath);
+    const queryArrow = svgElement("marker", "");
+    queryArrow.id = "query-vector-arrowhead";
+    queryArrow.setAttribute("viewBox", "0 0 10 10");
+    queryArrow.setAttribute("refX", "8");
+    queryArrow.setAttribute("refY", "5");
+    queryArrow.setAttribute("markerWidth", "9");
+    queryArrow.setAttribute("markerHeight", "9");
+    queryArrow.setAttribute("orient", "auto-start-reverse");
+    const queryArrowPath = svgElement("path", "query-vector-arrow");
+    queryArrowPath.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    queryArrow.appendChild(queryArrowPath);
+    definitions.append(axisArrow, queryArrow);
+    svg.appendChild(definitions);
+
+    const cuboidLayer = svgElement("g", "embedding-cuboid");
+    ["x", "y", "z"].forEach((dimension) => {
+      cuboidLayer.dataset[`${dimension}Minimum`] = String(
+        sceneGeometry.coordinateRanges[dimension].minimum,
+      );
+      cuboidLayer.dataset[`${dimension}Maximum`] = String(
+        sceneGeometry.coordinateRanges[dimension].maximum,
+      );
+    });
+    const gridLayer = svgElement("g", "embedding-grid-layer");
+    const axisLayer = svgElement("g", "embedding-axis-layer");
+    const connectionLayer = svgElement("g", "embedding-connection-layer");
+    const queryVectorLayer = svgElement("g", "embedding-query-vector-layer");
     const pointLayer = svgElement("g", "embedding-point-layer");
+    const originLayer = svgElement("g", "embedding-origin-layer");
     const queryLayer = svgElement("g", "embedding-query-layer");
-    svg.append(pointLayer, queryLayer);
+    svg.append(
+      cuboidLayer,
+      gridLayer,
+      axisLayer,
+      connectionLayer,
+      queryVectorLayer,
+      pointLayer,
+      originLayer,
+      queryLayer,
+    );
 
     const initialCamera = Object.freeze({
-      rotationX: defaultCamera.rotationX,
-      rotationY: defaultCamera.rotationY,
+      rotation: defaultCamera.rotation,
       zoom: defaultCamera.zoom,
     });
     const state = {
       width,
       height,
       svg,
+      background,
+      cuboidLayer,
+      gridLayer,
+      axisLayer,
+      connectionLayer,
+      queryVectorLayer,
       pointLayer,
-      connectionLine,
-      plotBounds,
+      originLayer,
+      sceneBounds,
+      sceneCenterWorld: sceneGeometry.sceneCenter,
+      cuboid: null,
+      gridLines: [],
+      axes: [],
+      connections: new Map(),
       points: [],
+      origin: null,
       query: null,
       initialCamera,
       fittedSceneScale,
-      rotationX: initialCamera.rotationX,
-      rotationY: initialCamera.rotationY,
+      rotation: { ...initialCamera.rotation },
       zoom: initialCamera.zoom,
       pointerId: null,
-      lastPointerX: 0,
-      lastPointerY: 0,
+      lastTrackballVector: null,
       dragMoved: false,
+      hoveredScenePointId: null,
+      queryHovered: false,
+      queryFocused: false,
+      resizeObserver: null,
     };
+
+    const cuboidCorners = sceneGeometry.cuboid.corners.map((corner) => {
+      const visual = svgElement("circle", "embedding-cuboid-corner");
+      visual.setAttribute("r", "1.7");
+      visual.dataset.cornerIndex = String(corner.index);
+      visual.dataset.x = String(corner.coordinate.x);
+      visual.dataset.y = String(corner.coordinate.y);
+      visual.dataset.z = String(corner.coordinate.z);
+      cuboidLayer.appendChild(visual);
+      return { ...corner, visual };
+    });
+    const cuboidEdges = sceneGeometry.cuboid.edgeIndices.map(([startIndex, endIndex]) => {
+      const visual = svgElement("line", "embedding-cuboid-edge");
+      visual.dataset.startCorner = String(startIndex);
+      visual.dataset.endCorner = String(endIndex);
+      cuboidLayer.appendChild(visual);
+      return { startIndex, endIndex, visual };
+    });
+    state.cuboid = { corners: cuboidCorners, edges: cuboidEdges };
+
+    const addGridLine = (startWorld, endWorld, plane, isOriginLine) => {
+      const line = svgElement(
+        "line",
+        `embedding-grid-line${isOriginLine ? " embedding-grid-origin-line" : ""}`,
+      );
+      line.dataset.plane = plane;
+      gridLayer.appendChild(line);
+      state.gridLines.push({
+        startWorld,
+        endWorld,
+        plane,
+        baseOpacity: plane === "xy" ? 0.09 : 0.035,
+        depthOpacity: plane === "xy" ? 0.14 : 0.075,
+        visual: line,
+      });
+    };
+    sceneGeometry.ticks.x.values.forEach((tick) => {
+      addGridLine(
+        { x: tick.world, y: sceneGeometry.axisRanges.y.minimum, z: 0 },
+        { x: tick.world, y: sceneGeometry.axisRanges.y.maximum, z: 0 },
+        "xy",
+        tick.value === 0,
+      );
+      addGridLine(
+        { x: tick.world, y: 0, z: sceneGeometry.axisRanges.z.minimum },
+        { x: tick.world, y: 0, z: sceneGeometry.axisRanges.z.maximum },
+        "xz",
+        tick.value === 0,
+      );
+    });
+    sceneGeometry.ticks.y.values.forEach((tick) => {
+      addGridLine(
+        { x: sceneGeometry.axisRanges.x.minimum, y: tick.world, z: 0 },
+        { x: sceneGeometry.axisRanges.x.maximum, y: tick.world, z: 0 },
+        "xy",
+        tick.value === 0,
+      );
+      addGridLine(
+        { x: 0, y: tick.world, z: sceneGeometry.axisRanges.z.minimum },
+        { x: 0, y: tick.world, z: sceneGeometry.axisRanges.z.maximum },
+        "yz",
+        tick.value === 0,
+      );
+    });
+    sceneGeometry.ticks.z.values.forEach((tick) => {
+      addGridLine(
+        { x: sceneGeometry.axisRanges.x.minimum, y: 0, z: tick.world },
+        { x: sceneGeometry.axisRanges.x.maximum, y: 0, z: tick.world },
+        "xz",
+        tick.value === 0,
+      );
+      addGridLine(
+        { x: 0, y: sceneGeometry.axisRanges.y.minimum, z: tick.world },
+        { x: 0, y: sceneGeometry.axisRanges.y.maximum, z: tick.world },
+        "yz",
+        tick.value === 0,
+      );
+    });
+
+    ["x", "y", "z"].forEach((dimension) => {
+      const group = svgElement("g", `embedding-axis embedding-axis-${dimension}`);
+      const negativeLine = svgElement("line", "embedding-axis-line embedding-axis-negative");
+      const positiveLine = svgElement("line", "embedding-axis-line embedding-axis-positive");
+      positiveLine.setAttribute("marker-end", "url(#embedding-axis-arrowhead)");
+      const label = svgElement("text", "embedding-axis-label");
+      label.textContent = dimension.toUpperCase();
+      const negativeWorld = { x: 0, y: 0, z: 0 };
+      const positiveWorld = { x: 0, y: 0, z: 0 };
+      negativeWorld[dimension] = sceneGeometry.axisRanges[dimension].minimum;
+      positiveWorld[dimension] = sceneGeometry.axisRanges[dimension].maximum;
+      const ticks = sceneGeometry.ticks[dimension].values
+        .filter((tick) => tick.value !== 0)
+        .map((tick) => {
+          const centerWorld = { x: 0, y: 0, z: 0 };
+          centerWorld[dimension] = tick.world;
+          const startWorld = { ...centerWorld };
+          const endWorld = { ...centerWorld };
+          const tickDimension = dimension === "x" ? "y" : "x";
+          startWorld[tickDimension] = -0.012;
+          endWorld[tickDimension] = 0.012;
+          const tickLine = svgElement("line", "embedding-axis-tick");
+          const tickLabel = svgElement("text", "embedding-axis-tick-label");
+          tickLabel.textContent = formatTickValue(tick.value, sceneGeometry.ticks[dimension].step);
+          group.append(tickLine, tickLabel);
+          return {
+            startWorld,
+            endWorld,
+            centerWorld,
+            value: tick.value,
+            visual: { line: tickLine, label: tickLabel },
+          };
+        });
+      group.append(negativeLine, positiveLine, label);
+      axisLayer.appendChild(group);
+      state.axes.push({
+        dimension,
+        negativeWorld,
+        positiveWorld,
+        ticks,
+        visual: { group, negativeLine, positiveLine, label },
+      });
+    });
+
+    const originGroup = svgElement("g", "embedding-origin");
+    const originMarker = svgElement("circle", "embedding-origin-marker");
+    originMarker.setAttribute("r", "5");
+    const originLabel = svgElement("text", "embedding-origin-label");
+    originLabel.setAttribute("x", "11");
+    originLabel.setAttribute("y", "-10");
+    originLabel.textContent = "O";
+    originGroup.append(originMarker, originLabel);
+    originLayer.appendChild(originGroup);
+    state.origin = {
+      world: sceneGeometry.origin,
+      visual: { group: originGroup },
+    };
+
+    const queryVector = svgElement("line", "query-vector");
+    queryVector.setAttribute("marker-end", "url(#query-vector-arrowhead)");
+    queryVectorLayer.appendChild(queryVector);
 
     visualization.points.forEach((point, index) => {
       const group = svgElement(
@@ -742,7 +1559,7 @@
       );
       group.dataset.chunkId = point.id;
       const marker = svgElement("circle", "embedding-point-marker");
-      marker.setAttribute("r", point.retrieved ? "16" : "5.5");
+      marker.setAttribute("r", point.retrieved ? "14" : "5");
       group.appendChild(marker);
       const nativeTooltip = svgElement("title", "");
       nativeTooltip.textContent = point.retrieved
@@ -750,38 +1567,65 @@
         : `Indexed chunk: ${point.source}`;
       group.appendChild(nativeTooltip);
 
+      group.addEventListener("mouseenter", () => {
+        state.hoveredScenePointId = point.id;
+        if (point.retrieved) {
+          setHoveredChunk(point.id);
+        } else {
+          renderViewerScene();
+        }
+      });
+      group.addEventListener("mouseleave", () => {
+        if (state.hoveredScenePointId === point.id) {
+          state.hoveredScenePointId = null;
+        }
+        if (point.retrieved) {
+          clearHoveredChunk(point.id);
+        } else {
+          renderViewerScene();
+        }
+      });
+
+      group.setAttribute("tabindex", "0");
+      group.setAttribute("role", "button");
+      group.setAttribute(
+        "aria-label",
+        point.retrieved
+          ? `Retrieved rank ${point.rank}, ${point.source}. Press Enter to pin this point.`
+          : `Indexed chunk, ${point.source}. Press Enter to pin this point.`,
+      );
+      group.setAttribute("aria-pressed", "false");
+      visualizationPointByChunkId.set(point.id, group);
+      group.addEventListener("focus", () => setFocusedChunk(point.id));
+      group.addEventListener("blur", () => clearFocusedChunk(point.id));
+      group.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (!state.dragMoved) {
+          togglePinnedChunk(point.id);
+        }
+        state.dragMoved = false;
+      });
+      group.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          togglePinnedChunk(point.id);
+        }
+      });
+
       if (point.retrieved) {
-        group.setAttribute("tabindex", "0");
-        group.setAttribute("role", "button");
-        group.setAttribute("aria-label", `Retrieved rank ${point.rank}, ${point.source}. Press Enter to pin this point.`);
-        group.setAttribute("aria-pressed", "false");
         const rank = svgElement("text", "embedding-rank");
         rank.setAttribute("text-anchor", "middle");
         rank.setAttribute("dominant-baseline", "central");
-        rank.textContent = String(point.rank);
+        rank.textContent = `#${point.rank}`;
         group.appendChild(rank);
-        visualizationPointByChunkId.set(point.id, group);
-        group.addEventListener("mouseenter", () => setHoveredChunk(point.id));
-        group.addEventListener("mouseleave", () => clearHoveredChunk(point.id));
-        group.addEventListener("focus", () => setFocusedChunk(point.id));
-        group.addEventListener("blur", () => clearFocusedChunk(point.id));
-        group.addEventListener("click", (event) => {
-          event.stopPropagation();
-          if (!state.dragMoved) {
-            togglePinnedChunk(point.id);
-          }
-          state.dragMoved = false;
-        });
-        group.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            togglePinnedChunk(point.id);
-          }
-        });
+        const connection = svgElement("line", "query-retrieval-connection");
+        connection.dataset.chunkId = point.id;
+        connectionLayer.appendChild(connection);
+        state.connections.set(point.id, connection);
       }
       const entry = {
         data: point,
-        world: normalizedScene.points[index],
+        world: sceneGeometry.points[index],
         visual: { group },
       };
       state.points.push(entry);
@@ -789,8 +1633,10 @@
     });
 
     const queryGroup = svgElement("g", "embedding-query-point");
-    queryGroup.setAttribute("role", "img");
-    queryGroup.setAttribute("aria-label", "Query");
+    queryGroup.setAttribute("tabindex", "0");
+    queryGroup.setAttribute("role", "button");
+    queryGroup.setAttribute("aria-pressed", "false");
+    queryGroup.setAttribute("aria-label", "Query vector endpoint. Press Enter to pin its PCA coordinates.");
     const queryMarker = svgElement("polygon", "embedding-query-marker");
     queryMarker.setAttribute("points", "0,-21 21,0 0,21 -21,0");
     const queryLabel = svgElement("text", "embedding-query-label");
@@ -798,23 +1644,57 @@
     queryLabel.setAttribute("dominant-baseline", "central");
     queryLabel.textContent = "Q";
     const queryTooltip = svgElement("title", "");
-    queryTooltip.textContent = "Query";
+    queryTooltip.textContent = `Query — X ${formatCoordinate(visualization.query.x)}, Y ${formatCoordinate(visualization.query.y)}, Z ${formatCoordinate(visualization.query.z)}`;
     queryGroup.append(queryMarker, queryLabel, queryTooltip);
     queryLayer.appendChild(queryGroup);
     state.query = {
       data: visualization.query,
-      world: normalizedScene.points[normalizedScene.points.length - 1],
-      visual: { group: queryGroup },
+      world: sceneGeometry.points[visualization.points.length],
+      visual: { group: queryGroup, vector: queryVector },
     };
 
-    // Camera rotation belongs in the browser so visitors can play with the
-    // safe three-coordinate projection; no raw embedding or 3D library is needed.
+    queryGroup.addEventListener("mouseenter", () => {
+      state.queryHovered = true;
+      renderViewerScene();
+    });
+    queryGroup.addEventListener("mouseleave", () => {
+      state.queryHovered = false;
+      renderViewerScene();
+    });
+    queryGroup.addEventListener("focus", () => {
+      state.queryFocused = true;
+      renderViewerScene();
+    });
+    queryGroup.addEventListener("blur", () => {
+      state.queryFocused = false;
+      renderViewerScene();
+    });
+    queryGroup.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (!state.dragMoved) {
+        togglePinnedQuery();
+      }
+      state.dragMoved = false;
+    });
+    queryGroup.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        togglePinnedQuery();
+      }
+    });
+
+    // These lines show retrieval participation only. Retrieval scores and
+    // nearest-neighbour search remain full-dimensional and are not computed here.
     viewerState = state;
     updateZoomControls(state);
     visualizationCanvas.insertBefore(svg, visualizationTooltip);
     installCameraInteraction(state);
     renderViewerScene();
     updateLinkedInteraction();
+    if (typeof ResizeObserver === "function") {
+      state.resizeObserver = new ResizeObserver(() => resizeViewerToCanvas(state));
+      state.resizeObserver.observe(visualizationCanvas);
+    }
   }
 
   function renderPrompt(prompt) {
@@ -898,7 +1778,7 @@
     }
   }
 
-  refreshButton.addEventListener("click", loadIndex);
+  refreshButton.addEventListener("click", () => loadIndex(true));
   queryForm.addEventListener("submit", submitQuery);
   retrievalModeInputs.forEach((input) => {
     input.addEventListener("change", () => clearStaleQueryResults());
@@ -918,11 +1798,11 @@
   zoomOutButton.addEventListener("click", () => zoomViewer(1 / 1.12));
   zoomInButton.addEventListener("click", () => zoomViewer(1.12));
   resetViewButton.addEventListener("click", resetViewer);
-  exampleButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      questionInput.value = button.dataset.question || "";
-      questionInput.focus();
-    });
-  });
+  expandViewButton.addEventListener("click", () => setPresentationMode(true));
+  restoreViewButton.addEventListener("click", () => setPresentationMode(false));
+  closeExpandedViewButton.addEventListener("click", () => setPresentationMode(false));
+  visualizationInspectorClose.addEventListener("click", clearPinnedSelection);
+  refreshExamplesButton.addEventListener("click", loadExamples);
+  loadExamples();
   loadIndex();
 })();
