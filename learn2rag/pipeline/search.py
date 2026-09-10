@@ -1,3 +1,4 @@
+import asyncio
 import warnings
 from typing import (
     cast,
@@ -484,7 +485,7 @@ async def search_authorized(
     if history and opt_config.get("rewrite") == "True":
         rewrite_components = (opt_config.get("rewrite_mode") or "").split("_")
         if "history" in rewrite_components:
-            contextualized_question = rewrite.contextualize_query(question, history, opt_config)
+            contextualized_question = await asyncio.to_thread(rewrite.contextualize_query, question, history, opt_config)
             if contextualized_question:
                 profilingLogger.info(
                     "history_rewrite_applied original_query=%r contextualized_query=%r",

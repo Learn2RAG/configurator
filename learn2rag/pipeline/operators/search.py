@@ -1,6 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Mapping, NotRequired, Sequence, TypedDict
-import asyncio
 
 from ..chat import Message
 from ..prov import Prov

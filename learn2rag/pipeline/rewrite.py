@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Any, Sequence
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 import ast
 import logging
@@ -133,7 +133,7 @@ def generate_subqueries(user_query: str, n: int=3) -> list[str]:
     return []
 
 
-def _format_history_transcript(history: Sequence[Message], opt_config: dict[str, object]) -> str:
+def _format_history_transcript(history: Sequence[Message], opt_config: dict[str, Any]) -> str:
     messages = select_history(history, opt_config)
     lines = [
         f"{'Assistant' if isinstance(message, AIMessage) else 'User'}: {message.content}"
@@ -142,7 +142,7 @@ def _format_history_transcript(history: Sequence[Message], opt_config: dict[str,
     return "\n".join(lines)
 
 
-def contextualize_query(question: str, history: Sequence[Message], opt_config: dict[str, object]) -> str:
+def contextualize_query(question: str, history: Sequence[Message], opt_config: dict[str, Any]) -> str:
     if llm is None:
         return ''
 
