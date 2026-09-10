@@ -124,8 +124,8 @@ class TestDrupal():
 
         def check_import() -> None:
             project = Project.get(self.project_name)
-            assert project is not None
-            assert not project.running
+            assert project is not None, 'project exists'
+            assert not project.running, 'import completed'
         waitUntil(check_import, timeout=1 * 180 * 1000)
 
         project.remove()
@@ -152,6 +152,6 @@ class TestDrupal():
                 assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
                 assert 'purple, red, yellow or white' in content, 'specific text from a test file'
             except APIConnectionError:
-                assert False
+                assert False, 'Drupal API is available'
         waitUntil(check_rag, timeout=1 * 120 * 1000)
         logging.info("Finished pipeline")
