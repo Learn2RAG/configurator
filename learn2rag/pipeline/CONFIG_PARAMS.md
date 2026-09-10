@@ -32,7 +32,7 @@ This document describes all keys present in:
 | `top_k_reranker` | `int` | Positive integer                                                                                                     | Number of points (search results) kept after reranking.                                                                                                                                                                            |
 | `fusion_mode` | `string` | Implemented options: `RRF` (Reciprocal Rank Fusion), `DBSF` (Distribution-Based Score Fusion)                        | Used in retrieval with hybrid search (if `search_mode` is `dense_sparse` or `dense_sparse_colbert`) to combine search results.                                                                                                     |
 | `rewrite` | `string` | Effective enabled value: `"True"` (string)                                                                           | If exactly `"True"`, query rewriting is used for retrieval.                                                                                                                                                                        |
-| `rewrite_mode` | `string` | Implemented: `subqueries`, `keywords`, `subqueries_keywords`                                                         | Controls whether subqueries and/or keyword expansions are generated if `rewrite == "True"`.<sup>4)</sup>                                                                                                                           |
+| `rewrite_mode` | `string` | Implemented: `subqueries`, `keywords`, `history`, and any `_`-joined combination of them (e.g. `subqueries_keywords`, `history_subqueries_keywords`) | Selects one or more rewriting components, active if `rewrite == "True"`.<sup>4)</sup>                                                                                                                           |
 | `n_subqueries` | `int` | Positive integer                                                                                                     | Number of generated subqueries if rewriting with subqueries is performed.                                                                                                                                                          |
 | `n_keywords` | `int` | Positive integer                                                                                                     | Number of generated keywords if rewriting with keywords is performed.                                                                                                                                                              |
 | `top_k_subqueries` | `int` | Positive integer                                                                                                     | Number of retrieval results for each generated subquery in rewritten search flow.                                                                                                                                                  |
@@ -69,17 +69,20 @@ This document describes all keys present in:
 
 #### 4) `rewrite_mode`
 
+`rewrite_mode` is split on `_` into components; each recognized component activates independently, so any combination (e.g. `history_subqueries`) works without needing its own literal entry.
+
 - `subqueries`: generates and searches additional subqueries with selected `search_mode`.
 - `keywords`: generates keywords and searches them with forced sparse mode. Only possible if sparse vectors exist in used Qdrant collection.
-- `subqueries_keywords`: combines both rewriting behaviors.
-- Prompts for subquery/keywords generation can be modified in `rewrite.py`.
+- `history`: **opt-in, requires the conversation history to be passed to search** (it is not by clients that omit it, for example the optimization scripts). Before the base search and any subquery/keyword expansion, rewrites the Current Question plus the recent conversation history (same `history_length` window used for generation) into a standalone search query via one additional LLM call (`rewrite.contextualize_query`), so follow-up questions like "tell me again" or "what about tomatoes?" resolve to something retrieval can actually match. Only runs when the conversation history is non-empty; a failed or empty rewrite falls back to the Current Question unchanged, so retrieval is never blocked by it. Runs once per request in `search_authorized`, not once per internal retry, so it does not multiply with the authorization retry/oversampling loop. **Adds one sequential LLM call per follow-up turn when active** - on a slow local model this is a deliberate latency/quality trade-off, which is why it defaults to off.
+- `subqueries_keywords`, `history_subqueries_keywords`, etc.: combine the components above; when `history` is combined with `subqueries`/`keywords`, the latter operate on the already-rewritten (contextualized) query, not the raw Current Question.
+- Prompts for subquery/keywords/history-rewrite generation can be modified in `rewrite.py`.
 
 #### 5) `history_length`
 
 - Clients of the OpenAI API (for example Open WebUI) send the whole conversation with every request. `history_length` limits how much of it reaches the model, because how much history a model can handle depends on the model.
 - Counted in answers of the pipeline. The question belonging to an answer is always kept as well, so a value of `5` results in up to 10 messages.
 - Only the roles `user` and `assistant` (also accepted: `model`) are used. Any other role in the request is dropped, so that a client cannot inject system instructions through the history.
-- Retrieval is not affected: the search always uses the Current Question, and every request is filtered by the authorization of the user again.
+- Retrieval is unaffected by default: the search uses the Current Question as-is, and every request is filtered by the authorization of the user again. This changes only if `rewrite_mode` includes the `history` component (see<sup>4)</sup>), in which case retrieval searches a history-derived standalone query instead of the raw Current Question.
 
 ### Known Implementation Caveats:
 

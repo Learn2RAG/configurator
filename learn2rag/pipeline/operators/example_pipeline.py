@@ -28,6 +28,7 @@ class ExamplePipeline(BaseOperator):
             inputs={
                 'question': inputs['question'],
                 'user': inputs['user'],
+                'history': inputs.get('history', ()),
             },
             prov=prov,
         ))
