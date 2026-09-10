@@ -1,5 +1,5 @@
 from operator import itemgetter
-from typing import Any, NotRequired, Sequence, TypedDict
+from typing import Any, Mapping, NotRequired, Sequence, TypedDict
 
 from ..chat import Message
 from ..prov import Prov
@@ -10,7 +10,7 @@ from .generation import GenerationOperator
 
 Inputs = TypedDict('Inputs', {
     'question': str,
-    'user': str | None,
+    'user_auths': Mapping[str, Any] | None,
     # Callers without a conversation, for example the optimization scripts,
     # may leave the history out.
     'history': NotRequired[Sequence[Message]],
@@ -27,7 +27,7 @@ class ExamplePipeline(BaseOperator):
         documents = itemgetter('documents')(await SearchOperator()(
             inputs={
                 'question': inputs['question'],
-                'user': inputs['user'],
+                'user_auths': inputs.get('user_auths', {}),
                 'history': inputs.get('history', ()),
             },
             prov=prov,

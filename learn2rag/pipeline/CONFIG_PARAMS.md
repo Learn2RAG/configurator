@@ -82,7 +82,7 @@ This document describes all keys present in:
 - Clients of the OpenAI API (for example Open WebUI) send the whole conversation with every request. `history_length` limits how much of it reaches the model, because how much history a model can handle depends on the model.
 - Counted in answers of the pipeline. The question belonging to an answer is always kept as well, so a value of `5` results in up to 10 messages.
 - Only the roles `user` and `assistant` (also accepted: `model`) are used. Any other role in the request is dropped, so that a client cannot inject system instructions through the history.
-- Retrieval is unaffected by default: the search uses the Current Question as-is, and every request is filtered by the authorization of the user again. This changes only if `rewrite_mode` includes the `history` component (see<sup>4)</sup>), in which case retrieval searches a history-derived standalone query instead of the raw Current Question.
+- Retrieval is unaffected by default: the search uses the Current Question as-is, and every request is filtered by the authorization of the user again. This changes only if `rewrite_mode` includes the `history` component (see [rewrite_mode notes](#4-rewrite_mode)), in which case retrieval searches a history-derived standalone query instead of the raw Current Question.
 
 ### Known Implementation Caveats:
 
