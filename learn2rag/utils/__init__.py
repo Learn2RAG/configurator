@@ -44,6 +44,10 @@ def save_data_path(*resource: str) -> str:
         return os.path.join(windows_app_data, *resource)
 
 
+def is_testing() -> bool:
+    return 'PYTEST_CURRENT_TEST' in os.environ
+
+
 # adapted from pytestqt
 def waitUntil(
     callback: Callable[[], Optional[bool]], *, timeout: int = 5000
@@ -102,6 +106,8 @@ def waitUntil(
         except AssertionError as e:
             if timed_out():
                 raise TimeoutError(timeout_msg) from e
+            if is_testing():
+                logging.debug('Waiting for: %s', e.args[0] if len(e.args) else e)
         else:
             if result not in (None, True, False):
                 msg = "waitUntil() callback must return None, True or False, returned %r"
