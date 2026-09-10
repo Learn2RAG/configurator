@@ -89,7 +89,7 @@ class Learn2RAGTestCase(TestCase):
         def check_import() -> None:
             project = Project.get(self.project_name)
             assert project is not None
-            assert not project.running
+            assert not project.running, 'import completed'
         waitUntil(check_import, timeout=1 * 60 * 1000)
 
         project.remove()
@@ -166,7 +166,11 @@ class Learn2RAGTestCase(TestCase):
                 )
                 content = completion.choices[-1].message.content
                 logger.debug('Response content: %s', content)
-                assert 'descendants of the wolf' in content
+                assert 'for testing only' in content, 'contains test marker'
+                assert "Information:\n" in content, 'contains the prompt'
+                assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
+                assert 'Lagomorpha' in content, 'specific text from a previously existing file'
+                assert 'descendants of the wolf' in content, 'specific text from a newly added file'
             except APIConnectionError:
                 assert False
 
@@ -189,13 +193,13 @@ class Learn2RAGTestCase(TestCase):
 
         time.sleep(1)
         project.remove()
+        logging.info("Import completed, data on dogs should be now removed")
 
         project = Project.create(template_dir / 'pipeline.yml', self.project_name, template=True,
                                  template_context=template_context)
         assert project is not None, 'project should not be None'
         project.start()
         assert project.running
-        logging.info("ask about DOGs")
 
         def check_rag_dog_when_not_exist() -> None:
             try:
@@ -207,9 +211,10 @@ class Learn2RAGTestCase(TestCase):
                 )
                 content = completion.choices[-1].message.content
                 logger.debug('Response content: %s', content)
-                assert "Information:\\n" in content, 'contains the prompt'
-                assert not content.endswith("Information:\\n"), 'contains any document chunks in the prompt'
-                assert 'descendants of the wolf' not in content
+                assert "Information:\n" in content, 'contains the prompt'
+                assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
+                assert 'Lagomorpha' in content, 'specific text from a file which still exists'
+                assert 'descendants of the wolf' not in content, 'specific text from a file which is removed'
             except APIConnectionError:
                 assert False
 
