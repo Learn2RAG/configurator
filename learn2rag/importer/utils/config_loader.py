@@ -6,12 +6,13 @@ This module provides a function to load configuration files (e.g., JSON, YAML) f
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.3
+Version: 0.0.7
 Creation Date: June 10, 2025
-Last Modified: February 20, 2026
+Last Modified: August 31, 2026
 """
 
 import json
+import os
 import yaml
 from typing import Dict, Any, cast
 from ..config.config_constants import ALLOWED_LOADERS
@@ -62,9 +63,53 @@ def validate_config_entry(entry: Dict[str, Any]) -> bool:
             raise ValueError("Missing 'username' or 'password' for DrupalLoader with auth_type 'basic'.")
         if auth_type == "token" and not entry.get("token"):
             raise ValueError("Missing 'token' for DrupalLoader with auth_type 'token'.")
-     
-    else:
-        raise ValueError(f"Unknown 'loader_type': {loader_type}")
+    elif loader_type == "JiraLoader":
+        if not entry.get("base_url"):
+            raise ValueError("Missing 'base_url' for 'JiraLoader' in configuration entry.")
+        if not entry.get("jql") and not entry.get("projects"):
+            raise ValueError("Missing filter for 'JiraLoader'. Provide either 'jql' or 'projects'.")
+        auth_type = entry.get("auth_type", "basic")
+        if auth_type not in ("none", "basic", "token"):
+            raise ValueError(f"Invalid 'auth_type' for 'JiraLoader': '{auth_type}'. Must be 'none', 'basic' or 'token'.")
+        if auth_type == "basic":
+            username = entry.get("username") or os.environ.get("JIRA_USERNAME", "")
+            password = entry.get("password") or os.environ.get("JIRA_API_TOKEN", "")
+            if not username or not password:
+                raise ValueError("Missing 'username' or 'password' for JiraLoader with auth_type 'basic'. "
+                                 "Provide them in config or set JIRA_USERNAME/JIRA_API_TOKEN environment variables.")
+        if auth_type == "token" and not entry.get("token"):
+            raise ValueError("Missing 'token' for JiraLoader with auth_type 'token'.")
+    elif loader_type == "MediaWikiLoader":
+        if not entry.get("base_url"):
+            raise ValueError("Missing 'base_url' for 'MediaWikiLoader' in configuration entry.")
+        auth_type = entry.get("auth_type", "none")
+        if auth_type not in ("none", "basic", "token"):
+            raise ValueError(f"Invalid 'auth_type' for 'MediaWikiLoader': '{auth_type}'. Must be 'none', 'basic' or 'token'.")
+        if auth_type == "basic" and (not entry.get("username") or not entry.get("password")):
+            raise ValueError("Missing 'username' or 'password' for MediaWikiLoader with auth_type 'basic'.")
+        if auth_type == "token" and not entry.get("token"):
+            raise ValueError("Missing 'token' for MediaWikiLoader with auth_type 'token'.")
+        namespaces = entry.get("namespaces", [0])
+        if not isinstance(namespaces, list):
+            raise ValueError("'namespaces' for 'MediaWikiLoader' must be a list of namespace IDs.")
+        page_size = entry.get("page_size", 50)
+        try:
+            parsed_page_size = int(page_size)
+        except (TypeError, ValueError):
+            raise ValueError("'page_size' for 'MediaWikiLoader' must be an integer.")
+        if parsed_page_size < 1:
+            raise ValueError("'page_size' for 'MediaWikiLoader' must be greater than 0.")
+
+    if "failure_threshold" in entry:
+        threshold = entry.get("failure_threshold")
+        if threshold is None:
+            raise ValueError("'failure_threshold' must be a positive integer.")
+        try:
+            parsed_threshold = int(threshold)
+        except (TypeError, ValueError):
+            raise ValueError("'failure_threshold' must be a positive integer.")
+        if parsed_threshold < 1:
+            raise ValueError("'failure_threshold' must be a positive integer.")
 
     # ToDo: Add further validation for other loader types as needed
     return True

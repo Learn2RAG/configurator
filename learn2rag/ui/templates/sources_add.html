@@ -1,0 +1,23 @@
+{% macro source_create_item(name, label) -%}
+<div class="accordion-item">
+  <h2 class="accordion-header">
+    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_source_create_{{ name }}" aria-expanded="false" aria-controls="collapse_source_create_{{ name }}">
+      {{ label }}
+    </button>
+  </h2>
+  <div id="collapse_source_create_{{ name }}" class="accordion-collapse collapse" data-bs-parent="#accordion_source_create">
+    <div class="accordion-body">
+      {% include 'sources_add_' ~ name ~ '.html' %}
+    </div>
+  </div>
+</div>
+{%- endmacro %}
+
+<div class="accordion" id="accordion_source_create">
+  {{ source_create_item('local', pgettext('heading', 'Local file or directory')) }}
+  {{ source_create_item('web', pgettext('heading', 'Web page')) }}
+  {{ source_create_item('sharepoint', 'Sharepoint') }}
+  {{ source_create_item('drupal', 'Drupal') }}
+  {{ source_create_item('jira', 'Jira') }}
+  {{ source_create_item('mediawiki', 'Mediawiki') }}
+</div>

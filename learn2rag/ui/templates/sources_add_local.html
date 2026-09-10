@@ -1,0 +1,28 @@
+<form method="POST">
+  <input type="hidden" name="type" value="local"/>
+  <div class="mb-3">
+    <div class="alert alert-warning">
+      {{gettext('This data source type does not support access control. All users will be provided access to all data.')}}
+    </div>
+  </div>
+  <div class="mb-3">
+    <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
+    <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
+  </div>
+  <div class="mb-3">
+    <input type="hidden" name="type" value="local"/>
+    <label for="path" class="form-label">{{pgettext('form_label', 'Path on the local filesystem')}}</label>
+    <input type="text" pattern="\S(?:.*\S)?" class="form-control" name="path" required="required"
+           {% if is_windows %}
+           title="{{pgettext('tooltip', 'For example: %(path)s', example_local_path)}}"
+           {% else %}
+           title="{{pgettext('tooltip', 'For example: /home/user/Documents')}}"
+           {% endif %}
+           >
+  </div>
+  <div class="mb-3">
+    <label for="failure_threshold" class="form-label">{{ pgettext('form_label', 'Failure threshold') }}</label>
+    <input type="number" min="1" step="1" class="form-control" name="failure_threshold" value="5">
+  </div>
+  <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
+</form>

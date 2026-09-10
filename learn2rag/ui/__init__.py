@@ -4,41 +4,46 @@ import importlib
 import logging
 import math
 import os
-import platform
-import xdg.BaseDirectory
 import secrets
 import shutil
 import signal
 import socket
-import subprocess
 import threading
 import time
 import tomllib
 from typing import Any
 import urllib
+from itertools import islice
 
+from babel import negotiate_locale
 from flask import Flask, flash, redirect as flask_redirect, render_template, request, make_response, url_for
 from flask_babel import Babel, gettext, ngettext, pgettext  # type: ignore[import-untyped]
 import flask.logging
-import jinja2
 import ollama
 import uvicorn
 import yaml
 import werkzeug.wrappers
 
 from learn2rag.compose import Project
+from learn2rag.evaluation.tools import read_dataset_qa
 import learn2rag.data
 import learn2rag.pipeline.llm
+from ..bootstrap import setup_flask as learn2rag_bootstrap_setup
+from ..importer.utils.import_state import ImportState
 
-from datetime import datetime  # <-- ADD THIS
+
+from ..utils import (
+    is_windows,
+    normalize_path,
+    open_web_browser,
+    save_data_path,
+)
+
+from datetime import datetime
 
 
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
-
-
-def expand_path(path: Path) -> Path:
-    return Path(path).expanduser().absolute()
 
 
 import werkzeug
@@ -53,22 +58,19 @@ def redirect(url: str) -> 'werkzeug.wrappers.response.Response':
 
 def start_project(name: str, template_file: Path, storage_path: Path, render_context: dict[str, Any]={}) -> Project:
     logging.debug('UI starting project: %s', name)
-    storage_path = expand_path(storage_path)
     logging.debug('Storage path: %s', storage_path)
-    storage_path.mkdir(parents=True, exist_ok=True)
-    project_file = storage_path / 'compose.yml'
-
-    template = jinja2.Template(template_file.read_text())
-    project_file.write_text(template.render(render_context | {
-        'is_windows': platform.system() == 'Windows',
-        'learn2rag_path': Path('.').absolute(),
-        'storage_path': storage_path,
-    }))
     project = None
     if project := Project.get(name):
         assert not project.running
         project.remove()
-    project = Project.create(project_file, name)
+
+    storage_path.mkdir(parents=True, exist_ok=True)
+
+    project = Project.create(template_file, name, template=True, template_context=render_context | {
+        'is_windows': is_windows(),
+        'learn2rag_path': Path('.').absolute(),
+        'storage_path': storage_path,
+    })
     assert project is not None, 'project should not be None'
     project.start()
     return project
@@ -79,38 +81,46 @@ def stop_project(name: str) -> None:
     assert project is not None, 'project should not be None'
     project.stop()
 
-def find_free_ports(n: int, *, configured_ports: list[int]=[], preferred_ports: list[int]=[]) -> list[int]:
+def find_free_ports(n: int, *, configured_ports: list[int] | None = None, preferred_ports: list[int] | None = None) -> list[int]:
     """
     Finds n free ports. Prioritizes preferred_ports if provided.
     """
+    configured_ports = configured_ports or []
+    preferred_ports = preferred_ports or []
+
     ports = [*configured_ports]
 
     # 1. Try preferred ports first
     for p in filter(lambda p: p not in ports, preferred_ports):
         if len(ports) >= n:
             break
+        logging.debug('Checking if preferred port %d is available...', p)
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 # Set REUSEADDR to handle ports in TIME_WAIT state
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind(('', p))
+                logging.debug('Port %d is free. Allocating.', p)
                 ports.append(p)
         except OSError:
+            logging.warning('Port %d is busy. Trying next...', p)
             continue  # Port is taken, skip to next or fallback
 
     # 2. Fallback to OS-assigned random ports if we still need more
     remaining = n - len(ports)
     if remaining > 0:
+        logging.debug('Still need %d ports. Falling back to OS-assigned random ports.', remaining)
         temp_sockets = []
         for _ in range(remaining):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.bind(('', 0))
             ports.append(s.getsockname()[1])
+            logging.info('OS assigned random port %d.', s.getsockname()[1])
             temp_sockets.append(s)
 
         for s in temp_sockets:
             s.close()
-
+    logging.debug('Final allocated ports: %s', ports)
     return ports
 
 
@@ -124,16 +134,22 @@ def merge(source: dict[str, Any], destination: dict[str, Any]) -> dict[str, Any]
     return destination
 
 
+def pipeline_status_file(pipeline: dict[str, Any]) -> Path:
+    return normalize_path(Path(pipeline['storage_path'])) / 'logs' / 'status.log'
+
+
+def pipeline_status_message(pipeline: dict[str, Any]) -> str:
+    try:
+        return pipeline_status_file(pipeline).read_text().splitlines()[-1]
+    except (FileNotFoundError, IndexError):
+        return ''
+
+
 def create_app(config: dict[str, Any]={}) -> Flask:
     # create and configure the app
-    if platform.system() == 'Windows':
-        windows_app_data = os.getenv('LOCALAPPDATA')
-        assert windows_app_data is not None
-        default_instance_path = windows_app_data + '/Learn2RAG/instance'
-    else:
-        default_instance_path = xdg.BaseDirectory.save_data_path('Learn2RAG/instance')
+    default_instance_path = save_data_path('Learn2RAG', 'instance')
 
-    example_local_path = r'C:\Users\User\Documents' if platform.system() == 'Windows' else '/home/user/Documents'
+    example_local_path = r'C:\Users\User\Documents' if is_windows() else '/home/user/Documents'
     app = Flask(
         __name__,
         instance_path=config.get('flask', {}).get('instance_path', default_instance_path),
@@ -147,6 +163,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     app.logger.debug('Packaged config: %s', packaged_config)
     app.config.from_mapping(merge(config, packaged_config))
 
+    learn2rag_bootstrap_setup(app)
+
     # ensure the instance folder exists
     try:
         os.makedirs(app.instance_path)
@@ -158,12 +176,11 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def get_locale() -> str:
         translations = list(map(str, babel.list_translations()))
         default_translation = 'de'  # FIXME
-        translation = request.accept_languages.best_match(translations) or default_translation
+        translation = negotiate_locale((x.replace('-', '_') for x in request.accept_languages.values()), translations) or default_translation
         # app.logger.debug('Available translations: %s; accept languages: %s; chosen translation: %s', translations, request.accept_languages, translation)
         return translation
     babel.init_app(app, locale_selector=get_locale)
 
-    app.logger.info('create_app')
     app.logger.debug('cwd: %s', os.getcwd())
     app.logger.debug('root_path: %s', app.root_path)
     assert app.template_folder is not None
@@ -199,7 +216,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         suggested_models = app.config.get('SUGGESTED_MODELS', {})
         return {
             'suggested_models': suggested_models,
-            'firststeps_model': suggested_models.get('gemma3_27b'),
+            'firststeps_model': suggested_models.get('gemma4_26b'),
             'models': learn2rag.data.get_all(app.instance_path, 'models'),
             'sources': learn2rag.data.get_all(app.instance_path, 'sources'),
             'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
@@ -215,7 +232,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
 
-
     cached_version = get_version()
     cached_hash = get_git_hash()
 
@@ -225,6 +241,21 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             "app_version": cached_version,
             "git_hash": cached_hash
         }
+
+    def remove_pipeline_storage_directory(storage_path: Path) -> bool:
+        try:
+            storage_path = normalize_path(storage_path)
+            shutil.rmtree(storage_path)
+            flash(pgettext('flash', 'Directory removed: %(path)s', path=storage_path))
+        except FileNotFoundError:
+            # storage directory may be not created yet
+            app.logger.info('Directory was not removed since it does not exist: %s', storage_path)
+            pass
+        except Exception as e:
+            app.logger.error('Failed to remove directory: %s, %s', storage_path, e)
+            flash(pgettext('flash', 'Failed to remove directory: %(path)s: %(message)s', path=storage_path, message=e), 'error')
+            return False
+        return True
 
     @app.get('/')
     def start() -> 'str | werkzeug.wrappers.response.Response':
@@ -254,7 +285,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     @app.get('/models')
     def models_list() -> 'str | werkzeug.wrappers.response.Response':
         return render_template(
-            'models_list.html',
+            'models_page.html',
             ollama_models=list_ollama_models(),
         )
 
@@ -274,7 +305,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             if request.form.get('ollama') == 'pull':
                 if model.find(':') == -1:
                     model += ':latest'
-                start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(), {'model': model})
+                start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(app.instance_path) / 'ollama_download', {'model': model})
                 return flask_redirect(url_for('model_pulling', model=model))
         elif api == learn2rag.pipeline.llm.OpenAIClient.ID:
             url = request.form['url']
@@ -342,15 +373,25 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/sources')
     def sources_list() -> 'str | werkzeug.wrappers.response.Response':
-        return render_template('sources_list.html', example_local_path=example_local_path)
+        return render_template(
+            'sources_page.html',
+            example_local_path=example_local_path,
+            example_drupal_content_types='article, page, recipe',
+        )
 
     @app.post('/sources')
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
-        learn2rag.data.create_entry(app.instance_path, 'sources', {
-            'label': label,
-            'path': request.form['path'],
-        })
+        data: dict[str, Any] = request.form.to_dict()
+        if 'content_types' in data:
+            data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
+        if 'depth' in data:
+            data['depth'] = int(data['depth'])
+        if 'failure_threshold' in data and data['failure_threshold'] not in (None, ''):
+            data['failure_threshold'] = int(data['failure_threshold'])
+        if 'object_ids' in data:
+            data['object_ids'] = request.form.getlist('object_ids')
+        learn2rag.data.create_entry(app.instance_path, 'sources', data)
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
 
@@ -370,39 +411,41 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/pipelines')
     def pipelines_list() -> 'str | werkzeug.wrappers.response.Response':
+        pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
+        for pipeline in pipelines.values():
+            pipeline['status_message'] = pipeline_status_message(pipeline)
         context = {
+            'pipelines': pipelines,
             'projects': Project.get_all(),
         }
-        template = '_pipelines_list_table.html' if request.headers.get('HX-Request') else 'pipelines_list.html'
+        template = 'pipelines_list.html' if request.headers.get('HX-Request') else 'pipelines_page.html'
         return render_template(template, **context)
 
     @app.post('/pipelines')
     def pipeline_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
-        ports = [int(port) for port in request.form.getlist("ports") if port]
-        name = learn2rag.data.create_entry(app.instance_path, 'pipelines', {
-            'label': label,
-            'storage_path': request.form['storage_path'],
-            'language_model': request.form['language_model'],
-            'sources': request.form.getlist('sources'),
-            'ports': ports,
-        })
+        data: dict[str, Any] = request.form.to_dict()
+        data.pop('now', None)
+        data['ports'] = [int(port) for port in request.form.getlist("ports") if port]
+        data['sources'] = request.form.getlist('sources')
+        data['import_schedule_interval_hours'] = float(data['import_schedule_interval_hours'])
+        name = learn2rag.data.create_entry(app.instance_path, 'pipelines', data)
         flash(pgettext('flash', 'Added a new pipeline configuration: %(label)s', label=label))
-        if request.form.get('import'):
+        if request.form.get('now'):
             pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
             assert pipeline is not None
-            start_pipeline(name, pipeline, 'import')
-        return redirect(url_for('pipelines_list'))
+            start_pipeline(name, pipeline, 'continuous')
+        return redirect(url_for('pipeline_details', name=name))
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
         has_ssl = bool(app.config.get("TLS"))
-
         url = urllib.parse.urlparse(request.base_url)
         assert url.scheme
 
         sources = learn2rag.data.get_entries(app.instance_path, 'sources', pipeline['sources'])
         for path_name, source in sources.items():
-            source['path'] = str(expand_path(source['path']))
+            if 'path' in source:
+                source['path'] = str(normalize_path(source['path']))
 
         #  Fetch the language model configuration first let see if it works
         language_model = learn2rag.data.get_entry(app.instance_path, 'models', pipeline['language_model'])
@@ -412,12 +455,33 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             language_model['url'] = language_model['url'].replace('http://', 'https://', 1)
             app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
 
+        # Format the import config
+        import_config = {
+            'loaders': [{
+                'loader_id': name,
+                'loader_type': {
+                    # FIXME
+                    'local': 'DirectoryLoader',
+                    'web': 'HTMLLoader',
+                    'sharepoint': 'SharepointLoader',
+                    'drupal': 'DrupalLoader',
+                    'jira': 'JiraLoader',
+                    'mediawiki': 'MediaWikiLoader',
+                }.get(source.get(
+                    'type',
+                    'local'  # FIXME: remove this later and throw Exception
+                )),
+                'recursive': 'True',  # DirectoryLoader; FIXME: add this in the interface
+                **{key: value for key, value in source.items() if key not in ['label', 'type']},
+            } for name, source in sources.items()],
+        }
+
         render_context = {
             'config': app.config,
             'learn2rag_hostname': url.hostname,
             'pipeline': pipeline,
             'language_model': language_model,
-            'sources': sources,
+            'import_config': import_config,
             'debug_logging': config.get('logging', {}).get('debug', False),
             'qdrant_api_key': secrets.token_hex(16),
             # FIXME
@@ -435,7 +499,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=app.config.get('PREFERRED_PORTS', range(9001, 9011)))
             render_context['ports'] = dict(zip(port_names, ports))
 
-        storage_path = Path(pipeline['storage_path'])
+        storage_path = normalize_path(pipeline['storage_path'])
 
         try:
             project = start_project(name, template_file, storage_path, render_context)
@@ -450,25 +514,58 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
         # TODO "load" the corresponding Ollama model
 
+    @app.get('/pipelines/<name>')
+    def pipeline_details(name: str) -> 'str | werkzeug.wrappers.response.Response':
+        try:
+            pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        except FileNotFoundError:
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+            return redirect(url_for('pipelines_list'))
+        pipeline['status_message'] = pipeline_status_message(pipeline)
+        storage_path = Path(pipeline['storage_path'])
+        import_state = ImportState(str(storage_path / 'import_state.json'))
+        try:
+            training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
+        except FileNotFoundError:
+            training_dataset = None
+        return render_template(
+            'pipelines_details_page.html',
+            name=name,
+            pipeline=pipeline,
+            import_state=import_state,
+            training_dataset=training_dataset,
+            projects=Project.get_all(),
+        )
+
+    @app.post('/pipelines/<name>/training')
+    def pipeline_details_training_data(name: str) -> 'str | werkzeug.wrappers.response.Response':
+        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        if pipeline is None:
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+            return redirect(url_for('pipelines_list'))
+        try:
+            storage_path = Path(pipeline['storage_path'])
+            storage_path.mkdir(parents=True, exist_ok=True)
+            training_file = request.files['trainingFile']
+            training_file.save(storage_path / 'training.csv')
+        except Exception as e:
+            app.logger.exception(e)
+            flash(pgettext('flash', 'Could not save the file'), 'error')
+        return redirect(url_for('pipeline_details', name=name))
+
     @app.post('/pipelines/<name>')
     def pipeline_action(name: str) -> 'str | werkzeug.wrappers.response.Response':
         pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
         if pipeline is None:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+        elif request.form['action'] == 'clean':
+            remove_pipeline_storage_directory(pipeline['storage_path'])
         elif request.form['action'] == 'delete':
-            ok = True
-            try:
-                storage_path = expand_path(pipeline['storage_path'])
-                shutil.rmtree(storage_path)
-            except FileNotFoundError:
-                pass
-            except Exception as e:
-                app.logger.error('Failed to remove directory: %s, %s', storage_path, e)
-                flash(pgettext('flash', 'Failed to remove directory: %(path)s', path=storage_path), 'error')
-                ok = False
+            ok = remove_pipeline_storage_directory(pipeline['storage_path'])
             if ok:
                 learn2rag.data.delete_entry(app.instance_path, 'pipelines', name)
                 flash(pgettext('flash', 'Removed pipeline: %(label)s', label=pipeline['label']))
+                return redirect(url_for('pipelines_list'))
         elif request.form['action'].startswith('start:'):
             start_pipeline(name, pipeline, request.form['action'].split(':', 2)[1])
         elif request.form['action'] == 'stop':
@@ -479,7 +576,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                 app.logger.exception(e)
                 app.logger.error('Could not stop the pipeline')
                 flash(pgettext('flash', 'Could not stop the pipeline: %(message)s', message=e), 'error')
-        return redirect(url_for('pipelines_list'))
+        return redirect(url_for('pipeline_details', name=name))
 
     @app.get('/pipelines/<name>/logs/<file>')
     def pipeline_logs(name: str, file: str) -> 'str | werkzeug.wrappers.response.Response':
@@ -487,7 +584,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         if pipeline is None:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
         elif file in ['debug.log', 'error.log']:
-            storage_path = expand_path(pipeline['storage_path'])
+            storage_path = normalize_path(pipeline['storage_path'])
             log_file = storage_path / 'logs' / file
             try:
                 content = log_file.read_text()
@@ -519,7 +616,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         threading.Thread(target=shutdown).start()
         return pgettext('shutdown', 'Bye!')  # type: ignore[no-any-return]
 
-    app.logger.info('App creation complete')
     return app
 
 def get_version() -> str:
@@ -559,23 +655,16 @@ def shutdown() -> None:
     os.kill(os.getpid(), signal.SIGTERM)
 
 
-def webbrowser_open(url: str) -> None:
-    try:
-        if platform.system() == 'Windows':
-            subprocess.Popen(['explorer', url])
-        else:
-            subprocess.Popen(['xdg-open', url])
-    except FileNotFoundError:
-        pass
-    except Exception as e:
-        print(e)
-
-
 def main(config: dict[str, Any]) -> None:
     app = create_app(config=config)
 
-    port = config.get('port', '9000')
-    host = config.get('host', '0.0.0.0')
+    ui_config = config.get('UI', {})
+    port = ui_config.get('port', '9000')
+    host = '127.0.0.1'
+    if 'host' in ui_config:
+        host = ui_config['host']
+    else:
+        logging.warning('By default, interface is only accessible from the same machine')
 
     ssl_key = config.get('TLS', {}).get('KEYFILE')
     ssl_cert = config.get('TLS', {}).get('CERTFILE')
@@ -583,26 +672,25 @@ def main(config: dict[str, Any]) -> None:
     use_https = False
     if ssl_key and ssl_cert:
         if os.path.exists(ssl_key) and os.path.exists(ssl_cert):
-            logging.info(f" SSL files defined and found at {ssl_key} or {ssl_cert}")
+            logging.debug('TLS enabled')
             use_https = True
         else:
-            logging.error(f"Warning: SSL files defined but not found at {ssl_key} or {ssl_cert}")
-            raise FileNotFoundError(f"SSL files defined but not found at {ssl_key} or {ssl_cert}")
+            raise FileNotFoundError(f'The configured TLS files are not found: {ssl_key}, {ssl_cert}')
     else:
-        logging.info(f"no SSL files provided then switch to HTTP mode")
+        logging.debug('TLS disabled')
 
     protocol = 'https' if use_https else 'http'
     url = f"{protocol}://localhost:{port}"
-    webbrowser_open(url)
-    logging.info('*' * 40)
+    open_web_browser(url)
+    logging.info('*' * 60)
     logging.info('Learn2RAG: ' + url)
-    logging.info('*' * 40)
+    logging.info('*' * 60)
 
-    uvicorn_kwargs = {
+    uvicorn_kwargs: dict[str, Any] = {
         "app": app,
         "host": host,
         "port": int(port),
-        "log_level": "info",
+        "log_level": "warning",
         "interface": "wsgi",
     }
 
@@ -610,4 +698,13 @@ def main(config: dict[str, Any]) -> None:
         uvicorn_kwargs["ssl_keyfile"] = ssl_key
         uvicorn_kwargs["ssl_certfile"] = ssl_cert
 
-    uvicorn.run(**uvicorn_kwargs)
+    try:
+        uvicorn.run(**uvicorn_kwargs)
+    except SystemExit as e:
+        if e.code == 1:
+            # FIXME: the previous message with URL is already printed; delay it until further?
+            logging.warning('*' * 60)
+            logging.warning('It looks like the port is already in use')
+            logging.warning('See how to change configuration: https://docs.learn2rag.de/')
+            logging.warning('*' * 60)
+        raise

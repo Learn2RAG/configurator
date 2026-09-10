@@ -51,5 +51,6 @@ if __name__ == '__main__':
     # qa_rows = read_dataset_qa('hotpot_qa', 'distractor', 'validation')
     # process_qa('hotpot_qa', qa_rows.select(range(3)))
 
-    qa_rows = read_dataset_qa('WikiEval', '', 'train')
+    target_path = pathlib.Path('./datasets/WikiEval/source')
+    qa_rows = read_dataset_qa(target_path, split='train')
     process_qa('WikiEval', qa_rows)

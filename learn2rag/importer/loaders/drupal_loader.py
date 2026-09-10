@@ -11,20 +11,27 @@ Drupal requirements:
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.1
+Version: 0.0.4
 Creation Date: March 17, 2026
-Last Modified: March 17, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
 import logging
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 import requests
 from ..globals import stop_loading
+from ..loaders.errors import LoaderAccessError
+
+if TYPE_CHECKING:
+    from ..utils.progress import ImportProgress
 
 logger = logging.getLogger("Learn2RAGImporter")
+
+_DRUPAL_STATUS_INTERVAL = 25
 
 # JSON:API index paths to probe (in order) when auto-discovering endpoints
 _JSONAPI_INDEX_CANDIDATES = ["/jsonapi", "/en/jsonapi", "/de/jsonapi"]
@@ -77,7 +84,7 @@ def _build_session(auth_type: str, username: str, password: str, token: str) -> 
 def _html_to_text(html: str) -> str:
     """Strip HTML tags and return plain text."""
     soup = BeautifulSoup(html, "html.parser")
-    return soup.get_text(separator="\n", strip=True)
+    return str(soup.get_text(separator="\n", strip=True))
 
 
 def _extract_page_content(attributes: Dict[str, Any], text_fields: List[str]) -> str:
@@ -140,6 +147,8 @@ def load_from_drupal(
     text_fields: Optional[List[str]] = None,
     page_size: int = 50,
     language: str = "",
+    since: Optional[datetime] = None,
+    progress: Optional["ImportProgress"] = None,
 ) -> List[Document]:
     """
     Load documents from a Drupal instance via the JSON:API.
@@ -178,6 +187,14 @@ def load_from_drupal(
             logger.info("Loading process stopped by user.")
             break
 
+        if progress is not None:
+            progress.emit(
+                "Phase 2/4 Load",
+                f"Drupal content type started | page size {page_size}",
+                processed=len(all_documents),
+                source=f"{base_url.rstrip('/')}/jsonapi/node/{content_type}",
+            )
+
         resource_key = f"node--{content_type}"
         if resource_key in endpoint_map:
             endpoint = endpoint_map[resource_key]
@@ -192,6 +209,15 @@ def load_from_drupal(
             "page[limit]": page_size,
             "page[offset]": 0,
         }
+
+        # Timestamp filter: only documents changed on or after `since`
+        if since is not None:
+            # Ensure the timestamp is timezone-aware and formatted as ISO 8601 for JSON:API
+            since_utc = since.astimezone(timezone.utc) if since.tzinfo else since.replace(tzinfo=timezone.utc)
+            params["filter[changed-filter][condition][path]"] = "changed"
+            params["filter[changed-filter][condition][operator]"] = ">="
+            params["filter[changed-filter][condition][value]"] = since_utc.isoformat()
+            logger.info(f"DrupalLoader: applying since-filter >= {since_utc.isoformat()} for '{content_type}'")
 
         page_count = 0
         next_url: Optional[str] = endpoint
@@ -214,9 +240,13 @@ def load_from_drupal(
                 data = response.json()
             except requests.exceptions.HTTPError as e:
                 logger.error(f"DrupalLoader: HTTP error for content type '{content_type}': {e}")
+                if page_count == 0:
+                    raise LoaderAccessError(f"DrupalLoader could not access '{base_url}' for content type '{content_type}': {e}") from e
                 break
             except requests.exceptions.RequestException as e:
                 logger.error(f"DrupalLoader: Request failed for content type '{content_type}': {e}")
+                if page_count == 0:
+                    raise LoaderAccessError(f"DrupalLoader request failed for '{base_url}' and content type '{content_type}': {e}") from e
                 break
 
             items = data.get("data", [])
@@ -296,8 +326,121 @@ def load_from_drupal(
 
             page_count += 1
             logger.debug(f"DrupalLoader: fetched page {page_count} for '{content_type}', {len(items)} items")
+            if progress is not None:
+                progress.emit(
+                    "Phase 2/4 Load",
+                    f"Drupal page {page_count} loaded | content type {content_type}",
+                    processed=len(all_documents),
+                    source=f"{base_url.rstrip('/')}/jsonapi/node/{content_type}",
+                )
 
         logger.info(f"DrupalLoader: loaded {len(all_documents)} documents total so far after content type '{content_type}'")
+        if progress is not None:
+            progress.emit(
+                "Phase 2/4 Load",
+                f"Drupal content type finished | {content_type}",
+                processed=len(all_documents),
+                source=f"{base_url.rstrip('/')}/jsonapi/node/{content_type}",
+            )
 
     logger.info(f"DrupalLoader: finished. Total documents loaded: {len(all_documents)}")
     return all_documents
+
+
+def get_all_drupal_document_ids(
+    base_url: str,
+    content_types: List[str],
+    auth_type: str = "none",
+    username: str = "",
+    password: str = "",
+    token: str = "",
+    page_size: int = 100,
+    language: str = "",
+) -> List[str]:
+    """
+    Retrieve the source URL for every current node in Drupal without loading content.
+
+    Intended for deletion detection in the 2-pass delta import: compare the returned
+    set against the paths stored in Qdrant to find nodes that have been removed.
+
+    Args:
+        base_url (str): Base URL of the Drupal site, e.g. ``"https://example.com"``.
+        content_types (list): List of content type machine names, e.g. ``["article", "page"]``.
+        auth_type (str): Authentication type: ``"none"``, ``"basic"``, or ``"token"``.
+        username (str): Username for Basic Auth.
+        password (str): Password for Basic Auth.
+        token (str): Bearer token for token auth.
+        page_size (int): Items per API page request (default 100; larger than load_from_drupal
+                         default because only IDs are fetched, saving bandwidth).
+        language (str): Optional language filter passed via ``Accept-Language`` header.
+
+    Returns:
+        List[str]: Source URLs of all current nodes, e.g. ``["https://example.com/node/42"]``.
+    """
+    session = _build_session(auth_type, username, password, token)
+    if language:
+        session.headers.update({"Accept-Language": language})
+
+    endpoint_map = _discover_endpoint_map(base_url, session)
+    all_ids: List[str] = []
+
+    for content_type in content_types:
+        if stop_loading:
+            break
+
+        resource_key = f"node--{content_type}"
+        if resource_key in endpoint_map:
+            endpoint = endpoint_map[resource_key]
+        else:
+            endpoint = f"{base_url.rstrip('/')}/jsonapi/node/{content_type}"
+
+        # Request only nid + langcode (no content) to minimise bandwidth
+        params: Dict[str, Any] = {
+            "fields[node--{}]".format(content_type): "drupal_internal__nid,langcode",
+            "page[limit]": page_size,
+            "page[offset]": 0,
+        }
+
+        next_url: Optional[str] = endpoint
+        page_count = 0
+
+        while next_url:
+            try:
+                if page_count == 0:
+                    response = session.get(next_url, params=params, timeout=30)
+                else:
+                    response = session.get(next_url, timeout=30)
+                response.raise_for_status()
+                data = response.json()
+            except requests.exceptions.RequestException as e:
+                logger.error(f"get_all_drupal_document_ids: Request failed for '{content_type}': {e}")
+                if page_count == 0:
+                    raise LoaderAccessError(f"DrupalLoader could not list document IDs for '{base_url}' / '{content_type}': {e}") from e
+                break
+
+            items = data.get("data", [])
+            if not items:
+                break
+
+            for item in items:
+                attributes: Dict[str, Any] = item.get("attributes", {})
+                node_id: str = item.get("id", "")
+                drupal_id: str = str(attributes.get("drupal_internal__nid", node_id))
+                source_url = f"{base_url.rstrip('/')}/node/{drupal_id}"
+                all_ids.append(source_url)
+
+            links = data.get("links", {})
+            next_link = links.get("next")
+            if next_link and isinstance(next_link, dict):
+                next_url = next_link.get("href")
+            elif next_link and isinstance(next_link, str):
+                next_url = next_link
+            else:
+                next_url = None
+
+            page_count += 1
+
+        logger.info(f"get_all_drupal_document_ids: found {len(all_ids)} IDs so far after content type '{content_type}'")
+
+    logger.info(f"get_all_drupal_document_ids: total {len(all_ids)} document IDs")
+    return all_ids

@@ -1,0 +1,9 @@
+services:
+  drupal:
+    image: docker.io/library/drupal:11.3.16
+    volumes:
+      - ./scripts:/opt/drupal/scripts:ro
+    command:
+      - './scripts/main.sh'
+    ports:
+      - 3470:80

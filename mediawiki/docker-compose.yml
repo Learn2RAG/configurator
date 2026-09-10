@@ -1,0 +1,8 @@
+services:
+  mediawiki:
+    image: docker.io/library/mediawiki:1.45.4
+    volumes:
+      - ./opt:/opt
+    entrypoint: "/opt/entrypoint"
+    ports:
+      - "7338:80"

@@ -5,25 +5,31 @@ Description:
 This module handles loading documents from directories.
 
 Author: Kyrill Meyer
-Version: 0.0.4
+Version: 0.0.8
 Institution: IFDT
 Creation Date: June 10, 2025
-Last Modified: March 17, 2026
+Last Modified: August 31, 2026
 """
 import hashlib
 import logging
 import os
 from datetime import datetime
-from typing import List, Union
+from typing import List, Union, Optional, TYPE_CHECKING
 from ..globals import stop_loading
-from langchain_community.document_loaders import DirectoryLoader
+from ..loaders.errors import LoaderAccessError
+from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain_core.documents import Document
+
+if TYPE_CHECKING:
+    from ..utils.progress import ImportProgress
 
 # supress pdfminer-Warnings
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 # initialize logger
 logger = logging.getLogger("Learn2RAGImporter")
+
+_DIRECTORY_STATUS_INTERVAL = 25
 
 def ensure_pandoc_available() -> None:
     """Checks if pandoc is available and downloads it with pypandoc if necessary."""
@@ -43,7 +49,7 @@ def ensure_pandoc_available() -> None:
         logger.warning("pypandoc is not installed. Install it with 'poetry add pypandoc' to manage pandoc automatically.")
 
 
-def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: bool = False, loader_id: str = "N/A") -> List[Document]:
+def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: bool = False, loader_id: str = "N/A", progress: Optional["ImportProgress"] = None) -> List[Document]:
     """
     Load documents from a directory and set metadata.
 
@@ -58,12 +64,17 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
     # Check if pandoc is available (for RTF, DOCX etc.)
     ensure_pandoc_available()
 
+    if progress is not None:
+        progress.emit("Phase 2/4 Load", f"Scanning directory | recursive {recursive}", source=path)
+
     documents = []
+    if not os.path.isdir(path):
+        raise LoaderAccessError(f"Directory '{path}' does not exist or is not accessible.")
     if isinstance(recursive, str):
         recursive = recursive.lower() == "true"
 
 
-    text_loader_kwargs = {"autodetect_encoding": True, "detect_language_per_element": False}
+    text_loader_kwargs = {"autodetect_encoding": True, "detect_language_per_element": False, "mode": "single"}
     loader = DirectoryLoader(
         path,
         show_progress=True,
@@ -74,7 +85,6 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
             "*.docx",
             "*.pptx",
             "*.xlsx",
-            "*.pdf",
             "*.txt",
             "*.csv",
             "*.html",
@@ -84,8 +94,15 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
             "*.epub",
         ]
     )
-   
-    #loader = DirectoryLoader(path, show_progress=True, loader_kwargs=text_loader_kwargs, recursive=recursive, glob=["*.csv", "*.docx", "*.eml", "*.epub", "*.html", "*.json", "*.md", "*.odt", "*.pdf", "*.ppt", "*.pptx", "*.rst", "*.rtf", "*.txt", "*.tsv", "*.cls", "*.xlsx", "*.xml"])
+    # use pypdf instead of unstructured[pdf] for better performance and stability, especially with large PDFs
+    pdf_loader = DirectoryLoader(
+        path,
+        glob="*.pdf",
+        loader_cls=PyPDFLoader,  # type: ignore[arg-type]
+        loader_kwargs={"mode": "single"},
+        recursive=recursive,
+        silent_errors=silent_errors,
+    )
    
     #external dependencies 
     # doc - requires libreoffice
@@ -93,19 +110,34 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
 
     #loader = DirectoryLoader(path, show_progress=True, silent_errors=True, recursive=False)
     try:
-        loaded_documents = loader.load()
+        other_docs = loader.load()
+        pdf_docs = pdf_loader.load()
+        loaded_documents = other_docs + pdf_docs
+        if progress is not None:
+            progress.emit(
+                "Phase 2/4 Load",
+                "Directory scan finished",
+                processed=0,
+                total=len(loaded_documents),
+                source=path,
+            )
     except Exception as e:
         logger.error(f"Error loading documents from directory: {e}")
-        return []
+        raise LoaderAccessError(f"Error loading documents from directory '{path}': {e}") from e
     
     for doc in loaded_documents:
         if stop_loading:
             logger.info("Loading process stopped by user.")
             break
         try:
-            # generate a unique hash for the document content
             if isinstance(doc, Document):
-                content_hash = hashlib.sha256(doc.page_content.encode('utf-8')).hexdigest()
+                # Hash raw file bytes so the Document carries a stable, source-level hash
+                # directly comparable to the value stored in Qdrant by get_documents().
+                try:
+                    with open(doc.metadata["source"], "rb") as _f:
+                        content_hash = hashlib.sha256(_f.read()).hexdigest()
+                except OSError:
+                    content_hash = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
                 doc.metadata["content_hash"] = content_hash
 
                 # get file metadata
@@ -134,6 +166,14 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
 
             documents.append(doc)
             logger.debug(f"Loaded file: {doc.metadata.get('source', 'Unknown')}")
+            if progress is not None and len(documents) % _DIRECTORY_STATUS_INTERVAL == 0:
+                progress.emit(
+                    "Phase 2/4 Load",
+                    "Directory files processed",
+                    processed=len(documents),
+                    total=len(loaded_documents),
+                    source=path,
+                )
         except Exception as e:
             error_str = str(e)
             doc_source = getattr(doc, 'metadata', {}).get('source', 'Unknown')
@@ -151,10 +191,15 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
         file_types = [doc.metadata.get("file_extension", "unknown") for doc in documents]
         type_count = {ext: file_types.count(ext) for ext in set(file_types)}
         logger.info(f"Loaded {len(documents)} documents from '{path}'. File types: {type_count}")
+        if progress is not None:
+            progress.emit(
+                "Phase 2/4 Load",
+                f"Directory load finished | file types {type_count}",
+                processed=len(documents),
+                total=len(loaded_documents),
+                source=path,
+            )
 
     else:
         logger.warning(f"No documents found in directory: {path}")
     return documents
-
-
-

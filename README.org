@@ -1,3 +1,5 @@
 * Learn2RAG
 ** Documentation
 https://docs.learn2rag.de/
+** Changelog
+[[./CHANGELOG.md]]

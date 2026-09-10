@@ -13,7 +13,6 @@ services:
       - ./qdrant_data:/qdrant/storage
 volumes:
   open-webui-data:
-  open-webui-pipelines:
 configs:
   qdrant_config:
     content: |

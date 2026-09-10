@@ -2,19 +2,29 @@ import argparse
 import logging
 from uuid import uuid4
 import hashlib
-from typing import Any, cast
+from typing import Any, cast, Optional, TYPE_CHECKING
 import numpy as np
 import warnings
 from collections.abc import Iterator
+from collections import deque
+from time import perf_counter
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_core.documents.base import Document
+from langchain_core.documents import Document
 from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
 
-
-from . import json_loader
 from .embeddings import create_embeddings
+
+if TYPE_CHECKING:
+    from learn2rag.importer.utils.progress import ImportProgress
+
+
+def _format_hhmmss(total_seconds: float) -> str:
+    seconds = max(0, int(total_seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
 def get_chunks_metadata(chunks: list[Document], item: str) -> Iterator[str]:
@@ -33,12 +43,12 @@ def point_exists(qdrant: Qdrant, collection_name: str, loader_id: str, path: str
     filter = Filter(
         must=[
             FieldCondition(key="loader_id", match=MatchValue(value=loader_id)),
-            FieldCondition(key="path", match=MatchValue(value=path)),
+            FieldCondition(key="source", match=MatchValue(value=path)),
             FieldCondition(key="content_hash", match=MatchValue(value=content_hash)),
             FieldCondition(key="chunk_hash", match=MatchValue(value=chunk_hash)),
         ]
     )
-    result, _ = qdrant.client.scroll(
+    result, _ = qdrant.get_client().scroll(
         collection_name=collection_name, scroll_filter=filter, limit=1
     )
     return len(result) > 0
@@ -52,7 +62,7 @@ def insert(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None
         },
         payload=payload(sample),
     )
-    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+    qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
 
 
 def insert_dense_sparse(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
@@ -67,7 +77,7 @@ def insert_dense_sparse(qdrant: Qdrant, collection_name: str, sample: dict[str, 
         },
         payload=payload(sample),
     )
-    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+    qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
 
 def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
     point = PointStruct(
@@ -82,7 +92,7 @@ def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: di
         },
         payload=payload(sample),
     )
-    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+    qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
 
 def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
     point = PointStruct(
@@ -92,119 +102,223 @@ def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -
         },
         payload=payload(sample),
     )
-    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+    qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
 
-def payload(sample: dict[str, Any]) -> dict[str, str]:
-    return {
+def payload(sample: dict[str, Any]) -> dict[str, Any]:
+    meta = sample["metadata"]
+    result: dict[str, Any] = {
         "content": sample["page_content"],
-        "path": sample["metadata"]["source"],
-        "content_hash": sample["metadata"]["content_hash"],
+        "source": meta["source"],
+        "content_hash": meta["content_hash"],
         "chunk_hash": sample["chunk_hash"],
-        "title": sample["metadata"].get("title",""),
-        "uri": sample["metadata"].get("uri",""),
-        "loader_id": sample["metadata"]["loader_id"],
-        "document_id": sample["metadata"].get("document_id", "")
+        "title": meta.get("title") or meta.get("summary", ""),
+        "uri": meta.get("uri", ""),
+        "loader_id": meta["loader_id"],
+        "document_id": meta.get("document_id", ""),
     }
 
-def index(user_config: dict[str, Any], opt_config: dict[str, Any]) -> None:
-    logging.info('Loading documents')
-    all_documents = json_loader.json_loader(user_config['imported_documents_file_path'])
+    if meta.get("loader") == "JiraLoader":
+        result["assignee"] = meta.get("assignee", "")
+        result["reporter"] = meta.get("reporter", "")
+        result["status"] = meta.get("status", "")
+        result["labels"] = meta.get("labels", [])
+        result["components"] = meta.get("components", [])
+        result["sprint"] = meta.get("sprints", [])
+        result["story_points"] = meta.get("story_points")
 
-    # Split documents into chunks
+    return result
+
+
+def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, Any], opt_config: dict[str, Any], progress: Optional["ImportProgress"] = None) -> None:
+    """
+    Chunk, embed, and bulk-insert a list of documents into Qdrant.
+
+    Mirrors the behaviour of the original ``index()`` function but accepts an
+    already-constructed ``Qdrant`` instance instead of creating one internally.
+    Intended for use by ``process_delta_imports`` and other callers that manage
+    their own Qdrant connection.
+
+    Points that already exist (identical ``loader_id``, ``path``, ``content_hash``,
+    and ``chunk_hash``) are skipped via ``point_exists()``.
+
+    Args:
+        docs (list[Document]): Documents to ingest. May be a full initial load or
+                               a filtered subset of changed documents.
+        qdrant (Qdrant): Authenticated Qdrant wrapper instance.
+        user_config (dict[str, Any]): User configuration dict (must contain
+                                      ``collection_name``).
+        opt_config (dict[str, Any]): Optimisation configuration dict (must contain
+                                     ``chunk_size``, ``chunk_overlap``,
+                                     ``embedding_model``, and ``search_mode``).
+    """
+    collection_name = user_config["collection_name"]
+
     logging.info('Splitting documents into chunks')
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=opt_config["chunk_size"], chunk_overlap=opt_config["chunk_overlap"]
     )
-    chunks = text_splitter.split_documents(all_documents)
+    chunks = text_splitter.split_documents(docs)
+    if progress is not None:
+        progress.emit("Phase 3/4 Index", f"Chunking finished | chunks {len(chunks)}", processed=0, total=len(chunks))
 
-    collection_name = user_config["collection_name"]
+    ingestion_batch_size = opt_config["ingestion_batch_size"]
+    total_batches = (len(chunks) + ingestion_batch_size - 1) // ingestion_batch_size
+    eta_window_size = 100
+    report_every = 100
+    recent_batch_durations: deque[float] = deque(maxlen=eta_window_size)
+    ingest_start = perf_counter()
 
-    # Init vector store
-    qdrant = Qdrant(
-        collection_name=collection_name,
-        opt_config=opt_config
-    )
+    logging.info('Creating embeddings and ingesting in batches...')
+    total_batches = max(1, (len(chunks) + ingestion_batch_size - 1) // ingestion_batch_size)
+    for batch_idx, batch_start in enumerate(range(0, len(chunks), ingestion_batch_size), start=1):
+        batch_started_at = perf_counter()
 
-    chunks_content = [chunk.page_content for chunk in chunks]
-    if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
-        chunks_metadata =  {}
-        embeddings_metadata = {}
-        for item in opt_config["multi_search"]:
-            chunks_metadata[item] = list(get_chunks_metadata(chunks, item))
-            embeddings_metadata[item] = create_embeddings(chunks_metadata[item], opt_config["embedding_model"], opt_config["search_mode"])
-            dense_vecs = embeddings_metadata[item]["dense_vecs"]
-            if isinstance(dense_vecs, np.ndarray):
-                assert dense_vecs.ndim == 2, dense_vecs.shape
-            else:
-                raise TypeError(f"dense_vecs must be np.ndarray, got {type(dense_vecs)}")
-
-    chunk_hash = [hashlib.md5(chunk.page_content.encode()).hexdigest() for chunk in chunks]            
-    # Todo: handle different vector lengths for batch encoding when using sparse vectors
-
-    logging.info('Creating embeddings...')
-    embeddings = create_embeddings(chunks_content, opt_config["embedding_model"], opt_config["search_mode"])
-    if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
-        mmembeddings: list[np.ndarray[Any, Any]] = []
-        for i in range(len(embeddings['dense_vecs'])):
-            vecs_to_concat: list[np.ndarray[Any, Any]] = [cast(np.ndarray[Any, Any], embeddings['dense_vecs'][i])]
-            for item in embeddings_metadata.keys():
-                vecs_to_concat.append(cast(np.ndarray[Any, Any], embeddings_metadata[item]['dense_vecs'][i]))
-            mmembeddings.append(np.concatenate(vecs_to_concat, axis=0))
-        embeddings['dense_vecs'] = mmembeddings
-
-    if isinstance(embeddings, dict) and "dense_vecs" in embeddings:
-        if opt_config["search_mode"] == "dense":
-            chunks_with_embeddings = [
-                dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
-                for chunk, dense, c_hash in zip(chunks, embeddings["dense_vecs"], chunk_hash)
-            ]
-        if opt_config["search_mode"] == "dense_sparse":
-            chunks_with_embeddings = [
-                dict(chunk)
-                | {"dense_vec": dense, "lexical_weights": sparse, "chunk_hash": c_hash}
-                for chunk, dense, sparse, c_hash in zip(
-                    chunks,
-                    list(embeddings["dense_vecs"]),
-                    list(embeddings["lexical_weights"]),
-                    chunk_hash
-                )
-            ]
-        if opt_config["search_mode"] == "dense_sparse_colbert":
-            chunks_with_embeddings = [
-                dict(chunk)
-                | {"dense_vec": dense, "lexical_weights": sparse, "colbert_vecs": colbert, "chunk_hash": c_hash}
-                for chunk, dense, sparse, colbert, c_hash in zip(
-                    chunks,
-                    list(embeddings["dense_vecs"]),
-                    list(embeddings["lexical_weights"]),
-                    list(embeddings['colbert_vecs']),
-                    chunk_hash
-                )
-            ]
-    else:
-        chunks_with_embeddings = [
-            dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
-            for chunk, dense, c_hash in zip(chunks, embeddings, chunk_hash)
+        batch_chunks = chunks[batch_start:batch_start + ingestion_batch_size]
+        batch_content = [chunk.page_content for chunk in batch_chunks]
+        # prevent Surrogate Halves errors through invalid UTF-8 characters in the text through replacing
+        batch_chunk_hash = [
+            hashlib.md5(chunk.page_content.encode("utf-8", errors="replace")).hexdigest()
+            for chunk in batch_chunks
         ]
 
-    for sample in chunks_with_embeddings:
-        if not point_exists(qdrant, collection_name, sample['metadata']['loader_id'], sample['metadata']['source'], sample['metadata']['content_hash'], sample['chunk_hash']):
-            if opt_config["search_mode"] == "dense_sparse":
-                insert_dense_sparse(qdrant, collection_name, sample)
+        embeddings = create_embeddings(
+            batch_content,
+            opt_config["embedding_model"],
+            opt_config["search_mode"],
+        )
+
+        if len(opt_config["multi_search"]) > 0 and opt_config["query_mode"] == "multi":
+            if not isinstance(embeddings, dict) or "dense_vecs" not in embeddings:
+                raise TypeError("Expected dense_vecs in embeddings for multi query mode")
+
+            embeddings_metadata: dict[str, Any] = {}
+            for item in opt_config["multi_search"]:
+                item_values = list(get_chunks_metadata(batch_chunks, item))
+                embeddings_metadata[item] = create_embeddings(
+                    item_values,
+                    opt_config["embedding_model"],
+                    opt_config["search_mode"],
+                )
+                dense_vecs = embeddings_metadata[item]["dense_vecs"]
+                if isinstance(dense_vecs, np.ndarray):
+                    assert dense_vecs.ndim == 2, dense_vecs.shape
+                else:
+                    raise TypeError(f"dense_vecs must be np.ndarray, got {type(dense_vecs)}")
+
+            mmembeddings: list[np.ndarray[Any, Any]] = []
+            for i in range(len(embeddings['dense_vecs'])):
+                vecs_to_concat: list[np.ndarray[Any, Any]] = [cast(np.ndarray[Any, Any], embeddings['dense_vecs'][i])]
+                for item in embeddings_metadata.keys():
+                    vecs_to_concat.append(cast(np.ndarray[Any, Any], embeddings_metadata[item]['dense_vecs'][i]))
+                mmembeddings.append(np.concatenate(vecs_to_concat, axis=0))
+            embeddings['dense_vecs'] = mmembeddings
+
+        if isinstance(embeddings, dict) and "dense_vecs" in embeddings:
+            if opt_config["search_mode"] == "dense":
+                chunks_with_embeddings = [
+                    dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
+                    for chunk, dense, c_hash in zip(batch_chunks, embeddings["dense_vecs"], batch_chunk_hash)
+                ]
+            elif opt_config["search_mode"] == "dense_sparse":
+                chunks_with_embeddings = [
+                    dict(chunk)
+                    | {"dense_vec": dense, "lexical_weights": sparse, "chunk_hash": c_hash}
+                    for chunk, dense, sparse, c_hash in zip(
+                        batch_chunks,
+                        list(embeddings["dense_vecs"]),
+                        list(embeddings["lexical_weights"]),
+                        batch_chunk_hash
+                    )
+                ]
             elif opt_config["search_mode"] == "dense_sparse_colbert":
-                insert_dense_sparse_colbert(qdrant, collection_name, sample)
-            elif opt_config["query_mode"] == "multi":
-                insert_multi(qdrant, collection_name, sample)
+                chunks_with_embeddings = [
+                    dict(chunk)
+                    | {"dense_vec": dense, "lexical_weights": sparse, "colbert_vecs": colbert, "chunk_hash": c_hash}
+                    for chunk, dense, sparse, colbert, c_hash in zip(
+                        batch_chunks,
+                        list(embeddings["dense_vecs"]),
+                        list(embeddings["lexical_weights"]),
+                        list(embeddings["colbert_vecs"]),
+                        batch_chunk_hash
+                    )
+                ]
             else:
-                insert(qdrant, collection_name, sample)
+                chunks_with_embeddings = [
+                    dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
+                    for chunk, dense, c_hash in zip(batch_chunks, embeddings["dense_vecs"], batch_chunk_hash)
+                ]
+        else:
+            chunks_with_embeddings = [
+                dict(chunk) | {"dense_vec": dense, "chunk_hash": c_hash}
+                for chunk, dense, c_hash in zip(batch_chunks, embeddings, batch_chunk_hash)
+            ]
+
+        for sample in chunks_with_embeddings:
+            if not point_exists(qdrant, collection_name, sample['metadata']['loader_id'], sample['metadata']['source'], sample['metadata']['content_hash'], sample['chunk_hash']):
+                if opt_config["search_mode"] == "dense_sparse":
+                    insert_dense_sparse(qdrant, collection_name, sample)
+                elif opt_config["search_mode"] == "dense_sparse_colbert":
+                    insert_dense_sparse_colbert(qdrant, collection_name, sample)
+                elif opt_config["query_mode"] == "multi":
+                    insert_multi(qdrant, collection_name, sample)
+                else:
+                    insert(qdrant, collection_name, sample)
+        batch_duration = perf_counter() - batch_started_at
+        recent_batch_durations.append(batch_duration)
+
+        if batch_idx % report_every == 0:
+            elapsed = perf_counter() - ingest_start
+            avg_batch_duration = sum(recent_batch_durations) / len(recent_batch_durations)
+            remaining_batches = total_batches - batch_idx
+            eta_seconds = avg_batch_duration * remaining_batches
+            progress_percent = (batch_idx / total_batches) * 100 if total_batches > 0 else 100.0
+
+            logging.info(
+                "Ingestion progress: %d/%d batches (%.2f%%), elapsed=%s, eta in %s",
+                batch_idx,
+                total_batches,
+                progress_percent,
+                _format_hhmmss(elapsed),
+                _format_hhmmss(eta_seconds),
+            )
+        if progress is not None:
+            processed_chunks = min(batch_start + len(batch_chunks), len(chunks))
+            progress.emit(
+                "Phase 3/4 Index",
+                f"Embedding and ingest batch {batch_idx}/{total_batches}",
+                processed=processed_chunks,
+                total=len(chunks),
+            )
+
+    total_elapsed = perf_counter() - ingest_start
+    logging.info(
+        "Ingestion finished: %d/%d batches (100.00%%), total_elapsed=%s",
+        total_batches,
+        total_batches,
+        _format_hhmmss(total_elapsed),
+    )
 
 
-def main() -> None:
-    logging.basicConfig(level=logging.INFO)
-    from .config import user_config, opt_config
-    index(user_config, opt_config)
+def index(documents: list[Document], user_config: dict[str, Any], opt_config: dict[str, Any], progress: Optional["ImportProgress"] = None) -> None:
+    """
+    Ingest a list of documents — entry point for standalone pipeline operation.
 
+    Creates a ``Qdrant`` instance internally and delegates to ``ingest_batch()``.
+    This function also serves as the replacement for the originally planned
+    ``ingest_document()`` helper: a single-document delta upsert is expressed as
+    ``index([doc], user_config, opt_config)`` without requiring a separate function.
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    main()
+    Called by ``pipeline/main.py`` and the ``/ingest`` HTTP endpoint. For the
+    delta-import path (which manages its own Qdrant connection), use
+    ``ingest_batch()`` directly.
+
+    Args:
+        documents (list[Document]): One or more documents to ingest.
+        user_config (dict[str, Any]): User configuration dict (must contain
+                                      ``collection_name``).
+        opt_config (dict[str, Any]): Optimisation configuration dict.
+    """
+    collection_name = user_config["collection_name"]
+    Qdrant.ensure_collection(collection_name=collection_name, opt_config=opt_config)
+    qdrant = Qdrant(collection_name=collection_name, opt_config=opt_config)
+    ingest_batch(documents, qdrant, user_config, opt_config, progress=progress)

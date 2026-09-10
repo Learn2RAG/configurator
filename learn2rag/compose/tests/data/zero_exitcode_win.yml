@@ -1,0 +1,6 @@
+services:
+  main:
+    command:
+      - 'cmd.exe'
+      - '/c'
+      - 'exit 0'
