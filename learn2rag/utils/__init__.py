@@ -1,10 +1,12 @@
 '''
 Utilities which do not depend on Learn2RAG.
 '''
+import importlib
 import logging
 import platform
 import os
 import subprocess
+from functools import cache, lru_cache
 from pathlib import Path
 from time import sleep
 from typing import Callable, Optional
@@ -14,6 +16,25 @@ import xdg.BaseDirectory
 
 def is_windows() -> bool:
     return platform.system() == 'Windows'
+
+
+@lru_cache()
+def python_package_version(package: str) -> str | None:
+    try:
+        return importlib.metadata.version(package)
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+@cache
+def vc_commit_id() -> str | None:
+    try:
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+    except (
+            FileNotFoundError,  # no git
+            subprocess.CalledProcessError,  # not a git repository
+    ):
+        return None
 
 
 def normalize_path(path: Path) -> Path:

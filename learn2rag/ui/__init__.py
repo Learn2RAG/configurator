@@ -36,7 +36,9 @@ from ..utils import (
     is_windows,
     normalize_path,
     open_web_browser,
+    python_package_version,
     save_data_path,
+    vc_commit_id,
 )
 
 from datetime import datetime
@@ -232,14 +234,11 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
 
-    cached_version = get_version()
-    cached_hash = get_git_hash()
-
     @app.context_processor
-    def inject_version() -> dict[str, str]:
+    def inject_version() -> dict[str, str | None]:
         return {
-            "app_version": cached_version,
-            "git_hash": cached_hash
+            'learn2rag_package_version': python_package_version('learn2rag'),
+            'vc_commit_id': vc_commit_id(),
         }
 
     def remove_pipeline_storage_directory(storage_path: Path) -> bool:
@@ -618,19 +617,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     return app
 
-def get_version() -> str:
-    try:
-        with open("pyproject.toml", "rb") as f:
-            data = tomllib.load(f)
-            return str(data.get("project", {}).get("version", "0.0.0"))
-    except Exception:
-        return "0.0.0"
-
-def get_git_hash() -> str:
-    try:
-        return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
-    except Exception:
-        return "unknown"
 
 def atexit_handler() -> None:
     logging.debug('Exit handler')
