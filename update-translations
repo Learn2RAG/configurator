@@ -2,6 +2,7 @@
 set -eu
 PYBABEL="uv run pybabel"
 $PYBABEL extract --mapping-file=learn2rag/ui/babel.cfg \
+         --add-comments="TRANSLATORS:" \
          --no-location --omit-header --sort-output \
          --output-file=learn2rag/ui/messages.pot learn2rag/ui
 $PYBABEL update --input-file=learn2rag/ui/messages.pot \
