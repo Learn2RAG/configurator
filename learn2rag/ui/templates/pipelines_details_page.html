@@ -69,9 +69,9 @@
 {% if not projects[name] or not projects[name].running %}
 <div class="card float-end ms-3 mb-3 shadow text-center">
   <div class="card-body">
-    {{ pipeline_start(name, compose_templates['continuous'], pgettext('button', 'Start'), pgettext('tooltip', 'Start periodic import and the AI chat')) }}
-    {{ pipeline_start(name, compose_templates['import'], pgettext('button', 'One time import'), pgettext('tooltip', 'Do the import once and stop')) }}
-    {{ pipeline_start(name, compose_templates['pipeline'], pgettext('button', 'Start only the AI chat'), pgettext('tooltip', 'Start the AI chat. Requires import to be already completed')) }}
+    {{ pipeline_start(name, compose_templates['continuous'], pgettext('button', 'Import and start chat'), pgettext('tooltip', 'Periodically import and start the AI chat.')) }}
+    {{ pipeline_start(name, compose_templates['import'], pgettext('button', 'Only import'), pgettext('tooltip', 'Import only once.')) }}
+    {{ pipeline_start(name, compose_templates['pipeline'], pgettext('button', 'Only start chat'), pgettext('tooltip', 'Start the AI chat. Requires import to be already completed.')) }}
   </div>
 </div>
 {% endif %}
