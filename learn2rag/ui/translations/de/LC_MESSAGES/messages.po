@@ -237,10 +237,6 @@ msgctxt "flash"
 msgid "Directory removed: %(path)s"
 msgstr "Verzeichnis entfernt: %(path)s"
 
-msgctxt "tooltip"
-msgid "Do the import once and stop"
-msgstr ""
-
 msgctxt "heading"
 msgid "Download a language model"
 msgstr "Neues Sprachmodell herunterladen"
@@ -322,8 +318,16 @@ msgctxt "form_label"
 msgid "Immediately start the data import and the chat interface"
 msgstr "Der Datenimport und die Chat direkt starten"
 
+msgctxt "button"
+msgid "Import and start chat"
+msgstr ""
+
 msgctxt "form_label"
 msgid "Import authenticaton"
+msgstr ""
+
+msgctxt "tooltip"
+msgid "Import only once."
 msgstr ""
 
 msgctxt "form_label"
@@ -417,13 +421,17 @@ msgstr ""
 msgid "Ollama is not running. Please restart the Learn2RAG configurator."
 msgstr "Ollama ist nicht verfügbar. Es wird empfohlen Learn2RAG neuzustarten."
 
-msgctxt "button"
-msgid "One time import"
-msgstr ""
-
 msgctxt "nav"
 msgid "Online documentation"
 msgstr "Dokumentation"
+
+msgctxt "button"
+msgid "Only import"
+msgstr ""
+
+msgctxt "button"
+msgid "Only start chat"
+msgstr ""
 
 msgctxt "button"
 msgid "Open AI chat"
@@ -443,6 +451,10 @@ msgstr "Passwort"
 msgctxt "form_label"
 msgid "Path on the local filesystem"
 msgstr "Pfad im lokalen Dateisytem"
+
+msgctxt "tooltip"
+msgid "Periodically import and start the AI chat."
+msgstr ""
 
 msgctxt "heading"
 msgid "Pipelines"
@@ -547,23 +559,11 @@ msgid "Sources"
 msgstr ""
 
 msgctxt "button"
-msgid "Start"
-msgstr ""
-
-msgctxt "button"
-msgid "Start only the AI chat"
-msgstr ""
-
-msgctxt "button"
 msgid "Start optimization"
 msgstr ""
 
 msgctxt "tooltip"
-msgid "Start periodic import and the AI chat"
-msgstr ""
-
-msgctxt "tooltip"
-msgid "Start the AI chat. Requires import to be already completed"
+msgid "Start the AI chat. Requires import to be already completed."
 msgstr ""
 
 #, python-format
@@ -610,6 +610,7 @@ msgstr ""
 msgid "This password would be saved in plain text in the configuration."
 msgstr "Dieses Passwort würde in der Konfiguration im Klartext gespeichert werden."
 
+#. training data preview
 #, python-format
 msgid "Total rows: %(amount)s"
 msgstr ""
@@ -685,7 +686,7 @@ msgstr "läuft"
 
 #~ msgctxt "button"
 #~ msgid "Start"
-#~ msgstr "Start"
+#~ msgstr ""
 
 #~ msgctxt "flash"
 #~ msgid "Started the pipeline"
@@ -744,5 +745,25 @@ msgstr "läuft"
 
 #~ msgctxt "heading"
 #~ msgid "Drupal"
+#~ msgstr ""
+
+#~ msgctxt "tooltip"
+#~ msgid "Do the import once and stop"
+#~ msgstr ""
+
+#~ msgctxt "button"
+#~ msgid "One time import"
+#~ msgstr ""
+
+#~ msgctxt "button"
+#~ msgid "Start only the AI chat"
+#~ msgstr ""
+
+#~ msgctxt "tooltip"
+#~ msgid "Start periodic import and the AI chat"
+#~ msgstr ""
+
+#~ msgctxt "tooltip"
+#~ msgid "Start the AI chat. Requires import to be already completed"
 #~ msgstr ""
 
