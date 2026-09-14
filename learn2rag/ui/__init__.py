@@ -551,9 +551,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             storage_path.mkdir(parents=True, exist_ok=True)
             training_file = request.files['trainingFile']
             training_file.save(storage_path / 'training.csv')
+            flash(pgettext('flash', 'Training data file saved'))
         except Exception as e:
             app.logger.exception(e)
-            flash(pgettext('flash', 'Could not save the file'), 'error')
+            flash(pgettext('flash', 'Could not save the training data file'), 'error')
         return redirect(url_for('pipeline_details', name=name))
 
     @app.post('/pipelines/<name>')

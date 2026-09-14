@@ -149,7 +149,7 @@
 
 <hr/>
 <h2>{{pgettext('header', 'Optimization')}}</h2>
-{% if training_dataset %}
+{% if training_examples %}
 <div class="table-responsive">
   <table class="caption-top table table-hover">
     <caption>{{pgettext('header', 'Training data')}}</caption>
@@ -178,7 +178,7 @@
   </table>
 </div>
 {% endif %}
-{% if training_dataset and not (projects[name] and projects[name].running) %}
+{% if training_examples and not (projects[name] and projects[name].running) %}
 <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
   <button class="btn btn-primary" type="submit" name="action" value="start:optimization">{{pgettext('button', 'Start optimization')}}</button>
 </form>
