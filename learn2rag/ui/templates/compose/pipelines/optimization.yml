@@ -1,5 +1,5 @@
 name: optimization
-label: Optimize
+label: Optimization
 ports:
   # TODO: labels in the interface currently assume a specific port order
   - ui
