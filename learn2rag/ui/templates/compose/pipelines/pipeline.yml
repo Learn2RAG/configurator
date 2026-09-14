@@ -2,10 +2,8 @@ name: pipeline
 label: Start only the chat
 ports:
   # TODO: labels in the interface currently assume a specific port order
-  - ui
-  - qdrant_http
   - pipeline
-  - open_webui_pipelines
+  - qdrant_http
 ui_url: '{{ pipeline.chat_proxy_url or learn2rag_scheme ~ "://" ~ learn2rag_hostname ~ ":" ~ ports.pipeline ~ "/" }}'
 files:
   - path: '{{storage_path}}/qdrant_config.yml'

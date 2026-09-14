@@ -2,7 +2,7 @@ name: optimization
 label: Optimize
 ports:
   # TODO: labels in the interface currently assume a specific port order
-  - ui
+  - pipeline
   - qdrant_http
 files:
   - path: '{{storage_path}}/importer_config.json'
