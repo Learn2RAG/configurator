@@ -10,6 +10,7 @@ import signal
 import socket
 import threading
 import time
+import tomllib
 from typing import Any
 import urllib
 from itertools import islice
@@ -35,7 +36,9 @@ from ..utils import (
     is_windows,
     normalize_path,
     open_web_browser,
+    python_package_version,
     save_data_path,
+    vc_commit_id,
 )
 
 from datetime import datetime
@@ -221,10 +224,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
         }
 
-    @app.context_processor
-    def inject_current_year() -> dict[str, Any]:
-        return {'current_year': datetime.now().year}
-
     atexit.register(atexit_handler)
 
     # TODO: let the user configure the directory for ollama data before starting it?
@@ -234,6 +233,13 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     except Exception as e:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
+
+    @app.context_processor
+    def inject_version() -> dict[str, str | None]:
+        return {
+            'learn2rag_package_version': python_package_version('learn2rag'),
+            'vc_commit_id': vc_commit_id(),
+        }
 
     def remove_pipeline_storage_directory(storage_path: Path) -> bool:
         try:

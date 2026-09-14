@@ -1,21 +1,17 @@
 <footer class="footer gradient-header py-4">
   <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center">
-    <!-- Left: Links -->
     <div class="d-flex flex-column align-items-start">
-      <div class="mb-2">
-        <a href="https://github.com/learn2rag" class="footer-link me-4">
-          <i class="fab fa-github"></i> GITHUB
-        </a>
-        <a href="https://www.linkedin.com/" class="footer-link">
-          <i class="fab fa-linkedin"></i> LINKEDIN
-        </a>
-      </div>
       <div>
-        © {{ current_year }} Learn2RAG.
+        {% if vc_commit_id %}<abbr title="{{ vc_commit_id }}">{% endif %}
+          {% if learn2rag_package_version %}
+          Learn2RAG {{ learn2rag_package_version }}
+          {% else %}
+          Learn2RAG
+          {% endif %}
+        {% if vc_commit_id %}</abbr>{% endif %}
       </div>
     </div>
 
-    <!-- Right: BMFTR Logo -->
     <div class="mt-3 mt-md-0">
       <a href="https://www.bmftr.bund.de/" target="_blank">
         <img src="{{ url_for('learn2rag_bootstrap_static', path='images/BMFTR.png') }}" alt="BMFTR Logo" style="height: 120px;" />
