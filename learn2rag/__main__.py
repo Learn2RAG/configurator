@@ -45,7 +45,7 @@ def configure_logging(config_path: pathlib.Path, debug: bool) -> None:
             logging.config.dictConfig(yaml.safe_load(f))
     else:
         logging.basicConfig(level=logging.INFO if not debug else logging.DEBUG)
-        logging.info('Using basic logging config')
+        logging.warning('Using basic logging config')
 
 
 if __name__ == '__main__':

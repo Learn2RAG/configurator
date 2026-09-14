@@ -17,4 +17,4 @@ with open(os.environ.get("IMPORTER_CONFIG", default_importer_config), "r") as fi
 
 with open(os.environ.get("PIPELINE_OPT_CONFIG", default_opt_config), "r") as file:
     opt_config = json.load(file)
-    logging.info(f"Loaded opt_config:\n{json.dumps(opt_config, indent=4)}")
+    logging.debug(f"Loaded opt_config:\n{json.dumps(opt_config, indent=4)}")
