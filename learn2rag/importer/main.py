@@ -11,6 +11,9 @@ Creation Date: June 10, 2025
 Last Modified: August 31, 2026
 """
 
+# FIXME: import this early to prevent segmentation fault on Windows
+import pyarrow.dataset  # noqa: F401
+
 import argparse
 import json
 import os
