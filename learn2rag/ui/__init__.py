@@ -525,14 +525,18 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         import_state = ImportState(str(storage_path / 'import_state.json'))
         try:
             training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
+            training_examples = training_dataset.select(range(min(3, len(training_dataset))))
+            training_total = len(training_dataset)
         except FileNotFoundError:
-            training_dataset = None
+            training_examples = None
+            training_total = None
         return render_template(
             'pipelines_details_page.html',
             name=name,
             pipeline=pipeline,
             import_state=import_state,
-            training_dataset=training_dataset,
+            training_examples=training_examples,
+            training_total=training_total,
             projects=Project.get_all(),
         )
 
