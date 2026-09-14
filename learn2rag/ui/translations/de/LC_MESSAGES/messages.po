@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-14 10:19+0200\n"
+"POT-Creation-Date: 2026-09-14 13:46+0200\n"
 "PO-Revision-Date: 2026-09-14 10:19+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: de\n"
@@ -17,6 +17,10 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
+
+msgctxt "firststep"
+msgid " Yes, add my <code>~/Documents</code> folder"
+msgstr "Ja, füge meinen Ordner <code>~/Documents</code> hinzu."
 
 #, python-format
 msgid "%(num)d data source configuration"
@@ -115,6 +119,14 @@ msgstr "Neue Pipeline-Konfiguration hinzugefügt: %(label)s"
 
 msgid "Advanced configuration"
 msgstr "Erweiterte Optionen"
+
+msgctxt "firststep"
+msgid ""
+"All the files in this directory would be imported. That can take some "
+"time."
+msgstr ""
+"Alle Dateien in diesem Verzeichnis würden importiert werden. Das kann "
+"einige Zeit in Anspruch nehmen."
 
 msgid "Another model"
 msgstr "Ein weiteres Sprachmodell"
@@ -255,6 +267,10 @@ msgctxt "flash"
 msgid "Directory removed: %(path)s"
 msgstr "Verzeichnis entfernt: %(path)s"
 
+msgctxt "firststep"
+msgid "Do you want to add a folder now?"
+msgstr "Möchten Sie jetzt einen Ordner hinzufügen?"
+
 msgctxt "heading"
 msgid "Download a language model"
 msgstr "Neues Sprachmodell herunterladen"
@@ -350,7 +366,7 @@ msgstr "Nur einmal importieren"
 
 msgctxt "form_label"
 msgid "Internal vector store"
-msgstr "Interner Vektorspeicher"
+msgstr ""
 
 msgctxt "column_heading"
 msgid "Label"
@@ -420,6 +436,10 @@ msgctxt "button"
 msgid "More options"
 msgstr "Weitere Optionen"
 
+msgctxt "firststep"
+msgid "More options"
+msgstr "Weitere Optionen"
+
 msgctxt "form_auth_option"
 msgid "None"
 msgstr "keine"
@@ -453,7 +473,7 @@ msgstr "KI-Chat öffnen"
 
 msgctxt "header"
 msgid "Optimization"
-msgstr "Optimierung"
+msgstr ""
 
 msgid "Optional"
 msgstr "Optional"
@@ -536,7 +556,7 @@ msgstr "Speichern"
 
 msgctxt "label"
 msgid "Save"
-msgstr "Speichern"
+msgstr ""
 
 msgctxt "button"
 msgid "Select all"
@@ -576,7 +596,7 @@ msgstr "Datenquellen"
 
 msgctxt "button"
 msgid "Start optimization"
-msgstr "Optimierung starten"
+msgstr ""
 
 msgctxt "tooltip"
 msgid "Start the AI chat. Requires import to be already completed."
@@ -635,7 +655,7 @@ msgstr ""
 
 msgctxt "header"
 msgid "Training data"
-msgstr "Trainingsdaten"
+msgstr ""
 
 msgctxt "tooltip"
 msgid "Unknown value"
@@ -684,6 +704,10 @@ msgstr "Webseite"
 msgctxt "title"
 msgid "Welcome"
 msgstr "Wilkommen"
+
+msgctxt "firststep"
+msgid "You do not have any data sources selected"
+msgstr "Sie haben keine Datenquellen ausgewählt."
 
 msgid "running"
 msgstr "läuft"
@@ -795,5 +819,9 @@ msgstr "läuft"
 
 #~ msgctxt "form_label"
 #~ msgid "User interface"
+#~ msgstr ""
+
+#~ msgctxt "button"
+#~ msgid "Optimization"
 #~ msgstr ""
 
