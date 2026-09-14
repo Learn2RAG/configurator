@@ -160,7 +160,8 @@
       </tr>
     </thead>
     <tbody>
-      {% for training_item in training_dataset.select(range(3)) %}
+      {% set limit = [3, training_dataset.num_rows]|min %}
+      {% for training_item in training_dataset.select(range(limit)) %}
       <tr>
         <td>{{training_item['question']}}</td>
         <td>{{training_item['answer']}}</td>
