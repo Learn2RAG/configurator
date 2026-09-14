@@ -1,11 +1,11 @@
 #!/bin/sh
-set -eu
+set -eux
 PYBABEL="uv run pybabel"
 $PYBABEL extract --mapping-file=learn2rag/ui/babel.cfg \
          --add-comments="TRANSLATORS:" \
-         --no-location --omit-header --sort-output \
+         --no-location --sort-output \
          --output-file=learn2rag/ui/messages.pot learn2rag/ui
 $PYBABEL update --input-file=learn2rag/ui/messages.pot \
-         --no-fuzzy-matching --omit-header \
+         --no-fuzzy-matching \
          --output-dir=learn2rag/ui/translations
 $PYBABEL compile --directory=learn2rag/ui/translations
