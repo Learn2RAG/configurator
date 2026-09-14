@@ -1,5 +1,12 @@
+import asyncio
 import warnings
-from typing import List, Any, cast
+from typing import (
+    cast,
+    Any,
+    List,
+    Mapping,
+    Sequence,
+)
 import logging
 import copy
 from functools import lru_cache
@@ -11,6 +18,7 @@ from qdrant_client import models
 from qdrant_client.http.models import QueryResponse, ScoredPoint
 
 from .authorization import filter_authorized
+from .chat import Message
 from .config import opt_config, user_config
 from .embeddings import create_embeddings
 from .qdrant import Qdrant
@@ -174,6 +182,7 @@ def _collect_query_points(
 
     if opt_config.get("rewrite") == "True":
         rewrite_mode = opt_config.get("rewrite_mode")
+        rewrite_components = (rewrite_mode or "").split("_")
 
         profilingLogger.info(
             "rewrite_enabled query=%r rewrite_mode=%s",
@@ -182,7 +191,7 @@ def _collect_query_points(
             extra={'activity': '_collect_query_points', 'request_id': request_id},
         )
 
-        if rewrite_mode in ["subqueries", "subqueries_keywords"]:
+        if "subqueries" in rewrite_components:
             opt_config_subqueries = copy.deepcopy(opt_config)
             opt_config_subqueries["top_k"] = opt_config["top_k_subqueries"]
 
@@ -220,7 +229,7 @@ def _collect_query_points(
 
                 points_all.extend(sq_results.points)
 
-        if rewrite_mode in ["keywords", "subqueries_keywords"]:
+        if "keywords" in rewrite_components:
             opt_config_keywords = copy.deepcopy(opt_config)
             opt_config_keywords["top_k"] = opt_config["top_k_keywords"]
             opt_config_keywords["search_mode"] = "sparse"
@@ -464,9 +473,64 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
     return results
 
 
-async def search_authorized(question: str, user: str, *, request_id: str | None = None, user_config: dict[str, Any] = user_config, opt_config: dict[str, Any] = opt_config) -> List[ScoredPoint]:
-    points = _collect_query_points(question, user_config, opt_config, request_id=request_id)
-    query_response = QueryResponse(points=points)
-    authorized_points = await filter_authorized(user, query_response)
-    # keep deterministic order after auth filter
-    return _sort_and_deduplicate(list(authorized_points))
+async def search_authorized(
+    question: str,
+    user_auths: Mapping[str, Any],
+    *,
+    history: Sequence[Message] = (),
+    request_id: str | None = None,
+    user_config: dict[str, Any] = user_config,
+    opt_config: dict[str, Any] = opt_config,
+) -> List[ScoredPoint]:
+    if history and opt_config.get("rewrite") == "True":
+        rewrite_components = (opt_config.get("rewrite_mode") or "").split("_")
+        if "history" in rewrite_components:
+            contextualized_question = await asyncio.to_thread(rewrite.contextualize_query, question, history, opt_config)
+            if contextualized_question:
+                profilingLogger.info(
+                    "history_rewrite_applied original_query=%r contextualized_query=%r",
+                    question,
+                    contextualized_question,
+                    extra={'activity': 'search_authorized', 'request_id': request_id},
+                )
+                question = contextualized_question
+
+    max_retries = opt_config.get("max_auth_retries", 3)
+    target_k = opt_config.get("top_k", 10)
+    current_multiplier = opt_config.get("auth_oversample_start", 2)
+    step_multiplier = opt_config.get("auth_oversample_step", 2)
+    deduplicated: list[ScoredPoint] = []
+    for attempt in range(max_retries):
+        local_opt = copy.deepcopy(opt_config)
+        local_opt["top_k"] = target_k * current_multiplier
+        if "top_k_reranker" in local_opt:
+            local_opt["top_k_reranker"] = local_opt["top_k_reranker"] * current_multiplier
+        if "top_k_subqueries" in local_opt:
+            local_opt["top_k_subqueries"] = local_opt["top_k_subqueries"] * current_multiplier
+        if "top_k_keywords" in local_opt:
+            local_opt["top_k_keywords"] = local_opt["top_k_keywords"] * current_multiplier
+
+        for key in ["prefetch_limit_sparse", "prefetch_limit_dense", "prefetch_limit_colbert"]:
+            if key in local_opt:
+                local_opt[key] = local_opt[key] * current_multiplier
+
+        profilingLogger.info(
+                "authorized_search_attempt attempt=%d/%d multiplier=%d target_k=%d",
+                attempt + 1,
+                max_retries,
+                current_multiplier,
+                target_k,
+                extra={'activity': 'search_authorized', 'request_id': request_id},
+        )
+
+        points = _collect_query_points(question, user_config, local_opt, request_id=request_id)
+        query_response = QueryResponse(points=points)
+
+        authorized_points = await filter_authorized(user_auths, query_response)
+        deduplicated = _sort_and_deduplicate(list(authorized_points))
+
+        if len(deduplicated) >= target_k:
+            return deduplicated[:target_k]
+        current_multiplier += step_multiplier
+    # If all retries are exhausted, return whatever we managed to authorize
+    return deduplicated[:target_k]

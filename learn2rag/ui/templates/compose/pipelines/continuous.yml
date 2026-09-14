@@ -1,12 +1,10 @@
 name: continuous
-label: Start
+label: Import and start chat
 ports:
   # TODO: labels in the interface currently assume a specific port order
-  - ui
-  - qdrant_http
   - pipeline
-  - open_webui_pipelines
-ui_url: '{{ pipeline.chat_proxy_url or learn2rag_scheme ~ "://" ~ learn2rag_hostname ~ ":" ~ ports.ui ~ "/" }}'
+  - qdrant_http
+ui_url: '{{ pipeline.chat_proxy_url or learn2rag_scheme ~ "://" ~ learn2rag_hostname ~ ":" ~ ports.pipeline ~ "/" }}'
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
     content: |
@@ -52,7 +50,7 @@ files:
       handlers:
         display:
           class: logging.StreamHandler
-          level: INFO
+          level: {% if debug_logging %}DEBUG{% else %}INFO{% endif %}
           formatter: colored
           stream: ext://sys.stderr
         profiling_display:
@@ -108,67 +106,6 @@ files:
     content: ''
 
 services:
-  #!!! {% if ports.ui %}
-  open-webui:
-    working_dir: '{{storage_path}}'
-    command:
-      - '{{learn2rag_path}}/services/start-open-webui{% if is_windows %}.exe{% endif %}'
-      - 'serve'
-      - '--host'
-      - '{{config.get("CHAT", {}).get("host") or config.get("UI", {}).get("host") or "127.0.0.1"}}'
-      - '--port'
-      - '{{ports.ui}}'
-    environment:
-      LEARN2RAG_PATH: '{{learn2rag_path}}'
-      DATA_DIR: '{{storage_path}}/open-webui-data'
-      DEFAULT_LOCALE: 'de'
-      ENABLE_OLLAMA_API: 'False'
-      ENABLE_OPENAI_API: 'True'
-      OPENAI_API_BASE_URL: http://127.0.0.1:{{ports.pipeline}}
-      OPENAI_API_KEY: '0p3n-w3bu!'
-      ENABLE_AUTOCOMPLETE_GENERATION: 'False'
-      ENABLE_CODE_EXECUTION: 'False'
-      ENABLE_CODE_INTERPRETER: 'False'
-      ENABLE_COMMUNITY_SHARING: 'False'
-      ENABLE_EASTER_EGGS: 'False'
-      ENABLE_EVALUATION_ARENA_MODELS: 'False'
-      ENABLE_FOLLOW_UP_GENERATION: 'False'
-      ENABLE_MEMORIES: 'False'
-      ENABLE_NOTES: 'False'
-      ENABLE_OLLAMA_API: 'False'
-      ENABLE_PERSISTENT_CONFIG: 'False'
-      ENABLE_TAGS_GENERATION: 'False'
-      ENABLE_TITLE_GENERATION: 'False'
-      GLOBAL_LOG_LEVEL: 'WARNING'
-      OFFLINE_MODE: 'True'
-      RAG_EMBEDDING_MODEL_AUTO_UPDATE: 'False'
-      RAG_RERANKING_MODEL_AUTO_UPDATE: 'False'
-      USER_PERMISSIONS_CHAT_FILE_UPLOAD: 'False'
-      USER_PERMISSIONS_CHAT_TEMPORARY_ENFORCED: 'True'
-      USER_PERMISSIONS_FEATURES_CODE_INTERPRETER: 'False'
-      USER_PERMISSIONS_FEATURES_IMAGE_GENERATION: 'False'
-      USER_PERMISSIONS_FEATURES_WEB_SEARCH: 'False'
-      #!!! {% if config.get("SIMPLE_AUTH") %}
-      ENABLE_SIGNUP: 'False'
-      WEBUI_AUTH: 'True'
-      WEBUI_ADMIN_EMAIL: '{{config["SIMPLE_AUTH"].get("username", "")}}'
-      WEBUI_ADMIN_NAME: '{{config["SIMPLE_AUTH"].get("username", "")}}'
-      WEBUI_ADMIN_PASSWORD:  '{{config["SIMPLE_AUTH"].get("password", "")}}'
-      #!!! {% else %}
-      # https://docs.openwebui.com/getting-started/env-configuration/#webui_auth
-      # "turning off authentication is only possible for fresh installations without any existing users"
-      ENABLE_SIGNUP: 'True'
-      WEBUI_AUTH: 'False'
-      #!!! {% endif %}
-      WEBUI_NAME: 'Learn2RAG'
-      #!!! {% if config.get("TLS") %}
-      UVICORN_SSL_CERTFILE: '{{ config["TLS"]["CERTFILE"] }}'
-      UVICORN_SSL_KEYFILE: '{{ config["TLS"]["KEYFILE"] }}'
-      #!!! {% endif %}
-    healthcheck:
-      # TODO: We only support ['CMD', 'curl', '-f', ...]
-      test: ['CMD', 'curl', '-f', '{{learn2rag_scheme}}://localhost:{{ports.ui}}/health']
-  #!!! {% endif %}
   #!!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
   qdrant:
     working_dir: '{{storage_path}}'
@@ -210,12 +147,25 @@ services:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/configurator{% if is_windows %}.exe{% endif %}'
-      - 'learn2rag.pipeline'
+      - 'learn2rag.userui'
       - '--logging-config'
       - '{{storage_path}}/logging_config.yml'
+      - '--host'
+      - '{{config.get("CHAT", {}).get("host") or config.get("UI", {}).get("host") or "127.0.0.1"}}'
+      - '--port'
+      - '{{ports.pipeline}}'
+      #!!! {% if config.get("TLS") %}
+      - '--tls-certfile'
+      - '{{ config["TLS"]["CERTFILE"] }}'
+      - '--tls-keyfile'
+      - '{{ config["TLS"]["KEYFILE"] }}'
+      #!!! {% endif %}
+      - '--basic-username'
+      - '{{ config.get("CHAT", {}).get("username", config.get("SIMPLE_AUTH", {}).get("username", "")) }}'
+      - '--basic-password'
+      - '{{ config.get("CHAT", {}).get("password", config.get("SIMPLE_AUTH", {}).get("password", "")) }}'
     environment:
       LEARN2RAG_PATH: '{{learn2rag_path}}'
-      LEARN2RAG_PIPELINE_PORT: '{{ports.pipeline}}'
       QDRANT_LOCATION: '{{ pipeline.qdrant_location or "http://localhost:" ~ ports.qdrant_http }}'
       QDRANT_PATH: '{{ pipeline.qdrant_path }}'
       QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'
@@ -228,3 +178,6 @@ services:
       LLM_API_URL: '{{language_model.url}}'
       LLM_API_TOKEN: '{{language_model.token}}'
       LLM_API_MODEL: '{{language_model.model}}'
+    healthcheck:
+      # TODO: We only support ['CMD', 'curl', '-f', ...]
+      test: ['CMD', 'curl', '-f', '{{learn2rag_scheme}}://localhost:{{ports.pipeline}}/']

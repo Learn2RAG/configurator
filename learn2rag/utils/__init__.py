@@ -1,10 +1,12 @@
 '''
 Utilities which do not depend on Learn2RAG.
 '''
+import importlib
 import logging
 import platform
 import os
 import subprocess
+from functools import cache, lru_cache
 from pathlib import Path
 from time import sleep
 from typing import Callable, Optional
@@ -14,6 +16,25 @@ import xdg.BaseDirectory
 
 def is_windows() -> bool:
     return platform.system() == 'Windows'
+
+
+@lru_cache()
+def python_package_version(package: str) -> str | None:
+    try:
+        return importlib.metadata.version(package)
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+@cache
+def vc_commit_id() -> str | None:
+    try:
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+    except (
+            FileNotFoundError,  # no git
+            subprocess.CalledProcessError,  # not a git repository
+    ):
+        return None
 
 
 def normalize_path(path: Path) -> Path:
@@ -42,6 +63,10 @@ def save_data_path(*resource: str) -> str:
         windows_app_data = os.getenv('LOCALAPPDATA')
         assert windows_app_data is not None
         return os.path.join(windows_app_data, *resource)
+
+
+def is_testing() -> bool:
+    return 'PYTEST_CURRENT_TEST' in os.environ
 
 
 # adapted from pytestqt
@@ -102,6 +127,8 @@ def waitUntil(
         except AssertionError as e:
             if timed_out():
                 raise TimeoutError(timeout_msg) from e
+            if is_testing():
+                logging.debug('Waiting for: %s', e.args[0] if len(e.args) else e)
         else:
             if result not in (None, True, False):
                 msg = "waitUntil() callback must return None, True or False, returned %r"

@@ -64,9 +64,9 @@ class ImportState:
             try:
                 with self._path.open("r", encoding="utf-8") as f:
                     self._state = json.load(f)
-                logger.info("Import state loaded from %s", self._path)
+                logger.debug("Import state loaded from %s", self._path)
             except (json.JSONDecodeError, OSError) as e:
-                logger.warning("Could not load import state from %s: %s — starting fresh.", self._path, e)
+                logger.debug("Could not load import state from %s: %s — starting fresh.", self._path, e)
                 self._state = {}
         else:
             self._state = {}

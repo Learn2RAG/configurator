@@ -1,8 +1,8 @@
 name: import
-label: Start one-time import
+label: Only import
 ports:
   # TODO: UI port is not used; labels in the interface currently assume a specific port order
-  - ui
+  - pipeline
   - qdrant_http
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
@@ -49,7 +49,7 @@ files:
       handlers:
         display:
           class: logging.StreamHandler
-          level: INFO
+          level: {% if debug_logging %}DEBUG{% else %}INFO{% endif %}
           formatter: colored
           stream: ext://sys.stderr
         profiling_display:
