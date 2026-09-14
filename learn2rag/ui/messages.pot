@@ -93,10 +93,6 @@ msgctxt "flash"
 msgid "Added a new pipeline configuration: %(label)s"
 msgstr ""
 
-msgctxt "form_label"
-msgid "Additional internal port"
-msgstr ""
-
 msgid "Advanced configuration"
 msgstr ""
 
@@ -317,10 +313,6 @@ msgstr ""
 
 msgctxt "tooltip"
 msgid "Import only once."
-msgstr ""
-
-msgctxt "form_label"
-msgid "Internal RAG service"
 msgstr ""
 
 msgctxt "form_label"
@@ -625,7 +617,7 @@ msgid "User authentication"
 msgstr ""
 
 msgctxt "form_label"
-msgid "User interface"
+msgid "User interface and RAG service"
 msgstr ""
 
 msgctxt "form_label"
