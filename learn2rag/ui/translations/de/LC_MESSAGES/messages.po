@@ -1,3 +1,23 @@
+# German translations for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-14 10:19+0200\n"
+"PO-Revision-Date: 2026-09-14 10:19+0200\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: de\n"
+"Language-Team: de <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
 #, python-format
 msgid "%(num)d data source configuration"
 msgid_plural "%(num)d data source configurations"
@@ -133,7 +153,7 @@ msgstr ""
 
 msgctxt "form_label"
 msgid "Authentication"
-msgstr ""
+msgstr "Authentifizierung"
 
 msgctxt "form_label"
 msgid "Automatically import data with interval (hours)"
@@ -153,7 +173,7 @@ msgstr "URL des Chat-Proxys"
 
 msgctxt "label"
 msgid "Choose a new training data file:"
-msgstr ""
+msgstr "Wähle eine neue Trainingsdatei aus"
 
 msgctxt "heading"
 msgid "Connect an external language model"
@@ -161,12 +181,14 @@ msgstr "Ein externes Sprachmodell anbinden"
 
 msgctxt "column_heading"
 msgid "Consecutive failures"
-msgstr ""
+msgstr "aufeinanderfolgende Fehler"
 
 msgid ""
 "Consult the administrator or documentation of the corresponding system to"
 " find the required configuration values."
 msgstr ""
+"Wenden Sie sich an den Administrator oder siehe Dokumentation des "
+"jeweiligen Systems, um die erforderlichen Konfigurationswerte zu finden."
 
 msgctxt "form_label"
 msgid "Content types"
@@ -174,7 +196,7 @@ msgstr ""
 
 msgctxt "flash"
 msgid "Could not save the file"
-msgstr ""
+msgstr "Die Datei konnte nicht gespeichert werden"
 
 #, python-format
 msgctxt "flash"
@@ -189,7 +211,7 @@ msgstr "Pipeline konnte nicht gestoppt werden: %(message)s"
 #, python-format
 msgctxt "status"
 msgid "Currently running: %(pipeline)s"
-msgstr ""
+msgstr "Derzeit läuft: %(pipeline)s"
 
 msgctxt "column_heading"
 msgid "Data source type"
@@ -226,7 +248,7 @@ msgstr "Weitere"
 
 msgctxt "header"
 msgid "Details"
-msgstr ""
+msgstr "Weitere"
 
 #, python-format
 msgctxt "flash"
@@ -316,19 +338,19 @@ msgstr "Der Datenimport und die Chat direkt starten"
 
 msgctxt "button"
 msgid "Import and start chat"
-msgstr ""
+msgstr "Importieren und Chat starten"
 
 msgctxt "form_label"
 msgid "Import authenticaton"
-msgstr ""
+msgstr "Import-Authentifizierung"
 
 msgctxt "tooltip"
 msgid "Import only once."
-msgstr ""
+msgstr "Nur einmal importieren"
 
 msgctxt "form_label"
 msgid "Internal vector store"
-msgstr ""
+msgstr "Interner Vektorspeicher"
 
 msgctxt "column_heading"
 msgid "Label"
@@ -348,7 +370,7 @@ msgstr "Sprachmodell"
 
 msgctxt "header"
 msgid "Language model"
-msgstr ""
+msgstr "Sprachmodell"
 
 msgctxt "heading"
 msgid "Language models"
@@ -364,15 +386,15 @@ msgstr "Sprachmodelle"
 
 msgctxt "status"
 msgid "Last run failed"
-msgstr ""
+msgstr "Letzter Durchlauf fehlgeschlagen"
 
 msgctxt "status"
 msgid "Last run succeeded"
-msgstr ""
+msgstr "Letzter Durchlauf erfolgreich"
 
 msgctxt "column_heading"
 msgid "Last successful import"
-msgstr ""
+msgstr "Letzter erfolgreicher Import"
 
 msgctxt "nav"
 msgid "Learn2RAG website"
@@ -384,7 +406,7 @@ msgstr "Lokale Datei oder Verzeichnis"
 
 msgctxt "header"
 msgid "Logs"
-msgstr ""
+msgstr "Protokolle"
 
 msgctxt "button"
 msgid "Manage"
@@ -404,7 +426,7 @@ msgstr "keine"
 
 msgctxt "form_auth_option"
 msgid "None (all users will be provided access to all data)"
-msgstr ""
+msgstr "keine (alle Benutzer erhalten Zugriff auf alle Daten)"
 
 msgctxt "form_auth_option"
 msgid "OAuth"
@@ -419,19 +441,19 @@ msgstr "Dokumentation"
 
 msgctxt "button"
 msgid "Only import"
-msgstr ""
+msgstr "Nur importieren"
 
 msgctxt "button"
 msgid "Only start chat"
-msgstr ""
+msgstr "Nur Chat starten"
 
 msgctxt "button"
 msgid "Open AI chat"
-msgstr ""
+msgstr "KI-Chat öffnen"
 
 msgctxt "header"
 msgid "Optimization"
-msgstr ""
+msgstr "Optimierung"
 
 msgid "Optional"
 msgstr "Optional"
@@ -446,7 +468,7 @@ msgstr "Pfad im lokalen Dateisytem"
 
 msgctxt "tooltip"
 msgid "Periodically import and start the AI chat."
-msgstr ""
+msgstr "Importieren Sie die Daten regelmäßig und starten Sie den KI-Chat."
 
 msgctxt "heading"
 msgid "Pipelines"
@@ -466,10 +488,12 @@ msgstr "Ports"
 
 msgctxt "header"
 msgid "Ports"
-msgstr ""
+msgstr "Ports"
 
 msgid "Ports are not configured and would be chosen automatically."
 msgstr ""
+"Die Ports sind nicht konfiguriert und würden automatisch ausgewählt "
+"werden."
 
 msgctxt "header"
 msgid "Question"
@@ -481,7 +505,7 @@ msgstr "Löschen"
 
 msgctxt "header"
 msgid "Remove"
-msgstr ""
+msgstr "Löschen"
 
 msgctxt "button"
 msgid "Remove the stored data"
@@ -512,7 +536,7 @@ msgstr "Speichern"
 
 msgctxt "label"
 msgid "Save"
-msgstr ""
+msgstr "Speichern"
 
 msgctxt "button"
 msgid "Select all"
@@ -548,15 +572,15 @@ msgstr ""
 
 msgctxt "header"
 msgid "Sources"
-msgstr ""
+msgstr "Datenquellen"
 
 msgctxt "button"
 msgid "Start optimization"
-msgstr ""
+msgstr "Optimierung starten"
 
 msgctxt "tooltip"
 msgid "Start the AI chat. Requires import to be already completed."
-msgstr ""
+msgstr "Starten Sie den KI-Chat. Dazu muss der Import bereits abgeschlossen sein."
 
 #, python-format
 msgctxt "flash"
@@ -577,7 +601,7 @@ msgstr "Speicherpfad"
 
 msgctxt "header"
 msgid "Storage directory path"
-msgstr ""
+msgstr "Speicherpfad"
 
 msgid "The language model is downloading, please wait"
 msgstr "Das Sprachmodell ist heruntergeladen, bitte warten"
@@ -598,6 +622,8 @@ msgid ""
 "This data source type does not support access control. All users will be "
 "provided access to all data."
 msgstr ""
+"Dieser Datenquellentyp unterstützt keine Zugriffskontrolle. Alle Benutzer"
+" erhalten Zugriff auf alle Daten."
 
 msgid "This password would be saved in plain text in the configuration."
 msgstr "Dieses Passwort würde in der Konfiguration im Klartext gespeichert werden."
@@ -609,7 +635,7 @@ msgstr ""
 
 msgctxt "header"
 msgid "Training data"
-msgstr ""
+msgstr "Trainingsdaten"
 
 msgctxt "tooltip"
 msgid "Unknown value"
@@ -629,7 +655,7 @@ msgstr "Empfohlenes Sprachmodell verwenden"
 
 msgctxt "form_label"
 msgid "User authentication"
-msgstr ""
+msgstr "Benutzerauthentifizierung"
 
 msgctxt "form_label"
 msgid "User interface and RAG service"
