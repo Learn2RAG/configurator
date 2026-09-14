@@ -12,7 +12,7 @@ Last Modified: August 31, 2026
 """
 
 # FIXME: import this early to prevent segmentation fault on Windows
-import pyarrow.dataset  # noqa: F401
+__import__('pyarrow.dataset')
 
 import argparse
 import json
