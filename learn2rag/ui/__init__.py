@@ -437,6 +437,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         return redirect(url_for('pipeline_details', name=name))
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
+        storage_path = normalize_path(pipeline['storage_path'])
+
         has_ssl = bool(app.config.get("TLS"))
         url = urllib.parse.urlparse(request.base_url)
         assert url.scheme
@@ -475,12 +477,33 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             } for name, source in sources.items()],
         }
 
+        optimization_registry = {
+            "datasets": {
+                "training": {
+                    "subdirectory": "", "split": "train",
+                    "fields": {"q": "question", "a": "answer", "id": "id"},
+                    "path": str(storage_path / 'training.csv')
+                }
+            },
+            "prompts": {
+                "default":
+                "# Role and Objective\nYou will act as a smart AI chatbot that answers questions only by using the content from the provided information list.\n\n  # Instructions\n- Respond in the language of the question.\n - Answer clear and concise.\n- Only use the provided information.\n        - NEVER use your general knowledge.\n\n # Information:\n{context}"
+                ,
+                "concise":
+                "Answer the question using ONLY the provided information.   Be concise and direct. If the information does not contain the answer, say so.\n\n        Information:\n{context}"
+                ,
+                "detailed":
+                "You are a knowledgeable assistant. Using ONLY the provided information below,        answer the question thoroughly. Cite your sources.         If the information is insufficient, state that clearly.\n\n        Information:\n{context}"
+            }
+        }
+
         render_context = {
             'config': app.config,
             'learn2rag_hostname': url.hostname,
             'pipeline': pipeline,
             'language_model': language_model,
             'import_config': import_config,
+            'optimization_registry': optimization_registry,
             'debug_logging': config.get('logging', {}).get('debug', False),
             'qdrant_api_key': secrets.token_hex(16),
             # FIXME
@@ -497,8 +520,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
             ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=app.config.get('PREFERRED_PORTS', range(9001, 9011)))
             render_context['ports'] = dict(zip(port_names, ports))
-
-        storage_path = normalize_path(pipeline['storage_path'])
 
         try:
             project = start_project(name, template_file, storage_path, render_context)
