@@ -7,7 +7,6 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-14 10:19+0200\n"
 "PO-Revision-Date: 2026-09-14 10:19+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: de\n"
@@ -195,8 +194,8 @@ msgid "Content types"
 msgstr ""
 
 msgctxt "flash"
-msgid "Could not save the file"
-msgstr "Die Datei konnte nicht gespeichert werden"
+msgid "Could not save the training data file"
+msgstr ""
 
 #, python-format
 msgctxt "flash"
@@ -637,6 +636,10 @@ msgctxt "header"
 msgid "Training data"
 msgstr "Trainingsdaten"
 
+msgctxt "flash"
+msgid "Training data file saved"
+msgstr ""
+
 msgctxt "tooltip"
 msgid "Unknown value"
 msgstr "Unbekannt"
@@ -796,4 +799,8 @@ msgstr "läuft"
 #~ msgctxt "form_label"
 #~ msgid "User interface"
 #~ msgstr ""
+
+#~ msgctxt "flash"
+#~ msgid "Could not save the file"
+#~ msgstr "Die Datei konnte nicht gespeichert werden"
 
