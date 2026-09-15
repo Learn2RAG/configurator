@@ -1,11 +1,18 @@
 #!/bin/sh
 set -eux
 PYBABEL="uv run pybabel"
+POT="learn2rag/ui/messages.pot"
+PO_DIR="learn2rag/ui/translations"
 $PYBABEL extract --mapping-file=learn2rag/ui/babel.cfg \
          --add-comments="TRANSLATORS:" \
          --no-location --sort-output \
-         --output-file=learn2rag/ui/messages.pot learn2rag/ui
-$PYBABEL update --input-file=learn2rag/ui/messages.pot \
+         --output-file="$POT" learn2rag/ui
+
+$PYBABEL update --input-file="$POT" \
+         --ignore-pot-creation-date \
          --no-fuzzy-matching \
-         --output-dir=learn2rag/ui/translations
+         --output-dir="$PO_DIR"
+
+sed -i '/^"POT-Creation-Date: /d' "$POT" "$PO_DIR"/*/LC_MESSAGES/messages.po
+
 $PYBABEL compile --directory=learn2rag/ui/translations
