@@ -64,7 +64,8 @@
 {% block endofbody %}
 <script type="text/javascript">
   document.body.addEventListener('htmx:afterRequest', event => {
-      if (event.detail.successful) {
+      // FIXME: successful boosted requests have !event.detail.successful
+      if (event.detail.successful || event.detail.boosted) {
           document.querySelector('#communication_error')?.remove();
       } else if (!document.querySelector('#communication_error')) {
           const el = document.createElement('div');
