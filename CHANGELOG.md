@@ -1,5 +1,27 @@
 # Changelog
 ## [Unreleased]
+## [1.0.0] - 2026-09-16
+### Added
+- MediaWiki data import
+- Jira data import
+- chat history awareness
+- per-document user access control (Drupal)
+- pipeline auto-optimization
+- retrieval optimization
+- displaying status during import
+
+### Fixed
+- offline installation
+- Windows process management
+
+### Changed
+- open webui chat UI replaced with llama.cpp's UI
+- interface improvements
+- performance improvements
+
+### Removed
+- unused API endpoints were removed
+
 ## [0.3.0] - 2026-06-02
 ### Added
 - continuous import with updating the indexed data
