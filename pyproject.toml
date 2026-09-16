@@ -205,7 +205,7 @@ description = ""
 license = "MIT"
 name = "learn2rag"
 requires-python = "==3.13.5"
-version = "1.0.0"
+version = "1.0.0.dev0"
 [project.urls]
 Homepage = "https://learn2rag.de/"
 Documentation = "https://docs.learn2rag.de/"
