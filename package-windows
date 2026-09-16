@@ -20,6 +20,8 @@ unzip -o $BUNDLE_DIR/qdrant-windows-v1.17.1.zip -d $BUNDLE/services/qdrant
 
 cp start.windows.bat $BUNDLE/start.bat
 cp uninstall.windows.bat $BUNDLE/uninstall.bat
+cp remove-learn2rag-software.bat "$BUNDLE/remove-learn2rag-software.bat"
+cp remove-user-data.bat "$BUNDLE/remove-user-data.bat"
 
 # https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables
 [ -z "${GITHUB_ACTIONS-}" ] && (cd $BUNDLE_DIR; zip -r $BUNDLE_NAME $BUNDLE_NAME)
