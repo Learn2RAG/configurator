@@ -62,19 +62,19 @@
 
 
 {% block endofbody %}
-        <script type="text/javascript">
-      document.body.addEventListener('htmx:afterRequest', event => {
-          if (event.detail.successful) {
-              document.querySelector('#communication_error')?.remove();
-          } else if (!document.querySelector('#communication_error')) {
-              const el = document.createElement('div');
-              el.className = 'alert alert-danger';
-              el.id = 'communication_error';
-              el.innerText = "{{gettext('Failed to connect to your Learn2RAG server')}}";
-              document.querySelector('#connection_indicator').append(el);
-          }
-      });
-    </script>
+<script type="text/javascript">
+  document.body.addEventListener('htmx:afterRequest', event => {
+      if (event.detail.successful) {
+          document.querySelector('#communication_error')?.remove();
+      } else if (!document.querySelector('#communication_error')) {
+          const el = document.createElement('div');
+          el.className = 'alert alert-danger';
+          el.id = 'communication_error';
+          el.innerText = "{{gettext('Failed to connect to your Learn2RAG server')}}";
+          document.querySelector('#connection_indicator').append(el);
+      }
+  });
+</script>
 <script type="text/javascript">
   document.querySelectorAll('[data-update-attr]').forEach(target => {
       const source = document.querySelector(target.dataset.updateAttrFrom);
