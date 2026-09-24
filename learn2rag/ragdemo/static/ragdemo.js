@@ -19,6 +19,12 @@
   const queryResults = document.querySelector("#query-results");
   const comparisonActions = document.querySelector("#comparison-actions");
   const compareRetrievalButton = document.querySelector("#compare-retrieval");
+  const embedStage = document.querySelector("#embed-stage");
+  const retrieveStage = document.querySelector("#retrieve-stage");
+  const promptStage = document.querySelector("#prompt-stage");
+  const answerStage = document.querySelector("#answer-stage");
+  const embeddedQuestion = document.querySelector("#embedded-question");
+  const embeddedRetrievalMethod = document.querySelector("#embedded-retrieval-method");
   const answerKicker = document.querySelector("#answer-kicker");
   const answerHeading = document.querySelector("#answer-heading");
   const answerContent = document.querySelector("#answer-content");
@@ -54,6 +60,7 @@
   const refreshExamplesButton = document.querySelector("#refresh-examples");
   let displayedExamples = [];
   const documentChunksCache = new Map();
+  const chunkDetailsCache = new Map();
   const searchCardByChunkId = new Map();
   const searchResultByChunkId = new Map();
   const visualizationPointByChunkId = new Map();
@@ -65,9 +72,10 @@
   const minimumZoom = 0.55;
   const maximumZoom = 2.6;
   const wheelZoomFactor = 1.09;
+  const pointerDragThreshold = 5;
   const scenePadding = 12;
   const redundantVisualizationNote =
-    "This is a 3D PCA projection. Retrieval itself uses the full-dimensional dense embedding space.";
+    "3D proximity is approximate because PCA compresses the embedding space. Retrieval uses the original full-dimensional vectors.";
   // Screen-space labels and markers share this edge reserve; it is not added
   // to the rotation-safe world-space radius.
   const maximumMarkerExtent = 30;
@@ -76,6 +84,10 @@
   let focusedChunkId = null;
   let pinnedChunkId = null;
   let pinnedQuery = false;
+  let inspectorTrigger = null;
+  let chunkInspectorLoadingId = null;
+  let chunkInspectorErrorId = null;
+  let inspectorRequestVersion = 0;
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -479,22 +491,61 @@
     }
   }
 
-  function togglePinnedChunk(chunkId) {
-    pinnedChunkId = pinnedChunkId === chunkId ? null : chunkId;
+  async function openChunkInspector(chunkId, trigger) {
+    pinnedChunkId = chunkId;
     pinnedQuery = false;
+    inspectorTrigger = trigger || visualizationPointByChunkId.get(chunkId) || null;
+    chunkInspectorErrorId = null;
+    const requestVersion = ++inspectorRequestVersion;
+    if (chunkDetailsCache.has(chunkId)) {
+      chunkInspectorLoadingId = null;
+      updateLinkedInteraction();
+      return;
+    }
+    chunkInspectorLoadingId = chunkId;
     updateLinkedInteraction();
+    try {
+      const response = await fetch(`./api/chunks/${encodeURIComponent(chunkId)}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error("Chunk unavailable");
+      const details = await response.json();
+      chunkDetailsCache.set(chunkId, details);
+      if (requestVersion === inspectorRequestVersion && pinnedChunkId === chunkId) {
+        chunkInspectorLoadingId = null;
+        updateLinkedInteraction(false);
+      }
+    } catch (error) {
+      if (requestVersion === inspectorRequestVersion && pinnedChunkId === chunkId) {
+        chunkInspectorLoadingId = null;
+        chunkInspectorErrorId = chunkId;
+        updateLinkedInteraction(false);
+      }
+    }
   }
 
-  function togglePinnedQuery() {
+  function togglePinnedQuery(trigger) {
     pinnedQuery = !pinnedQuery;
     pinnedChunkId = null;
+    inspectorTrigger = trigger || null;
+    chunkInspectorLoadingId = null;
+    chunkInspectorErrorId = null;
+    inspectorRequestVersion += 1;
     updateLinkedInteraction();
   }
 
-  function clearPinnedSelection() {
+  function clearPinnedSelection(restoreFocus = false) {
+    const previousTrigger = inspectorTrigger;
     pinnedChunkId = null;
     pinnedQuery = false;
+    inspectorTrigger = null;
+    chunkInspectorLoadingId = null;
+    chunkInspectorErrorId = null;
+    inspectorRequestVersion += 1;
     updateLinkedInteraction();
+    if (restoreFocus && previousTrigger && typeof previousTrigger.focus === "function") {
+      previousTrigger.focus();
+    }
   }
 
   function updateLinkedInteraction(renderScene = true) {
@@ -734,13 +785,6 @@
     return Math.min(safeWidth, safeHeight) / 2;
   }
 
-  function safePointPreview(point) {
-    const searchResult = searchResultByChunkId.get(point.id);
-    const rawPreview = point.preview || (searchResult ? searchResult.content : "");
-    const preview = String(rawPreview || "").replace(/\s+/g, " ").trim();
-    return preview;
-  }
-
   function formatCoordinate(value) {
     const number = Number(value);
     const magnitude = Math.abs(number);
@@ -783,11 +827,25 @@
     container.appendChild(coordinates);
   }
 
+  function appendInspectorField(container, label, value, className = "") {
+    const field = document.createElement("div");
+    field.className = "embedding-inspector-field";
+    const heading = document.createElement("h4");
+    heading.className = "embedding-inspector-label";
+    heading.textContent = label;
+    const content = document.createElement("p");
+    content.className = className;
+    content.textContent = value;
+    field.append(heading, content);
+    container.appendChild(field);
+    return content;
+  }
+
   function renderPinnedInspector() {
     visualizationInspectorContent.replaceChildren();
     if (!viewerState || (!pinnedQuery && !pinnedChunkId)) {
       visualizationInspector.hidden = true;
-      visualizationInspectorTitle.textContent = "Inspector";
+      visualizationInspectorTitle.textContent = "Chunk details";
       return;
     }
 
@@ -804,20 +862,64 @@
       return;
     }
     const point = selected.data;
-    visualizationInspectorTitle.textContent = point.retrieved
-      ? `#${point.rank}`
-      : "Indexed chunk";
-    const source = document.createElement("p");
-    source.className = "embedding-inspector-source";
-    source.textContent = point.source || "Unknown source";
-    visualizationInspectorContent.appendChild(source);
-    const previewText = safePointPreview(point);
-    if (previewText) {
-      const preview = document.createElement("p");
-      preview.className = "embedding-inspector-preview";
-      preview.textContent = previewText;
-      visualizationInspectorContent.appendChild(preview);
+    const details = chunkDetailsCache.get(point.id);
+    visualizationInspectorTitle.textContent = "Chunk details";
+    const retrievalStatus = document.createElement("p");
+    retrievalStatus.className = point.retrieved
+      ? "embedding-inspector-status is-retrieved"
+      : "embedding-inspector-status";
+    retrievalStatus.textContent = point.retrieved
+      ? `Retrieved · Rank #${point.rank}`
+      : "Not retrieved for this question";
+    visualizationInspectorContent.appendChild(retrievalStatus);
+    appendInspectorField(
+      visualizationInspectorContent,
+      "Source",
+      (details && details.source) || point.source || "Unknown source",
+      "embedding-inspector-source",
+    );
+
+    if (chunkInspectorLoadingId === point.id) {
+      appendInspectorField(
+        visualizationInspectorContent,
+        "Chunk content",
+        "Loading chunk…",
+        "embedding-inspector-message",
+      );
+    } else if (chunkInspectorErrorId === point.id) {
+      appendInspectorField(
+        visualizationInspectorContent,
+        "Chunk content",
+        "This chunk could not be loaded.",
+        "embedding-inspector-message",
+      );
+    } else if (details) {
+      appendInspectorField(
+        visualizationInspectorContent,
+        "Chunk content",
+        details.content,
+        "embedding-inspector-chunk",
+      );
+      if (details.truncated) {
+        const truncatedNote = document.createElement("p");
+        truncatedNote.className = "small text-body-secondary";
+        truncatedNote.textContent = "This chunk's text has been shortened for display.";
+        visualizationInspectorContent.appendChild(truncatedNote);
+      }
     }
+    const searchResult = searchResultByChunkId.get(point.id);
+    if (point.retrieved && searchResult) {
+      appendInspectorField(
+        visualizationInspectorContent,
+        "Retrieval score",
+        String(searchResult.score),
+        "embedding-inspector-score",
+      );
+    }
+    const coordinateLabel = document.createElement("h4");
+    coordinateLabel.className = "embedding-inspector-label";
+    coordinateLabel.textContent = "PCA coordinates";
+    visualizationInspectorContent.appendChild(coordinateLabel);
     appendCoordinateReadout(visualizationInspectorContent, point);
     visualizationInspector.hidden = false;
   }
@@ -1054,10 +1156,10 @@
     );
     state.query.visual.group.classList.toggle("is-pinned", pinnedQuery);
     state.query.visual.group.setAttribute("aria-pressed", String(pinnedQuery));
-    if (state.queryHovered || state.queryFocused) {
+    const tooltipId = activeId || state.hoveredScenePointId;
+    if (state.queryHovered || (state.queryFocused && !tooltipId)) {
       renderQueryHoverLabel(state.query.data, projectedQuery, state);
     } else {
-      const tooltipId = activeId || state.hoveredScenePointId;
       const tooltipPoint = state.points.find((entry) => entry.data.id === tooltipId);
       const projectedTooltipPoint = tooltipId ? projectedById.get(tooltipId) : null;
       if (tooltipPoint && projectedTooltipPoint) {
@@ -1066,6 +1168,17 @@
         clearPointTooltip();
       }
     }
+  }
+
+  function closestSvgGroup(target, boundary, className) {
+    let element = target;
+    while (element && element !== boundary) {
+      if (element.classList && element.classList.contains(className)) {
+        return element;
+      }
+      element = element.parentElement || element.parentNode;
+    }
+    return null;
   }
 
   function installCameraInteraction(state) {
@@ -1082,9 +1195,17 @@
         return;
       }
       state.pointerId = event.pointerId;
+      state.pointerStartClientX = event.clientX;
+      state.pointerStartClientY = event.clientY;
       state.lastTrackballVector = trackballVector(event, svg);
       state.dragMoved = false;
-      svg.setPointerCapture(event.pointerId);
+      state.pressedChunkElement = closestSvgGroup(event.target, svg, "embedding-point");
+      state.pressedChunkId = state.pressedChunkElement
+        ? state.pressedChunkElement.dataset.chunkId
+        : null;
+      state.pressedQuery = Boolean(
+        closestSvgGroup(event.target, svg, "embedding-query-point"),
+      );
       svg.classList.add("is-dragging");
       event.preventDefault();
     });
@@ -1092,15 +1213,21 @@
       if (state.pointerId !== event.pointerId) {
         return;
       }
-      const nextTrackballVector = trackballVector(event, svg);
-      const movement = Math.hypot(
-        nextTrackballVector.x - state.lastTrackballVector.x,
-        nextTrackballVector.y - state.lastTrackballVector.y,
-        nextTrackballVector.z - state.lastTrackballVector.z,
+      const screenMovement = Math.hypot(
+        event.clientX - state.pointerStartClientX,
+        event.clientY - state.pointerStartClientY,
       );
-      if (movement > 0.002) {
+      if (!state.dragMoved && screenMovement > pointerDragThreshold) {
         state.dragMoved = true;
+        if (!svg.hasPointerCapture(event.pointerId)) {
+          svg.setPointerCapture(event.pointerId);
+        }
       }
+      if (!state.dragMoved) {
+        event.preventDefault();
+        return;
+      }
+      const nextTrackballVector = trackballVector(event, svg);
       const deltaRotation = quaternionBetween(state.lastTrackballVector, nextTrackballVector);
       state.rotation = quaternionMultiply(deltaRotation, state.rotation);
       state.lastTrackballVector = nextTrackballVector;
@@ -1120,14 +1247,28 @@
         // Pointer capture can end before cancellation or a lost-capture event.
       }
       state.pointerId = null;
+      state.pointerStartClientX = null;
+      state.pointerStartClientY = null;
       state.lastTrackballVector = null;
+      state.pressedChunkId = null;
+      state.pressedChunkElement = null;
+      state.pressedQuery = false;
       svg.classList.remove("is-dragging");
     };
-    svg.addEventListener("pointerup", endDrag);
-    svg.addEventListener("pointercancel", endDrag);
-    svg.addEventListener("lostpointercapture", endDrag);
-    svg.addEventListener("click", () => {
-      if (!state.dragMoved) {
+    svg.addEventListener("pointerup", async (event) => {
+      if (state.pointerId !== event.pointerId) {
+        return;
+      }
+      const shouldInspectChunk = !state.dragMoved && state.pressedChunkId;
+      const pressedChunkId = state.pressedChunkId;
+      const pressedChunkElement = state.pressedChunkElement;
+      const shouldClearSelection = !state.dragMoved
+        && !state.pressedChunkId
+        && !state.pressedQuery;
+      endDrag(event);
+      if (shouldInspectChunk) {
+        await openChunkInspector(pressedChunkId, pressedChunkElement);
+      } else if (shouldClearSelection) {
         const activeElement = document.activeElement;
         if (activeElement && svg.contains(activeElement) && typeof activeElement.blur === "function") {
           activeElement.blur();
@@ -1137,8 +1278,9 @@
         pinnedQuery = false;
         updateLinkedInteraction();
       }
-      state.dragMoved = false;
     });
+    svg.addEventListener("pointercancel", endDrag);
+    svg.addEventListener("lostpointercapture", endDrag);
   }
 
   function updateZoomControls(state) {
@@ -1170,8 +1312,13 @@
       }
     }
     state.pointerId = null;
+    state.pointerStartClientX = null;
+    state.pointerStartClientY = null;
     state.lastTrackballVector = null;
     state.dragMoved = false;
+    state.pressedChunkId = null;
+    state.pressedChunkElement = null;
+    state.pressedQuery = false;
     state.svg.classList.remove("is-dragging");
   }
 
@@ -1404,8 +1551,13 @@
       rotation: { ...initialCamera.rotation },
       zoom: initialCamera.zoom,
       pointerId: null,
+      pointerStartClientX: null,
+      pointerStartClientY: null,
       lastTrackballVector: null,
       dragMoved: false,
+      pressedChunkId: null,
+      pressedChunkElement: null,
+      pressedQuery: false,
       hoveredScenePointId: null,
       queryHovered: false,
       queryFocused: false,
@@ -1598,17 +1750,16 @@
       visualizationPointByChunkId.set(point.id, group);
       group.addEventListener("focus", () => setFocusedChunk(point.id));
       group.addEventListener("blur", () => clearFocusedChunk(point.id));
-      group.addEventListener("click", (event) => {
+      group.addEventListener("click", async (event) => {
         event.stopPropagation();
-        if (!state.dragMoved) {
-          togglePinnedChunk(point.id);
+        if (event.detail === 0) {
+          await openChunkInspector(point.id, group);
         }
-        state.dragMoved = false;
       });
-      group.addEventListener("keydown", (event) => {
+      group.addEventListener("keydown", async (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          togglePinnedChunk(point.id);
+          await openChunkInspector(point.id, group);
         }
       });
 
@@ -1672,14 +1823,14 @@
     queryGroup.addEventListener("click", (event) => {
       event.stopPropagation();
       if (!state.dragMoved) {
-        togglePinnedQuery();
+        togglePinnedQuery(queryGroup);
       }
       state.dragMoved = false;
     });
     queryGroup.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        togglePinnedQuery();
+        togglePinnedQuery(queryGroup);
       }
     });
 
@@ -1728,6 +1879,8 @@
 
   function renderQueryResponse(data) {
     const hasEvidence = data.search.results.length > 0;
+    embeddedQuestion.textContent = data.question;
+    embeddedRetrievalMethod.textContent = data.search.label;
     answerKicker.textContent = hasEvidence ? "Answer" : "Grounding guard";
     answerHeading.textContent = hasEvidence ? "Generated answer" : "Grounded answer status";
     answerContent.textContent = data.answer;
@@ -1738,6 +1891,10 @@
     renderVisualization(data.visualization, data.search.mode);
     renderPrompt(data.prompt);
     configureComparisonShortcut(data.search.mode);
+    embedStage.open = false;
+    retrieveStage.open = false;
+    promptStage.open = false;
+    answerStage.open = true;
     queryError.hidden = true;
     retrievalChangeNote.hidden = true;
     retrievalChangeNote.textContent = "";
@@ -1801,7 +1958,16 @@
   expandViewButton.addEventListener("click", () => setPresentationMode(true));
   restoreViewButton.addEventListener("click", () => setPresentationMode(false));
   closeExpandedViewButton.addEventListener("click", () => setPresentationMode(false));
-  visualizationInspectorClose.addEventListener("click", clearPinnedSelection);
+  visualizationInspectorClose.addEventListener("click", () => clearPinnedSelection(true));
+  visualizationInspector.addEventListener("wheel", (event) => event.stopPropagation());
+  visualizationInspector.addEventListener("pointerdown", (event) => event.stopPropagation());
+  if (typeof document.addEventListener === "function") {
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !visualizationInspector.hidden) {
+        clearPinnedSelection(true);
+      }
+    });
+  }
   refreshExamplesButton.addEventListener("click", loadExamples);
   loadExamples();
   loadIndex();

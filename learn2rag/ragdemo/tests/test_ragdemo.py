@@ -1,4 +1,6 @@
+import json
 from pathlib import Path
+import re
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -14,8 +16,18 @@ from qdrant_client.http.models import ScoredPoint
 import learn2rag.pipeline.generate as pipeline_generate
 from learn2rag.ragdemo import router
 from learn2rag.ragdemo import routes, service
-from learn2rag.ragdemo.models import ExampleQuestions, QueryRequest, QuerySearchResult
-from learn2rag.ragdemo.service import DEMO_USER, build_query_visualization, inspect_index
+from learn2rag.ragdemo.models import (
+    ExampleQuestions,
+    MAX_PUBLIC_CHUNK_CHARS,
+    QueryRequest,
+    QuerySearchResult,
+)
+from learn2rag.ragdemo.service import (
+    DEMO_USER,
+    build_query_visualization,
+    inspect_chunk_details,
+    inspect_index,
+)
 
 
 DEMO_CONFIG = {
@@ -184,6 +196,21 @@ async def test_ask_rag_page_contains_query_and_result_containers() -> None:
     assert "Prompt sent to the model" in response.text
     assert "Application-level chat messages" in response.text
     assert "<details" in response.text
+    assert "1</span><span>Embed question" in response.text
+    assert "2</span><span>Retrieve top-ranked chunks" in response.text
+    assert "3</span><span>Add chunks to prompt" in response.text
+    assert "4</span><span>Generate answer" in response.text
+    assert '<details id="answer-stage" class="rag-stage" open>' in response.text
+    assert response.text.index('id="embed-stage"') < response.text.index('id="retrieve-stage"')
+    assert response.text.index('id="retrieve-stage"') < response.text.index('id="prompt-stage"')
+    assert response.text.index('id="prompt-stage"') < response.text.index('id="answer-stage"')
+    assert response.text.index('id="retrieve-stage"') < response.text.index('id="search-results"') < response.text.index('id="prompt-stage"')
+    assert response.text.index('id="prompt-stage"') < response.text.index('id="prompt-messages"') < response.text.index('id="answer-stage"')
+    assert response.text.index('id="answer-stage"') < response.text.index('id="answer-content"')
+    assert response.text.count('id="search-results"') == 1
+    assert response.text.count('id="prompt-messages"') == 1
+    assert response.text.count('id="answer-content"') == 1
+    assert "embedding-process-summary" not in response.text
     assert "Prompt inspection will be added in the next phase." not in response.text
 
 
@@ -258,8 +285,8 @@ def test_visualization_frontend_has_one_coordinate_graph_stage() -> None:
     assert stage_rule.count("border:") == 1
     assert "width: calc(100% + 3rem);" in stage_rule
     assert ".embedding-map-background {\n  fill: transparent;\n}" in stylesheet
-    assert "X/Y/Z show the first three PCA components" in template
-    assert "Retrieval itself uses the full-dimensional embeddings." in template
+    assert "3D proximity is approximate because PCA compresses the embedding space." in template
+    assert "Retrieval uses the original full-dimensional vectors." in template
     assert "Query vector" in template
     assert "Retrieved chunks" in template
     assert "Other indexed chunks" in template
@@ -267,8 +294,7 @@ def test_visualization_frontend_has_one_coordinate_graph_stage() -> None:
     assert 'id="visualization-expand"' in template
     assert 'id="visualization-restore"' in template
     assert 'id="visualization-expanded-close"' in template
-    assert "Top-ranked chunks retrieved as a set" in template
-    assert "Retrieved chunks added to the prompt" in template
+    assert "embedding-process-summary" not in template
 
 
 def test_visualization_uses_data_focused_fit_and_decorations_do_not_shrink_it() -> None:
@@ -281,7 +307,7 @@ def test_visualization_uses_data_focused_fit_and_decorations_do_not_shrink_it() 
     ]
     fit = javascript[
         javascript.index("function computeFittedSceneScale"):
-        javascript.index("function safePointPreview")
+        javascript.index("function formatCoordinate")
     ]
 
     assert "const dataAnchors = numericCoordinates.concat({ x: 0, y: 0, z: 0 });" in geometry
@@ -338,7 +364,7 @@ def test_visualization_presentation_mode_reuses_graph_state() -> None:
     assert "position: fixed;" in expanded_rule
     assert "inset: clamp(0.75rem, 2vw, 1.5rem);" in expanded_rule
     assert "z-index: 1080;" in expanded_rule
-    assert "grid-template-rows: auto auto minmax(0, 1fr) auto;" in expanded_rule
+    assert "grid-template-rows: auto minmax(0, 1fr) auto;" in expanded_rule
     assert 'visualizationPanel.classList.toggle("is-expanded", expanded);' in presentation
     assert "resizeViewerToCanvas(viewerState);" in presentation
     assert "viewerState =" not in presentation
@@ -348,10 +374,11 @@ def test_visualization_presentation_mode_reuses_graph_state() -> None:
     assert 'expandViewButton.addEventListener("click", () => setPresentationMode(true));' in javascript
     assert 'restoreViewButton.addEventListener("click", () => setPresentationMode(false));' in javascript
     assert 'closeExpandedViewButton.addEventListener("click", () => setPresentationMode(false));' in javascript
-    assert "Question embedded" in template
-    assert "Top-ranked chunks retrieved as a set" in template
-    assert "Retrieved chunks added to the prompt" in template
-    assert "Model generates the answer" in template
+    assert "Embed question" in template
+    assert "Retrieve top-ranked chunks" in template
+    assert "Add chunks to prompt" in template
+    assert "Generate answer" in template
+    assert "embedding-process-summary" not in template
 
 
 def test_visualization_hides_only_the_redundant_success_note() -> None:
@@ -451,7 +478,7 @@ def test_visualization_frontend_uses_safe_linked_coordinate_tooltips() -> None:
     assert "visualizationPointByChunkId.set(point.id, group);" in javascript
     assert "setHoveredChunk(point.id);" in javascript
     assert "setFocusedChunk(point.id)" in javascript
-    assert "togglePinnedChunk(point.id);" in javascript
+    assert "openChunkInspector(point.id, group)" in javascript
     assert 'event.key === "Enter" || event.key === " "' in javascript
     assert 'point.classList.toggle("is-linked", chunkId === activeId);' in javascript
     assert 'card.classList.toggle("is-linked", chunkId === activeId);' in javascript
@@ -468,10 +495,14 @@ def test_visualization_frontend_uses_safe_linked_coordinate_tooltips() -> None:
     assert "preview" not in hover_renderer
     assert "function renderPinnedInspector()" in javascript
     assert "visualizationInspectorTitle.textContent = \"Query\";" in javascript
-    assert "preview.textContent = previewText;" in javascript
-    assert "source.textContent = point.source" in javascript
+    assert '"Loading chunk…"' in javascript
+    assert '"This chunk could not be loaded."' in javascript
+    assert '"Not retrieved for this question"' in javascript
+    assert '`Retrieved · Rank #${point.rank}`' in javascript
+    assert '"Chunk content"' in javascript
+    assert "details.content" in javascript
     assert "appendCoordinateReadout(visualizationInspectorContent" in javascript
-    assert 'visualizationInspectorClose.addEventListener("click", clearPinnedSelection);' in javascript
+    assert 'visualizationInspectorClose.addEventListener("click", () => clearPinnedSelection(true));' in javascript
     assert "visualizationInspector.style" not in javascript
     inspector_rule = stylesheet[
         stylesheet.index(".embedding-map-inspector {"):
@@ -480,12 +511,33 @@ def test_visualization_frontend_uses_safe_linked_coordinate_tooltips() -> None:
     assert "position: absolute;" in inspector_rule
     assert "right: 0.9rem;" in inspector_rule
     assert "bottom: 0.9rem;" in inspector_rule
+    assert "z-index: 4;" in inspector_rule
+    hidden_rule = stylesheet[
+        stylesheet.index(".embedding-map-inspector[hidden]"):
+        stylesheet.index(".embedding-map-stage.is-expanded .embedding-map-inspector")
+    ]
+    assert "display: none;" in hidden_rule
     assert '["X", "Y", "Z"].forEach((label) =>' in javascript
     assert "heading.textContent = point.retrieved" in javascript
     assert "nativeTooltip.textContent" in javascript
     assert "point.vector" not in javascript
     assert "visualization.vector" not in javascript
     assert "innerHTML" not in javascript
+
+    inspector_open = javascript[
+        javascript.index("async function openChunkInspector"):
+        javascript.index("function togglePinnedQuery")
+    ]
+    inspector_close = javascript[
+        javascript.index("function clearPinnedSelection"):
+        javascript.index("function updateLinkedInteraction")
+    ]
+    for inspector_action in (inspector_open, inspector_close):
+        assert "resizeViewerToCanvas" not in inspector_action
+        assert "setPresentationMode" not in inspector_action
+        assert ".rotation =" not in inspector_action
+        assert ".zoom =" not in inspector_action
+        assert "fittedSceneScale" not in inspector_action
 
 
 def test_visualization_frontend_uses_one_stable_scene_and_free_trackball_rotation() -> None:
@@ -543,10 +595,24 @@ def test_visualization_frontend_uses_one_stable_scene_and_free_trackball_rotatio
     assert "state.rotation = quaternionMultiply(deltaRotation, state.rotation);" in javascript
     assert 'svg.addEventListener("pointerdown"' in javascript
     assert 'svg.addEventListener("pointermove"' in javascript
-    assert 'svg.addEventListener("pointerup", endDrag);' in javascript
+    assert 'svg.addEventListener("pointerup", async (event) =>' in javascript
     assert 'svg.addEventListener("pointercancel", endDrag);' in javascript
     assert 'svg.addEventListener("lostpointercapture", endDrag);' in javascript
+    assert "pointerDragThreshold = 5" in javascript
+    assert "event.clientX - state.pointerStartClientX" in javascript
+    assert "event.clientY - state.pointerStartClientY" in javascript
+    assert "await openChunkInspector(pressedChunkId, pressedChunkElement);" in javascript
     assert "svg.setPointerCapture(event.pointerId);" in javascript
+    pointer_down = javascript[
+        javascript.index('svg.addEventListener("pointerdown"'):
+        javascript.index('svg.addEventListener("pointermove"')
+    ]
+    pointer_move = javascript[
+        javascript.index('svg.addEventListener("pointermove"'):
+        javascript.index("const endDrag =")
+    ]
+    assert "setPointerCapture" not in pointer_down
+    assert "svg.setPointerCapture(event.pointerId);" in pointer_move
     assert "state.pointerId = null;" in javascript
     assert "state.lastTrackballVector = null;" in javascript
     assert "touch-action: none" in stylesheet
@@ -946,6 +1012,39 @@ def test_generate_default_prompt_behavior_keeps_raw_source(monkeypatch: Any) -> 
     assert raw_source in model.calls[0][0].content
 
 
+def test_configured_prompt_uses_real_newlines_and_public_view_matches_invocation(
+    monkeypatch: Any,
+) -> None:
+    config_path = Path(__file__).resolve().parents[2] / "pipeline" / "opt_config.json"
+    configured = json.loads(config_path.read_text(encoding="utf-8"))
+    configured_prompt = configured["prompt"]
+    assert "\n" in configured_prompt
+    assert "\\n" not in configured_prompt
+
+    document = ScoredPoint(
+        id="qdrant-newline-test",
+        version=0,
+        score=0.7,
+        payload={"source": "/private/source.txt", "content": "Line one.\nLine two."},
+    )
+    messages = pipeline_generate.build_prompt_messages(
+        "What does the source say?",
+        [document],
+        configured,
+        source_transform=service._safe_prompt_source,
+    )
+    public_prompt = service._public_prompt(messages)
+    model = CapturingModel(answer="Generated answer")
+    monkeypatch.setattr(pipeline_generate, "llm", model)
+
+    assert pipeline_generate.invoke_prompt_messages(messages) == "Generated answer"
+    assert len(model.calls) == 1
+    assert public_prompt.messages[0].content == model.calls[0][0].content
+    assert public_prompt.messages[1].content == model.calls[0][1].content
+    assert "\n" in public_prompt.messages[0].content
+    assert "\\n" not in public_prompt.messages[0].content
+
+
 def test_bm25_is_deterministic_and_ranks_stronger_lexical_matches() -> None:
     strong = _point(
         "strong-private-id",
@@ -989,18 +1088,138 @@ def test_bm25_is_deterministic_and_ranks_stronger_lexical_matches() -> None:
     many_terms = [f"term{index}" for index in range(20)]
     bounded_record = _point(
         "bounded-private-id",
-        content=" ".join(many_terms),
+        content="the of for and " + " ".join(many_terms),
         source="/private/bounded.txt",
         loader_id="directory",
         document_id="bounded-document",
     )
     bounded_points, bounded_matches = service._bm25_candidates(
-        " ".join(many_terms),
+        "the of for and " + " ".join(many_terms),
         [bounded_record],
     )
     terms = bounded_matches[service._point_display_id(bounded_points[0])]
     assert len(terms) == service.MAX_MATCHED_TERMS == 12
+    assert terms == tuple(many_terms[: service.MAX_MATCHED_TERMS])
     assert all(len(term) <= service.MAX_MATCHED_TERM_LENGTH for term in terms)
+
+
+def test_weka_stopword_resource_is_normalized_and_loads_deterministically() -> None:
+    lines = service._STOPWORDS_PATH.read_text(encoding="utf-8").splitlines()
+    first = service._load_keyword_presentation_stopwords()
+    second = service._load_keyword_presentation_stopwords()
+
+    assert lines
+    assert all(
+        line
+        and line == line.strip()
+        and line == line.casefold()
+        and service._WORD_TOKEN.fullmatch(line)
+        for line in lines
+    )
+    assert first == frozenset(lines)
+    assert first is second
+    assert {"the", "of", "for", "and", "ll", "ve"} <= first
+
+
+def test_keyword_matched_terms_filter_exact_normalized_weka_tokens() -> None:
+    question = "THE theater authors improve what we'll recommend and they've documented"
+    record = _point(
+        "presentation-private-id",
+        content=question,
+        source="/private/presentation.txt",
+        loader_id="directory",
+        document_id="presentation-document",
+    )
+
+    ranked, matched = service._bm25_candidates(question, [record])
+
+    assert service._tokenize_keyword_text(question) == [
+        "the",
+        "theater",
+        "authors",
+        "improve",
+        "what",
+        "we",
+        "ll",
+        "recommend",
+        "and",
+        "they",
+        "ve",
+        "documented",
+    ]
+    assert "theater" not in service._load_keyword_presentation_stopwords()
+    assert matched[service._point_display_id(ranked[0])] == (
+        "theater",
+        "authors",
+        "improve",
+        "recommend",
+        "documented",
+    )
+
+
+def test_stopword_presentation_filter_does_not_change_bm25_scores_or_ranking(
+    monkeypatch: Any,
+) -> None:
+    records = [
+        _point(
+            "strong-stopword-id",
+            content="the Berlin process and Berlin authors recommend to improve",
+            source="/private/strong.txt",
+        ),
+        _point(
+            "weak-stopword-id",
+            content="the authors describe the Berlin process",
+            source="/private/weak.txt",
+        ),
+    ]
+    question = "What do the authors recommend to improve the Berlin Process?"
+    expected_query_tokens = service._tokenize_keyword_text(question)
+    stopwords = service._load_keyword_presentation_stopwords()
+
+    monkeypatch.setattr(
+        service,
+        "_load_keyword_presentation_stopwords",
+        lambda: frozenset(),
+    )
+    unfiltered_points, unfiltered_matches = service._bm25_candidates(question, records)
+    monkeypatch.setattr(
+        service,
+        "_load_keyword_presentation_stopwords",
+        lambda: stopwords,
+    )
+    filtered_points, filtered_matches = service._bm25_candidates(question, records)
+
+    assert service._tokenize_keyword_text(question) == expected_query_tokens
+    assert [point.id for point in filtered_points] == [
+        point.id for point in unfiltered_points
+    ]
+    assert [point.score for point in filtered_points] == pytest.approx(
+        [point.score for point in unfiltered_points]
+    )
+    strong_public_id = service._point_display_id(filtered_points[0])
+    assert {"the", "to"} <= set(unfiltered_matches[strong_public_id])
+    assert {"the", "to"}.isdisjoint(filtered_matches[strong_public_id])
+    assert filtered_matches[strong_public_id] == (
+        "authors",
+        "recommend",
+        "improve",
+        "berlin",
+        "process",
+    )
+
+
+def test_all_stopword_query_can_still_produce_bm25_results() -> None:
+    record = _point(
+        "all-stopwords-private-id",
+        content="the of for and the",
+        source="/private/all-stopwords.txt",
+    )
+
+    ranked, matched = service._bm25_candidates("the of for and", [record])
+
+    assert len(ranked) == 1
+    assert ranked[0].score > 0
+    assert matched[service._point_display_id(ranked[0])] == ()
 
 
 def test_keyword_scan_is_paginated_bounded_and_requests_no_vectors() -> None:
@@ -1313,7 +1532,7 @@ def test_dense_visualization_projects_safe_points_and_matches_search_ids(
         == {"id", "source", "x", "y", "z", "retrieved", "rank", "preview"}
         for point in result.points
     )
-    assert "vector" not in serialized
+    assert '"vector":' not in serialized
     assert "0.91" not in serialized
 
 
@@ -1710,7 +1929,8 @@ def test_packaged_examples_and_html_separation() -> None:
     assert all(question not in template for question in questions)
     assert "data-question=" not in template
     assert 'id="refresh-examples"' in template
-    assert 'type="button" disabled>Refresh examples' in template
+    assert 'type="button" disabled>Suggest more examples' in template
+    assert "Refresh examples" not in template
 
 
 @pytest.mark.parametrize("questions", [
@@ -1844,6 +2064,130 @@ async def test_examples_api_safe_error_for_unavailable_or_invalid_config(
 
 def _document_public_id(point: SimpleNamespace) -> str:
     return inspect_index(_client(([point], None)), "demo").documents[0].id
+
+
+@pytest.mark.anyio
+async def test_chunk_details_endpoint_returns_one_safe_public_projection(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setattr(routes, "to_thread", _run_inline)
+    raw_source = "https://user:secret@example.com/docs/report.pdf?token=private"
+    point = _point(
+        "raw-qdrant-id",
+        content=f"Evidence reproduced from {raw_source}.",
+        source=raw_source,
+        loader_id="private-loader",
+        document_id="private-document",
+        content_hash="private-content-hash",
+        chunk_hash="private-chunk-hash",
+        credentials="private-secret",
+    )
+    public_id = service._point_display_id(point)
+    reader = _client(([point], None))
+    monkeypatch.setattr(routes, "demo_qdrant_reader", reader)
+    monkeypatch.setattr(routes, "user_config", {"collection_name": "configured-demo"})
+
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://testserver") as client:
+        response = await client.get(
+            f"/ragdemo/api/chunks/{public_id}",
+            params={
+                "collection_name": "private",
+                "source": "/private/path",
+                "loader_id": "private-loader",
+                "content_hash": "private-hash",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": public_id,
+        "source": "report.pdf — example.com",
+        "content": "Evidence reproduced from report.pdf — example.com.",
+        "truncated": False,
+    }
+    assert set(response.json()) == {"id", "source", "content", "truncated"}
+    for forbidden in (
+        raw_source,
+        "raw-qdrant-id",
+        "private-loader",
+        "private-document",
+        "private-content-hash",
+        "private-chunk-hash",
+        "credentials",
+        "vector",
+        "/private/",
+    ):
+        assert forbidden not in response.text
+    call = reader.scroll.call_args.kwargs
+    assert call["collection_name"] == "configured-demo"
+    assert call["with_vectors"] is False
+    assert call["with_payload"] == service.KEYWORD_PAYLOAD_FIELDS
+    assert call["limit"] <= service.MAX_CHUNK_LOOKUP_CHUNKS
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("public_id", ["0" * 24, "raw-qdrant-id", "A" * 24])
+async def test_chunk_details_endpoint_unknown_and_malformed_ids_are_safe(
+    monkeypatch: Any, public_id: str,
+) -> None:
+    monkeypatch.setattr(routes, "to_thread", _run_inline)
+    reader = _client(([], None))
+    monkeypatch.setattr(routes, "demo_qdrant_reader", reader)
+    monkeypatch.setattr(routes, "user_config", {"collection_name": "configured-demo"})
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://testserver") as client:
+        response = await client.get(f"/ragdemo/api/chunks/{public_id}")
+    assert response.status_code == 404
+    assert response.json()["message"] == "The chunk was not found."
+    assert public_id not in response.text
+    if not re.fullmatch(r"[0-9a-f]{24}", public_id):
+        reader.collection_exists.assert_not_called()
+        reader.scroll.assert_not_called()
+
+
+def test_chunk_details_lookup_is_paginated_bounded_and_truncates_content() -> None:
+    first = _point("first", content="First", source="/private/first.txt")
+    second = _point("second", content="Second", source="/private/second.txt")
+    target = _point("target", content="x" * 8_001, source="/private/target.txt")
+    target_id = service._point_display_id(target)
+    reader = _client(([first, second], "next"), ([target], None))
+
+    result = inspect_chunk_details(
+        reader,
+        "configured-demo",
+        target_id,
+        page_size=2,
+        max_chunks=3,
+    )
+
+    assert result is not None
+    assert result.id == target_id
+    assert result.source == "target.txt"
+    assert len(result.content) == MAX_PUBLIC_CHUNK_CHARS
+    assert result.truncated is True
+    assert [call.kwargs["limit"] for call in reader.scroll.call_args_list] == [2, 1]
+    assert all(call.kwargs["with_vectors"] is False for call in reader.scroll.call_args_list)
+    assert all(call.kwargs["collection_name"] == "configured-demo" for call in reader.scroll.call_args_list)
+
+    incomplete = _client(([first], "more"))
+    with pytest.raises(ValueError, match="incomplete"):
+        inspect_chunk_details(incomplete, "configured-demo", "0" * 24, max_chunks=1)
+    with pytest.raises(ValueError, match="bounds"):
+        inspect_chunk_details(reader, "configured-demo", target_id, max_chunks=service.MAX_CHUNK_LOOKUP_CHUNKS + 1)
+
+
+@pytest.mark.anyio
+async def test_chunk_details_endpoint_failure_is_generic(monkeypatch: Any) -> None:
+    monkeypatch.setattr(routes, "to_thread", _run_inline)
+    reader = _client()
+    reader.scroll.side_effect = RuntimeError("secret /home/private collection=private")
+    monkeypatch.setattr(routes, "demo_qdrant_reader", reader)
+    monkeypatch.setattr(routes, "user_config", {"collection_name": "configured-demo"})
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://testserver") as client:
+        response = await client.get(f"/ragdemo/api/chunks/{'0' * 24}")
+    assert response.status_code == 503
+    assert response.json()["message"] == "The chunk is temporarily unavailable. Please try again shortly."
+    assert "secret" not in response.text
+    assert "/home" not in response.text
 
 
 @pytest.mark.anyio
@@ -2214,13 +2558,18 @@ class Element {
     };
     this.hidden = false; this.disabled = false; this.value = ""; this.checked = false;
     this.className = ""; this._text = ""; this.classList = new ClassList(this);
-    this.capturedPointers = new Set();
+    this.capturedPointers = new Set(); this.reparentCount = 0;
   }
   set textContent(value) { this._text = String(value); this.children = []; }
   get textContent() { return this._text + this.children.map(child => child.textContent).join(""); }
   appendChild(child) {
-    if (child.parent) child.parent.children = child.parent.children.filter(candidate => candidate !== child);
-    this.children.push(child); child.parent = this; return child;
+    if (child.parent) {
+      child.parent.children = child.parent.children.filter(candidate => candidate !== child);
+      child.reparentCount += 1;
+    }
+    this.children.push(child);
+    child.parent = this; child.parentElement = this; child.parentNode = this;
+    return child;
   }
   append(...children) { children.forEach(child => this.appendChild(child)); }
   insertBefore(child, reference) {
@@ -2296,13 +2645,16 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   const keyword = new Element("input", document);
   keyword.value = "keyword";
   const retrievalInputs = [semantic, keyword];
+  let queryRequestCount = 0;
+  const chunkDetailRequests = new Map();
   const semanticResponse = {
+    question: "Where is the evidence?",
     answer: "Safe answer",
     search: {mode: "semantic", label: "Search", technical_label: "Dense", score_label: "Score", results: [
       {id: "one", rank: 1, source: "one.pdf", score: 0.9, content: "First safe chunk", matched_terms: []},
       {id: "two", rank: 2, source: "two.pdf", score: 0.8, content: "Second safe chunk", matched_terms: []},
     ]},
-    visualization: {status: "ready", label: "Explore the embedding space", technical_label: "3D PCA", note: "This is a 3D PCA projection. Retrieval itself uses the full-dimensional dense embedding space.", points: [
+    visualization: {status: "ready", label: "Explore the embedding space", technical_label: "3D PCA", note: "3D proximity is approximate because PCA compresses the embedding space. Retrieval uses the original full-dimensional vectors.", points: [
       {id: "one", source: "one.pdf", x: -2, y: 1, z: 0.5, retrieved: true, rank: 1, preview: "First safe chunk"},
       {id: "two", source: "two.pdf", x: 1, y: 2, z: -1, retrieved: true, rank: 2, preview: "Second safe chunk"},
       {id: "other", source: "other.pdf", x: 3, y: -1, z: 2, retrieved: false, rank: null, preview: "Background chunk"},
@@ -2322,8 +2674,21 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
       if (url === "./api/examples") return {ok: true, json: async () => ({display_count: 1, question_sets: [{questions: ["Example?"]}]})};
       if (url === "./api/index") return {ok: true, json: async () => ({document_count: 0, chunk_count: 0, truncated: false, documents: []})};
       if (url === "./api/query") {
+        queryRequestCount += 1;
         const request = JSON.parse(options.body);
         return {ok: true, json: async () => request.retrieval_mode === "keyword" ? keywordResponse : semanticResponse};
+      }
+      if (url.startsWith("./api/chunks/")) {
+        const id = decodeURIComponent(url.slice("./api/chunks/".length));
+        const count = (chunkDetailRequests.get(id) || 0) + 1;
+        chunkDetailRequests.set(id, count);
+        if (id === "other" && count === 1) return {ok: false};
+        const details = {
+          one: {id: "one", source: "one.pdf", content: "First safe chunk", truncated: false},
+          two: {id: "two", source: "two.pdf", content: "Second safe chunk", truncated: false},
+          other: {id: "other", source: "other.pdf", content: "Background chunk content", truncated: false},
+        }[id];
+        return {ok: Boolean(details), json: async () => details};
       }
       throw new Error(`Unexpected request: ${url}`);
     },
@@ -2334,9 +2699,50 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   const question = document.querySelector("#question-input");
   question.value = "Where is the evidence?";
   await document.querySelector("#query-form").dispatch("submit");
+  assert.equal(queryRequestCount, 1);
+  assert.equal(document.querySelector("#embed-stage").open, false);
+  assert.equal(document.querySelector("#retrieve-stage").open, false);
+  assert.equal(document.querySelector("#prompt-stage").open, false);
+  assert.equal(document.querySelector("#answer-stage").open, true);
+  document.querySelector("#embed-stage").open = true;
+  document.querySelector("#retrieve-stage").open = true;
+  document.querySelector("#prompt-stage").open = true;
+  assert.equal(queryRequestCount, 1);
   const canvas = document.querySelector("#visualization-canvas");
   const svg = canvas.children.find(child => child.tag === "svg");
   assert(svg);
+  const dispatchScenePointer = async (target, pointerId, movement = {x: 0, y: 0}) => {
+    const pointerTarget = target.children.find(child => child.tag !== "title") || target;
+    const pointer = {button: 0, pointerId, clientX: 480, clientY: 300, target: pointerTarget};
+    await target.dispatch("pointerenter", pointer);
+    const reparentCountBeforePress = target.reparentCount;
+    await svg.dispatch("pointerdown", pointer);
+    if (document.activeElement && document.activeElement !== target) {
+      await document.activeElement.blur();
+    }
+    await target.focus();
+    if (movement.x || movement.y) {
+      await svg.dispatch("pointermove", {
+        ...pointer,
+        clientX: pointer.clientX + movement.x,
+        clientY: pointer.clientY + movement.y,
+      });
+    }
+    const reorderedDuringPress = target.reparentCount > reparentCountBeforePress;
+    await svg.dispatch("pointerup", {
+      ...pointer,
+      clientX: pointer.clientX + movement.x,
+      clientY: pointer.clientY + movement.y,
+    });
+    if (!reorderedDuringPress) {
+      await target.dispatch("click", {detail: 1, target});
+    }
+    return reorderedDuringPress;
+  };
+  const inspector = document.querySelector("#visualization-inspector");
+  const inspectorTitle = document.querySelector("#visualization-inspector-title");
+  const inspectorContent = document.querySelector("#visualization-inspector-content");
+  assert.equal(inspector.hidden, true);
   assert.equal(document.querySelector("#visualization-panel").hidden, false);
   assert.equal(document.querySelector("#visualization-note").hidden, true);
   assert.equal(document.querySelector("#visualization-note").textContent, "");
@@ -2429,10 +2835,8 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   assert.match(tooltip.textContent, /Y -0.500/);
   assert.match(tooltip.textContent, /Z 1.250/);
   assert(tooltip.textContent.length < 80);
-  await query.dispatch("click");
-  const inspector = document.querySelector("#visualization-inspector");
-  const inspectorTitle = document.querySelector("#visualization-inspector-title");
-  const inspectorContent = document.querySelector("#visualization-inspector-content");
+  await dispatchScenePointer(query, 1, {x: 1, y: 1});
+  assert.equal(chunkDetailRequests.size, 0);
   assert.equal(inspector.hidden, false);
   assert.equal(inspectorTitle.textContent, "Query");
   assert.match(inspectorContent.textContent, /X0.750/);
@@ -2454,21 +2858,54 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   assert.doesNotMatch(tooltip.textContent, /First safe chunk/);
   assert.match(tooltip.textContent, /X -2\.0/);
   assert(tooltip.textContent.length < 90);
-  await retrieved.dispatch("click");
+  const geometryBeforeInspectorOpen = axisLines.map(geometry);
+  const boundsBeforeInspectorOpen = canvas.getBoundingClientRect();
+  const zoomBeforeInspectorOpen = document.querySelector("#visualization-zoom-level").textContent;
+  const retrievedReorderedDuringPress = await dispatchScenePointer(retrieved, 2, {x: 2, y: 1});
+  assert.equal(retrievedReorderedDuringPress, true);
   assert(retrieved.classList.contains("is-pinned"));
   assert.equal(inspector.hidden, false);
-  assert.equal(inspectorTitle.textContent, "#1");
+  assert.equal(inspectorTitle.textContent, "Chunk details");
+  assert.match(inspectorContent.textContent, /Retrieved · Rank #1/);
   assert.match(inspectorContent.textContent, /one\.pdf/);
   assert.match(inspectorContent.textContent, /First safe chunk/);
+  assert.match(inspectorContent.textContent, /Retrieval score0\.9/);
   assert.match(inspectorContent.textContent, /X-2\.0/);
+  assert.equal(chunkDetailRequests.get("one"), 1);
+  await retrieved.dispatch("click", {detail: 1, target: retrieved});
+  assert.equal(chunkDetailRequests.get("one"), 1);
+  assert.deepEqual(axisLines.map(geometry), geometryBeforeInspectorOpen);
+  assert.deepEqual(canvas.getBoundingClientRect(), boundsBeforeInspectorOpen);
+  assert.equal(document.querySelector("#visualization-zoom-level").textContent, zoomBeforeInspectorOpen);
   assert.deepEqual(
     byClass(svg, "query-retrieval-connection").filter(line => line.classList.contains("is-active")).map(line => line.dataset.chunkId),
     ["one"],
   );
   await retrieved.dispatch("mouseleave");
+  const geometryBeforeInspectorClose = axisLines.map(geometry);
+  const zoomBeforeInspectorClose = document.querySelector("#visualization-zoom-level").textContent;
+  await document.querySelector("#visualization-inspector-close").click();
+  assert.equal(inspector.hidden, true);
+  assert.deepEqual(axisLines.map(geometry), geometryBeforeInspectorClose);
+  assert.equal(document.querySelector("#visualization-zoom-level").textContent, zoomBeforeInspectorClose);
+  await dispatchScenePointer(retrieved, 3);
+  assert.equal(inspector.hidden, false);
+  assert.equal(chunkDetailRequests.get("one"), 1);
+  const secondRetrieved = byClass(svg, "retrieved-point").find(point => point.dataset.chunkId === "two");
+  await dispatchScenePointer(secondRetrieved, 9);
+  assert.match(inspectorContent.textContent, /Retrieved · Rank #2/);
+  assert.match(inspectorContent.textContent, /two\.pdf/);
+  assert.match(inspectorContent.textContent, /Second safe chunk/);
+  assert.doesNotMatch(inspectorContent.textContent, /First safe chunk/);
+  assert.equal(chunkDetailRequests.get("two"), 1);
+  await dispatchScenePointer(retrieved, 10);
+  assert.match(inspectorContent.textContent, /Retrieved · Rank #1/);
+  assert.equal(chunkDetailRequests.get("one"), 1);
 
   await svg.dispatch("pointerdown", {button: 0, pointerId: 7, clientX: 480, clientY: 300});
+  assert.equal(svg.hasPointerCapture(7), false);
   await svg.dispatch("pointermove", {pointerId: 7, clientX: 690, clientY: 130});
+  assert.equal(svg.hasPointerCapture(7), true);
   assert.notDeepEqual(axisLines.map(geometry), initialAxes);
   assert.notDeepEqual(gridLines.map(geometry), initialGrid);
   assert.notDeepEqual([...cuboidEdges, ...cuboidCorners].map(geometry), initialCuboid);
@@ -2482,12 +2919,17 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   await svg.dispatch("pointermove", {pointerId: 8, clientX: 760, clientY: 420});
   assertSafeBounds();
   await svg.dispatch("pointerup", {pointerId: 8});
+  await svg.dispatch("click");
 
   assert.equal(svg.eventOptions.wheel.length, 1);
   assert.equal(svg.eventOptions.wheel[0].passive, false);
   const wheelIn = {deltaY: -100};
   await svg.dispatch("wheel", wheelIn);
   assert.equal(wheelIn.defaultPrevented, true);
+  assert.equal(document.querySelector("#visualization-zoom-level").textContent, "109%");
+  const inspectorWheel = {deltaY: 100};
+  await inspector.dispatch("wheel", inspectorWheel);
+  assert.equal(inspectorWheel.propagationStopped, true);
   assert.equal(document.querySelector("#visualization-zoom-level").textContent, "109%");
   const panel = document.querySelector("#visualization-panel");
   const rotatedAt109 = axisLines.map(geometry);
@@ -2500,6 +2942,19 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   assert(retrieved.classList.contains("is-pinned"));
   assert.equal(inspector.hidden, false);
   assert.notDeepEqual(axisLines.map(geometry), rotatedAt109);
+  const expandedGeometryWithInspector = axisLines.map(geometry);
+  const expandedBoundsWithInspector = canvas.getBoundingClientRect();
+  await document.querySelector("#visualization-inspector-close").click();
+  assert.equal(inspector.hidden, true);
+  assert.equal(inspector.children.length, 0);
+  assert.equal(inspectorContent.children.length, 0);
+  assert(panel.classList.contains("is-expanded"));
+  assert.equal(document.querySelector("#visualization-zoom-level").textContent, "109%");
+  assert.deepEqual(axisLines.map(geometry), expandedGeometryWithInspector);
+  assert.deepEqual(canvas.getBoundingClientRect(), expandedBoundsWithInspector);
+  await dispatchScenePointer(retrieved, 4, {x: 2, y: 2});
+  assert.equal(inspector.hidden, false);
+  assert.equal(chunkDetailRequests.get("one"), 1);
   await document.querySelector("#visualization-restore").click();
   assert.equal(panel.classList.contains("is-expanded"), false);
   assert.deepEqual(axisLines.map(geometry), rotatedAt109);
@@ -2531,17 +2986,36 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   assert(byClass(svg, "query-retrieval-connection").every(line => !line.classList.contains("is-active")));
 
   const backgroundPoint = byClass(svg, "indexed-point")[0];
+  await backgroundPoint.dispatch("mouseenter");
+  assert.equal(tooltip.hidden, false);
+  assert.match(tooltip.textContent, /other\.pdf/);
+  assert.match(tooltip.textContent, /X 3\.0/);
+  assert.doesNotMatch(tooltip.textContent, /Background chunk content/);
+  await backgroundPoint.dispatch("mouseleave");
+  const backgroundBeforeDrag = geometry(backgroundPoint);
+  await dispatchScenePointer(backgroundPoint, 11, {x: 42, y: 18});
+  assert.equal(chunkDetailRequests.has("other"), false);
+  assert.equal(inspector.hidden, true);
+  assert.notEqual(geometry(backgroundPoint).transform, backgroundBeforeDrag.transform);
   const backgroundGeometry = geometry(backgroundPoint);
-  await backgroundPoint.dispatch("click");
-  assert.equal(inspectorTitle.textContent, "Indexed chunk");
+  const backgroundReorderedDuringPress = await dispatchScenePointer(
+    backgroundPoint, 5, {x: 1, y: 2},
+  );
+  assert.equal(backgroundReorderedDuringPress, true);
+  assert.equal(inspectorTitle.textContent, "Chunk details");
+  assert.match(inspectorContent.textContent, /Not retrieved for this question/);
   assert.match(inspectorContent.textContent, /other\.pdf/);
-  assert.match(inspectorContent.textContent, /Background chunk/);
+  assert.match(inspectorContent.textContent, /This chunk could not be loaded/);
+  assert.equal(chunkDetailRequests.get("other"), 1);
+  await dispatchScenePointer(backgroundPoint, 6);
+  assert.match(inspectorContent.textContent, /Background chunk content/);
+  assert.equal(chunkDetailRequests.get("other"), 2);
   assert.equal(geometry(backgroundPoint).transform, backgroundGeometry.transform);
   assert(byClass(svg, "query-retrieval-connection").every(line => !line.classList.contains("is-active")));
   await document.querySelector("#visualization-inspector-close").click();
 
   semanticResponse.visualization.status = "partial";
-  semanticResponse.visualization.note = "This is a 3D PCA projection. Retrieval itself uses the full-dimensional dense embedding space. The bounded display shows a partial index snapshot.";
+  semanticResponse.visualization.note = "3D proximity is approximate because PCA compresses the embedding space. Retrieval uses the original full-dimensional vectors. The bounded display shows a partial index snapshot.";
   await document.querySelector("#query-form").dispatch("submit");
   assert.equal(document.querySelector("#visualization-note").hidden, false);
   assert.equal(document.querySelector("#visualization-note").textContent, "The bounded display shows a partial index snapshot.");

@@ -98,6 +98,13 @@ class IndexedDocumentChunksResponse(BaseModel):
     truncated: bool = False
 
 
+class PublicChunkDetails(BaseModel):
+    id: str
+    source: str
+    content: str = Field(max_length=MAX_PUBLIC_CHUNK_CHARS)
+    truncated: bool = False
+
+
 class IndexedDocument(BaseModel):
     id: str
     name: str

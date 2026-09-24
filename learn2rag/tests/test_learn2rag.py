@@ -106,8 +106,9 @@ class Learn2RAGTestCase(TestCase):
                 content = completion.choices[-1].message.content
                 logger.debug('Response content: %s', content)
                 assert 'for testing only' in content, 'contains test marker'
-                assert "Information:\\n" in content, 'contains the prompt'
-                assert not content.endswith("Information:\\n"), 'contains any document chunks in the prompt'
+                assert "Information:\n" in content, 'contains the prompt with real line breaks'
+                assert "\\n" not in content, 'does not contain escaped newline text'
+                assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
                 assert 'Lagomorpha' in content, 'specific text from a test file'
             except APIConnectionError:
                 assert False

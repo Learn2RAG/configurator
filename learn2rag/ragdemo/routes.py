@@ -16,6 +16,7 @@ from .models import (
     IndexedDocumentChunksResponse,
     IndexErrorResponse,
     IndexResponse,
+    PublicChunkDetails,
     PublicExampleQuestions,
     QueryErrorResponse,
     QueryRequest,
@@ -23,6 +24,7 @@ from .models import (
 )
 from .service import (
     execute_query,
+    inspect_chunk_details,
     inspect_document_chunks,
     inspect_index,
     load_public_example_questions,
@@ -151,6 +153,31 @@ async def document_chunks_api(document_id: str) -> IndexedDocumentChunksResponse
         logger.exception("Unable to inspect demo document chunks")
         return JSONResponse(status_code=503, content=IndexErrorResponse(
             message="Document chunks are temporarily unavailable. Please try again shortly."
+        ).model_dump())
+
+
+@router.get(
+    "/api/chunks/{chunk_id}",
+    response_model=PublicChunkDetails,
+    responses={404: {"model": IndexErrorResponse}, 503: {"model": IndexErrorResponse}},
+)
+async def chunk_details_api(chunk_id: str) -> PublicChunkDetails | JSONResponse:
+    try:
+        collection_name = user_config["collection_name"]
+        if not isinstance(collection_name, str) or not collection_name.strip():
+            raise ValueError("A valid collection_name is required")
+        result = await to_thread(
+            inspect_chunk_details, demo_qdrant_reader, collection_name, chunk_id
+        )
+        if result is not None:
+            return result
+        return JSONResponse(status_code=404, content=IndexErrorResponse(
+            message="The chunk was not found."
+        ).model_dump())
+    except Exception:
+        logger.exception("Unable to inspect demo chunk")
+        return JSONResponse(status_code=503, content=IndexErrorResponse(
+            message="The chunk is temporarily unavailable. Please try again shortly."
         ).model_dump())
 
 

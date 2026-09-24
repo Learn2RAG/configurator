@@ -113,7 +113,7 @@
             <p class="small text-uppercase text-body-secondary fw-semibold mb-2">Try an example</p>
             <div id="example-questions" class="d-flex flex-column flex-lg-row gap-2"></div>
             <p id="examples-status" class="small text-body-secondary mt-2 mb-0" role="status">Loading examples…</p>
-            <button id="refresh-examples" class="btn btn-sm btn-outline-secondary mt-2" type="button" disabled>Refresh examples</button>
+            <button id="refresh-examples" class="btn btn-sm btn-outline-secondary mt-2" type="button" disabled>Suggest more examples</button>
           </div>
 
           <div id="query-error" class="alert alert-danger mt-4 mb-0" role="alert" hidden></div>
@@ -126,99 +126,97 @@
             <div id="comparison-actions" class="comparison-actions mb-3" hidden>
               <button id="compare-retrieval" class="btn btn-sm btn-outline-primary" type="button"></button>
             </div>
-            <section aria-labelledby="answer-heading">
-              <p id="answer-kicker" class="result-kicker mb-2">Answer</p>
-              <h2 id="answer-heading" class="visually-hidden">Generated answer</h2>
-              <div id="answer-container" class="card shadow-sm answer-card">
-                <div id="answer-content" class="card-body answer-content"></div>
-              </div>
-            </section>
-
-            <section class="mt-5" aria-labelledby="search-heading">
-              <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-3">
-                <div>
-                  <p class="result-kicker mb-1">Search</p>
-                  <h2 id="search-heading" class="h4 mb-0">
-                    <span id="search-label">Semantic vector search</span>
-                  </h2>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                  <span id="search-technical-label" class="badge text-bg-primary">Dense / BGE-M3</span>
-                  <span id="score-label" class="badge text-bg-light border text-secondary">Dense similarity</span>
-                </div>
-              </div>
-              <div id="search-results" class="d-flex flex-column gap-3"></div>
-
-              <div id="visualization-section" class="mt-4" aria-labelledby="visualization-heading">
-                <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-2">
-                  <h3 id="visualization-heading" class="h5 mb-0">
-                    <span id="visualization-label">Explore the embedding space</span>
-                  </h3>
-                  <span id="visualization-technical-label" class="badge text-bg-light border text-secondary">3D PCA projection of dense embeddings</span>
-                </div>
-                <p class="visualization-intro mb-1">All indexed chunks form the surrounding embedding space. The Query vector and its links identify the chunks selected for the RAG context.</p>
-                <p class="small text-body-secondary mb-1">X/Y/Z show the first three PCA components of the dense embedding space. Retrieval itself uses the full-dimensional embeddings.</p>
-                <p id="visualization-note" class="small text-body-secondary mb-3"></p>
-                <div id="visualization-status" class="alert alert-secondary mb-0" role="status" hidden></div>
-                <div id="visualization-panel" class="embedding-map-stage" aria-label="Interactive 3D embedding graph" hidden>
-                  <div class="embedding-map-toolbar">
-                    <p id="visualization-help" class="small text-body-secondary mb-0">Drag freely to rotate · Use the wheel or +/− to zoom · Hover for a label · Click to inspect</p>
-                    <div class="embedding-map-controls">
-                      <div class="btn-group btn-group-sm" role="group" aria-label="3D embedding view controls">
-                        <button id="visualization-zoom-out" class="btn btn-outline-secondary" type="button" aria-label="Zoom out of embedding space" title="Zoom out">−</button>
-                        <output id="visualization-zoom-level" class="embedding-zoom-level" aria-live="polite" aria-label="Current embedding space zoom: 100%">100%</output>
-                        <button id="visualization-zoom-in" class="btn btn-outline-secondary" type="button" aria-label="Zoom into embedding space" title="Zoom in">+</button>
-                        <button id="visualization-reset" class="btn btn-outline-secondary" type="button" aria-label="Reset embedding space view">Reset view</button>
+            <div class="rag-stages">
+              <details id="embed-stage" class="rag-stage">
+                <summary><span class="rag-stage-number">1</span><span>Embed question</span></summary>
+                <section class="rag-stage-content" aria-labelledby="embed-stage-heading">
+                  <h2 id="embed-stage-heading" class="visually-hidden">Embed question</h2>
+                  <dl class="rag-stage-context mb-4">
+                    <div><dt>Question</dt><dd id="embedded-question"></dd></div>
+                    <div><dt>Retrieval method</dt><dd id="embedded-retrieval-method"></dd></div>
+                  </dl>
+                  <div id="visualization-section" aria-labelledby="visualization-heading">
+                    <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-2">
+                      <h3 id="visualization-heading" class="h5 mb-0"><span id="visualization-label">Explore the embedding space</span></h3>
+                      <span id="visualization-technical-label" class="badge text-bg-light border text-secondary">3D PCA projection of dense embeddings</span>
+                    </div>
+                    <p class="visualization-intro mb-1">All indexed chunks form the surrounding embedding space. The Query vector and its links identify the chunks selected for the RAG context.</p>
+                    <p class="small text-body-secondary mb-1">3D proximity is approximate because PCA compresses the embedding space. Retrieval uses the original full-dimensional vectors.</p>
+                    <p id="visualization-note" class="small text-body-secondary mb-3"></p>
+                    <div id="visualization-status" class="alert alert-secondary mb-0" role="status" hidden></div>
+                    <div id="visualization-panel" class="embedding-map-stage" aria-label="Interactive 3D embedding graph" hidden>
+                      <div class="embedding-map-toolbar">
+                        <p id="visualization-help" class="small text-body-secondary mb-0">Drag freely to rotate · Use the wheel or +/− to zoom · Hover for a label · Click to inspect</p>
+                        <div class="embedding-map-controls">
+                          <div class="btn-group btn-group-sm" role="group" aria-label="3D embedding view controls">
+                            <button id="visualization-zoom-out" class="btn btn-outline-secondary" type="button" aria-label="Zoom out of embedding space" title="Zoom out">−</button>
+                            <output id="visualization-zoom-level" class="embedding-zoom-level" aria-live="polite" aria-label="Current embedding space zoom: 100%">100%</output>
+                            <button id="visualization-zoom-in" class="btn btn-outline-secondary" type="button" aria-label="Zoom into embedding space" title="Zoom in">+</button>
+                            <button id="visualization-reset" class="btn btn-outline-secondary" type="button" aria-label="Reset embedding space view">Reset view</button>
+                          </div>
+                          <div class="btn-group btn-group-sm" role="group" aria-label="Embedding graph display mode">
+                            <button id="visualization-expand" class="btn btn-outline-secondary" type="button" aria-label="Expand embedding graph">Expand</button>
+                            <button id="visualization-restore" class="btn btn-outline-secondary" type="button" aria-label="Restore embedded graph" hidden>Restore</button>
+                            <button id="visualization-expanded-close" class="btn btn-outline-secondary" type="button" aria-label="Close expanded graph" hidden>Close</button>
+                          </div>
+                        </div>
                       </div>
-                      <div class="btn-group btn-group-sm" role="group" aria-label="Embedding graph display mode">
-                        <button id="visualization-expand" class="btn btn-outline-secondary" type="button" aria-label="Expand embedding graph">Expand</button>
-                        <button id="visualization-restore" class="btn btn-outline-secondary" type="button" aria-label="Restore embedded graph" hidden>Restore</button>
-                        <button id="visualization-expanded-close" class="btn btn-outline-secondary" type="button" aria-label="Close expanded graph" hidden>Close</button>
+                      <div id="visualization-canvas" class="embedding-map-canvas" aria-describedby="visualization-help">
+                        <div id="visualization-tooltip" class="embedding-map-tooltip" role="status" aria-live="polite" hidden></div>
+                        <aside id="visualization-inspector" class="embedding-map-inspector" aria-label="Chunk details" aria-live="polite" hidden>
+                          <div class="embedding-inspector-header">
+                            <strong id="visualization-inspector-title">Chunk details</strong>
+                            <button id="visualization-inspector-close" class="btn-close" type="button" aria-label="Close chunk details"></button>
+                          </div>
+                          <div id="visualization-inspector-content" class="embedding-inspector-content"></div>
+                        </aside>
+                      </div>
+                      <div class="embedding-map-legend" aria-label="Embedding map legend">
+                        <span><span class="legend-symbol legend-query-vector" aria-hidden="true"></span>Query vector</span>
+                        <span><span class="legend-symbol legend-retrieved" aria-hidden="true"></span>Retrieved chunks</span>
+                        <span><span class="legend-symbol legend-indexed" aria-hidden="true"></span>Other indexed chunks</span>
+                        <span><span class="legend-symbol legend-connection" aria-hidden="true"></span>Query → retrieved link</span>
                       </div>
                     </div>
                   </div>
-                  <ol class="embedding-process-summary" aria-label="RAG process summary">
-                    <li><span>1</span>Question embedded</li>
-                    <li><span>2</span>Top-ranked chunks retrieved as a set</li>
-                    <li><span>3</span>Retrieved chunks added to the prompt</li>
-                    <li><span>4</span>Model generates the answer</li>
-                  </ol>
-                  <div id="visualization-canvas" class="embedding-map-canvas" aria-describedby="visualization-help">
-                    <div id="visualization-tooltip" class="embedding-map-tooltip" role="status" aria-live="polite" hidden></div>
-                    <aside id="visualization-inspector" class="embedding-map-inspector" aria-label="Pinned embedding point inspector" aria-live="polite" hidden>
-                      <div class="embedding-inspector-header">
-                        <strong id="visualization-inspector-title">Inspector</strong>
-                        <button id="visualization-inspector-close" class="btn-close" type="button" aria-label="Close inspector"></button>
-                      </div>
-                      <div id="visualization-inspector-content" class="embedding-inspector-content"></div>
-                    </aside>
-                  </div>
-                  <div class="embedding-map-legend" aria-label="Embedding map legend">
-                    <span><span class="legend-symbol legend-query-vector" aria-hidden="true"></span>Query vector</span>
-                    <span><span class="legend-symbol legend-retrieved" aria-hidden="true"></span>Retrieved chunks</span>
-                    <span><span class="legend-symbol legend-indexed" aria-hidden="true"></span>Other indexed chunks</span>
-                    <span><span class="legend-symbol legend-connection" aria-hidden="true"></span>Query → retrieved link</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section class="mt-5" aria-labelledby="prompt-heading">
-              <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-2">
-                <div>
-                  <p class="result-kicker mb-1">Prompt</p>
-                  <h2 id="prompt-heading" class="h4 mb-0">
-                    <span id="prompt-label">Prompt sent to the model</span>
-                  </h2>
-                </div>
-                <span id="prompt-technical-label" class="badge text-bg-light border text-secondary">Application-level chat messages</span>
-              </div>
-              <p id="prompt-note" class="small text-body-secondary mb-3"></p>
-              <details class="card prompt-details">
-                <summary class="card-header fw-semibold">Inspect exact messages</summary>
-                <div id="prompt-messages" class="card-body d-flex flex-column gap-3"></div>
+                </section>
               </details>
-            </section>
+
+              <details id="retrieve-stage" class="rag-stage">
+                <summary><span class="rag-stage-number">2</span><span>Retrieve top-ranked chunks</span></summary>
+                <section class="rag-stage-content" aria-labelledby="search-heading">
+                  <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-3">
+                    <div><p class="result-kicker mb-1">Search</p><h2 id="search-heading" class="h4 mb-0"><span id="search-label">Semantic vector search</span></h2></div>
+                    <div class="d-flex flex-wrap gap-2">
+                      <span id="search-technical-label" class="badge text-bg-primary">Dense / BGE-M3</span>
+                      <span id="score-label" class="badge text-bg-light border text-secondary">Dense similarity</span>
+                    </div>
+                  </div>
+                  <div id="search-results" class="d-flex flex-column gap-3"></div>
+                </section>
+              </details>
+
+              <details id="prompt-stage" class="rag-stage">
+                <summary><span class="rag-stage-number">3</span><span>Add chunks to prompt</span></summary>
+                <section class="rag-stage-content" aria-labelledby="prompt-heading">
+                  <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-2">
+                    <div><p class="result-kicker mb-1">Prompt</p><h2 id="prompt-heading" class="h4 mb-0"><span id="prompt-label">Prompt sent to the model</span></h2></div>
+                    <span id="prompt-technical-label" class="badge text-bg-light border text-secondary">Application-level chat messages</span>
+                  </div>
+                  <p id="prompt-note" class="small text-body-secondary mb-3"></p>
+                  <div id="prompt-messages" class="d-flex flex-column gap-3"></div>
+                </section>
+              </details>
+
+              <details id="answer-stage" class="rag-stage" open>
+                <summary><span class="rag-stage-number">4</span><span>Generate answer</span></summary>
+                <section class="rag-stage-content" aria-labelledby="answer-heading">
+                  <p id="answer-kicker" class="result-kicker mb-2">Answer</p>
+                  <h2 id="answer-heading" class="visually-hidden">Generated answer</h2>
+                  <div id="answer-container" class="card shadow-sm answer-card"><div id="answer-content" class="card-body answer-content"></div></div>
+                </section>
+              </details>
+            </div>
           </div>
         </div>
       </section>

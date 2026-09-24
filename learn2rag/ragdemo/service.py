@@ -16,6 +16,7 @@ import math
 import re
 from collections import Counter
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Literal, Mapping, Protocol, Sequence, cast
 from urllib.parse import unquote, urlsplit
@@ -37,6 +38,7 @@ from .models import (
     MAX_PUBLIC_CHUNK_CHARS,
     IndexedDocument,
     IndexResponse,
+    PublicChunkDetails,
     PublicExampleQuestions,
     PublicExampleQuestionSet,
     QueryPromptMessage,
@@ -56,7 +58,9 @@ SCROLL_PAGE_SIZE = 256
 MAX_CHUNKS = 10_000
 MAX_DOCUMENT_CHUNKS = 100
 _QUESTIONS_PATH = Path(__file__).resolve().with_name("demo_questions.json")
+_STOPWORDS_PATH = Path(__file__).resolve().with_name("stopwords_en_weka.txt")
 MAX_VISUALIZATION_CHUNKS = 2_000
+MAX_CHUNK_LOOKUP_CHUNKS = MAX_VISUALIZATION_CHUNKS
 MAX_KEYWORD_SEARCH_CHUNKS = 2_000
 DEFAULT_KEYWORD_TOP_K = 5
 MAX_KEYWORD_RESULTS = 50
@@ -254,6 +258,71 @@ def inspect_document_chunks(
         chunks=ordered,
         truncated=truncated or any(chunk.truncated for chunk in ordered),
     )
+
+
+def inspect_chunk_details(
+    client: QdrantReader,
+    collection_name: str,
+    chunk_id: str,
+    *,
+    page_size: int = SCROLL_PAGE_SIZE,
+    max_chunks: int = MAX_CHUNK_LOOKUP_CHUNKS,
+) -> PublicChunkDetails | None:
+    """Resolve one opaque graph chunk ID within the configured demo collection.
+
+    The bounded read requests only the payload fields needed to reproduce the
+    public ID and safe projection. Raw point IDs, vectors, hashes, loader IDs,
+    paths, and arbitrary backend filters never cross this boundary.
+    """
+    if not re.fullmatch(r"[0-9a-f]{24}", chunk_id):
+        return None
+    if not (1 <= page_size <= SCROLL_PAGE_SIZE
+            and 1 <= max_chunks <= MAX_CHUNK_LOOKUP_CHUNKS):
+        raise ValueError("Invalid chunk lookup bounds")
+    if not client.collection_exists(collection_name):
+        return None
+
+    offset: qdrant_types.PointId | None = None
+    seen_offsets: set[qdrant_types.PointId] = set()
+    scanned = 0
+    while scanned < max_chunks:
+        limit = min(page_size, max_chunks - scanned)
+        points, next_offset = client.scroll(
+            collection_name=collection_name,
+            limit=limit,
+            offset=offset,
+            with_payload=KEYWORD_PAYLOAD_FIELDS,
+            with_vectors=False,
+        )
+        if len(points) > limit:
+            raise ValueError("Backend exceeded chunk lookup page limit")
+        for point in points:
+            payload_value = getattr(point, "payload", None)
+            payload = payload_value if isinstance(payload_value, Mapping) else {}
+            if _chunk_display_id(point, payload) != chunk_id:
+                continue
+            content = payload.get("content")
+            if not isinstance(content, str):
+                raise ValueError("Indexed content must be text")
+            public_content = _sanitize_answer(content, [point])
+            source, _ = _display_metadata(payload)
+            return PublicChunkDetails(
+                id=chunk_id,
+                source=source,
+                content=public_content[:MAX_PUBLIC_CHUNK_CHARS],
+                truncated=len(public_content) > MAX_PUBLIC_CHUNK_CHARS,
+            )
+
+        scanned += len(points)
+        if next_offset is None:
+            return None
+        if not points or next_offset in seen_offsets:
+            raise ValueError("Chunk lookup scan did not advance")
+        if scanned >= max_chunks:
+            raise ValueError("Chunk lookup scan incomplete")
+        seen_offsets.add(next_offset)
+        offset = next_offset
+    return None
 
 
 def inspect_index(
@@ -564,6 +633,28 @@ def _tokenize_keyword_text(value: str) -> list[str]:
     return tokens
 
 
+@lru_cache(maxsize=1)
+def _load_keyword_presentation_stopwords() -> frozenset[str]:
+    """Load the Weka English stopwords used only for public match highlighting.
+
+    The locally packaged list comes from the reviewed Weka stopword collection.
+    It suppresses uninformative ``matched_terms`` and does not alter BM25 ranking.
+    """
+    lines = _STOPWORDS_PATH.read_text(encoding="utf-8").splitlines()
+    if (
+        not lines
+        or any(
+            not line
+            or line != line.strip()
+            or line != line.casefold()
+            or _WORD_TOKEN.fullmatch(line) is None
+            for line in lines
+        )
+    ):
+        raise ValueError("The packaged Weka stopword list must contain normalized words")
+    return frozenset(lines)
+
+
 def _bm25_candidates(
     question: str,
     records: Sequence[Any],
@@ -596,6 +687,7 @@ def _bm25_candidates(
         if frequencies[term] > 0
     )
 
+    presentation_stopwords = _load_keyword_presentation_stopwords()
     candidates: list[ScoredPoint] = []
     matched_terms_by_id: dict[str, tuple[str, ...]] = {}
     for record, payload, tokens, frequencies in documents:
@@ -627,7 +719,9 @@ def _bm25_candidates(
         )
         public_id = _point_display_id(candidate)
         matched_terms_by_id[public_id] = tuple(
-            term for term in query_terms if frequencies[term] > 0
+            term
+            for term in query_terms
+            if term not in presentation_stopwords and frequencies[term] > 0
         )[:MAX_MATCHED_TERMS]
         candidates.append(candidate)
 
@@ -921,8 +1015,8 @@ def _visualization_technical_label(runtime_config: Mapping[str, Any]) -> str:
 
 def _visualization_note(truncated: bool) -> str:
     base = (
-        "This is a 3D PCA projection. Retrieval itself uses the full-dimensional "
-        "dense embedding space."
+        "3D proximity is approximate because PCA compresses the embedding space. "
+        "Retrieval uses the original full-dimensional vectors."
     )
     if truncated:
         return f"{base} The bounded display shows a partial index snapshot."
