@@ -1,4 +1,4 @@
-from typing import Any, Generator, Sequence
+from typing import Any, AsyncGenerator, Sequence
 import logging
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -96,7 +96,7 @@ async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config
     return answer.content
 
 
-async def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> Generator[str, None, None]:
+async def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> AsyncGenerator[str, None]:
     assert llm is not None
 
     if hasattr(search_results, "points"):
@@ -111,5 +111,5 @@ async def generate_stream(query: str, search_results: list[ScoredPoint], opt_con
 
     async for chunk in llm.astream(messages):
         text_chunk = chunk.text() if hasattr(chunk, 'text') else chunk.content
-        if text_chunk:
+        if isinstance(text_chunk, str) and text_chunk:
             yield text_chunk
