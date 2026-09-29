@@ -52,11 +52,11 @@
       {% if allow_open_chat %}
       {{pgettext('button', 'Open AI chat')}}
       {% else %}
-      <div class="spinner-border spinner-border-sm"></div>
+      <div class="spinner-border spinner-border-sm" style="animation-duration: 2s;"></div>
       {% endif %}
     </a>
     {% else %}
-    <div class="spinner-border spinner-border-sm mb-2"></div>
+    <div class="spinner-border spinner-border-sm mb-2" style="animation-duration: 2s;"></div>
     {% endif %}
     <form class="mb-2" method="POST" action="{{ url_for('pipeline_action', name=name) }}">
       <button type="submit" class="btn btn-warning" name="action" value="stop">
