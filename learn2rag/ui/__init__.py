@@ -473,7 +473,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     'local'  # FIXME: remove this later and throw Exception
                 )),
                 'recursive': 'True',  # DirectoryLoader; FIXME: add this in the interface
-                **{key: value for key, value in source.items() if key not in ['label', 'type']},
+                **{key: value for key, value in source.items() if key not in ['type']},
             } for name, source in sources.items()],
         }
 
