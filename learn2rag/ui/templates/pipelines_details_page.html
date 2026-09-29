@@ -16,7 +16,7 @@
 {% if projects[name].succeeded %}
 <div class="card w-100 mb-3 shadow text-bg-success">
   <div class="card-body">
-    <h5 class="card-title">{{pgettext('status', 'Last run succeeded')}}</h5>
+    <h5 class="card-title">{{ pipeline_current_status(name) }}</h5>
     <p class="card-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{{ pipeline.status_message }}</p>
   </div>
 </div>
@@ -24,7 +24,7 @@
 {% if projects[name].failed %}
 <div class="card w-100 mb-3 shadow text-bg-danger">
   <div class="card-body">
-    <h5 class="card-title">{{pgettext('status', 'Last run failed')}}</h5>
+    <h5 class="card-title">{{ pipeline_current_status(name) }}</h5>
     <p class="card-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{{ pipeline.status_message }}</p>
   </div>
 </div>
@@ -33,7 +33,7 @@
 {% if projects[name] and projects[name].running %}
 <div class="card w-100 mb-3 shadow text-bg-info">
   <div class="card-body">
-    <h5 class="card-title">{{pgettext('status', 'Currently running: %(pipeline)s', pipeline=projects[name].content.get('label', gettext('running')))}}</h5>
+    <h5 class="card-title">{{ pipeline_current_status(name) }}</h5>
     <p class="card-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{{ pipeline.status_message }}</p>
   </div>
 </div>
