@@ -382,14 +382,35 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
         data: dict[str, Any] = request.form.to_dict()
-        if 'content_types' in data:
-            data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
-        if 'depth' in data:
-            data['depth'] = int(data['depth'])
-        if 'failure_threshold' in data and data['failure_threshold'] not in (None, ''):
-            data['failure_threshold'] = int(data['failure_threshold'])
-        if 'object_ids' in data:
-            data['object_ids'] = request.form.getlist('object_ids')
+        for field in [
+                'content_types',
+                'issue_types',
+                'projects',
+        ]:
+            if field in data:
+                data[field] = list(map(str.strip, data[field].split(',')))
+                if len(data[field]) == 1 and len(data[field][0]) == 0:
+                    data[field] = []
+        for field in [
+                'include_comments',
+        ]:
+            if field in data:
+                data[field] = request.form.getlist(field)[-1] == 'yes'
+        for field in [
+                'depth',
+                'failure_threshold',
+                'page_size',
+        ]:
+            if field in data:
+                if data[field] not in (None, ''):
+                    data[field] = int(data[field])
+                else:
+                    del data[field]
+        for field in [
+                'object_ids',
+        ]:
+            if field in data:
+                data[field] = request.form.getlist(field)
         learn2rag.data.create_entry(app.instance_path, 'sources', data)
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
