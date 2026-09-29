@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eux
-composer require --with-all-dependencies 'drupal/simple_oauth:^6.1' 'drush/drush:*'
+composer require --no-audit --no-blocking --no-progress --with-all-dependencies 'drupal/simple_oauth:^6.1' 'drush/drush:*'
 php -d memory_limit=256M web/core/scripts/drupal install --password=test --no-interaction demo_umami
 drush config:set system.logging error_level verbose
 # simple_oauth_static_scope: provides 'user' granularity_id
