@@ -43,13 +43,13 @@
   <div class="card-body">
     {% if 'ui_url' in projects[name].content %}
     <a
-      class="btn {% if projects[name].health %}btn-primary{% else %}btn-secondary{% endif %} mb-2"
-      {% if not projects[name].health %}style="cursor: not-allowed;"{% endif %}
+      class="btn {% if allow_open_chat %}btn-primary{% else %}btn-secondary{% endif %} mb-2"
+      {% if not allow_open_chat %}style="cursor: not-allowed;"{% endif %}
       href="{{ projects[name].content['ui_url'] }}"
       role="button"
       target="_blank"
       >
-      {% if projects[name].health %}
+      {% if allow_open_chat %}
       {{pgettext('button', 'Open AI chat')}}
       {% else %}
       <div class="spinner-border spinner-border-sm"></div>

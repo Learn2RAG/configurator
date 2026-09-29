@@ -543,7 +543,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             return redirect(url_for('pipelines_list'))
         pipeline['status_message'] = pipeline_status_message(pipeline)
         storage_path = Path(pipeline['storage_path'])
+        projects = Project.get_all()  # FIXME: only get one
         import_state = ImportState(str(storage_path / 'import_state.json'))
+        import_succeeded_once = any(import_state.get_last_import_time(source) for source in pipeline['sources'])
+        allow_open_chat = projects[name].health and import_succeeded_once
         try:
             training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
             training_examples = training_dataset.select(range(min(3, len(training_dataset))))
@@ -556,9 +559,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             name=name,
             pipeline=pipeline,
             import_state=import_state,
+            allow_open_chat=allow_open_chat,
             training_examples=training_examples,
             training_total=training_total,
-            projects=Project.get_all(),
+            projects=projects,
         )
 
     @app.post('/pipelines/<name>/training')
