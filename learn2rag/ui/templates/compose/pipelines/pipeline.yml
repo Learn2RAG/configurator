@@ -132,6 +132,9 @@ services:
       - '{{ config.get("CHAT", {}).get("username", config.get("SIMPLE_AUTH", {}).get("username", "")) }}'
       - '--basic-password'
       - '{{ config.get("CHAT", {}).get("password", config.get("SIMPLE_AUTH", {}).get("password", "")) }}'
+      - '--brand-text'
+      # FIXME; but only set by the administrator
+      - '{{ pipeline.label }}'
     environment:
       DO_NOT_TRACK: 'true'
       SCARF_NO_ANALYTICS: 'true'

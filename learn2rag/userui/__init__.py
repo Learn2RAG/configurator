@@ -14,6 +14,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument('--tls-keyfile', default=None)
         self.add_argument('--basic-username', type=str, default='')
         self.add_argument('--basic-password', type=str, default='')
+        self.add_argument('--brand-text', default=None)
 
 
 def main(args: argparse.Namespace) -> None:
@@ -21,6 +22,7 @@ def main(args: argparse.Namespace) -> None:
     app = build_app(
         basic_username=args.basic_username,
         basic_password=args.basic_password,
+        brand_text=args.brand_text,
     )
     uvicorn.run(
         app,

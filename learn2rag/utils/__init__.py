@@ -32,8 +32,8 @@ def vc_commit_id() -> str | None:
         return subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     except (
             FileNotFoundError,  # no git
-            subprocess.CalledProcessError,  # not a git repository
-    ):
+            subprocess.CalledProcessError,  # not a git repository or another non-zero exit code
+    ) as e:
         return None
 
 
