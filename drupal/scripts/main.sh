@@ -8,6 +8,7 @@ drush pm:install -v jsonapi simple_oauth simple_oauth_static_scope
 scripts/configure_oauth_keys.sh
 drush scr scripts/configure_oauth_scope.php
 drush scr scripts/create_consumer.php
+drush scr scripts/create_normal_user.php
 
 (cd web && # https://www.drupal.org/project/drupal/issues/3150146
 # add --host=0.0.0.0 for remote access
