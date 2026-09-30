@@ -16,6 +16,6 @@ $PYBABEL update --input-file="$POT" \
          --no-wrap \
          --output-dir="$PO_DIR"
 
-sed -i '/^"POT-Creation-Date: /d' "$POT" "$PO_DIR"/*/LC_MESSAGES/messages.po
+sed -i -E '/^"(POT-Creation-Date|PO-Revision-Date): /d' "$POT" "$PO_DIR"/*/LC_MESSAGES/messages.po
 
 $PYBABEL compile --directory=learn2rag/ui/translations
