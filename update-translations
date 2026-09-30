@@ -5,12 +5,15 @@ POT="learn2rag/ui/messages.pot"
 PO_DIR="learn2rag/ui/translations"
 $PYBABEL extract --mapping-file=learn2rag/ui/babel.cfg \
          --add-comments="TRANSLATORS:" \
-         --no-location --sort-output \
+         --no-location \
+         --no-wrap \
+         --sort-output \
          --output-file="$POT" learn2rag/ui
 
 $PYBABEL update --input-file="$POT" \
          --ignore-pot-creation-date \
          --no-fuzzy-matching \
+         --no-wrap \
          --output-dir="$PO_DIR"
 
 sed -i '/^"POT-Creation-Date: /d' "$POT" "$PO_DIR"/*/LC_MESSAGES/messages.po
