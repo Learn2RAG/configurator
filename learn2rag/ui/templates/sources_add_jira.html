@@ -27,8 +27,29 @@
     <input class="form-control" name="token"/>
   </div>
   <div class="mb-3">
-    <label for="path" class="form-label"><code>base_url</code></label>
+    <label for="path" class="form-label">{{ pgettext('form_label', 'Base URL') }}</label>
     <input class="form-control" name="base_url" required="required"/>
+  </div>
+  <div class="mb-3">
+    <label for="projects" class="form-label">{{ pgettext('form_label:jira', 'Projects') }}</label>
+    <input class="form-control" name="projects" placeholder="TEAM1,TEAM2"/>
+  </div>
+  <div class="mb-3">
+    <label for="issue_types" class="form-label">{{ pgettext('form_label:jira', 'Issue types') }}</label>
+    <input class="form-control" name="issue_types" placeholder="Task,Story,Bug"/>
+  </div>
+  <input type="hidden" name="include_comments" value="no"/>
+  <div class="mb-3">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" value="yes" id="include_comments" name="include_comments" checked>
+      <label class="form-check-label" for="include_comments">
+        {{ pgettext('form_label:jira', 'Include comments') }}
+      </label>
+    </div>
+  </div>
+  <div class="mb-3">
+    <label for="path" class="form-label">{{ pgettext('form_label:jira', 'Page size') }}</label>
+    <input class="form-control" name="page_size" type="number" placeholder="50"/>
   </div>
   <div class="mb-3">
     <label for="path" class="form-label"><code>jql</code></label>

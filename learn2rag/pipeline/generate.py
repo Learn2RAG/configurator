@@ -1,4 +1,4 @@
-from typing import Any, Generator, Sequence
+from typing import Any, AsyncGenerator, Sequence
 import logging
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from qdrant_client.http.models import ScoredPoint
 from .chat import ASSISTANT_ROLES, Message
 from .llm import llm
-
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -77,22 +77,26 @@ def build_context(search_results: Sequence[ScoredPoint]) -> str:
     ])
 
 
-def generate(query: str, search_results: Sequence[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> Any:
+async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> Any:
     assert llm is not None
     if hasattr(search_results, "points"):
         search_results = search_results.points
     context = build_context(search_results)
 
     chain = build_prompt(opt_config) | llm
-    answer = chain.invoke({
-        "context": context,
-        "question": query,
-        "history": select_history(history, opt_config),
-    })
+
+    answer = await asyncio.to_thread(
+        chain.invoke,
+        {
+            "context": context,
+            "question": query,
+            "history": select_history(history, opt_config),
+        }
+    )
     return answer.content
 
 
-def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> Generator[str, None, None]:
+async def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> AsyncGenerator[str, None]:
     assert llm is not None
 
     if hasattr(search_results, "points"):
@@ -105,7 +109,7 @@ def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: d
         history=select_history(history, opt_config),
     )
 
-    for chunk in llm.stream(messages):
-        text_chunk = chunk.text()
-        if text_chunk:
+    async for chunk in llm.astream(messages):
+        text_chunk = chunk.text() if hasattr(chunk, 'text') else chunk.content
+        if isinstance(text_chunk, str) and text_chunk:
             yield text_chunk

@@ -26,6 +26,7 @@ def build_app(
         *,
         basic_username: str = '',
         basic_password: str = '',
+        brand_text: str | None = None,
 ) -> FastAPI:
     dependencies = []
     if basic_username != '' and basic_password != '':
@@ -83,6 +84,7 @@ def build_app(
             'auth_prefix': auth_prefix,
             'auth_routers': auth_router.auth_routers,
             'user_auths': request.session.get(SESSION_USER_AUTHS, {}),
+            'brand_text': brand_text,
         })
 
     @app.exception_handler(RequestValidationError)

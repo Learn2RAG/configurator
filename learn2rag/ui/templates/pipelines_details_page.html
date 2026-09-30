@@ -16,7 +16,7 @@
 {% if projects[name].succeeded %}
 <div class="card w-100 mb-3 shadow text-bg-success">
   <div class="card-body">
-    <h5 class="card-title">{{pgettext('status', 'Last run succeeded')}}</h5>
+    <h5 class="card-title">{{ pipeline_current_status(name) }}</h5>
     <p class="card-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{{ pipeline.status_message }}</p>
   </div>
 </div>
@@ -24,7 +24,7 @@
 {% if projects[name].failed %}
 <div class="card w-100 mb-3 shadow text-bg-danger">
   <div class="card-body">
-    <h5 class="card-title">{{pgettext('status', 'Last run failed')}}</h5>
+    <h5 class="card-title">{{ pipeline_current_status(name) }}</h5>
     <p class="card-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{{ pipeline.status_message }}</p>
   </div>
 </div>
@@ -33,7 +33,7 @@
 {% if projects[name] and projects[name].running %}
 <div class="card w-100 mb-3 shadow text-bg-info">
   <div class="card-body">
-    <h5 class="card-title">{{pgettext('status', 'Currently running: %(pipeline)s', pipeline=projects[name].content.get('label', gettext('running')))}}</h5>
+    <h5 class="card-title">{{ pipeline_current_status(name) }}</h5>
     <p class="card-text" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">{{ pipeline.status_message }}</p>
   </div>
 </div>
@@ -43,20 +43,20 @@
   <div class="card-body">
     {% if 'ui_url' in projects[name].content %}
     <a
-      class="btn {% if projects[name].health %}btn-primary{% else %}btn-secondary{% endif %} mb-2"
-      {% if not projects[name].health %}style="cursor: not-allowed;"{% endif %}
+      class="btn {% if allow_open_chat %}btn-primary{% else %}btn-secondary{% endif %} mb-2"
+      {% if not allow_open_chat %}style="cursor: not-allowed;"{% endif %}
       href="{{ projects[name].content['ui_url'] }}"
       role="button"
       target="_blank"
       >
-      {% if projects[name].health %}
+      {% if allow_open_chat %}
       {{pgettext('button', 'Open AI chat')}}
       {% else %}
-      <div class="spinner-border spinner-border-sm"></div>
+      <div class="spinner-border spinner-border-sm" style="animation-duration: 2s;"></div>
       {% endif %}
     </a>
     {% else %}
-    <div class="spinner-border spinner-border-sm mb-2"></div>
+    <div class="spinner-border spinner-border-sm mb-2" style="animation-duration: 2s;"></div>
     {% endif %}
     <form class="mb-2" method="POST" action="{{ url_for('pipeline_action', name=name) }}">
       <button type="submit" class="btn btn-warning" name="action" value="stop">
@@ -71,7 +71,9 @@
   <div class="card-body">
     {{ pipeline_start(name, compose_templates['continuous'], pgettext('button', 'Import and start chat'), pgettext('tooltip', 'Periodically import and start the AI chat.')) }}
     {{ pipeline_start(name, compose_templates['import'], pgettext('button', 'Only import'), pgettext('tooltip', 'Import only once.')) }}
+    {% if allow_start_chat %}
     {{ pipeline_start(name, compose_templates['pipeline'], pgettext('button', 'Only start chat'), pgettext('tooltip', 'Start the AI chat. Requires import to be already completed.')) }}
+    {% endif %}
   </div>
 </div>
 {% endif %}
@@ -208,6 +210,7 @@
   </li>
 </ul>
 
+{% if not projects[name] or not projects[name].running %}
 <hr/>
 <h2>{{pgettext('header', 'Remove')}}</h2>
 <section>
@@ -228,4 +231,5 @@
     </form>
   </p>
 </section>
+{% endif %}
 {% endblock %}

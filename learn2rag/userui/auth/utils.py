@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 class AuthImplRouter(ABC, APIRouter):
     @abstractmethod
-    def registered_applications(self) -> Mapping[str, str]:
+    def registered_applications(self) -> Mapping[str, Mapping[str, str]]:
         raise NotImplementedError()
 
 

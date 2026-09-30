@@ -25,15 +25,8 @@
     >
     <h5>{{ pipeline.label }}</h5>
     {% if projects[name] %}
-    {% if projects[name].running %}
-    <p>{{pgettext('status', 'Currently running: %(pipeline)s', pipeline=projects[name].content.get('label', gettext('running')))}}</p>
-    {% else %}
-    {% if projects[name].succeeded %}
-    <p>{{pgettext('status', 'Last run succeeded')}}</p>
-    {% endif %}
-    {% if projects[name].failed %}
-    <p>{{pgettext('status', 'Last run failed')}}</p>
-    {% endif %}
+    {% if projects[name].running or projects[name].succeeded or projects[name].failed %}
+    <p>{{ pipeline_current_status(name) }}</p>
     {% endif %}
     {% endif %}
     {% if pipeline.status_message %}
