@@ -8,7 +8,6 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -122,9 +121,7 @@ msgid "Answer"
 msgstr ""
 
 #, python-format
-msgid ""
-"Are you sure you want to remove all data stored for this pipeline: "
-"%(label)s?"
+msgid "Are you sure you want to remove all data stored for this pipeline: %(label)s?"
 msgstr ""
 
 #, python-format
@@ -132,15 +129,11 @@ msgid "Are you sure you want to remove this data source configuration: %(label)s
 msgstr ""
 
 #, python-format
-msgid ""
-"Are you sure you want to remove this language model configuration: "
-"%(label)s?"
+msgid "Are you sure you want to remove this language model configuration: %(label)s?"
 msgstr ""
 
 #, python-format
-msgid ""
-"Are you sure you want to remove this pipeline configuration and all its "
-"stored data: %(label)s?"
+msgid "Are you sure you want to remove this pipeline configuration and all its stored data: %(label)s?"
 msgstr ""
 
 msgctxt "form_label"
@@ -175,9 +168,7 @@ msgctxt "column_heading"
 msgid "Consecutive failures"
 msgstr ""
 
-msgid ""
-"Consult the administrator or documentation of the corresponding system to"
-" find the required configuration values."
+msgid "Consult the administrator or documentation of the corresponding system to find the required configuration values."
 msgstr ""
 
 msgctxt "form_label"
@@ -196,11 +187,6 @@ msgstr ""
 #, python-format
 msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
-msgstr ""
-
-#, python-format
-msgctxt "status"
-msgid "Currently running: %(pipeline)s"
 msgstr ""
 
 msgctxt "column_heading"
@@ -224,9 +210,7 @@ msgid "Data sources"
 msgstr ""
 
 #, python-format
-msgid ""
-"Debug logging is enabled in config file <code>%(file)s</code>. It might "
-"capture sensitive information."
+msgid "Debug logging is enabled in config file <code>%(file)s</code>. It might capture sensitive information."
 msgstr ""
 
 msgctxt "column_heading"
@@ -333,8 +317,24 @@ msgctxt "tooltip"
 msgid "Import only once."
 msgstr ""
 
+msgctxt "status"
+msgid "Importing"
+msgstr ""
+
+msgctxt "status"
+msgid "Importing and running AI chat"
+msgstr ""
+
+msgctxt "form_label:jira"
+msgid "Include comments"
+msgstr ""
+
 msgctxt "form_label"
 msgid "Internal vector store"
+msgstr ""
+
+msgctxt "form_label:jira"
+msgid "Issue types"
 msgstr ""
 
 msgctxt "column_heading"
@@ -443,6 +443,10 @@ msgstr ""
 msgid "Optional"
 msgstr ""
 
+msgctxt "form_label:jira"
+msgid "Page size"
+msgstr ""
+
 msgctxt "form_label"
 msgid "Password"
 msgstr ""
@@ -476,6 +480,10 @@ msgid "Ports"
 msgstr ""
 
 msgid "Ports are not configured and would be chosen automatically."
+msgstr ""
+
+msgctxt "form_label:jira"
+msgid "Projects"
 msgstr ""
 
 msgctxt "header"
@@ -513,6 +521,14 @@ msgctxt "flash"
 msgid "Removed pipeline: %(label)s"
 msgstr ""
 
+msgctxt "status"
+msgid "Running"
+msgstr ""
+
+msgctxt "status"
+msgid "Running AI chat"
+msgstr ""
+
 msgctxt "button"
 msgid "Save"
 msgstr ""
@@ -538,15 +554,11 @@ msgid "Shutdown Learn2RAG"
 msgstr ""
 
 msgctxt "flash"
-msgid ""
-"Some configured pipelines use this data source configuration, remove them"
-" first"
+msgid "Some configured pipelines use this data source configuration, remove them first"
 msgstr ""
 
 msgctxt "flash"
-msgid ""
-"Some configured pipelines use this language model configuration, remove "
-"them first"
+msgid "Some configured pipelines use this language model configuration, remove them first"
 msgstr ""
 
 msgctxt "header"
@@ -597,9 +609,7 @@ msgctxt "flash"
 msgid "The requested pipeline is not found"
 msgstr ""
 
-msgid ""
-"This data source type does not support access control. All users will be "
-"provided access to all data."
+msgid "This data source type does not support access control. All users will be provided access to all data."
 msgstr ""
 
 msgid "This password would be saved in plain text in the configuration."
@@ -666,6 +676,6 @@ msgctxt "title"
 msgid "Welcome"
 msgstr ""
 
-msgid "running"
+msgid "You and users will see this label."
 msgstr ""
 
