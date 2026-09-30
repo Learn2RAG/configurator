@@ -7,7 +7,7 @@ use Symfony\Component\Validator\Exception\ValidationFailedException;
 $label = 'Test consumer';
 $secret = 'test_secret';
 $ownerId = 1;
-$redirectUrl = 'http://localhost:9003/auth/oauth/callback';
+$redirectUrl = 'http://localhost:9001/auth/oauth/callback';
 $grantTypes = ['authorization_code', 'refresh_token'];
 $scopeIds = ['authenticated'];
 
