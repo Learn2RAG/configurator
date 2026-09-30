@@ -154,6 +154,10 @@ services:
       - '{{config.get("CHAT", {}).get("host") or config.get("UI", {}).get("host") or "127.0.0.1"}}'
       - '--port'
       - '{{ports.pipeline}}'
+      #!!! {% if config.get("CHAT", {}).get("forwarded-allow-ips") %}
+      - '--forwarded-allow-ips'
+      - '{{ config["CHAT"]["forwarded-allow-ips"] }}'
+      #!!! {% endif %}
       #!!! {% if config.get("TLS") %}
       - '--tls-certfile'
       - '{{ config["TLS"]["CERTFILE"] }}'
