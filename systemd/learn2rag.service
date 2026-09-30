@@ -1,0 +1,12 @@
+[Unit]
+Description=Learn2RAG
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/opt/learn2rag/start
+WorkingDirectory=/opt/learn2rag
+[Install]
+WantedBy=default.target
