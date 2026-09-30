@@ -71,7 +71,9 @@
   <div class="card-body">
     {{ pipeline_start(name, compose_templates['continuous'], pgettext('button', 'Import and start chat'), pgettext('tooltip', 'Periodically import and start the AI chat.')) }}
     {{ pipeline_start(name, compose_templates['import'], pgettext('button', 'Only import'), pgettext('tooltip', 'Import only once.')) }}
+    {% if allow_start_chat %}
     {{ pipeline_start(name, compose_templates['pipeline'], pgettext('button', 'Only start chat'), pgettext('tooltip', 'Start the AI chat. Requires import to be already completed.')) }}
+    {% endif %}
   </div>
 </div>
 {% endif %}

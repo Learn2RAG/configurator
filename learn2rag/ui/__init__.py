@@ -559,6 +559,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             name=name,
             pipeline=pipeline,
             import_state=import_state,
+            allow_start_chat=import_succeeded_once,
             allow_open_chat=allow_open_chat,
             training_examples=training_examples,
             training_total=training_total,
