@@ -1,5 +1,10 @@
 Install required dependencies.
 
+Enable lingering for your user on the server:
+```
+sudo loginctl enable-linger $USER
+```
+
 Start with the example inventory file:
 ```
 cp hosts.example.yml myhosts.yml
