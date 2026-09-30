@@ -210,6 +210,7 @@
   </li>
 </ul>
 
+{% if not projects[name] or not projects[name].running %}
 <hr/>
 <h2>{{pgettext('header', 'Remove')}}</h2>
 <section>
@@ -230,4 +231,5 @@
     </form>
   </p>
 </section>
+{% endif %}
 {% endblock %}
