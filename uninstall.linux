@@ -1,7 +1,32 @@
 #!/bin/sh
 set -u
-# TODO: use https://ofek.dev/pyapp/latest/runtime/#remove ?
-rm -rf "$HOME/.local/share/pyapp/learn2rag"
-rm -rf "$HOME/.local/share/pyapp/open-webui"
-rm -rf "$HOME/.local/share/pyapp/open-webui-pipelines"
-echo Done
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/remove-learn2rag-software.sh" ]; then
+    /bin/sh "$SCRIPT_DIR/remove-learn2rag-software.sh"
+else
+    echo "Error: $SCRIPT_DIR/remove-learn2rag-software.sh not found." >&2
+    exit 1
+fi
+
+echo ""
+
+printf "Do you also want to remove all personal user data (databases, configs)? (y/N): "
+read -r PURGE_DATA
+
+case "$PURGE_DATA" in
+    [yY][eE][sS]|[yY])
+        if [ -f "$SCRIPT_DIR/remove-user-data.sh" ]; then
+            /bin/sh "$SCRIPT_DIR/remove-user-data.sh" -y
+        else
+            echo "Error: $SCRIPT_DIR/remove-user-data.sh not found." >&2
+            exit 1
+        fi
+        ;;
+    *)
+        echo "User data preserved."
+        ;;
+esac
+
+echo "Uninstall process finished."

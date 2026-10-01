@@ -20,6 +20,8 @@ tar -C $BUNDLE/services/qdrant -xzvf $BUNDLE_DIR/qdrant-linux-v1.17.1.tar.gz
 
 cp start.linux $BUNDLE/start
 cp uninstall.linux $BUNDLE/uninstall
+cp remove-learn2rag-software.sh "$BUNDLE/remove-learn2rag-software.sh"
+cp remove-user-data.sh "$BUNDLE/remove-user-data.sh"
 
 # https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables
 [ -z "${GITHUB_ACTIONS-}" ] && (cd $BUNDLE_DIR; zip -r $BUNDLE_NAME $BUNDLE_NAME)
