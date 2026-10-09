@@ -11,7 +11,8 @@ from .utils import AuthImplRouter
 logger = logging.getLogger(__name__)
 
 
-def discover_applications(import_config: Mapping[str, Any]) -> Generator[tuple[str, dict[str, str], dict[str, Any]], None, None]:
+def discover_applications(import_config: Mapping[str, Any]) -> Generator[
+    tuple[str, dict[str, str], dict[str, Any]], None, None]:
     for loader_config in import_config['loaders']:
         if loader_config.get('user_auth_type', 'none') == 'oauth':
             name = loader_config['loader_id']
@@ -20,9 +21,14 @@ def discover_applications(import_config: Mapping[str, Any]) -> Generator[tuple[s
             base_url = loader_config.get('base_url', '')
             authorize_url = loader_config.get('oauth_authorize_url', base_url + '/oauth/authorize')
             access_token_url = loader_config.get('oauth_access_token_url', base_url + '/oauth/token')
+
+            # Read the scope from config, defaulting to administrator
+            scope = loader_config.get('oauth_scope', 'administrator')
+
             if client_id != '' and client_secret != '' and (base_url != '' or authorize_url != ''):
                 info_url = base_url or authorize_url
-                logger.info('Discovered OAuth application: %s (%s), client_id=%s)', name, info_url, client_id)
+                logger.info('Discovered OAuth application: %s (%s), client_id=%s, scope=%s)', name, info_url, client_id,
+                            scope)
                 yield name, {
                     'label': loader_config.get('label', info_url),
                     'type': 'OAuth',
@@ -32,7 +38,7 @@ def discover_applications(import_config: Mapping[str, Any]) -> Generator[tuple[s
                     'client_secret': client_secret,
                     'authorize_url': authorize_url,
                     'access_token_url': access_token_url,
-                    'client_kwargs': {'scope': 'authenticated'},
+                    'client_kwargs': {'scope': scope},
                 }
 
 
@@ -66,6 +72,7 @@ def build_router(import_config: Mapping[str, Any], login_handler: Callable[[Requ
         provider = getattr(oauth, name)
         try:
             token = await provider.authorize_access_token(request)
+            #logging.debug(f"################ token : {token}")
         except Exception as e:
             logger.error('OAuth authentication failed', e)
             raise HTTPException(status_code=400, detail='Callback failed') from e

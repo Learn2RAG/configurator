@@ -70,15 +70,77 @@ def _discover_endpoint_map(base_url: str, session: requests.Session) -> Dict[str
     return {}
 
 
-def _build_session(auth_type: str, username: str, password: str, token: str) -> requests.Session:
-    """Build a requests Session with the configured authentication."""
+def _fetch_oauth_token(base_url: str, entry_config: Dict[str, Any]) -> Optional[str]:
+    """Dynamically request a fresh OAuth token using client credentials."""
+    client_id = entry_config.get("oauth_client_id")
+    client_secret = entry_config.get("oauth_client_secret")
+
+    if not client_id or not client_secret:
+        logger.debug("DrupalLoader: Missing oauth_client_id or oauth_client_secret for token generation.")
+        logger.warning("DrupalLoader: no oauth creds in entry_config (keys=%s)", sorted(entry_config.keys()))
+        return None
+
+    token_url = f"{base_url.rstrip('/')}/oauth/token"
+
+    # For client_credentials, we must request the specific scope we need
+    payload = {
+        "grant_type": "client_credentials",
+        "scope": "administrator"
+    }
+
+    logger.info("DrupalLoader: Requesting token via 'client_credentials' grant...")
+
+    try:
+        # Pass client credentials securely via Basic Auth headers
+        response = requests.post(
+            token_url,
+            data=payload,
+            auth=(client_id, client_secret),
+            timeout=15
+        )
+        logger.debug(f"DrupalLoader: Token endpoint response status: {response.status_code}")
+
+        if response.status_code == 200:
+            token_data = response.json()
+            access_token = token_data.get("access_token")
+            if access_token:
+                logger.debug("DrupalLoader: Successfully acquired fresh dynamic OAuth access token.")
+                return access_token
+        else:
+            logger.error(f"DrupalLoader: Failed to fetch token. Response: {response.text}")
+    except Exception as e:
+        logger.error(f"DrupalLoader: Exception while fetching OAuth token: {e}")
+
+    logger.warning("DrupalLoader: end of fetch Oauth will return NONE")
+    return None
+
+
+def _build_session(auth_type: str, username: str, password: str, token: Any,
+                   entry_config: Optional[Dict[str, Any]] = None, base_url: str = "") -> requests.Session:
     session = requests.Session()
     session.headers.update({"Accept": "application/vnd.api+json"})
-    if auth_type == "basic":
-        session.auth = (username, password)
-    elif auth_type == "token":
+
+    logger.debug("BUILD_SESSION: auth_type=%r token_present=%s entry_config_is_none=%s base_url=%r",
+                auth_type, bool(token), entry_config is None, base_url)
+
+    if isinstance(token, dict) and "access_token" in token:
+        token = token["access_token"]
+
+    if not token and entry_config and base_url:
+        token = _fetch_oauth_token(base_url, entry_config)
+
+    if token:
         session.headers.update({"Authorization": f"Bearer {token}"})
+    else:
+        logger.warning("No token available. Requests will be sent as ANONYMOUS.")
+
+    if auth_type == "basic" and not token:
+        session.auth = (username, password)
+
+    logger.debug("BUILD_SESSION RESULT: bearer_header=%s session.auth_set=%s",
+                "Authorization" in session.headers, session.auth is not None)
     return session
+
 
 
 def _html_to_text(html: str) -> str:
@@ -149,6 +211,7 @@ def load_from_drupal(
     language: str = "",
     since: Optional[datetime] = None,
     progress: Optional["ImportProgress"] = None,
+    entry_config: Optional[Dict[str, Any]] = None,
 ) -> List[Document]:
     """
     Load documents from a Drupal instance via the JSON:API.
@@ -172,8 +235,7 @@ def load_from_drupal(
     """
     if text_fields is None:
         text_fields = ["title", "field_body", "body"]  # fallback covers both naming conventions
-
-    session = _build_session(auth_type, username, password, token)
+    session = _build_session(auth_type, username, password, token, entry_config=entry_config, base_url=base_url)
     if language:
         session.headers.update({"Accept-Language": language})
 
@@ -205,19 +267,19 @@ def load_from_drupal(
 
         # Do NOT use sparse fieldsets (fields[...]) – unknown field names cause 404/400.
         # Fetch all attributes and extract only the configured text_fields locally.
-        params: Dict[str, Any] = {
-            "page[limit]": page_size,
-            "page[offset]": 0,
-        }
+        params: Dict[str, Any] = {}
+        #     "page[limit]": page_size,
+        #     "page[offset]": 0,
+        # }
 
         # Timestamp filter: only documents changed on or after `since`
-        if since is not None:
-            # Ensure the timestamp is timezone-aware and formatted as ISO 8601 for JSON:API
-            since_utc = since.astimezone(timezone.utc) if since.tzinfo else since.replace(tzinfo=timezone.utc)
-            params["filter[changed-filter][condition][path]"] = "changed"
-            params["filter[changed-filter][condition][operator]"] = ">="
-            params["filter[changed-filter][condition][value]"] = since_utc.isoformat()
-            logger.info(f"DrupalLoader: applying since-filter >= {since_utc.isoformat()} for '{content_type}'")
+        # if since is not None:
+        #     # Ensure the timestamp is timezone-aware and formatted as ISO 8601 for JSON:API
+        #     since_utc = since.astimezone(timezone.utc) if since.tzinfo else since.replace(tzinfo=timezone.utc)
+        #     params["filter[changed-filter][condition][path]"] = "changed"
+        #     params["filter[changed-filter][condition][operator]"] = ">="
+        #     params["filter[changed-filter][condition][value]"] = since_utc.isoformat()
+        #     logger.info(f"DrupalLoader: applying since-filter >= {since_utc.isoformat()} for '{content_type}'")
 
         page_count = 0
         next_url: Optional[str] = endpoint
@@ -235,6 +297,15 @@ def load_from_drupal(
                 else:
                     # next_url from JSON:API links already includes all query params
                     response = session.get(next_url, timeout=30)
+
+                sent_auth = response.request.headers.get("Authorization", "")
+                logger.debug("SENT: %s | Authorization scheme=%s | status=%s | content-type=%s",
+                            response.url, sent_auth.split(" ")[0] or "NONE",
+                            response.status_code, response.headers.get("Content-Type"))
+
+                logger.debug(f"!!! DEBUG HTTP GET !!! URL: {response.url}")
+                logger.debug(f"!!! DEBUG HTTP STATUS !!! Code: {response.status_code}")
+                logger.debug(f"!!! DEBUG HTTP RESPONSE !!! Body snippet: {response.text[:200]}")
 
                 response.raise_for_status()
                 data = response.json()
@@ -356,6 +427,7 @@ def get_all_drupal_document_ids(
     token: str = "",
     page_size: int = 100,
     language: str = "",
+    entry_config: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     """
     Retrieve the source URL for every current node in Drupal without loading content.
@@ -377,7 +449,7 @@ def get_all_drupal_document_ids(
     Returns:
         List[str]: Source URLs of all current nodes, e.g. ``["https://example.com/node/42"]``.
     """
-    session = _build_session(auth_type, username, password, token)
+    session = _build_session(auth_type, username, password, token, entry_config=entry_config, base_url=base_url)
     if language:
         session.headers.update({"Accept-Language": language})
 
@@ -395,11 +467,11 @@ def get_all_drupal_document_ids(
             endpoint = f"{base_url.rstrip('/')}/jsonapi/node/{content_type}"
 
         # Request only nid + langcode (no content) to minimise bandwidth
-        params: Dict[str, Any] = {
-            "fields[node--{}]".format(content_type): "drupal_internal__nid,langcode",
-            "page[limit]": page_size,
-            "page[offset]": 0,
-        }
+        params: Dict[str, Any] = {}
+        #     "fields[node--{}]".format(content_type): "drupal_internal__nid,langcode",
+        #     "page[limit]": page_size,
+        #     "page[offset]": 0,
+        # }
 
         next_url: Optional[str] = endpoint
         page_count = 0

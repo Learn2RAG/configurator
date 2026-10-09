@@ -89,9 +89,23 @@ async def _get_loader_id(point: ScoredPoint) -> str:
 
 
 async def _get_doc_id(point: ScoredPoint) -> str:
+    """This must return the unique document/URL identifier to prevent overwrite bugs."""
+    # If there is no payload at all, fallback to the guaranteed unique Qdrant ID
     if not point.payload:
-        return ''
-    return str(point.payload.get("document_id", ""))
+        return str(point.id)
+
+    # Different loaders inject different metadata keys for their primary identifier.
+    # We must return a strictly unique ID per document. If multiple documents return an
+    # empty string, they overwrite each other in the authorization dictionary, causing a
+    # critical security bypass where one public document authorizes restricted documents.
+    unique_id = (
+            point.payload.get("document_id") or
+            point.payload.get("source") or
+            point.payload.get("node_id")
+    )
+
+    # Ultimate fallback: use the Qdrant vector point ID if no metadata keys match
+    return str(unique_id if unique_id else point.id)
 
 
 async def filter_authorized(user_auths: Mapping[str, Any], search_results: QueryResponse) -> List[ScoredPoint]:

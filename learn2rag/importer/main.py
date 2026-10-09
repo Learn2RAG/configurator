@@ -108,7 +108,13 @@ def init(args: argparse.Namespace) -> None:
 def main(args: argparse.Namespace) -> None:
     try:
         config = load_json_config(args.config)
-        logger.debug("Configuration loaded successfully, starting validation...")
+        logger.debug("CONFIG PATH: %s (abs: %s)", args.config, Path(args.config).resolve())
+        for e in config.get("loaders", []):
+            logger.info("CONFIG LOADER %s: keys=%s auth_type=%r user_auth_type=%r has_oauth_creds=%s",
+                        e.get("loader_id"), sorted(e.keys()), e.get("auth_type"),
+                        e.get("user_auth_type"),
+                        bool(e.get("oauth_client_id") and e.get("oauth_client_secret")))
+
         progress = ImportProgress(
             total_loaders=len(config.get("loaders", [])),
             mode="delta" if args.delta else "full",

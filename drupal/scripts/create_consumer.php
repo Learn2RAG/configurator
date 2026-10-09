@@ -8,8 +8,9 @@ $label = 'Test consumer';
 $secret = 'test_secret';
 $ownerId = 1;
 $redirectUrl = 'http://localhost:9001/auth/oauth/callback';
-$grantTypes = ['authorization_code', 'refresh_token'];
-$scopeIds = ['authenticated'];
+$grantTypes = ['authorization_code', 'refresh_token', 'client_credentials'];
+// We include both roles here so the consumer has access to request them
+$scopeIds = ['authenticated', 'administrator'];
 
 $setFieldValues = static function (
   \Drupal\Core\Entity\ContentEntityInterface $entity,
@@ -17,15 +18,13 @@ $setFieldValues = static function (
   array $values,
 ): void {
   if (!$entity->hasField($fieldName)) {
-    throw new RuntimeException(sprintf('Consumer entity does not have the field: %s', $fieldName));
+    return;
   }
-
   $definition = $entity->get($fieldName)->getFieldDefinition()->getFieldStorageDefinition();
   $mainProperty = $definition->getMainPropertyName();
   if (!$mainProperty) {
     throw new RuntimeException(sprintf('No main property for field: %s', $fieldName));
   }
-
   $entity->set($fieldName, array_map(
     static fn(string $value): array => [$mainProperty => $value],
     $values,
@@ -34,12 +33,11 @@ $setFieldValues = static function (
 
 $storage = \Drupal::entityTypeManager()->getStorage('consumer');
 
-$existingIds = $storage->getQuery()->accessCheck(FALSE)->condition('label', $label)->range(0, 1)->execute();
+$existingIds = $storage->getQuery()->accessCheck(FALSE)->condition('client_id', 'test_client')->execute();
 if ($existingIds) {
-  throw new RuntimeException('Consumer already exists.');
+  $storage->delete($storage->loadMultiple($existingIds));
 }
 
-/** @var \Drupal\consumers\Entity\Consumer $consumer */
 $consumer = Consumer::create([
   'label' => $label,
   'description' => 'Test consumer.',
@@ -50,6 +48,7 @@ $consumer = Consumer::create([
   'third_party' => FALSE,
   'roles' => $scopeIds,
 ]);
+
 $setFieldValues($consumer, 'redirect', [$redirectUrl]);
 $setFieldValues($consumer, 'grant_types', $grantTypes);
 
