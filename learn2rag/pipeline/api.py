@@ -8,6 +8,7 @@ from typing import (
     List,
     Optional,
 )
+import asyncio
 import json
 import logging
 
@@ -26,6 +27,8 @@ from .qdrant import Qdrant
 from ..userui.constants import SESSION_USER_AUTHS
 
 logger = logging.getLogger(__name__)
+
+KEEPALIVE_INTERVAL_SECONDS = 5
 
 example_query = "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
 example_messages = {
@@ -56,8 +59,15 @@ async def run_pipeline(pipeline: BaseOperator, request: Request, chat_state: Cha
 
 
 async def event_stream(pipeline: BaseOperator, request: Request, inputs: ChatState) -> AsyncGenerator[Any, Any]:
+    # SSE comments keep idle connections (e.g. port forwarding, proxies) from timing out while the pipeline runs
+    task = asyncio.ensure_future(run_pipeline(pipeline, request, inputs))
     try:
-        answer = itemgetter('answer')(await run_pipeline(pipeline, request, inputs))
+        yield ": keepalive\n\n"
+        while not task.done():
+            await asyncio.wait({task}, timeout=KEEPALIVE_INTERVAL_SECONDS)
+            if not task.done():
+                yield ": keepalive\n\n"
+        answer = itemgetter('answer')(task.result())
 
         delta = {'content': answer}
         yield f"data: {json.dumps({'choices': [{'delta': delta, 'finish_reason': 'stop'}]})}\n\n"
@@ -66,6 +76,9 @@ async def event_stream(pipeline: BaseOperator, request: Request, inputs: ChatSta
         content = 'There is a problem with Learn2RAG configuration. Please contact your administrator.'  # FIXME
         delta = {'content': content}
         yield f"data: {json.dumps({'choices': [{'delta': delta, 'finish_reason': 'stop'}]})}\n\n"
+    finally:
+        # stops the pipeline if the client disconnected early, no-op otherwise
+        task.cancel()
     yield "data: [DONE]\n\n"
 
 
