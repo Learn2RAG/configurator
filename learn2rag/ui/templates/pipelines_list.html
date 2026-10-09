@@ -1,3 +1,5 @@
+{% from 'macros.html' import pipeline_current_status with context %}
+
 {% macro pipeline_start(name, project, cls) %}
 <form method="POST" action="{{ url_for('pipeline_action', name=name) }}">
   <button class="{{ cls }}" type="submit" name="action" value="start:{{ project.name }}">{{project.label}}</button>
