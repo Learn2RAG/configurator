@@ -103,9 +103,9 @@ def _fetch_oauth_token(base_url: str, entry_config: Dict[str, Any]) -> Optional[
         if response.status_code == 200:
             token_data = response.json()
             access_token = token_data.get("access_token")
-            if access_token:
+            if access_token :
                 logger.debug("DrupalLoader: Successfully acquired fresh dynamic OAuth access token.")
-                return access_token
+                return str(access_token)
         else:
             logger.error(f"DrupalLoader: Failed to fetch token. Response: {response.text}")
     except Exception as e:

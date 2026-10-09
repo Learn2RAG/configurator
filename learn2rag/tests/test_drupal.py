@@ -110,7 +110,7 @@ class TestDrupal():
                         'loader_type': 'DrupalLoader',
                         'auth_type': 'none',
                         'base_url': drupal_instance,
-                        'content_types': ['article'],  # articles are the least amount in demo_umami of all types
+                        'content_types': ['article','recipe'],
                     },
                 ],
             },
@@ -137,12 +137,35 @@ class TestDrupal():
         project.start()
         assert project.running
 
+        def check_rag_401() -> None:
+            try:
+                completion = self.openai_client.chat.completions.create(
+                    model='learn2rag',
+                    messages=[
+                        {'role': 'user', 'content': 'Which colors can be carrots?'},
+                    ],
+                )
+                content = completion.choices[-1].message.content
+                logger.debug('Response content for 401 test: %s', content)
+
+                assert 'for testing only' in content, 'contains test marker'
+
+                # We EXPECT chunks here (the public recipes it fell back to)
+                assert not content.endswith("Information:\n"), 'Should contain public fallback chunks'
+                assert 'purple, red, yellow or white' not in content, 'SECURITY LEAK: Restricted text was exposed!'
+
+            except APIConnectionError:
+                assert False, 'Drupal API is available'
+
+        waitUntil(check_rag_401, timeout=1 * 120 * 1000)
+
         def check_rag() -> None:
             try:
                 completion = self.openai_client.chat.completions.create(
                     model='learn2rag',
                     messages=[
-                        {'role': 'user', 'content': f'Which colors can be carrots?'},
+                        # Query a public article instead of the restricted carrot article
+                        {'role': 'user', 'content': 'How do I make Crema catalana?'},
                     ],
                 )
                 content = completion.choices[-1].message.content
@@ -150,8 +173,8 @@ class TestDrupal():
                 assert 'for testing only' in content, 'contains test marker'
                 assert "Information:\n" in content, 'contains the prompt'
                 assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
-                assert 'purple, red, yellow or white' in content, 'specific text from a test file'
+                assert 'catalana' in content.lower(), 'specific text from a test file'
             except APIConnectionError:
                 assert False, 'Drupal API is available'
+
         waitUntil(check_rag, timeout=1 * 120 * 1000)
-        logging.info("Finished pipeline")

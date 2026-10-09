@@ -53,7 +53,8 @@ class DrupalAuthorizationFilter(AuthorizationFilter):
                 logger.debug("AUTH DEBUG: Building session WITHOUT token (anonymous).")
                 session = _build_session('none', '', '', '')
 
-            access_url = document.get('source')
+            raw_access_url = document.get('source')
+            access_url = str(raw_access_url) if raw_access_url else ''
             logger.debug(f"AUTH DEBUG: Attempting network request to: {access_url}")
 
             # Network request (no redirects)
