@@ -202,7 +202,7 @@ def process_configuration_entries(
                 auth_type = str(entry.get("auth_type", "none"))
                 username = str(entry.get("username", ""))
                 password = str(entry.get("password", ""))
-                token = str(entry.get("token", ""))
+                token = entry.get("token", "")
                 text_fields = entry.get("text_fields")  # None → loader uses default
                 page_size = int(entry.get("page_size", 50))
                 language = str(entry.get("language", ""))
@@ -218,6 +218,7 @@ def process_configuration_entries(
                     page_size=page_size,
                     language=language,
                     progress=progress,
+                    entry_config=entry,
                 )
                 logger.info(f"Loaded {len(documents)} documents from Drupal ({base_url}) using {loader_type}.")
             elif loader_type == "JiraLoader":
@@ -371,9 +372,13 @@ def process_delta_imports(
                 base_url = str(base_url)
                 content_types = entry.get("content_types", [])
                 auth_type = str(entry.get("auth_type", "none"))
+                logger.debug("DRUPAL ENTRY: auth_type=%r keys=%s has_oauth_creds=%s",
+                            auth_type, sorted(entry.keys()),
+                            bool(entry.get("oauth_client_id") and entry.get("oauth_client_secret")))
+
                 username = str(entry.get("username", ""))
                 password = str(entry.get("password", ""))
-                token = str(entry.get("token", ""))
+                token = entry.get("token", "")
                 text_fields = entry.get("text_fields")
                 page_size = int(entry.get("page_size", 50))
                 language = str(entry.get("language", ""))
@@ -384,7 +389,7 @@ def process_delta_imports(
                     all_docs = load_from_drupal(
                         base_url=base_url, content_types=content_types, loader_id=loader_id,
                         auth_type=auth_type, username=username, password=password, token=token,
-                        text_fields=text_fields, page_size=page_size, language=language, progress=progress,
+                        text_fields=text_fields, page_size=page_size, language=language, progress=progress,entry_config=entry,
                     )
                     loaded_document_count = len(all_docs)
                     if is_initial:
@@ -401,7 +406,7 @@ def process_delta_imports(
                     current_ids = set(get_all_drupal_document_ids(
                         base_url=base_url, content_types=content_types,
                         auth_type=auth_type, username=username, password=password, token=token,
-                        page_size=page_size, language=language,
+                        page_size=page_size, language=language,entry_config=entry,
                     ))
                     deleted_paths = [p for p in existing_map if p not in current_ids]
                     if deleted_paths:
@@ -413,7 +418,7 @@ def process_delta_imports(
                         base_url=base_url, content_types=content_types, loader_id=loader_id,
                         auth_type=auth_type, username=username, password=password, token=token,
                         text_fields=text_fields, page_size=page_size, language=language,
-                        since=last_import_time, progress=progress,
+                        since=last_import_time, progress=progress,entry_config=entry,
                     )
                     loaded_document_count = len(changed_docs)
                     sources_to_delete = [doc.metadata.get("source", "") for doc in changed_docs]
