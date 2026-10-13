@@ -1,0 +1,5 @@
+---
+ungrouped:
+  hosts:
+    myserver.example:
+      #learn2rag_dir: /opt/learn2rag

@@ -11,6 +11,9 @@ Creation Date: June 10, 2025
 Last Modified: August 31, 2026
 """
 
+# FIXME: import this early to prevent segmentation fault on Windows
+__import__('pyarrow.dataset')
+
 import argparse
 import json
 import os

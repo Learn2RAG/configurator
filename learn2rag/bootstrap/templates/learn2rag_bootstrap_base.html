@@ -26,10 +26,9 @@
         <!-- Logo & Title -->
         <div class="d-flex align-items-center me-4">
           <a class="navbar-brand d-flex align-items-center" href="/">
-            <img src="{{ url_for('learn2rag_bootstrap_static', path='images/logo_learn2rag_logo.png') }}" alt="Learn2RAG Logo">
+            <img src="{{ url_for('learn2rag_bootstrap_static', path='images/logo_learn2rag_logo.png') }}" alt="Learn2RAG">
             <div class="navbar-brand-text">
-              <strong class="d-block">Learn2RAG</strong>
-              <small class="d-block">RAG-Systeme in Unternehmen</small>
+              {{ brand_text or 'RAG-Systeme in Unternehmen' }}
             </div>
           </a>
         </div>
