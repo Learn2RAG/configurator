@@ -43,10 +43,12 @@ from ..utils import (
 
 from datetime import datetime
 
+import platformdirs
 
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
+docs_dir = platformdirs.user_documents_dir()
 
 import werkzeug
 def redirect(url: str) -> 'werkzeug.wrappers.response.Response':
@@ -264,7 +266,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
         return render_template(
             'start.html',
-            running_pipelines=running_pipelines
+            running_pipelines=running_pipelines,
+            docs_dir=docs_dir
         )
 
     def list_ollama_models() -> list[Any]:
@@ -286,6 +289,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         return render_template(
             'models_page.html',
             ollama_models=list_ollama_models(),
+            docs_dir=docs_dir
         )
 
     @app.post('/models')
@@ -353,6 +357,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             raise Exception('Unexpected downloader state')
         return render_template(
             'model_pulling.html',
+            docs_dir=docs_dir
         )
 
     @app.post('/models/<name>')
@@ -372,24 +377,48 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/sources')
     def sources_list() -> 'str | werkzeug.wrappers.response.Response':
+
+        logging.debug(f"docs_dir is {docs_dir}")
         return render_template(
             'sources_page.html',
             example_local_path=example_local_path,
             example_drupal_content_types='article, page, recipe',
+            docs_dir=docs_dir
         )
 
     @app.post('/sources')
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
         data: dict[str, Any] = request.form.to_dict()
-        if 'content_types' in data:
-            data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
-        if 'depth' in data:
-            data['depth'] = int(data['depth'])
-        if 'failure_threshold' in data and data['failure_threshold'] not in (None, ''):
-            data['failure_threshold'] = int(data['failure_threshold'])
-        if 'object_ids' in data:
-            data['object_ids'] = request.form.getlist('object_ids')
+        for field in [
+                'content_types',
+                'issue_types',
+                'projects',
+        ]:
+            if field in data:
+                data[field] = list(map(str.strip, data[field].split(',')))
+                if len(data[field]) == 1 and len(data[field][0]) == 0:
+                    data[field] = []
+        for field in [
+                'include_comments',
+        ]:
+            if field in data:
+                data[field] = request.form.getlist(field)[-1] == 'yes'
+        for field in [
+                'depth',
+                'failure_threshold',
+                'page_size',
+        ]:
+            if field in data:
+                if data[field] not in (None, ''):
+                    data[field] = int(data[field])
+                else:
+                    del data[field]
+        for field in [
+                'object_ids',
+        ]:
+            if field in data:
+                data[field] = request.form.getlist(field)
         learn2rag.data.create_entry(app.instance_path, 'sources', data)
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
@@ -416,6 +445,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         context = {
             'pipelines': pipelines,
             'projects': Project.get_all(),
+            'docs_dir' : docs_dir
         }
         template = 'pipelines_list.html' if request.headers.get('HX-Request') else 'pipelines_page.html'
         return render_template(template, **context)
@@ -473,7 +503,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     'local'  # FIXME: remove this later and throw Exception
                 )),
                 'recursive': 'True',  # DirectoryLoader; FIXME: add this in the interface
-                **{key: value for key, value in source.items() if key not in ['label', 'type']},
+                **{key: value for key, value in source.items() if key not in ['type']},
             } for name, source in sources.items()],
         }
 
@@ -543,7 +573,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             return redirect(url_for('pipelines_list'))
         pipeline['status_message'] = pipeline_status_message(pipeline)
         storage_path = Path(pipeline['storage_path'])
+        projects = Project.get_all()  # FIXME: only get one
         import_state = ImportState(str(storage_path / 'import_state.json'))
+        import_succeeded_once = any(import_state.get_last_import_time(source) for source in pipeline['sources'])
+        allow_open_chat = projects[name].health and import_succeeded_once
         try:
             training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
             training_examples = training_dataset.select(range(min(3, len(training_dataset))))
@@ -556,9 +589,12 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             name=name,
             pipeline=pipeline,
             import_state=import_state,
+            allow_start_chat=import_succeeded_once,
+            allow_open_chat=allow_open_chat,
             training_examples=training_examples,
             training_total=training_total,
-            projects=Project.get_all(),
+            projects=projects,
+            docs_dir=docs_dir
         )
 
     @app.post('/pipelines/<name>/training')
@@ -619,13 +655,15 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                 'logs.html',
                 content=content,
                 file=file,
+                docs_dir=docs_dir
+
             )
         return redirect(url_for('pipelines_list'))
 
     @app.get('/ps')
     def ps_list() -> 'str | werkzeug.wrappers.response.Response':
         projects = Project.get_all()
-        return render_template('ps_list.html', projects=projects)
+        return render_template('ps_list.html', projects=projects,docs_dir=docs_dir)
 
     @app.post('/ps/stop')
     def ps_stop() -> 'str | werkzeug.wrappers.response.Response':

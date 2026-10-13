@@ -5,7 +5,7 @@
         {% if vc_commit_id %}<abbr title="{{ vc_commit_id }}">{% endif %}
           {% if learn2rag_package_version %}
           Learn2RAG {{ learn2rag_package_version }}
-          {% else %}
+          {% elif vc_commit_id %}
           Learn2RAG
           {% endif %}
         {% if vc_commit_id %}</abbr>{% endif %}
