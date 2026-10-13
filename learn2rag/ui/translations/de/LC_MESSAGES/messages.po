@@ -16,9 +16,10 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
+#, python-format
 msgctxt "firststep"
-msgid " Yes, add my <code>~/Documents</code> folder"
-msgstr "Ja, füge meinen Ordner <code>~/Documents</code> hinzu."
+msgid " Yes, add my <code>%(docs_dir)s</code> folder"
+msgstr "Ja, meinen Ordner %(docs_dir)s hinzufügen"
 
 #, python-format
 msgid "%(num)d data source configuration"
@@ -823,4 +824,8 @@ msgstr "Sie haben keine Datenquellen ausgewählt."
 #~ msgctxt "button"
 #~ msgid "Optimization"
 #~ msgstr ""
+
+#~ msgctxt "firststep"
+#~ msgid " Yes, add my <code>~/Documents</code> folder"
+#~ msgstr "Ja, füge meinen Ordner <code>~/Documents</code> hinzu."
 

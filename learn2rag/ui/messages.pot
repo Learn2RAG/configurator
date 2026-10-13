@@ -15,8 +15,9 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
+#, python-format
 msgctxt "firststep"
-msgid " Yes, add my <code>~/Documents</code> folder"
+msgid " Yes, add my <code>%(docs_dir)s</code> folder"
 msgstr ""
 
 #, python-format

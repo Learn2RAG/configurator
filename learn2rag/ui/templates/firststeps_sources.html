@@ -11,7 +11,7 @@
         <input type="hidden" name="type" value="local"/>
         <input type="hidden" name="label" value="~/Documents"/>
         <input type="hidden" name="path" value="~/Documents"/>
-        <button type="submit" class="btn btn-primary">🪄 {{ pgettext('firststep', ' Yes, add my <code>~/Documents</code> folder')|safe }}</button>
+        <button type="submit" class="btn btn-primary">🪄 {{ pgettext('firststep', ' Yes, add my <code>%(docs_dir)s</code> folder', docs_dir=docs_dir)|safe }}</button>
       </form>
     </div>
     <div class="btn-group me-2" role="group">
