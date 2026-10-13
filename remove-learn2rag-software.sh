@@ -3,8 +3,8 @@ set -eu
 
 echo "Removing Learn2RAG application runtimes..."
 # TODO: use https://ofek.dev/pyapp/latest/runtime/#remove ?
-rm -rf "$HOME/.local/share/pyapp/learn2rag"
-rm -rf "$HOME/.local/share/pyapp/open-webui"
-rm -rf "$HOME/.local/share/pyapp/open-webui-pipelines"
+rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/pyapp/learn2rag"
+rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/pyapp/open-webui"
+rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/pyapp/open-webui-pipelines"
 
 echo "Software removed successfully."
