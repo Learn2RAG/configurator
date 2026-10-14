@@ -13,7 +13,10 @@
     <input type="hidden" name="type" value="web"/>
     <label for="url" class="form-label">{{pgettext('form_label', 'Web page URL')}}</label>
     <input type="url" class="form-control" name="url" required="required" title="{{pgettext('tooltip', 'For example: https://learn2rag.de/')}}">
-    <input type="hidden" name="depth" value="0"/>
+  </div>
+  <div class="mb-3">
+    <label for="depth" class="form-label">{{pgettext('form_label', 'Crawl depth')}}</label>
+    <input type="number" min="-1" step="1" class="form-control" name="depth" placeholder="-1" title="{{pgettext('tooltip', 'How many levels of links to follow from the URL: 0 loads only this page, -1 crawls the whole site under this URL')}}">
   </div>
   <div class="mb-3">
     <label for="failure_threshold" class="form-label">{{ pgettext('form_label', 'Failure threshold') }}</label>
