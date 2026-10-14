@@ -523,7 +523,14 @@ async def search_authorized(
                 extra={'activity': 'search_authorized', 'request_id': request_id},
         )
 
-        points = _collect_query_points(question, user_config, local_opt, request_id=request_id)
+        points = await asyncio.to_thread(
+            _collect_query_points,
+            question,
+            user_config,
+            local_opt,
+            request_id=request_id)
+
+
         query_response = QueryResponse(points=points)
 
         authorized_points = await filter_authorized(user_auths, query_response)

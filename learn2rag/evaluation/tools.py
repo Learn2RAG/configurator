@@ -99,11 +99,15 @@ def read_dataset_qa(file_path: pathlib.Path | str, split: str | None = None) -> 
                 detected_sep = ','
 
         logging.debug(f'load csv file with delimiter: "{detected_sep}"')
-        dataset_dict = datasets.load_dataset(
-            'csv',
-            data_files=target_path.as_posix(),
-            delimiter=detected_sep
-        )
+        #dataset_dict = datasets.load_dataset(
+        #    'csv',
+        #    data_files=target_path.as_posix(),
+        #    delimiter=detected_sep
+        #)
+        df = pd.read_csv(target_path.as_posix(), sep=detected_sep)
+        dataset_dict = datasets.DatasetDict({
+            "train": datasets.Dataset.from_pandas(df, preserve_index = False)
+        })
     else:
         logging.debug(f'load HF dataset ')
         dataset_dict = datasets.load_from_disk(str(target_path))
