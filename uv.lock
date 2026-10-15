@@ -1916,6 +1916,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "pandas-stubs" },
+    { name = "yamllint" },
 ]
 
 [package.metadata]
@@ -2108,7 +2109,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pandas-stubs", specifier = ">=3.0.0.260204,<4.0.0.0" }]
+dev = [
+    { name = "pandas-stubs", specifier = ">=3.0.0.260204,<4.0.0.0" },
+    { name = "yamllint", specifier = ">=1.38.0" },
+]
 
 [[package]]
 name = "librt"
@@ -7472,6 +7476,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/94/32/8a9531f37b59e5a013003db7cb7414baf4ce7e0e1268e0d5947cd3d6a2df/xxhash-3.8.1-cp313-cp313t-win32.whl", hash = "sha256:5b96f0024e9840f449bd91b2d005c921a4b666055a0d1b6492463799f32aae22", size = 32377, upload-time = "2026-07-06T10:46:26.86Z" },
     { url = "https://files.pythonhosted.org/packages/e7/ab/2ca45fd7f671de5f81fc297ef1c95080b40c86ec6be0cc6034b8f7707ac8/xxhash-3.8.1-cp313-cp313t-win_amd64.whl", hash = "sha256:37d5a56c36dcc0b9a87b814cd992598d33863ff683749de6c86081f278d5e629", size = 33274, upload-time = "2026-07-06T10:46:28.39Z" },
     { url = "https://files.pythonhosted.org/packages/5a/54/20d7163463ddb6438b73a427d1655a77a502cf9b9b0c3ada3599629d9c0a/xxhash-3.8.1-cp313-cp313t-win_arm64.whl", hash = "sha256:6696c8752aded28ff3b16f33ef28ce28fb5d209b80c206746f943199fcf5fd65", size = 29375, upload-time = "2026-07-06T10:46:29.962Z" },
+]
+
+[[package]]
+name = "yamllint"
+version = "1.38.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pathspec" },
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/28/a0/8fc2d68e132cf918f18273fdc8a1b8432b60d75ac12fdae4b0ef5c9d2e8d/yamllint-1.38.0.tar.gz", hash = "sha256:09e5f29531daab93366bb061e76019d5e91691ef0a40328f04c927387d1d364d", size = 142446, upload-time = "2026-01-13T07:47:53.276Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/92/aed08e68de6e6a3d7c2328ce7388072cd6affc26e2917197430b646aed02/yamllint-1.38.0-py3-none-any.whl", hash = "sha256:fc394a5b3be980a4062607b8fdddc0843f4fa394152b6da21722f5d59013c220", size = 68940, upload-time = "2026-01-13T07:47:51.343Z" },
 ]
 
 [[package]]
