@@ -13,7 +13,7 @@ def _get_bge_m3_model() -> BGEM3FlagModel:
 
 @lru_cache(maxsize=4)
 def _get_sentence_transformer_model(model_name: str) -> SentenceTransformer:
-    return SentenceTransformer(model_name)
+    return SentenceTransformer(model_name) # type: ignore[no-any-return]
 
 
 def create_embeddings(
@@ -78,7 +78,7 @@ def create_embeddings(
 
     elif model_name == "sentence-transformers/all-mpnet-base-v2":
         model = _get_sentence_transformer_model("sentence-transformers/all-mpnet-base-v2")
-        return model.encode(input_sample)
+        return model.encode(input_sample, convert_to_numpy=True)
 
     else:
         warnings.warn("Embedding model unknown or not provided. Using dense embeddings of default model: BAAI/bge-m3")
