@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 set "TARGET_DIR=%LOCALAPPDATA%\Learn2RAG"
 set "FORCE=0"
@@ -14,8 +14,9 @@ if not exist "%TARGET_DIR%" (
 
 if "%FORCE%"=="0" (
     echo WARNING: This will permanently delete all user data in %TARGET_DIR%.
+    set "CONFIRM="
     set /p CONFIRM="Are you sure? (y/N): "
-    if /i not "%CONFIRM%"=="y" (
+    if /i not "!CONFIRM!"=="y" if /i not "!CONFIRM!"=="yes" (
         echo Aborted. No data was deleted.
         exit /b 1
     )

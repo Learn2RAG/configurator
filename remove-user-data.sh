@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-TARGET_DIR="$HOME/.local/share/Learn2RAG"
+TARGET_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/Learn2RAG"
 FORCE=0
 
 # Check for -y or --yes flag when we call it from unistall will send -y

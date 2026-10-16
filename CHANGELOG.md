@@ -1,5 +1,10 @@
 # Changelog
 ## [Unreleased]
+### Added
+- `remove-learn2rag-software` script to remove the Learn2RAG application runtimes
+- `remove-user-data` script to remove user data (asks for confirmation; `-y` skips it)
+### Changed
+- `uninstall` now removes the software and asks whether to also remove user data
 ## [0.3.0] - 2026-06-02
 ### Added
 - continuous import with updating the indexed data
