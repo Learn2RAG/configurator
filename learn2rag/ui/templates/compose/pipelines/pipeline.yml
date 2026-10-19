@@ -1,3 +1,4 @@
+---
 name: pipeline
 label: Only start chat
 ports:
@@ -103,14 +104,14 @@ files:
     content: ''
 
 services:
-  #!!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
+  # !!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
   qdrant:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
       - '{{storage_path}}/qdrant_config.yml'
-  #!!! {% endif %}
+  # !!! {% endif %}
   main:
     working_dir: '{{storage_path}}'
     command:
@@ -122,16 +123,16 @@ services:
       - '{{config.get("CHAT", {}).get("host") or config.get("UI", {}).get("host") or "127.0.0.1"}}'
       - '--port'
       - '{{ports.pipeline}}'
-      #!!! {% if config.get("CHAT", {}).get("forwarded-allow-ips") %}
+      # !!! {% if config.get("CHAT", {}).get("forwarded-allow-ips") %}
       - '--forwarded-allow-ips'
       - '{{ config["CHAT"]["forwarded-allow-ips"] }}'
-      #!!! {% endif %}
-      #!!! {% if config.get("TLS") %}
+      # !!! {% endif %}
+      # !!! {% if config.get("TLS") %}
       - '--tls-certfile'
       - '{{ config["TLS"]["CERTFILE"] }}'
       - '--tls-keyfile'
       - '{{ config["TLS"]["KEYFILE"] }}'
-      #!!! {% endif %}
+      # !!! {% endif %}
       - '--basic-username'
       - '{{ config.get("CHAT", {}).get("username", config.get("SIMPLE_AUTH", {}).get("username", "")) }}'
       - '--basic-password'
