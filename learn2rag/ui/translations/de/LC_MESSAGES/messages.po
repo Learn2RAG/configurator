@@ -7,7 +7,6 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"PO-Revision-Date: 2026-09-14 10:19+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: de\n"
 "Language-Team: de <LL@li.org>\n"
@@ -38,20 +37,20 @@ msgstr[1] "%(num)d Pipelinekonfigurationen"
 #, python-format
 msgid "%(num)d pipeline running"
 msgid_plural "%(num)d pipelines running"
-msgstr[0] "Löschen die gespeicherten Daten"
+msgstr[0] "1 Pipeline läuft"
 msgstr[1] "%(num)d Pipeline laufen"
 
 msgctxt "tooltip"
 msgid "A custom display name for this data source"
-msgstr "Ein individueller Anzeigename"
+msgstr "Ein individueller Anzeigename für diese Datenquelle"
 
 msgctxt "tooltip"
 msgid "A custom display name for this language model"
-msgstr "Ein individueller Anzeigename"
+msgstr "Ein individueller Anzeigename für dieses Sprachmodell"
 
 msgctxt "tooltip"
 msgid "A custom display name for this pipeline"
-msgstr "Ein individueller Anzeigename"
+msgstr "Ein individueller Anzeigename für diese Pipeline"
 
 msgctxt "column_heading"
 msgid "API URL"
@@ -123,32 +122,20 @@ msgid "Answer"
 msgstr "Antwort"
 
 #, python-format
-msgid ""
-"Are you sure you want to remove all data stored for this pipeline: "
-"%(label)s?"
-msgstr ""
-"Sind Sie sicher, dass Sie alle gespeicherten Daten entfernen möchten: "
-"%(label)s?"
+msgid "Are you sure you want to remove all data stored for this pipeline: %(label)s?"
+msgstr "Sind Sie sicher, dass Sie alle gespeicherten Daten für die folgende Pipeline entfernen möchten: %(label)s?"
 
 #, python-format
 msgid "Are you sure you want to remove this data source configuration: %(label)s?"
-msgstr "Sind Sie sicher, dass Sie diese Konfiguration entfernen möchten: %(label)s"
+msgstr "Sind Sie sicher, dass Sie diese Konfiguration entfernen möchten: %(label)s?"
 
 #, python-format
-msgid ""
-"Are you sure you want to remove this language model configuration: "
-"%(label)s?"
-msgstr ""
-"Sind Sie sicher, dass Sie diese Sprachmodellkonfiguration entfernen "
-"möchten: %(label)s"
+msgid "Are you sure you want to remove this language model configuration: %(label)s?"
+msgstr "Sind Sie sicher, dass Sie diese Sprachmodellkonfiguration entfernen möchten: %(label)s?"
 
 #, python-format
-msgid ""
-"Are you sure you want to remove this pipeline configuration and all its "
-"stored data: %(label)s?"
-msgstr ""
-"Sind Sie sicher, dass Sie diese Konfiguration und alle gespeicherten "
-"Daten entfernen möchten: %(label)s?"
+msgid "Are you sure you want to remove this pipeline configuration and all its stored data: %(label)s?"
+msgstr "Sind Sie sicher, dass Sie diese Konfiguration und alle gespeicherten Daten entfernen möchten: %(label)s?"
 
 msgctxt "form_label"
 msgid "Authentication"
@@ -172,7 +159,7 @@ msgstr "URL des Chat-Proxys"
 
 msgctxt "label"
 msgid "Choose a new training data file:"
-msgstr "Wähle eine neue Trainingsdatei aus"
+msgstr "Wählen Sie eine neue Trainingsdatei aus"
 
 msgctxt "heading"
 msgid "Connect an external language model"
@@ -180,14 +167,10 @@ msgstr "Ein externes Sprachmodell anbinden"
 
 msgctxt "column_heading"
 msgid "Consecutive failures"
-msgstr "aufeinanderfolgende Fehler"
+msgstr "Aufeinanderfolgende Fehler"
 
-msgid ""
-"Consult the administrator or documentation of the corresponding system to"
-" find the required configuration values."
-msgstr ""
-"Wenden Sie sich an den Administrator oder siehe Dokumentation des "
-"jeweiligen Systems, um die erforderlichen Konfigurationswerte zu finden."
+msgid "Consult the administrator or documentation of the corresponding system to find the required configuration values."
+msgstr "Wenden Sie sich an den Administrator oder studieren Sie die Dokumentation des jeweiligen Systems, um die erforderlichen Konfigurationswerte zu finden."
 
 msgctxt "form_label"
 msgid "Content types"
@@ -209,7 +192,7 @@ msgstr "Pipeline konnte nicht gestoppt werden: %(message)s"
 
 msgctxt "column_heading"
 msgid "Data source type"
-msgstr "Datenquellen Typ"
+msgstr "Datenquellentyp"
 
 msgctxt "form_label"
 msgid "Data sources"
@@ -228,13 +211,8 @@ msgid "Data sources"
 msgstr "Datenquellen"
 
 #, python-format
-msgid ""
-"Debug logging is enabled in config file <code>%(file)s</code>. It might "
-"capture sensitive information."
-msgstr ""
-"Debug-Protokollierung ist in der Konfigurationsdatei "
-"<code>%(file)s</code> aktiviert. Es könnte sensible Informationen "
-"erfassen."
+msgid "Debug logging is enabled in config file <code>%(file)s</code>. It might capture sensitive information."
+msgstr "Debug-Protokollierung ist in der Konfigurationsdatei <code>%(file)s</code> aktiviert. Es könnten sensible Informationen erfasst werden."
 
 msgctxt "column_heading"
 msgid "Details"
@@ -259,7 +237,7 @@ msgid "Download a suggested language model: %(model)s"
 msgstr "Empfohlenes Sprachmodell %(model)s herunterladen"
 
 msgid "Download any model from Ollama library."
-msgstr "Laden Sie jedes Modell aus der Ollama herunter."
+msgstr "Laden Sie ein Modell aus der Ollama Bibliothek herunter."
 
 msgid "Download has failed"
 msgstr "Das Herunterladen gelang nicht"
@@ -278,12 +256,12 @@ msgstr "Die Verbindung zu Ihrem Learn2RAG-Server ist nicht möglich"
 #, python-format
 msgctxt "flash"
 msgid "Failed to download a language model: %(model)s"
-msgstr "Das Herunterladen des Sprachmodells %(model)s ist fehlgeschlagenn"
+msgstr "Das Herunterladen des Sprachmodells %(model)s ist fehlgeschlagen"
 
 #, python-format
 msgctxt "flash"
 msgid "Failed to remove directory: %(path)s: %(message)s"
-msgstr "Kann den Dateipfad nicht entfernen: %(path)s: %(message)s"
+msgstr "Entfernen des Dateipfads fehlgeschlagen: %(path)s: %(message)s"
 
 #, python-format
 msgctxt "flash"
@@ -322,13 +300,11 @@ msgid "For example: https://learn2rag.de/"
 msgstr "Zum Beispiel: https://learn2rag.de/"
 
 msgid "If you use a model from an external provider, they will see your data."
-msgstr ""
-"Wenn Sie ein Modell eines externen Anbieters verwenden, hat dieser "
-"Zugriff auf Ihre Daten."
+msgstr "Wenn Sie ein Modell eines externen Anbieters verwenden, hat dieser Zugriff auf Ihre Daten."
 
 msgctxt "form_label"
 msgid "Immediately start the data import and the chat interface"
-msgstr "Der Datenimport und die Chat direkt starten"
+msgstr "Den Datenimport und Chat direkt starten"
 
 msgctxt "button"
 msgid "Import and start chat"
@@ -353,6 +329,15 @@ msgstr "Import und KI-Chat laufen"
 msgctxt "form_label:jira"
 msgid "Include comments"
 msgstr "Kommentare einbeziehen"
+
+
+msgctxt "status"
+msgid "Importing and running AI chat"
+msgstr "Importieren und laufen eines KI-Chats"
+
+msgctxt "form_label:jira"
+msgid "Include comments"
+msgstr "Kommentare aufnehmen"
 
 msgctxt "form_label"
 msgid "Internal vector store"
@@ -513,9 +498,11 @@ msgid "Ports"
 msgstr "Ports"
 
 msgid "Ports are not configured and would be chosen automatically."
-msgstr ""
-"Die Ports sind nicht konfiguriert und würden automatisch ausgewählt "
-"werden."
+msgstr "Die Ports sind nicht konfiguriert und würden automatisch ausgewählt werden."
+
+msgctxt "form_label:jira"
+msgid "Projects"
+msgstr "Projekte"
 
 msgctxt "form_label:jira"
 msgid "Projects"
@@ -535,11 +522,11 @@ msgstr "Löschen"
 
 msgctxt "button"
 msgid "Remove the stored data"
-msgstr "Löschen die gespeicherten Daten"
+msgstr "Gespeicherte Daten löschen"
 
 msgctxt "button"
 msgid "Remove the stored data and the pipeline"
-msgstr "Löschen diese Konfiguration und alle gespeicherten Daten"
+msgstr "Konfiguration und alle gespeicherten Daten löschen"
 
 #, python-format
 msgctxt "flash"
@@ -554,7 +541,15 @@ msgstr "Entfernen der Konfiguration: %(label)s"
 #, python-format
 msgctxt "flash"
 msgid "Removed pipeline: %(label)s"
-msgstr "Die Pipeline entfernt: %(label)s"
+msgstr "Entfernte Pipeline: %(label)s"
+
+msgctxt "status"
+msgid "Running"
+msgstr "Laufen"
+
+msgctxt "status"
+msgid "Running AI chat"
+msgstr "Laufen eines KI-Chats"
 
 msgctxt "status"
 msgid "Running"
@@ -586,23 +581,15 @@ msgstr "Fehlerprotokoll anzeigen"
 
 msgctxt "nav"
 msgid "Shutdown Learn2RAG"
-msgstr "Abschalten des Systems Learn2RAG"
+msgstr "Learn2RAG ausschalten"
 
 msgctxt "flash"
-msgid ""
-"Some configured pipelines use this data source configuration, remove them"
-" first"
-msgstr ""
-"Einige konfigurierte Pipelines nutzen diese Datenquellenkonfiguration, "
-"entfernen sie zuerst"
+msgid "Some configured pipelines use this data source configuration, remove them first"
+msgstr "Einige konfigurierte Pipelines nutzen diese Datenquellenkonfiguration. Entfernen sie diese zuerst."
 
 msgctxt "flash"
-msgid ""
-"Some configured pipelines use this language model configuration, remove "
-"them first"
-msgstr ""
-"Einige konfigurierte Pipelines verwenden diese Sprachmodellkonfiguration,"
-" entfernen sie zuerst"
+msgid "Some configured pipelines use this language model configuration, remove them first"
+msgstr "Einige konfigurierte Pipelines verwenden diese Sprachmodellkonfiguration. Entfernen sie diese zuerst."
 
 msgctxt "header"
 msgid "Sources"
@@ -614,7 +601,7 @@ msgstr "Optimierung starten"
 
 msgctxt "tooltip"
 msgid "Start the AI chat. Requires import to be already completed."
-msgstr "Starten Sie den KI-Chat. Dazu muss der Import bereits abgeschlossen sein."
+msgstr "KI-Chat starten. Dazu muss der Import bereits abgeschlossen sein."
 
 #, python-format
 msgctxt "flash"
@@ -638,7 +625,7 @@ msgid "Storage directory path"
 msgstr "Speicherpfad"
 
 msgid "The language model is downloading, please wait"
-msgstr "Das Sprachmodell ist heruntergeladen, bitte warten"
+msgstr "Das Sprachmodell wird heruntergeladen, bitte warten"
 
 msgctxt "flash"
 msgid "The requested data source configuration is not found"
@@ -646,18 +633,14 @@ msgstr "Die gewünschte Datenquellenkonfiguration konnte nicht gefunden werden"
 
 msgctxt "flash"
 msgid "The requested language model configuration is not found"
-msgstr "Die gewünschte Pipeline konnte nicht gefunden werden"
+msgstr "Die gewünschte Sprachmodellkonfiguration konnte nicht gefunden werden"
 
 msgctxt "flash"
 msgid "The requested pipeline is not found"
 msgstr "Die gewünschte Pipeline konnte nicht gefunden werden"
 
-msgid ""
-"This data source type does not support access control. All users will be "
-"provided access to all data."
-msgstr ""
-"Dieser Datenquellentyp unterstützt keine Zugriffskontrolle. Alle Benutzer"
-" erhalten Zugriff auf alle Daten."
+msgid "This data source type does not support access control. All users will be provided access to all data."
+msgstr "Dieser Datenquellentyp unterstützt keine Zugriffskontrolle. Alle Benutzer erhalten Zugriff auf alle Daten."
 
 msgid "This password would be saved in plain text in the configuration."
 msgstr "Dieses Passwort würde in der Konfiguration im Klartext gespeichert werden."
@@ -667,6 +650,7 @@ msgstr "Dieses Passwort würde in der Konfiguration im Klartext gespeichert werd
 msgid "Total rows: %(amount)s"
 msgstr "Zeilen insgesamt: %(amount)s"
 
+
 msgctxt "header"
 msgid "Training data"
 msgstr "Trainingsdaten"
@@ -674,6 +658,7 @@ msgstr "Trainingsdaten"
 msgctxt "flash"
 msgid "Training data file saved"
 msgstr "Trainingsdatei gespeichert"
+
 
 msgctxt "tooltip"
 msgid "Unknown value"
@@ -707,6 +692,7 @@ msgstr "Benutzerauthentifizierung"
 msgctxt "form_label"
 msgid "User interface and RAG service"
 msgstr "Benutzeroberfläche und RAG-Dienst"
+
 
 msgctxt "form_label"
 msgid "Username"

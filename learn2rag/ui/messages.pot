@@ -8,7 +8,6 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -122,9 +121,7 @@ msgid "Answer"
 msgstr ""
 
 #, python-format
-msgid ""
-"Are you sure you want to remove all data stored for this pipeline: "
-"%(label)s?"
+msgid "Are you sure you want to remove all data stored for this pipeline: %(label)s?"
 msgstr ""
 
 #, python-format
@@ -132,15 +129,11 @@ msgid "Are you sure you want to remove this data source configuration: %(label)s
 msgstr ""
 
 #, python-format
-msgid ""
-"Are you sure you want to remove this language model configuration: "
-"%(label)s?"
+msgid "Are you sure you want to remove this language model configuration: %(label)s?"
 msgstr ""
 
 #, python-format
-msgid ""
-"Are you sure you want to remove this pipeline configuration and all its "
-"stored data: %(label)s?"
+msgid "Are you sure you want to remove this pipeline configuration and all its stored data: %(label)s?"
 msgstr ""
 
 msgctxt "form_label"
@@ -175,9 +168,7 @@ msgctxt "column_heading"
 msgid "Consecutive failures"
 msgstr ""
 
-msgid ""
-"Consult the administrator or documentation of the corresponding system to"
-" find the required configuration values."
+msgid "Consult the administrator or documentation of the corresponding system to find the required configuration values."
 msgstr ""
 
 msgctxt "form_label"
@@ -219,9 +210,7 @@ msgid "Data sources"
 msgstr ""
 
 #, python-format
-msgid ""
-"Debug logging is enabled in config file <code>%(file)s</code>. It might "
-"capture sensitive information."
+msgid "Debug logging is enabled in config file <code>%(file)s</code>. It might capture sensitive information."
 msgstr ""
 
 msgctxt "column_heading"
@@ -573,15 +562,11 @@ msgid "Shutdown Learn2RAG"
 msgstr ""
 
 msgctxt "flash"
-msgid ""
-"Some configured pipelines use this data source configuration, remove them"
-" first"
+msgid "Some configured pipelines use this data source configuration, remove them first"
 msgstr ""
 
 msgctxt "flash"
-msgid ""
-"Some configured pipelines use this language model configuration, remove "
-"them first"
+msgid "Some configured pipelines use this language model configuration, remove them first"
 msgstr ""
 
 msgctxt "header"
@@ -632,9 +617,7 @@ msgctxt "flash"
 msgid "The requested pipeline is not found"
 msgstr ""
 
-msgid ""
-"This data source type does not support access control. All users will be "
-"provided access to all data."
+msgid "This data source type does not support access control. All users will be provided access to all data."
 msgstr ""
 
 msgid "This password would be saved in plain text in the configuration."

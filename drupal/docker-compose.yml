@@ -1,3 +1,4 @@
+---
 services:
   drupal:
     image: docker.io/library/drupal:11.3.16

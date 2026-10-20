@@ -1,3 +1,4 @@
+---
 name: import
 label: Only import
 ports:
@@ -105,14 +106,14 @@ files:
     content: ''
 
 services:
-  #!!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
+  # !!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
   qdrant:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
       - '{{storage_path}}/qdrant_config.yml'
-  #!!! {% endif %}
+  # !!! {% endif %}
   main:
     working_dir: '{{storage_path}}'
     command:
