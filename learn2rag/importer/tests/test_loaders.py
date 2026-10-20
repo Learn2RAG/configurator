@@ -1,5 +1,7 @@
 import json
 import os
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pathlib
 import shutil
 import sys
@@ -14,7 +16,7 @@ import requests
 from langchain_core.documents import Document
 from .generate_test_documents import create_test_documents
 from ..loaders.directory_loader import load_from_directory
-from ..loaders.drupal_loader import _build_session, load_from_drupal
+from ..loaders.drupal_loader import _build_session, get_all_drupal_document_ids, load_from_drupal
 from ..loaders.html_loader import load_html_content, _is_same_site
 from ..loaders.jira_loader import load_from_jira, get_all_jira_document_ids
 from ..loaders.mediawiki_loader import (
@@ -1088,7 +1090,8 @@ class DrupalLoaderUnitTestCase(unittest.TestCase):
 
         session = _build_session("oauth", "", "", "", entry_config=entry, base_url="https://drupal.example.com/")
 
-        self.assertEqual(session.headers["Authorization"], "Bearer abc")
+        prepared = session.prepare_request(requests.Request("GET", "https://drupal.example.com/jsonapi"))
+        self.assertEqual(prepared.headers["Authorization"], "Bearer abc")
         self.assertEqual(mock_post.call_args.args[0], "https://drupal.example.com/oauth/token")
         self.assertEqual(mock_post.call_args.kwargs["data"], {"grant_type": "client_credentials", "scope": "administrator"})
         self.assertEqual(mock_post.call_args.kwargs["auth"], ("test_client", "test_secret"))
@@ -1134,7 +1137,9 @@ class DrupalLoaderUnitTestCase(unittest.TestCase):
         params = mock_session.get.call_args.kwargs["params"]
         self.assertEqual(params["filter[changed-filter][condition][path]"], "changed")
         self.assertEqual(params["filter[changed-filter][condition][operator]"], ">=")
-        self.assertEqual(params["filter[changed-filter][condition][value]"], "2026-10-01T12:00:00+00:00")
+        # JSON:API compares "changed" as a Unix timestamp, an ISO date string matches nothing
+        self.assertEqual(params["filter[changed-filter][condition][value]"], 1790856000)
+        self.assertEqual((params["page[limit]"], params["page[offset]"]), (50, 0))
         self.assertEqual([doc.metadata["source"] for doc in docs], ["https://drupal.example.com/node/7"])
 
     @patch("learn2rag.importer.loaders.drupal_loader.requests.Session")
@@ -1160,6 +1165,106 @@ class DrupalLoaderUnitTestCase(unittest.TestCase):
         self.assertTrue(content.startswith("Vegan chocolate and nut brownies"))
         for text in ("Scrumptious vegan chocolate brownies.", "6 tbsp sunflower oil\n80g vegan dark chocolate", "Preheat the oven to 180°C."):
             self.assertIn(text, content)
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.Session")
+    def test_id_listing_uses_paging_and_sparse_fieldset(self, mock_session_cls: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session.headers = {}
+        mock_session_cls.return_value = mock_session
+        mock_session.get.side_effect = [_make_response("", status_code=404)] * 3 + [
+            _make_json_response({
+                "data": [{"id": "a", "attributes": {"drupal_internal__nid": 1}}],
+                "links": {"next": {"href": "https://drupal.example.com/jsonapi/node/recipe?page%5Boffset%5D=1"}},
+            }),
+            _make_json_response({"data": [{"id": "b", "attributes": {"drupal_internal__nid": 2}}], "links": {}}),
+        ]
+
+        ids = get_all_drupal_document_ids(base_url="https://drupal.example.com", content_types=["recipe"], page_size=1)
+
+        self.assertEqual(ids, ["https://drupal.example.com/node/1", "https://drupal.example.com/node/2"])
+        first_page = mock_session.get.call_args_list[3]
+        self.assertEqual(first_page.kwargs["params"], {
+            "fields[node--recipe]": "drupal_internal__nid,langcode", "page[limit]": 1, "page[offset]": 0,
+        })
+        # Later pages follow the "next" link, which already contains all parameters
+        self.assertNotIn("params", mock_session.get.call_args_list[4].kwargs)
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.Session")
+    def test_failure_on_a_later_page_raises(self, mock_session_cls: MagicMock) -> None:
+        # Partial results would delete (ID listing) or permanently skip (delta load) the missing documents
+        def responses() -> List[MagicMock]:
+            failed = _make_response("", status_code=500)
+            failed.raise_for_status.side_effect = requests.exceptions.HTTPError("500")
+            return [_make_response("", status_code=404)] * 3 + [
+                _make_json_response({
+                    "data": [{"id": "a", "attributes": {"drupal_internal__nid": 1, "title": "One", "body": {"value": "Text"}}}],
+                    "links": {"next": "https://drupal.example.com/jsonapi/node/recipe?page%5Boffset%5D=1"},
+                }),
+                failed,
+            ]
+
+        mock_session = MagicMock()
+        mock_session.headers = {}
+        mock_session_cls.return_value = mock_session
+
+        mock_session.get.side_effect = responses()
+        with self.assertRaises(LoaderAccessError):
+            get_all_drupal_document_ids(base_url="https://drupal.example.com", content_types=["recipe"])
+
+        mock_session.get.side_effect = responses()
+        with self.assertRaises(LoaderAccessError):
+            load_from_drupal(base_url="https://drupal.example.com", content_types=["recipe"], loader_id="drupal_test")
+
+    def test_expired_oauth_token_is_renewed(self) -> None:
+        issued: List[str] = []
+        valid_token: List[str] = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                # /oauth/token: hand out a new token each time; only the newest one is valid
+                issued.append(f"token-{len(issued) + 1}")
+                valid_token[:] = [issued[-1]]
+                self._send(200, {"access_token": issued[-1]})
+
+            def do_GET(self) -> None:
+                if self.headers.get("Authorization") != f"Bearer {valid_token[0]}":
+                    self._send(401, {"errors": [{"detail": "expired"}]})
+                else:
+                    self._send(200, {"data": [], "links": {}})
+
+            def _send(self, status: int, payload: Dict[str, Any]) -> None:
+                body = json.dumps(payload).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, format: str, *args: Any) -> None:
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            base_url = f"http://127.0.0.1:{server.server_address[1]}"
+            session = _build_session("oauth", "", "", "", entry_config=self.OAUTH_ENTRY, base_url=base_url)
+            self.assertEqual(session.get(f"{base_url}/jsonapi").status_code, 200)
+
+            # Drupal expires the token, e.g. after 5 minutes of a long import
+            valid_token[:] = ["token-from-elsewhere"]
+            response = session.get(f"{base_url}/jsonapi")
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(issued, ["token-1", "token-2"])
+            self.assertEqual([r.status_code for r in response.history], [401])
+
+            # A token that is rejected right after renewal is not retried endlessly
+            valid_token[:] = ["never-issued"]
+            with patch("learn2rag.importer.loaders.drupal_loader._fetch_oauth_token", return_value="still-wrong"):
+                self.assertEqual(session.get(f"{base_url}/jsonapi").status_code, 401)
+        finally:
+            server.shutdown()
+            server.server_close()
 
     def test_config_validation_of_oauth(self) -> None:
         entry = {"loader_type": "DrupalLoader", "base_url": "https://drupal.example.com", "content_types": ["article"], "auth_type": "oauth"}

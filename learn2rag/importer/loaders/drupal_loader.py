@@ -96,6 +96,41 @@ def _fetch_oauth_token(base_url: str, entry_config: Dict[str, Any]) -> str:
     return str(access_token)
 
 
+class _ClientCredentialsAuth(requests.auth.AuthBase):
+    """
+    Bearer token from the client credentials grant that renews itself.
+
+    Drupal access tokens are short-lived (simple_oauth default: 5 minutes), so a long import can outlive
+    its token. On a 401 a new token is requested and the request is sent once more.
+    """
+
+    def __init__(self, base_url: str, entry_config: Dict[str, Any]):
+        self.base_url = base_url
+        self.entry_config = entry_config
+        self.token = _fetch_oauth_token(base_url, entry_config)
+
+    def __call__(self, request: requests.PreparedRequest) -> requests.PreparedRequest:
+        request.headers["Authorization"] = f"Bearer {self.token}"
+        request.register_hook("response", self._retry_with_new_token)  # type: ignore[no-untyped-call]
+        return request
+
+    def _retry_with_new_token(self, response: requests.Response, **kwargs: Any) -> requests.Response:
+        if response.status_code != 401 or getattr(response.request, "token_renewed", False):
+            return response
+        logger.info("DrupalLoader: access token rejected (401), requesting a new one")
+        self.token = _fetch_oauth_token(self.base_url, self.entry_config)
+        # Release the connection before reusing it, like requests' own HTTPDigestAuth
+        response.content
+        response.close()
+        retry = response.request.copy()
+        retry.headers["Authorization"] = f"Bearer {self.token}"
+        setattr(retry, "token_renewed", True)
+        retried: requests.Response = response.connection.send(retry, **kwargs)
+        retried.history.append(response)
+        retried.request = retry
+        return retried
+
+
 def _build_session(auth_type: str, username: str, password: str, token: str,
                    entry_config: Optional[Dict[str, Any]] = None, base_url: str = "") -> requests.Session:
     """Build a requests Session with the configured authentication."""
@@ -106,8 +141,7 @@ def _build_session(auth_type: str, username: str, password: str, token: str,
     elif auth_type == "token":
         session.headers.update({"Authorization": f"Bearer {token}"})
     elif auth_type == "oauth":
-        access_token = _fetch_oauth_token(base_url, entry_config or {})
-        session.headers.update({"Authorization": f"Bearer {access_token}"})
+        session.auth = _ClientCredentialsAuth(base_url, entry_config or {})
     return session
 
 
@@ -241,18 +275,18 @@ def load_from_drupal(
 
         # Do NOT use sparse fieldsets (fields[...]) – unknown field names cause 404/400.
         # Fetch all attributes and extract only the configured text_fields locally.
-        params: Dict[str, Any] = {}
-        #     "page[limit]": page_size,
-        #     "page[offset]": 0,
-        # }
+        params: Dict[str, Any] = {
+            "page[limit]": page_size,
+            "page[offset]": 0,
+        }
 
         # Timestamp filter: only documents changed on or after `since`
         if since is not None:
-            # Ensure the timestamp is timezone-aware and formatted as ISO 8601 for JSON:API
             since_utc = since.astimezone(timezone.utc) if since.tzinfo else since.replace(tzinfo=timezone.utc)
             params["filter[changed-filter][condition][path]"] = "changed"
             params["filter[changed-filter][condition][operator]"] = ">="
-            params["filter[changed-filter][condition][value]"] = since_utc.isoformat()
+            # JSON:API compares "changed" as a Unix timestamp; an ISO 8601 string silently matches nothing
+            params["filter[changed-filter][condition][value]"] = int(since_utc.timestamp())
             logger.info(f"DrupalLoader: applying since-filter >= {since_utc.isoformat()} for '{content_type}'")
 
         page_count = 0
@@ -274,16 +308,14 @@ def load_from_drupal(
 
                 response.raise_for_status()
                 data = response.json()
+            # Fail on any page, not only the first: partial results would be saved as a successful import,
+            # and the import state would then skip the missing documents in later delta runs
             except requests.exceptions.HTTPError as e:
-                logger.error(f"DrupalLoader: HTTP error for content type '{content_type}': {e}")
-                if page_count == 0:
-                    raise LoaderAccessError(f"DrupalLoader could not access '{base_url}' for content type '{content_type}': {e}") from e
-                break
+                logger.error(f"DrupalLoader: HTTP error for content type '{content_type}' on page {page_count + 1}: {e}")
+                raise LoaderAccessError(f"DrupalLoader could not access '{base_url}' for content type '{content_type}': {e}") from e
             except requests.exceptions.RequestException as e:
-                logger.error(f"DrupalLoader: Request failed for content type '{content_type}': {e}")
-                if page_count == 0:
-                    raise LoaderAccessError(f"DrupalLoader request failed for '{base_url}' and content type '{content_type}': {e}") from e
-                break
+                logger.error(f"DrupalLoader: Request failed for content type '{content_type}' on page {page_count + 1}: {e}")
+                raise LoaderAccessError(f"DrupalLoader request failed for '{base_url}' and content type '{content_type}': {e}") from e
 
             items = data.get("data", [])
             if not items:
@@ -435,11 +467,11 @@ def get_all_drupal_document_ids(
             endpoint = f"{base_url.rstrip('/')}/jsonapi/node/{content_type}"
 
         # Request only nid + langcode (no content) to minimise bandwidth
-        params: Dict[str, Any] = {}
-        #     "fields[node--{}]".format(content_type): "drupal_internal__nid,langcode",
-        #     "page[limit]": page_size,
-        #     "page[offset]": 0,
-        # }
+        params: Dict[str, Any] = {
+            "fields[node--{}]".format(content_type): "drupal_internal__nid,langcode",
+            "page[limit]": page_size,
+            "page[offset]": 0,
+        }
 
         next_url: Optional[str] = endpoint
         page_count = 0
@@ -453,10 +485,9 @@ def get_all_drupal_document_ids(
                 response.raise_for_status()
                 data = response.json()
             except requests.exceptions.RequestException as e:
-                logger.error(f"get_all_drupal_document_ids: Request failed for '{content_type}': {e}")
-                if page_count == 0:
-                    raise LoaderAccessError(f"DrupalLoader could not list document IDs for '{base_url}' / '{content_type}': {e}") from e
-                break
+                # A partial list would make the delta import delete every document missing from it
+                logger.error(f"get_all_drupal_document_ids: Request failed for '{content_type}' on page {page_count + 1}: {e}")
+                raise LoaderAccessError(f"DrupalLoader could not list document IDs for '{base_url}' / '{content_type}': {e}") from e
 
             items = data.get("data", [])
             if not items:

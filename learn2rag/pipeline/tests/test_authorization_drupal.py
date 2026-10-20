@@ -23,16 +23,22 @@ def _drupal_point(point_id: int, source: str) -> ScoredPoint:
     })
 
 
-def _response(status_code: int) -> MagicMock:
+def _response(url: str, status_code: int, location: str | None = None) -> MagicMock:
     response = MagicMock()
+    response.url = url
     response.status_code = status_code
     response.text = ""
+    response.is_redirect = location is not None
+    response.headers = {"Location": location} if location else {}
     return response
 
 
-def _fake_session(status_by_url: Dict[str, int]) -> MagicMock:
+def _fake_session(status_by_url: Dict[str, int], redirects: Dict[str, str] | None = None) -> MagicMock:
+    redirects = redirects or {}
     session = MagicMock()
-    session.get.side_effect = lambda url, **kwargs: _response(status_by_url[url])
+    session.get.side_effect = lambda url, **kwargs: (
+        _response(url, 301, redirects[url]) if url in redirects else _response(url, status_by_url[url])
+    )
     return session
 
 
@@ -65,12 +71,28 @@ class DrupalAuthorizationFilterTestCase(unittest.IsolatedAsyncioTestCase):
             with self.subTest(status_code=status_code):
                 self.assertFalse(await self._has_access(status_code))
 
-    async def test_redirects_are_not_followed(self) -> None:
+    async def _has_access_via_redirect(self, location: str, final_status: int = 200) -> bool:
+        target = location if location.startswith("http") else BASE_URL + location
         with patch("learn2rag.pipeline.authorization_drupal._build_session") as build_session:
-            session = _fake_session({PUBLIC_URL: 200})
-            build_session.return_value = session
-            await self.auth_filter._user_has_access(None, {"source": PUBLIC_URL})
-        self.assertIs(session.get.call_args.kwargs["allow_redirects"], False)
+            build_session.return_value = _fake_session({target: final_status}, redirects={PUBLIC_URL: location})
+            return await self.auth_filter._user_has_access(None, {"source": PUBLIC_URL})
+
+    async def test_redirect_to_path_alias_is_followed(self) -> None:
+        self.assertTrue(await self._has_access_via_redirect("/en/recipes/brownies"))
+        self.assertFalse(await self._has_access_via_redirect("/en/recipes/brownies", final_status=403))
+
+    async def test_redirect_to_login_page_denies_access(self) -> None:
+        # The login form itself answers with 200, so it must not be followed
+        self.assertFalse(await self._has_access_via_redirect("/user/login?destination=/node/1"))
+        self.assertFalse(await self._has_access_via_redirect("/en/user/login"))
+
+    async def test_redirect_to_other_site_denies_access(self) -> None:
+        self.assertFalse(await self._has_access_via_redirect("https://sso.example.com/node/1"))
+
+    async def test_redirect_loops_deny_access(self) -> None:
+        with patch("learn2rag.pipeline.authorization_drupal._build_session") as build_session:
+            build_session.return_value = _fake_session({}, redirects={PUBLIC_URL: PUBLIC_URL})
+            self.assertFalse(await self.auth_filter._user_has_access(None, {"source": PUBLIC_URL}))
 
     async def test_request_failure_denies_access(self) -> None:
         with patch("learn2rag.pipeline.authorization_drupal._build_session") as build_session:
