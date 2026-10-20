@@ -272,15 +272,6 @@ def load_from_drupal(
                     # next_url from JSON:API links already includes all query params
                     response = session.get(next_url, timeout=30)
 
-                sent_auth = response.request.headers.get("Authorization", "")
-                logger.debug("SENT: %s | Authorization scheme=%s | status=%s | content-type=%s",
-                            response.url, sent_auth.split(" ")[0] or "NONE",
-                            response.status_code, response.headers.get("Content-Type"))
-
-                logger.debug(f"!!! DEBUG HTTP GET !!! URL: {response.url}")
-                logger.debug(f"!!! DEBUG HTTP STATUS !!! Code: {response.status_code}")
-                logger.debug(f"!!! DEBUG HTTP RESPONSE !!! Body snippet: {response.text[:200]}")
-
                 response.raise_for_status()
                 data = response.json()
             except requests.exceptions.HTTPError as e:

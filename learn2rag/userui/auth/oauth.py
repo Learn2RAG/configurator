@@ -72,7 +72,6 @@ def build_router(import_config: Mapping[str, Any], login_handler: Callable[[Requ
         provider = getattr(oauth, name)
         try:
             token = await provider.authorize_access_token(request)
-            #logging.debug(f"################ token : {token}")
         except Exception as e:
             logger.error('OAuth authentication failed', e)
             raise HTTPException(status_code=400, detail='Callback failed') from e

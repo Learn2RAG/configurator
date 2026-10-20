@@ -372,10 +372,6 @@ def process_delta_imports(
                 base_url = str(base_url)
                 content_types = entry.get("content_types", [])
                 auth_type = str(entry.get("auth_type", "none"))
-                logger.debug("DRUPAL ENTRY: auth_type=%r keys=%s has_oauth_creds=%s",
-                            auth_type, sorted(entry.keys()),
-                            bool(entry.get("oauth_client_id") and entry.get("oauth_client_secret")))
-
                 username = str(entry.get("username", ""))
                 password = str(entry.get("password", ""))
                 token = str(entry.get("token", ""))
