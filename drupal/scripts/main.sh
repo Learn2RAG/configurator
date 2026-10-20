@@ -29,37 +29,34 @@ EOF
 
 cat <<'EOF' > web/modules/custom/api_access/api_access.module
 <?php
-use Drupal\Core\Access\AccessResult;
-use Drupal\node\NodeInterface;
+// Node access grants instead of a query alter: Drupal applies them to listings (JSON:API collections)
+// and single nodes alike, and caches the results per user (user.node_grants:view cache context).
+// Users with "bypass node access" (administrators, also via an OAuth token) skip the grants.
 use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\Database\Query\AlterableInterface;
+use Drupal\node\NodeInterface;
 
-function api_access_node_access(NodeInterface $node, $op, AccountInterface $account) {
-  if ($op === 'view' && $node->bundle() === 'article') {
-    if (!$account->hasPermission('bypass node access') && !$account->hasPermission('administer nodes') && !in_array('administrator', $account->getRoles())) {
-      return AccessResult::forbidden()->cachePerPermissions()->addCacheableDependency($node);
-    }
+function api_access_node_access_records(NodeInterface $node) {
+  if (!$node->isPublished()) {
+    return [];
   }
-  return AccessResult::neutral();
+  return [[
+    'realm' => $node->bundle() === 'article' ? 'api_access_restricted' : 'api_access_public',
+    'gid' => 0,
+    'grant_view' => 1,
+    'grant_update' => 0,
+    'grant_delete' => 0,
+  ]];
 }
 
-function api_access_query_node_access_alter(AlterableInterface $query) {
-  $account = \Drupal::currentUser();
-
-  // Allow access if the user has bypass permission OR if they are authenticated via an OAuth token with the administrator role
-  if (!$account->hasPermission('bypass node access') && !$account->hasPermission('administer nodes') && !in_array('administrator', $account->getRoles())) {
-    foreach ($query->getTables() as $alias => $table_info) {
-      if (isset($table_info['table']) && $table_info['table'] === 'node_field_data') {
-        $query->condition($alias . '.type', 'article', '<>');
-        break;
-      }
-    }
-  }
+function api_access_node_grants(AccountInterface $account, $op) {
+  // Nobody gets the restricted realm: articles are only visible with "bypass node access"
+  return ['api_access_public' => [0]];
 }
 EOF
 
-# Enable the module
+# Enable the module and write the grants for the existing content
 drush en api_access -y
+drush php:eval 'node_access_rebuild();'
 
 drush scr scripts/configure_oauth_scope.php
 

@@ -31,50 +31,31 @@ class DrupalAuthorizationFilter(AuthorizationFilter):
             document: Mapping[str, Any],
     ) -> bool:
         """
-        Check if a user has access to a specific file, with heavy debugging.
+        Check if a user has access to a specific file.
+
+        Args:
+            access_token: User's access token
+            document: The document (metadata)
+
+        Returns:
+            True if the user has access, False otherwise
         """
         try:
-            logger.debug(f"--- AUTH DEBUG: Starting check for document ---")
-            logger.debug(f"AUTH DEBUG: Token value is '{access_token}', type: {type(access_token)}")
-
-            content_type = document.get('content_type')
-            logger.debug(f"AUTH DEBUG: Document keys available: {list(document.keys())}")
-            logger.debug(f"AUTH DEBUG: Extracted content_type: '{content_type}'")
-
-            if content_type == 'article' and not access_token:
-                logger.debug("AUTH DEBUG: Denied by fast-metadata check (is article, no token).")
-                return False
-
-            # Setup session
             if access_token:
-                logger.debug("AUTH DEBUG: Building session WITH token.")
                 session = _build_session('token', '', '', access_token)
             else:
-                logger.debug("AUTH DEBUG: Building session WITHOUT token (anonymous).")
+                # The user is not logged in, try without any credentials
                 session = _build_session('none', '', '', '')
-
-            raw_access_url = document.get('source')
-            access_url = str(raw_access_url) if raw_access_url else ''
-            logger.debug(f"AUTH DEBUG: Attempting network request to: {access_url}")
-
-            # Network request (no redirects)
+            access_url = document['source']
+            # Don't follow redirects: a redirect to the login page would otherwise count as access
             response = session.get(access_url, timeout=10, allow_redirects=False)
-
-            logger.debug(f"AUTH DEBUG: Response Status Code: {response.status_code}")
-            logger.debug(f"AUTH DEBUG: Response Headers (Location/Redirect): {response.headers.get('Location', 'None')}")
-
             if response.status_code >= 500:
-                logger.error("Server error (%s) while checking for user's access; text: `%s`", response.status_code,
-                             response.text)
-
-            is_authorized = (response.status_code == 200)
-            logger.debug(
-                f"AUTH DEBUG: Final verdict for {access_url} -> Authorized: {is_authorized}\n-------------------------")
-
+                logger.error("Server error (%s) while checking for user's access; text: `%s`", response.status_code, response.text)
+            is_authorized = response.status_code == 200
+            logger.debug("User is allowed access: %s for the document: %s", is_authorized, access_url)
             return is_authorized
-
         except Exception as e:
-            logger.error(f"AUTH DEBUG: Exception while checking user's access to a document: {e}")
+            logger.error("Exception while checking user's access to a document: %s", e)
             return False
 
     async def filter_documents(self, user_auth: Any, documents: Mapping[str, Any]) -> Set[str]:

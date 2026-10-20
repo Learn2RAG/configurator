@@ -70,77 +70,45 @@ def _discover_endpoint_map(base_url: str, session: requests.Session) -> Dict[str
     return {}
 
 
-def _fetch_oauth_token(base_url: str, entry_config: Dict[str, Any]) -> Optional[str]:
-    """Dynamically request a fresh OAuth token using client credentials."""
+def _fetch_oauth_token(base_url: str, entry_config: Dict[str, Any]) -> str:
+    """Request an access token from Drupal (simple_oauth) using the client credentials grant."""
     client_id = entry_config.get("oauth_client_id")
     client_secret = entry_config.get("oauth_client_secret")
-
     if not client_id or not client_secret:
-        logger.debug("DrupalLoader: Missing oauth_client_id or oauth_client_secret for token generation.")
-        logger.warning("DrupalLoader: no oauth creds in entry_config (keys=%s)", sorted(entry_config.keys()))
-        return None
+        raise LoaderAccessError("DrupalLoader: auth_type 'oauth' requires oauth_client_id and oauth_client_secret")
 
-    token_url = f"{base_url.rstrip('/')}/oauth/token"
-
-    # For client_credentials, we must request the specific scope we need
-    payload = {
-        "grant_type": "client_credentials",
-        "scope": "administrator"
-    }
-
-    logger.info("DrupalLoader: Requesting token via 'client_credentials' grant...")
+    token_url = entry_config.get("oauth_access_token_url") or f"{base_url.rstrip('/')}/oauth/token"
+    payload = {"grant_type": "client_credentials"}
+    # Only request a scope if one is explicitly configured; otherwise Drupal uses the consumer's default scopes
+    scope = entry_config.get("oauth_import_scope")
+    if scope:
+        payload["scope"] = str(scope)
 
     try:
-        # Pass client credentials securely via Basic Auth headers
-        response = requests.post(
-            token_url,
-            data=payload,
-            auth=(client_id, client_secret),
-            timeout=15
-        )
-        logger.debug(f"DrupalLoader: Token endpoint response status: {response.status_code}")
-
-        if response.status_code == 200:
-            token_data = response.json()
-            access_token = token_data.get("access_token")
-            if access_token :
-                logger.debug("DrupalLoader: Successfully acquired fresh dynamic OAuth access token.")
-                return str(access_token)
-        else:
-            logger.error(f"DrupalLoader: Failed to fetch token. Response: {response.text}")
-    except Exception as e:
-        logger.error(f"DrupalLoader: Exception while fetching OAuth token: {e}")
-
-    logger.warning("DrupalLoader: end of fetch Oauth will return NONE")
-    return None
+        response = requests.post(token_url, data=payload, auth=(client_id, client_secret), timeout=15)
+        response.raise_for_status()
+        access_token = response.json().get("access_token")
+    except (requests.exceptions.RequestException, ValueError) as e:
+        raise LoaderAccessError(f"DrupalLoader: could not fetch OAuth token from '{token_url}': {e}") from e
+    if not access_token:
+        raise LoaderAccessError(f"DrupalLoader: token response from '{token_url}' contained no access_token")
+    logger.info("DrupalLoader: acquired OAuth access token via client credentials grant")
+    return str(access_token)
 
 
-def _build_session(auth_type: str, username: str, password: str, token: Any,
+def _build_session(auth_type: str, username: str, password: str, token: str,
                    entry_config: Optional[Dict[str, Any]] = None, base_url: str = "") -> requests.Session:
+    """Build a requests Session with the configured authentication."""
     session = requests.Session()
     session.headers.update({"Accept": "application/vnd.api+json"})
-
-    logger.debug("BUILD_SESSION: auth_type=%r token_present=%s entry_config_is_none=%s base_url=%r",
-                auth_type, bool(token), entry_config is None, base_url)
-
-    if isinstance(token, dict) and "access_token" in token:
-        token = token["access_token"]
-
-    if not token and entry_config and base_url:
-        token = _fetch_oauth_token(base_url, entry_config)
-
-    if token:
-        session.headers.update({"Authorization": f"Bearer {token}"})
-    else:
-        logger.warning("No token available. Requests will be sent as ANONYMOUS.")
-
-    if auth_type == "basic" and not token:
+    if auth_type == "basic":
         session.auth = (username, password)
-
-    logger.debug("BUILD_SESSION RESULT: bearer_header=%s session.auth_set=%s",
-                "Authorization" in session.headers, session.auth is not None)
+    elif auth_type == "token":
+        session.headers.update({"Authorization": f"Bearer {token}"})
+    elif auth_type == "oauth":
+        access_token = _fetch_oauth_token(base_url, entry_config or {})
+        session.headers.update({"Authorization": f"Bearer {access_token}"})
     return session
-
 
 
 def _html_to_text(html: str) -> str:
@@ -189,12 +157,18 @@ def _autodetect_text_content(attributes: Dict[str, Any]) -> str:
         elif isinstance(value, str) and len(value) > 30:
             parts.append(_html_to_text(value))
         elif isinstance(value, list):
+            items: List[str] = []
             for sub in value:
                 if isinstance(sub, dict):
                     text = sub.get("processed") or sub.get("value") or ""
                     cleaned = _html_to_text(str(text))
                     if cleaned:
                         parts.append(cleaned)
+                elif isinstance(sub, str) and sub.strip():
+                    # Multi-value plain text fields, e.g. recipe ingredients
+                    items.append(sub.strip())
+            if items:
+                parts.append("\n".join(items))
     return "\n\n".join(filter(None, parts))
 
 
@@ -273,13 +247,13 @@ def load_from_drupal(
         # }
 
         # Timestamp filter: only documents changed on or after `since`
-        # if since is not None:
-        #     # Ensure the timestamp is timezone-aware and formatted as ISO 8601 for JSON:API
-        #     since_utc = since.astimezone(timezone.utc) if since.tzinfo else since.replace(tzinfo=timezone.utc)
-        #     params["filter[changed-filter][condition][path]"] = "changed"
-        #     params["filter[changed-filter][condition][operator]"] = ">="
-        #     params["filter[changed-filter][condition][value]"] = since_utc.isoformat()
-        #     logger.info(f"DrupalLoader: applying since-filter >= {since_utc.isoformat()} for '{content_type}'")
+        if since is not None:
+            # Ensure the timestamp is timezone-aware and formatted as ISO 8601 for JSON:API
+            since_utc = since.astimezone(timezone.utc) if since.tzinfo else since.replace(tzinfo=timezone.utc)
+            params["filter[changed-filter][condition][path]"] = "changed"
+            params["filter[changed-filter][condition][operator]"] = ">="
+            params["filter[changed-filter][condition][value]"] = since_utc.isoformat()
+            logger.info(f"DrupalLoader: applying since-filter >= {since_utc.isoformat()} for '{content_type}'")
 
         page_count = 0
         next_url: Optional[str] = endpoint
@@ -348,15 +322,18 @@ def load_from_drupal(
                 langcode: str = str(attributes.get("langcode", language))
                 status: bool = bool(attributes.get("status", True))
 
-                page_content = _extract_page_content(attributes, text_fields)
-                if not page_content:
+                # The title alone doesn't count as content, otherwise e.g. recipes are indexed without their text
+                body_content = _extract_page_content(attributes, [field for field in text_fields if field != "title"])
+                if not body_content:
                     # Configured text_fields yielded nothing – auto-detect all readable text fields
-                    page_content = _autodetect_text_content(attributes)
-                    if page_content:
+                    body_content = _autodetect_text_content(attributes)
+                    if body_content:
                         logger.debug(
                             f"DrupalLoader: node {drupal_id} – configured text_fields had no content, "
                             f"used auto-detected fields instead."
                         )
+                title_content = _extract_page_content(attributes, ["title"]) if "title" in text_fields else ""
+                page_content = "\n\n".join(filter(None, [title_content, body_content]))
                 if not page_content:
                     # Last resort fallback: use title only
                     page_content = title

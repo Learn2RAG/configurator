@@ -198,11 +198,6 @@ msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
 msgstr ""
 
-#, python-format
-msgctxt "status"
-msgid "Currently running: %(pipeline)s"
-msgstr ""
-
 msgctxt "column_heading"
 msgid "Data source type"
 msgstr ""
@@ -333,8 +328,24 @@ msgctxt "tooltip"
 msgid "Import only once."
 msgstr ""
 
+msgctxt "status"
+msgid "Importing"
+msgstr ""
+
+msgctxt "status"
+msgid "Importing and running AI chat"
+msgstr ""
+
+msgctxt "form_label:jira"
+msgid "Include comments"
+msgstr ""
+
 msgctxt "form_label"
 msgid "Internal vector store"
+msgstr ""
+
+msgctxt "form_label:jira"
+msgid "Issue types"
 msgstr ""
 
 msgctxt "column_heading"
@@ -417,6 +428,14 @@ msgctxt "form_auth_option"
 msgid "OAuth"
 msgstr ""
 
+msgctxt "form_auth_option"
+msgid "OAuth client credentials"
+msgstr ""
+
+msgctxt "form_label"
+msgid "OAuth import scope"
+msgstr ""
+
 msgid "Ollama is not running. Please restart the Learn2RAG configurator."
 msgstr ""
 
@@ -441,6 +460,10 @@ msgid "Optimization"
 msgstr ""
 
 msgid "Optional"
+msgstr ""
+
+msgctxt "form_label:jira"
+msgid "Page size"
 msgstr ""
 
 msgctxt "form_label"
@@ -478,6 +501,10 @@ msgstr ""
 msgid "Ports are not configured and would be chosen automatically."
 msgstr ""
 
+msgctxt "form_label:jira"
+msgid "Projects"
+msgstr ""
+
 msgctxt "header"
 msgid "Question"
 msgstr ""
@@ -511,6 +538,14 @@ msgstr ""
 #, python-format
 msgctxt "flash"
 msgid "Removed pipeline: %(label)s"
+msgstr ""
+
+msgctxt "status"
+msgid "Running"
+msgstr ""
+
+msgctxt "status"
+msgid "Running AI chat"
 msgstr ""
 
 msgctxt "button"
@@ -634,6 +669,12 @@ msgctxt "button"
 msgid "Use this suggested language model"
 msgstr ""
 
+msgid ""
+"Used with \"OAuth client credentials\": the importer requests a token "
+"with the OAuth client ID and secret below. The scope decides which "
+"documents are imported."
+msgstr ""
+
 msgctxt "form_label"
 msgid "User authentication"
 msgstr ""
@@ -666,6 +707,6 @@ msgctxt "title"
 msgid "Welcome"
 msgstr ""
 
-msgid "running"
+msgid "You and users will see this label."
 msgstr ""
 

@@ -19,11 +19,11 @@ def discover_applications(import_config: Mapping[str, Any]) -> Generator[
             client_id = loader_config.get('oauth_client_id', '')
             client_secret = loader_config.get('oauth_client_secret', '')
             base_url = loader_config.get('base_url', '')
-            authorize_url = loader_config.get('oauth_authorize_url', base_url + '/oauth/authorize')
-            access_token_url = loader_config.get('oauth_access_token_url', base_url + '/oauth/token')
+            # The UI stores empty form fields as '', which must also fall back to the defaults
+            authorize_url = loader_config.get('oauth_authorize_url') or base_url.rstrip('/') + '/oauth/authorize'
+            access_token_url = loader_config.get('oauth_access_token_url') or base_url.rstrip('/') + '/oauth/token'
 
-            # Read the scope from config, defaulting to administrator
-            scope = loader_config.get('oauth_scope', 'administrator')
+            scope = loader_config.get('oauth_scope') or 'authenticated'
 
             if client_id != '' and client_secret != '' and (base_url != '' or authorize_url != ''):
                 info_url = base_url or authorize_url

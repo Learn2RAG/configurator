@@ -120,7 +120,7 @@ msgstr "Ein weiteres Sprachmodell"
 
 msgctxt "header"
 msgid "Answer"
-msgstr ""
+msgstr "Antwort"
 
 #, python-format
 msgid ""
@@ -191,11 +191,11 @@ msgstr ""
 
 msgctxt "form_label"
 msgid "Content types"
-msgstr ""
+msgstr "Inhaltstypen"
 
 msgctxt "flash"
 msgid "Could not save the training data file"
-msgstr ""
+msgstr "Die Trainingsdatei konnte nicht gespeichert werden"
 
 #, python-format
 msgctxt "flash"
@@ -206,11 +206,6 @@ msgstr "Pipeline konnte nicht gestartet werden: %(message)s"
 msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
 msgstr "Pipeline konnte nicht gestoppt werden: %(message)s"
-
-#, python-format
-msgctxt "status"
-msgid "Currently running: %(pipeline)s"
-msgstr "Derzeit läuft: %(pipeline)s"
 
 msgctxt "column_heading"
 msgid "Data source type"
@@ -297,7 +292,7 @@ msgstr "Pipeline konnte nicht gestartet werden: %(label)s"
 
 msgctxt "form_label"
 msgid "Failure threshold"
-msgstr ""
+msgstr "Fehlerschwelle"
 
 #, python-format
 msgctxt "tooltip"
@@ -347,9 +342,25 @@ msgctxt "tooltip"
 msgid "Import only once."
 msgstr "Nur einmal importieren"
 
+msgctxt "status"
+msgid "Importing"
+msgstr "Import läuft"
+
+msgctxt "status"
+msgid "Importing and running AI chat"
+msgstr "Import und KI-Chat laufen"
+
+msgctxt "form_label:jira"
+msgid "Include comments"
+msgstr "Kommentare einbeziehen"
+
 msgctxt "form_label"
 msgid "Internal vector store"
 msgstr "Interner Vektorspeicher"
+
+msgctxt "form_label:jira"
+msgid "Issue types"
+msgstr "Vorgangstypen"
 
 msgctxt "column_heading"
 msgid "Label"
@@ -429,7 +440,15 @@ msgstr "keine (alle Benutzer erhalten Zugriff auf alle Daten)"
 
 msgctxt "form_auth_option"
 msgid "OAuth"
-msgstr ""
+msgstr "OAuth"
+
+msgctxt "form_auth_option"
+msgid "OAuth client credentials"
+msgstr "OAuth-Client-Zugangsdaten"
+
+msgctxt "form_label"
+msgid "OAuth import scope"
+msgstr "OAuth-Scope für den Import"
 
 msgid "Ollama is not running. Please restart the Learn2RAG configurator."
 msgstr "Ollama ist nicht verfügbar. Es wird empfohlen Learn2RAG neuzustarten."
@@ -456,6 +475,10 @@ msgstr "Optimierung"
 
 msgid "Optional"
 msgstr "Optional"
+
+msgctxt "form_label:jira"
+msgid "Page size"
+msgstr "Seitengröße"
 
 msgctxt "form_label"
 msgid "Password"
@@ -494,9 +517,13 @@ msgstr ""
 "Die Ports sind nicht konfiguriert und würden automatisch ausgewählt "
 "werden."
 
+msgctxt "form_label:jira"
+msgid "Projects"
+msgstr "Projekte"
+
 msgctxt "header"
 msgid "Question"
-msgstr ""
+msgstr "Frage"
 
 msgctxt "button"
 msgid "Remove"
@@ -528,6 +555,14 @@ msgstr "Entfernen der Konfiguration: %(label)s"
 msgctxt "flash"
 msgid "Removed pipeline: %(label)s"
 msgstr "Die Pipeline entfernt: %(label)s"
+
+msgctxt "status"
+msgid "Running"
+msgstr "Läuft"
+
+msgctxt "status"
+msgid "Running AI chat"
+msgstr "KI-Chat läuft"
 
 msgctxt "button"
 msgid "Save"
@@ -630,7 +665,7 @@ msgstr "Dieses Passwort würde in der Konfiguration im Klartext gespeichert werd
 #. training data preview
 #, python-format
 msgid "Total rows: %(amount)s"
-msgstr ""
+msgstr "Zeilen insgesamt: %(amount)s"
 
 msgctxt "header"
 msgid "Training data"
@@ -638,7 +673,7 @@ msgstr "Trainingsdaten"
 
 msgctxt "flash"
 msgid "Training data file saved"
-msgstr ""
+msgstr "Trainingsdatei gespeichert"
 
 msgctxt "tooltip"
 msgid "Unknown value"
@@ -656,13 +691,22 @@ msgctxt "button"
 msgid "Use this suggested language model"
 msgstr "Empfohlenes Sprachmodell verwenden"
 
+msgid ""
+"Used with \"OAuth client credentials\": the importer requests a token "
+"with the OAuth client ID and secret below. The scope decides which "
+"documents are imported."
+msgstr ""
+"Wird mit „OAuth-Client-Zugangsdaten“ verwendet: Der Importer fordert mit "
+"der unten angegebenen OAuth-Client-ID und dem Client-Secret ein Token an."
+" Der Scope bestimmt, welche Dokumente importiert werden."
+
 msgctxt "form_label"
 msgid "User authentication"
 msgstr "Benutzerauthentifizierung"
 
 msgctxt "form_label"
 msgid "User interface and RAG service"
-msgstr ""
+msgstr "Benutzeroberfläche und RAG-Dienst"
 
 msgctxt "form_label"
 msgid "Username"
@@ -688,8 +732,8 @@ msgctxt "title"
 msgid "Welcome"
 msgstr "Wilkommen"
 
-msgid "running"
-msgstr "läuft"
+msgid "You and users will see this label."
+msgstr "Sie und die Benutzer sehen diesen Namen."
 
 #~ msgid "Download failed"
 #~ msgstr ""
@@ -803,4 +847,11 @@ msgstr "läuft"
 #~ msgctxt "flash"
 #~ msgid "Could not save the file"
 #~ msgstr "Die Datei konnte nicht gespeichert werden"
+
+#~ msgctxt "status"
+#~ msgid "Currently running: %(pipeline)s"
+#~ msgstr "Derzeit läuft: %(pipeline)s"
+
+#~ msgid "running"
+#~ msgstr "läuft"
 

@@ -10,12 +10,16 @@ from ..utils import is_windows, save_data_path, waitUntil
 
 import pytest
 from openai import APIConnectionError, OpenAI
+from qdrant_client import QdrantClient
 from _pytest.logging import LogCaptureFixture
 
 logger = logging.getLogger(__name__)
 
 template_dir = Path(__file__).resolve().parent.parent / 'ui' / 'templates' / 'compose' / 'pipelines'
 data_dir = Path(__file__).resolve().parent / 'data'
+
+# Text from the demo_umami article about carrots; drupal/scripts/main.sh restricts articles to administrators
+RESTRICTED_TEXT = 'purple, red, yellow or white'
 
 
 def docker_compose_available() -> bool:
@@ -108,9 +112,15 @@ class TestDrupal():
                     {
                         'loader_id': 'drupal_test',
                         'loader_type': 'DrupalLoader',
-                        'auth_type': 'none',
+                        # Import everything with the consumer from drupal/scripts/create_consumer.php ...
+                        'auth_type': 'oauth',
+                        'oauth_import_scope': 'administrator',
+                        'oauth_client_id': 'test_client',
+                        'oauth_client_secret': 'test_secret',
+                        # ... and filter search results by what the chat user may see
+                        'user_auth_type': 'oauth',
                         'base_url': drupal_instance,
-                        'content_types': ['article','recipe'],
+                        'content_types': ['article', 'recipe'],
                     },
                 ],
             },
@@ -131,13 +141,22 @@ class TestDrupal():
         project.remove()
         logging.info('Finished import')
 
+        # Without the restricted article in the index the leak check below would pass trivially
+        qdrant = QdrantClient(path=str(self.storage_path / 'qdrant_persistence'))
+        try:
+            points, _ = qdrant.scroll('learn2rag', limit=10000, with_payload=True)
+        finally:
+            qdrant.close()
+        assert any(RESTRICTED_TEXT in str((point.payload or {}).get('content', '')) for point in points), \
+            'restricted article was imported with the administrator scope'
+
         logging.info('Starting pipeline')
         project = Project.create(template_dir / 'pipeline.yml', self.project_name, template=True, template_context=template_context)
         assert project is not None, 'project should not be None'
         project.start()
         assert project.running
 
-        def check_rag_401() -> None:
+        def check_restricted_hidden() -> None:
             try:
                 completion = self.openai_client.chat.completions.create(
                     model='learn2rag',
@@ -146,26 +165,22 @@ class TestDrupal():
                     ],
                 )
                 content = completion.choices[-1].message.content
-                logger.debug('Response content for 401 test: %s', content)
-
+                logger.debug('Response content for anonymous user: %s', content)
                 assert 'for testing only' in content, 'contains test marker'
-
-                # We EXPECT chunks here (the public recipes it fell back to)
-                assert not content.endswith("Information:\n"), 'Should contain public fallback chunks'
-                assert 'purple, red, yellow or white' not in content, 'SECURITY LEAK: Restricted text was exposed!'
-
+                assert "Information:\n" in content, 'contains the prompt'
+                assert RESTRICTED_TEXT not in content, 'restricted article must not reach an anonymous user'
             except APIConnectionError:
                 assert False, 'Drupal API is available'
 
-        waitUntil(check_rag_401, timeout=1 * 120 * 1000)
+        waitUntil(check_restricted_hidden, timeout=1 * 120 * 1000)
 
-        def check_rag() -> None:
+        def check_public_visible() -> None:
             try:
                 completion = self.openai_client.chat.completions.create(
                     model='learn2rag',
                     messages=[
-                        # Query a public article instead of the restricted carrot article
-                        {'role': 'user', 'content': 'How do I make Crema catalana?'},
+                        # Recipes are public, so the authorization filter must keep them
+                        {'role': 'user', 'content': 'How do I make vegan chocolate and nut brownies?'},
                     ],
                 )
                 content = completion.choices[-1].message.content
@@ -173,8 +188,10 @@ class TestDrupal():
                 assert 'for testing only' in content, 'contains test marker'
                 assert "Information:\n" in content, 'contains the prompt'
                 assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
-                assert 'catalana' in content.lower(), 'specific text from a test file'
+                # Text from the recipe's ingredients, not its title: recipes have no body field
+                assert 'sunflower oil' in content, 'specific text from a test file'
             except APIConnectionError:
                 assert False, 'Drupal API is available'
 
-        waitUntil(check_rag, timeout=1 * 120 * 1000)
+        waitUntil(check_public_visible, timeout=1 * 120 * 1000)
+        logging.info("Finished pipeline")

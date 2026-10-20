@@ -202,7 +202,7 @@ def process_configuration_entries(
                 auth_type = str(entry.get("auth_type", "none"))
                 username = str(entry.get("username", ""))
                 password = str(entry.get("password", ""))
-                token = entry.get("token", "")
+                token = str(entry.get("token", ""))
                 text_fields = entry.get("text_fields")  # None → loader uses default
                 page_size = int(entry.get("page_size", 50))
                 language = str(entry.get("language", ""))
@@ -378,7 +378,7 @@ def process_delta_imports(
 
                 username = str(entry.get("username", ""))
                 password = str(entry.get("password", ""))
-                token = entry.get("token", "")
+                token = str(entry.get("token", ""))
                 text_fields = entry.get("text_fields")
                 page_size = int(entry.get("page_size", 50))
                 language = str(entry.get("language", ""))

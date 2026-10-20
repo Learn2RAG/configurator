@@ -10,9 +10,11 @@ from collections import defaultdict
 from typing import Any, ClassVar, DefaultDict, Dict, List, Optional, Set
 from unittest.mock import patch, MagicMock
 
+import requests
 from langchain_core.documents import Document
 from .generate_test_documents import create_test_documents
 from ..loaders.directory_loader import load_from_directory
+from ..loaders.drupal_loader import _build_session, load_from_drupal
 from ..loaders.html_loader import load_html_content, _is_same_site
 from ..loaders.jira_loader import load_from_jira, get_all_jira_document_ids
 from ..loaders.mediawiki_loader import (
@@ -21,6 +23,7 @@ from ..loaders.mediawiki_loader import (
     load_from_mediawiki,
 )
 from ..loaders.errors import LoaderAccessError
+from ..utils.config_loader import validate_config_entry
 from ..utils.import_state import ImportState
 
 # Set RUN_INTEGRATION_TESTS=1 to run tests that require network access.
@@ -1058,3 +1061,108 @@ class MediaWikiDeltaFailSafeTestCase(unittest.TestCase):
         mock_delete_documents.assert_not_called()
         mock_index.assert_not_called()
         import_state.save_success.assert_not_called()
+
+
+class DrupalLoaderUnitTestCase(unittest.TestCase):
+    """Unit tests for Drupal loader authentication and delta filtering with mocked HTTP."""
+
+    OAUTH_ENTRY: ClassVar[Dict[str, Any]] = {
+        "oauth_client_id": "test_client",
+        "oauth_client_secret": "test_secret",
+    }
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.post")
+    def test_none_and_basic_ignore_oauth_credentials(self, mock_post: MagicMock) -> None:
+        # OAuth credentials are also present for user login; they must not upgrade the importer's access
+        session = _build_session("none", "", "", "", entry_config=self.OAUTH_ENTRY, base_url="https://drupal.example.com")
+        self.assertNotIn("Authorization", session.headers)
+        session = _build_session("basic", "user", "pass", "", entry_config=self.OAUTH_ENTRY, base_url="https://drupal.example.com")
+        self.assertEqual(session.auth, ("user", "pass"))
+        self.assertNotIn("Authorization", session.headers)
+        mock_post.assert_not_called()
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.post")
+    def test_oauth_requests_client_credentials_token(self, mock_post: MagicMock) -> None:
+        mock_post.return_value = _make_json_response({"access_token": "abc"})
+        entry = {**self.OAUTH_ENTRY, "oauth_import_scope": "administrator"}
+
+        session = _build_session("oauth", "", "", "", entry_config=entry, base_url="https://drupal.example.com/")
+
+        self.assertEqual(session.headers["Authorization"], "Bearer abc")
+        self.assertEqual(mock_post.call_args.args[0], "https://drupal.example.com/oauth/token")
+        self.assertEqual(mock_post.call_args.kwargs["data"], {"grant_type": "client_credentials", "scope": "administrator"})
+        self.assertEqual(mock_post.call_args.kwargs["auth"], ("test_client", "test_secret"))
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.post")
+    def test_oauth_without_scope_uses_consumer_default(self, mock_post: MagicMock) -> None:
+        mock_post.return_value = _make_json_response({"access_token": "abc"})
+        _build_session("oauth", "", "", "", entry_config=self.OAUTH_ENTRY, base_url="https://drupal.example.com")
+        self.assertEqual(mock_post.call_args.kwargs["data"], {"grant_type": "client_credentials"})
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.post")
+    def test_oauth_failure_raises_instead_of_anonymous(self, mock_post: MagicMock) -> None:
+        mock_post.return_value = _make_response("invalid_scope", status_code=400)
+        mock_post.return_value.raise_for_status.side_effect = requests.exceptions.HTTPError("400")
+        with self.assertRaises(LoaderAccessError):
+            _build_session("oauth", "", "", "", entry_config=self.OAUTH_ENTRY, base_url="https://drupal.example.com")
+
+        mock_post.return_value = _make_json_response({})
+        with self.assertRaises(LoaderAccessError):
+            _build_session("oauth", "", "", "", entry_config=self.OAUTH_ENTRY, base_url="https://drupal.example.com")
+
+        with self.assertRaises(LoaderAccessError):
+            _build_session("oauth", "", "", "", entry_config={}, base_url="https://drupal.example.com")
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.Session")
+    def test_since_adds_changed_filter(self, mock_session_cls: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session.headers = {}
+        mock_session_cls.return_value = mock_session
+        # Endpoint discovery fails, then one page with one node
+        mock_session.get.side_effect = [_make_response("", status_code=404)] * 3 + [_make_json_response({
+            "data": [{"id": "uuid-1", "attributes": {"drupal_internal__nid": 7, "title": "Carrots", "body": {"value": "<p>Orange</p>"}}}],
+            "links": {},
+        })]
+
+        docs = load_from_drupal(
+            base_url="https://drupal.example.com",
+            content_types=["article"],
+            loader_id="drupal_test",
+            since=datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc),
+        )
+
+        params = mock_session.get.call_args.kwargs["params"]
+        self.assertEqual(params["filter[changed-filter][condition][path]"], "changed")
+        self.assertEqual(params["filter[changed-filter][condition][operator]"], ">=")
+        self.assertEqual(params["filter[changed-filter][condition][value]"], "2026-10-01T12:00:00+00:00")
+        self.assertEqual([doc.metadata["source"] for doc in docs], ["https://drupal.example.com/node/7"])
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.Session")
+    def test_recipe_fields_are_imported_with_default_text_fields(self, mock_session_cls: MagicMock) -> None:
+        # demo_umami recipes have no body, their text is in custom fields
+        mock_session = MagicMock()
+        mock_session.headers = {}
+        mock_session_cls.return_value = mock_session
+        mock_session.get.side_effect = [_make_response("", status_code=404)] * 3 + [_make_json_response({
+            "data": [{"id": "uuid-2", "attributes": {
+                "drupal_internal__nid": 2,
+                "title": "Vegan chocolate and nut brownies",
+                "field_summary": {"value": "<p>Scrumptious vegan chocolate brownies.</p>"},
+                "field_ingredients": ["6 tbsp sunflower oil", " 80g vegan dark chocolate"],
+                "field_recipe_instruction": {"value": "<ol><li>Preheat the oven to 180°C.</li></ol>"},
+            }}],
+            "links": {},
+        })]
+
+        docs = load_from_drupal(base_url="https://drupal.example.com", content_types=["recipe"], loader_id="drupal_test")
+
+        content = docs[0].page_content
+        self.assertTrue(content.startswith("Vegan chocolate and nut brownies"))
+        for text in ("Scrumptious vegan chocolate brownies.", "6 tbsp sunflower oil\n80g vegan dark chocolate", "Preheat the oven to 180°C."):
+            self.assertIn(text, content)
+
+    def test_config_validation_of_oauth(self) -> None:
+        entry = {"loader_type": "DrupalLoader", "base_url": "https://drupal.example.com", "content_types": ["article"], "auth_type": "oauth"}
+        with self.assertRaises(ValueError):
+            validate_config_entry(entry)
+        self.assertTrue(validate_config_entry({**entry, **self.OAUTH_ENTRY}))
