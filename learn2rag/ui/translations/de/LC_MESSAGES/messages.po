@@ -330,15 +330,6 @@ msgctxt "form_label:jira"
 msgid "Include comments"
 msgstr "Kommentare einbeziehen"
 
-
-msgctxt "status"
-msgid "Importing and running AI chat"
-msgstr "Importieren und laufen eines KI-Chats"
-
-msgctxt "form_label:jira"
-msgid "Include comments"
-msgstr "Kommentare aufnehmen"
-
 msgctxt "form_label"
 msgid "Internal vector store"
 msgstr "Interner Vektorspeicher"
@@ -504,10 +495,6 @@ msgctxt "form_label:jira"
 msgid "Projects"
 msgstr "Projekte"
 
-msgctxt "form_label:jira"
-msgid "Projects"
-msgstr "Projekte"
-
 msgctxt "header"
 msgid "Question"
 msgstr "Frage"
@@ -550,14 +537,6 @@ msgstr "Laufen"
 msgctxt "status"
 msgid "Running AI chat"
 msgstr "Laufen eines KI-Chats"
-
-msgctxt "status"
-msgid "Running"
-msgstr "Läuft"
-
-msgctxt "status"
-msgid "Running AI chat"
-msgstr "KI-Chat läuft"
 
 msgctxt "button"
 msgid "Save"
@@ -650,7 +629,6 @@ msgstr "Dieses Passwort würde in der Konfiguration im Klartext gespeichert werd
 msgid "Total rows: %(amount)s"
 msgstr "Zeilen insgesamt: %(amount)s"
 
-
 msgctxt "header"
 msgid "Training data"
 msgstr "Trainingsdaten"
@@ -658,7 +636,6 @@ msgstr "Trainingsdaten"
 msgctxt "flash"
 msgid "Training data file saved"
 msgstr "Trainingsdatei gespeichert"
-
 
 msgctxt "tooltip"
 msgid "Unknown value"
@@ -676,14 +653,8 @@ msgctxt "button"
 msgid "Use this suggested language model"
 msgstr "Empfohlenes Sprachmodell verwenden"
 
-msgid ""
-"Used with \"OAuth client credentials\": the importer requests a token "
-"with the OAuth client ID and secret below. The scope decides which "
-"documents are imported."
-msgstr ""
-"Wird mit „OAuth-Client-Zugangsdaten“ verwendet: Der Importer fordert mit "
-"der unten angegebenen OAuth-Client-ID und dem Client-Secret ein Token an."
-" Der Scope bestimmt, welche Dokumente importiert werden."
+msgid "Used with \"OAuth client credentials\": the importer requests a token with the OAuth client ID and secret below. The scope decides which documents are imported."
+msgstr "Wird mit „OAuth-Client-Zugangsdaten“ verwendet: Der Importer fordert mit der unten angegebenen OAuth-Client-ID und dem Client-Secret ein Token an. Der Scope bestimmt, welche Dokumente importiert werden."
 
 msgctxt "form_label"
 msgid "User authentication"
@@ -692,7 +663,6 @@ msgstr "Benutzerauthentifizierung"
 msgctxt "form_label"
 msgid "User interface and RAG service"
 msgstr "Benutzeroberfläche und RAG-Dienst"
-
 
 msgctxt "form_label"
 msgid "Username"

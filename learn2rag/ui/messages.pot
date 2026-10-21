@@ -652,10 +652,7 @@ msgctxt "button"
 msgid "Use this suggested language model"
 msgstr ""
 
-msgid ""
-"Used with \"OAuth client credentials\": the importer requests a token "
-"with the OAuth client ID and secret below. The scope decides which "
-"documents are imported."
+msgid "Used with \"OAuth client credentials\": the importer requests a token with the OAuth client ID and secret below. The scope decides which documents are imported."
 msgstr ""
 
 msgctxt "form_label"
