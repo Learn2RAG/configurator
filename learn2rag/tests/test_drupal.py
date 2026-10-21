@@ -126,7 +126,8 @@ class TestDrupal():
             project = Project.get(self.project_name)
             assert project is not None, 'project exists'
             assert not project.running, 'import completed'
-        waitUntil(check_import, timeout=1 * 180 * 1000)
+        # Embedding the full recipe texts takes 2-3 minutes on CI runners' CPUs
+        waitUntil(check_import, timeout=1 * 600 * 1000)
 
         project.remove()
         logging.info('Finished import')
