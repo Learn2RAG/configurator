@@ -7,6 +7,8 @@ set -eu
 # See also: pyapp/Cross.toml
 CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
 BIN_SUFFIX=""
+# The binary needs at least the glibc of the build image; cross' "main" image is Ubuntu 24.04 (glibc 2.39)
+export CROSS_TARGET_X86_64_UNKNOWN_LINUX_GNU_IMAGE=ghcr.io/cross-rs/x86_64-unknown-linux-gnu:0.2.5
 
 . ./package-common
 
