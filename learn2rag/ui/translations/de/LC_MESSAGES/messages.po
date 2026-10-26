@@ -190,6 +190,10 @@ msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
 msgstr "Pipeline konnte nicht gestoppt werden: %(message)s"
 
+msgctxt "form_label"
+msgid "Crawl depth"
+msgstr "Crawl-Tiefe"
+
 msgctxt "column_heading"
 msgid "Data source type"
 msgstr "Datenquellentyp"
@@ -298,6 +302,10 @@ msgstr "Zum Beispiel: https://example.com/api"
 msgctxt "tooltip"
 msgid "For example: https://learn2rag.de/"
 msgstr "Zum Beispiel: https://learn2rag.de/"
+
+msgctxt "tooltip"
+msgid "How many levels of links to follow from the URL: 0 loads only this page, -1 crawls the whole site under this URL"
+msgstr "Anzahl der Link-Ebenen, denen ab der URL gefolgt werden soll: 0 lädt nur diese Seite, -1 crawlt die gesamte Website unter dieser URL."
 
 msgid "If you use a model from an external provider, they will see your data."
 msgstr "Wenn Sie ein Modell eines externen Anbieters verwenden, hat dieser Zugriff auf Ihre Daten."
