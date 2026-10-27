@@ -434,6 +434,14 @@ msgctxt "form_auth_option"
 msgid "OAuth"
 msgstr ""
 
+msgctxt "form_auth_option"
+msgid "OAuth client credentials"
+msgstr ""
+
+msgctxt "form_label"
+msgid "OAuth import scope"
+msgstr ""
+
 msgid "Ollama is not running. Please restart the Learn2RAG configurator."
 msgstr ""
 
@@ -659,6 +667,9 @@ msgstr ""
 
 msgctxt "button"
 msgid "Use this suggested language model"
+msgstr ""
+
+msgid "Used with \"OAuth client credentials\": the importer requests a token with the OAuth client ID and secret below. The scope decides which documents are imported."
 msgstr ""
 
 msgctxt "form_label"

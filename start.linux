@@ -13,6 +13,10 @@ echo Initializing, please wait...
 if ! ./configurator learn2rag.noop; then
     cleanup_pyapp
 fi
+echo Downloading the embedding model, the first time this takes a while...
+if ! ./configurator learn2rag.download_models; then
+    echo "Downloading the embedding model failed, imports will try again"
+fi
 echo ========================================
 echo Starting Learn2RAG...
 LEARN2RAG_PATH=. \

@@ -409,6 +409,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     data[field] = int(data[field])
                 else:
                     del data[field]
+        if data.get('type') == 'web':
+            data.setdefault('depth', -1)
         for field in [
                 'object_ids',
         ]:
