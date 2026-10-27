@@ -11,32 +11,43 @@ from .utils import AuthImplRouter
 logger = logging.getLogger(__name__)
 
 
-def discover_applications(import_config: Mapping[str, Any]) -> Generator[tuple[str, str, dict[str, Any]], None, None]:
+def discover_applications(import_config: Mapping[str, Any]) -> Generator[
+    tuple[str, dict[str, str], dict[str, Any]], None, None]:
     for loader_config in import_config['loaders']:
         if loader_config.get('user_auth_type', 'none') == 'oauth':
             name = loader_config['loader_id']
             client_id = loader_config.get('oauth_client_id', '')
             client_secret = loader_config.get('oauth_client_secret', '')
             base_url = loader_config.get('base_url', '')
-            authorize_url = loader_config.get('oauth_authorize_url', base_url + '/oauth/authorize')
-            access_token_url = loader_config.get('oauth_access_token_url', base_url + '/oauth/token')
-            if client_id != '' and client_secret != '' and base_url != '':
-                logger.info('Discovered OAuth application: %s (%s), client_id=%s)', name, base_url, client_id)
-                yield name, f'OAuth ({base_url})', {
+            # The UI stores empty form fields as '', which must also fall back to the defaults
+            authorize_url = loader_config.get('oauth_authorize_url') or base_url.rstrip('/') + '/oauth/authorize'
+            access_token_url = loader_config.get('oauth_access_token_url') or base_url.rstrip('/') + '/oauth/token'
+
+            scope = loader_config.get('oauth_scope') or 'authenticated'
+
+            if client_id != '' and client_secret != '' and (base_url != '' or authorize_url != ''):
+                info_url = base_url or authorize_url
+                logger.info('Discovered OAuth application: %s (%s), client_id=%s, scope=%s)', name, info_url, client_id,
+                            scope)
+                yield name, {
+                    'label': loader_config.get('label', info_url),
+                    'type': 'OAuth',
+                    'url': info_url,
+                }, {
                     'client_id': client_id,
                     'client_secret': client_secret,
                     'authorize_url': authorize_url,
                     'access_token_url': access_token_url,
-                    'client_kwargs': {'scope': 'authenticated'},
+                    'client_kwargs': {'scope': scope},
                 }
 
 
 class OAuthRouter(AuthImplRouter):
     def __init__(self) -> None:
         super().__init__()
-        self.applications: dict[str, str] = {}
+        self.applications: dict[str, dict[str, str]] = {}
 
-    def registered_applications(self) -> Mapping[str, str]:
+    def registered_applications(self) -> Mapping[str, Mapping[str, str]]:
         return self.applications
 
 
@@ -44,9 +55,9 @@ def build_router(import_config: Mapping[str, Any], login_handler: Callable[[Requ
     router = OAuthRouter()
 
     oauth = OAuth()
-    for name, label, kwargs in discover_applications(import_config):
-        oauth.register(name, **kwargs)
-        router.applications[name] = label
+    for name, app, oauth_kwargs in discover_applications(import_config):
+        oauth.register(name, **oauth_kwargs)
+        router.applications[name] = app
 
     @router.post('/{name}/login')
     async def login(name: str, request: Request) -> Any:

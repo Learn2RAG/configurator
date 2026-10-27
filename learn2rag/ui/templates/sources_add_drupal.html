@@ -3,6 +3,9 @@
   <div class="mb-3">
     <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
     <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this data source')}}">
+    <div class="alert alert-secondary">
+      {{gettext('You and users will see this label.')}}
+    </div>
   </div>
   <div class="mb-3">
     <label for="path" class="form-label">{{pgettext('form_label', 'Base URL')}}</label>
@@ -19,6 +22,7 @@
         <option value="none">{{pgettext('form_auth_option', 'None')}}</option>
         <option value="basic">{{pgettext('form_auth_option', 'Username and password')}}</option>
         <option value="token">{{pgettext('form_auth_option', 'Access token')}}</option>
+        <option value="oauth">{{pgettext('form_auth_option', 'OAuth client credentials')}}</option>
       </select>
     </div>
     <div class="mb-3">
@@ -35,6 +39,13 @@
     <div class="mb-3">
       <label for="token" class="form-label">{{pgettext('form_label', 'Access token')}}</label>
       <input class="form-control" name="token"/>
+    </div>
+    <div class="mb-3">
+      <label for="oauth_import_scope" class="form-label">{{pgettext('form_label', 'OAuth import scope')}}</label>
+      <input class="form-control" name="oauth_import_scope"/>
+      <div class="form-text">
+        {{gettext('Used with "OAuth client credentials": the importer requests a token with the OAuth client ID and secret below. The scope decides which documents are imported.')}}
+      </div>
     </div>
   </fieldset>
   {% include 'sources_add_userauth.html' %}

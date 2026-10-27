@@ -7,11 +7,13 @@
 {% block main %}
 <ul class="list-group">
   {% for prefix, router in auth_routers.items() %}
-  {% for name, label in router.registered_applications().items() %}
+  {% for name, app in router.registered_applications().items() %}
   {% if name in user_auths %}
   <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-success">
     <span class="badge text-bg-success rounded-pill">Logged in</span>
-    {{ label }}
+    <span title="{{ app.url }}">
+      {{ app.label }}
+    </span>
     <form method="POST" action="{{ auth_prefix }}/{{ prefix }}{{ router.url_path_for('logout', name=name) }}">
       <button type="submit" class="btn btn-danger">
         Log out
@@ -21,7 +23,9 @@
   {% else %}
   <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-danger">
     <span class="badge text-bg-danger rounded-pill">Not logged in</span>
-    {{ label }}
+    <span title="{{ app.url }}">
+      {{ app.label }}
+    </span>
     <form method="POST" action="{{ auth_prefix }}/{{ prefix }}{{ router.url_path_for('login', name=name) }}">
       <button type="submit" class="btn btn-success">
         Log in

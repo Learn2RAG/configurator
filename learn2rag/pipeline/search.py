@@ -14,6 +14,7 @@ from functools import lru_cache
 import numpy as np
 from FlagEmbedding import FlagReranker # type: ignore[import-untyped]
 from sentence_transformers import CrossEncoder
+from sentence_transformers.base.modality_types import PairInput
 from qdrant_client import models
 from qdrant_client.http.models import QueryResponse, ScoredPoint
 
@@ -105,7 +106,7 @@ def _rerank_points_with_sentence_transformers(
         return []
 
     # CrossEncoder expects list of (query, text) pairs
-    pairs = [[query, cast(str, p.payload["content"])] for p in valid_points if p.payload is not None]
+    pairs: list[PairInput] = [(query, cast(str, p.payload["content"])) for p in valid_points if p.payload is not None]
     scores = model.predict(pairs)
 
     # Attach scores to payload
@@ -523,7 +524,14 @@ async def search_authorized(
                 extra={'activity': 'search_authorized', 'request_id': request_id},
         )
 
-        points = _collect_query_points(question, user_config, local_opt, request_id=request_id)
+        points = await asyncio.to_thread(
+            _collect_query_points,
+            question,
+            user_config,
+            local_opt,
+            request_id=request_id)
+
+
         query_response = QueryResponse(points=points)
 
         authorized_points = await filter_authorized(user_auths, query_response)

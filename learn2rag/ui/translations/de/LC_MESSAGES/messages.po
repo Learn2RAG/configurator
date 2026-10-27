@@ -7,7 +7,6 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"PO-Revision-Date: 2026-09-14 10:19+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: de\n"
 "Language-Team: de <LL@li.org>\n"
@@ -16,6 +15,11 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
+
+#, python-format
+msgctxt "firststep"
+msgid "Yes, add my <code>%(docs_dir)s</code> folder"
+msgstr "Ja, meinen Ordner <code>%(docs_dir)s</code> hinzufügen"
 
 #, python-format
 msgid "%(num)d data source configuration"
@@ -115,40 +119,32 @@ msgstr "Neue Pipeline-Konfiguration hinzugefügt: %(label)s"
 msgid "Advanced configuration"
 msgstr "Erweiterte Optionen"
 
+msgctxt "firststep"
+msgid "All the files in this directory would be imported. That can take some time."
+msgstr "Alle Dateien in diesem Verzeichnis würden importiert werden. Das kann einige Zeit in Anspruch nehmen."
+
 msgid "Another model"
 msgstr "Ein weiteres Sprachmodell"
 
 msgctxt "header"
 msgid "Answer"
-msgstr ""
+msgstr "Antwort"
 
 #, python-format
-msgid ""
-"Are you sure you want to remove all data stored for this pipeline: "
-"%(label)s?"
-msgstr ""
-"Sind Sie sicher, dass Sie alle gespeicherten Daten für die folgende Pipeline entfernen möchten: "
-"%(label)s?"
+msgid "Are you sure you want to remove all data stored for this pipeline: %(label)s?"
+msgstr "Sind Sie sicher, dass Sie alle gespeicherten Daten für die folgende Pipeline entfernen möchten: %(label)s?"
 
 #, python-format
 msgid "Are you sure you want to remove this data source configuration: %(label)s?"
 msgstr "Sind Sie sicher, dass Sie diese Konfiguration entfernen möchten: %(label)s?"
 
 #, python-format
-msgid ""
-"Are you sure you want to remove this language model configuration: "
-"%(label)s?"
-msgstr ""
-"Sind Sie sicher, dass Sie diese Sprachmodellkonfiguration entfernen "
-"möchten: %(label)s?"
+msgid "Are you sure you want to remove this language model configuration: %(label)s?"
+msgstr "Sind Sie sicher, dass Sie diese Sprachmodellkonfiguration entfernen möchten: %(label)s?"
 
 #, python-format
-msgid ""
-"Are you sure you want to remove this pipeline configuration and all its "
-"stored data: %(label)s?"
-msgstr ""
-"Sind Sie sicher, dass Sie diese Konfiguration und alle gespeicherten "
-"Daten entfernen möchten: %(label)s?"
+msgid "Are you sure you want to remove this pipeline configuration and all its stored data: %(label)s?"
+msgstr "Sind Sie sicher, dass Sie diese Konfiguration und alle gespeicherten Daten entfernen möchten: %(label)s?"
 
 msgctxt "form_label"
 msgid "Authentication"
@@ -182,20 +178,16 @@ msgctxt "column_heading"
 msgid "Consecutive failures"
 msgstr "Aufeinanderfolgende Fehler"
 
-msgid ""
-"Consult the administrator or documentation of the corresponding system to"
-" find the required configuration values."
-msgstr ""
-"Wenden Sie sich an den Administrator oder studieren Sie die Dokumentation"
-" des jeweiligen Systems, um die erforderlichen Konfigurationswerte zu finden."
+msgid "Consult the administrator or documentation of the corresponding system to find the required configuration values."
+msgstr "Wenden Sie sich an den Administrator oder studieren Sie die Dokumentation des jeweiligen Systems, um die erforderlichen Konfigurationswerte zu finden."
 
 msgctxt "form_label"
 msgid "Content types"
-msgstr ""
+msgstr "Inhaltstypen"
 
 msgctxt "flash"
 msgid "Could not save the training data file"
-msgstr ""
+msgstr "Die Trainingsdatei konnte nicht gespeichert werden"
 
 #, python-format
 msgctxt "flash"
@@ -207,10 +199,9 @@ msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
 msgstr "Pipeline konnte nicht gestoppt werden: %(message)s"
 
-#, python-format
-msgctxt "status"
-msgid "Currently running: %(pipeline)s"
-msgstr "Derzeit läuft: %(pipeline)s"
+msgctxt "form_label"
+msgid "Crawl depth"
+msgstr "Crawl-Tiefe"
 
 msgctxt "column_heading"
 msgid "Data source type"
@@ -233,13 +224,8 @@ msgid "Data sources"
 msgstr "Datenquellen"
 
 #, python-format
-msgid ""
-"Debug logging is enabled in config file <code>%(file)s</code>. It might "
-"capture sensitive information."
-msgstr ""
-"Debug-Protokollierung ist in der Konfigurationsdatei "
-"<code>%(file)s</code> aktiviert. Es könnten sensible Informationen "
-"erfasst werden."
+msgid "Debug logging is enabled in config file <code>%(file)s</code>. It might capture sensitive information."
+msgstr "Debug-Protokollierung ist in der Konfigurationsdatei <code>%(file)s</code> aktiviert. Es könnten sensible Informationen erfasst werden."
 
 msgctxt "column_heading"
 msgid "Details"
@@ -253,6 +239,10 @@ msgstr "Weitere"
 msgctxt "flash"
 msgid "Directory removed: %(path)s"
 msgstr "Verzeichnis entfernt: %(path)s"
+
+msgctxt "firststep"
+msgid "Do you want to add a folder now?"
+msgstr "Möchten Sie jetzt einen Ordner hinzufügen?"
 
 msgctxt "heading"
 msgid "Download a language model"
@@ -297,7 +287,7 @@ msgstr "Pipeline konnte nicht gestartet werden: %(label)s"
 
 msgctxt "form_label"
 msgid "Failure threshold"
-msgstr ""
+msgstr "Fehlerschwelle"
 
 #, python-format
 msgctxt "tooltip"
@@ -326,10 +316,12 @@ msgctxt "tooltip"
 msgid "For example: https://learn2rag.de/"
 msgstr "Zum Beispiel: https://learn2rag.de/"
 
+msgctxt "tooltip"
+msgid "How many levels of links to follow from the URL: 0 loads only this page, -1 crawls the whole site under this URL"
+msgstr "Anzahl der Link-Ebenen, denen ab der URL gefolgt werden soll: 0 lädt nur diese Seite, -1 crawlt die gesamte Website unter dieser URL."
+
 msgid "If you use a model from an external provider, they will see your data."
-msgstr ""
-"Wenn Sie ein Modell eines externen Anbieters verwenden, hat dieser "
-"Zugriff auf Ihre Daten."
+msgstr "Wenn Sie ein Modell eines externen Anbieters verwenden, hat dieser Zugriff auf Ihre Daten."
 
 msgctxt "form_label"
 msgid "Immediately start the data import and the chat interface"
@@ -347,9 +339,25 @@ msgctxt "tooltip"
 msgid "Import only once."
 msgstr "Nur einmal importieren"
 
+msgctxt "status"
+msgid "Importing"
+msgstr "Import läuft"
+
+msgctxt "status"
+msgid "Importing and running AI chat"
+msgstr "Import und KI-Chat laufen"
+
+msgctxt "form_label:jira"
+msgid "Include comments"
+msgstr "Kommentare einbeziehen"
+
 msgctxt "form_label"
 msgid "Internal vector store"
-msgstr "Interner Vektorspeicher"
+msgstr ""
+
+msgctxt "form_label:jira"
+msgid "Issue types"
+msgstr "Vorgangstypen"
 
 msgctxt "column_heading"
 msgid "Label"
@@ -419,6 +427,10 @@ msgctxt "button"
 msgid "More options"
 msgstr "Weitere Optionen"
 
+msgctxt "firststep"
+msgid "More options"
+msgstr "Weitere Optionen"
+
 msgctxt "form_auth_option"
 msgid "None"
 msgstr "keine"
@@ -429,7 +441,15 @@ msgstr "keine (alle Benutzer erhalten Zugriff auf alle Daten)"
 
 msgctxt "form_auth_option"
 msgid "OAuth"
-msgstr ""
+msgstr "OAuth"
+
+msgctxt "form_auth_option"
+msgid "OAuth client credentials"
+msgstr "OAuth-Client-Zugangsdaten"
+
+msgctxt "form_label"
+msgid "OAuth import scope"
+msgstr "OAuth-Scope für den Import"
 
 msgid "Ollama is not running. Please restart the Learn2RAG configurator."
 msgstr "Ollama ist nicht verfügbar. Es wird empfohlen Learn2RAG neuzustarten."
@@ -452,10 +472,14 @@ msgstr "KI-Chat öffnen"
 
 msgctxt "header"
 msgid "Optimization"
-msgstr "Optimierung"
+msgstr ""
 
 msgid "Optional"
 msgstr "Optional"
+
+msgctxt "form_label:jira"
+msgid "Page size"
+msgstr "Seitengröße"
 
 msgctxt "form_label"
 msgid "Password"
@@ -490,13 +514,15 @@ msgid "Ports"
 msgstr "Ports"
 
 msgid "Ports are not configured and would be chosen automatically."
-msgstr ""
-"Die Ports sind nicht konfiguriert und würden automatisch ausgewählt "
-"werden."
+msgstr "Die Ports sind nicht konfiguriert und würden automatisch ausgewählt werden."
+
+msgctxt "form_label:jira"
+msgid "Projects"
+msgstr "Projekte"
 
 msgctxt "header"
 msgid "Question"
-msgstr ""
+msgstr "Frage"
 
 msgctxt "button"
 msgid "Remove"
@@ -529,13 +555,21 @@ msgctxt "flash"
 msgid "Removed pipeline: %(label)s"
 msgstr "Entfernte Pipeline: %(label)s"
 
+msgctxt "status"
+msgid "Running"
+msgstr "Laufen"
+
+msgctxt "status"
+msgid "Running AI chat"
+msgstr "Laufen eines KI-Chats"
+
 msgctxt "button"
 msgid "Save"
 msgstr "Speichern"
 
 msgctxt "label"
 msgid "Save"
-msgstr "Speichern"
+msgstr ""
 
 msgctxt "button"
 msgid "Select all"
@@ -554,20 +588,12 @@ msgid "Shutdown Learn2RAG"
 msgstr "Learn2RAG ausschalten"
 
 msgctxt "flash"
-msgid ""
-"Some configured pipelines use this data source configuration, remove them"
-" first"
-msgstr ""
-"Einige konfigurierte Pipelines nutzen diese Datenquellenkonfiguration. "
-"Entfernen sie diese zuerst."
+msgid "Some configured pipelines use this data source configuration, remove them first"
+msgstr "Einige konfigurierte Pipelines nutzen diese Datenquellenkonfiguration. Entfernen sie diese zuerst."
 
 msgctxt "flash"
-msgid ""
-"Some configured pipelines use this language model configuration, remove "
-"them first"
-msgstr ""
-"Einige konfigurierte Pipelines verwenden diese Sprachmodellkonfiguration."
-" Entfernen sie diese zuerst."
+msgid "Some configured pipelines use this language model configuration, remove them first"
+msgstr "Einige konfigurierte Pipelines verwenden diese Sprachmodellkonfiguration. Entfernen sie diese zuerst."
 
 msgctxt "header"
 msgid "Sources"
@@ -575,7 +601,7 @@ msgstr "Datenquellen"
 
 msgctxt "button"
 msgid "Start optimization"
-msgstr "Optimierung starten"
+msgstr ""
 
 msgctxt "tooltip"
 msgid "Start the AI chat. Requires import to be already completed."
@@ -617,12 +643,8 @@ msgctxt "flash"
 msgid "The requested pipeline is not found"
 msgstr "Die gewünschte Pipeline konnte nicht gefunden werden"
 
-msgid ""
-"This data source type does not support access control. All users will be "
-"provided access to all data."
-msgstr ""
-"Dieser Datenquellentyp unterstützt keine Zugriffskontrolle. Alle Benutzer"
-" erhalten Zugriff auf alle Daten."
+msgid "This data source type does not support access control. All users will be provided access to all data."
+msgstr "Dieser Datenquellentyp unterstützt keine Zugriffskontrolle. Alle Benutzer erhalten Zugriff auf alle Daten."
 
 msgid "This password would be saved in plain text in the configuration."
 msgstr "Dieses Passwort würde in der Konfiguration im Klartext gespeichert werden."
@@ -630,15 +652,15 @@ msgstr "Dieses Passwort würde in der Konfiguration im Klartext gespeichert werd
 #. training data preview
 #, python-format
 msgid "Total rows: %(amount)s"
-msgstr ""
+msgstr "Zeilen insgesamt: %(amount)s"
 
 msgctxt "header"
 msgid "Training data"
-msgstr "Trainingsdaten"
+msgstr ""
 
 msgctxt "flash"
 msgid "Training data file saved"
-msgstr "Trainingsdaten gespeichert"
+msgstr "Trainingsdatei gespeichert"
 
 msgctxt "tooltip"
 msgid "Unknown value"
@@ -656,13 +678,16 @@ msgctxt "button"
 msgid "Use this suggested language model"
 msgstr "Empfohlenes Sprachmodell verwenden"
 
+msgid "Used with \"OAuth client credentials\": the importer requests a token with the OAuth client ID and secret below. The scope decides which documents are imported."
+msgstr "Wird mit „OAuth-Client-Zugangsdaten“ verwendet: Der Importer fordert mit der unten angegebenen OAuth-Client-ID und dem Client-Secret ein Token an. Der Scope bestimmt, welche Dokumente importiert werden."
+
 msgctxt "form_label"
 msgid "User authentication"
 msgstr "Benutzerauthentifizierung"
 
 msgctxt "form_label"
 msgid "User interface and RAG service"
-msgstr ""
+msgstr "Benutzeroberfläche und RAG-Dienst"
 
 msgctxt "form_label"
 msgid "Username"
@@ -688,8 +713,12 @@ msgctxt "title"
 msgid "Welcome"
 msgstr "Wilkommen"
 
-msgid "running"
-msgstr "läuft"
+msgid "You and users will see this label."
+msgstr "Sie und die Benutzer sehen diesen Namen."
+
+msgctxt "firststep"
+msgid "You do not have any data sources selected"
+msgstr "Sie haben keine Datenquellen ausgewählt."
 
 #~ msgid "Download failed"
 #~ msgstr ""
@@ -796,11 +825,26 @@ msgstr "läuft"
 #~ msgid "Internal RAG service"
 #~ msgstr ""
 
+#~ msgctxt "flash"
+#~ msgid "Could not save the file"
+#~ msgstr "Die Datei konnte nicht gespeichert werden"
+
+#~ msgctxt "status"
+#~ msgid "Currently running: %(pipeline)s"
+#~ msgstr "Derzeit läuft: %(pipeline)s"
+
+#~ msgid "running"
+#~ msgstr "läuft"
+
 #~ msgctxt "form_label"
 #~ msgid "User interface"
 #~ msgstr ""
 
-#~ msgctxt "flash"
-#~ msgid "Could not save the file"
-#~ msgstr "Die Datei konnte nicht gespeichert werden"
+#~ msgctxt "button"
+#~ msgid "Optimization"
+#~ msgstr ""
+
+#~ msgctxt "firststep"
+#~ msgid " Yes, add my <code>~/Documents</code> folder"
+#~ msgstr "Ja, füge meinen Ordner <code>~/Documents</code> hinzu."
 
