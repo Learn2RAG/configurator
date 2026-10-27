@@ -18,8 +18,8 @@ msgstr ""
 
 #, python-format
 msgctxt "firststep"
-msgid " Yes, add my <code>%(docs_dir)s</code> folder"
-msgstr "Ja, meinen Ordner %(docs_dir)s hinzufügen"
+msgid "Yes, add my <code>%(docs_dir)s</code> folder"
+msgstr "Ja, meinen Ordner <code>%(docs_dir)s</code> hinzufügen"
 
 #, python-format
 msgid "%(num)d data source configuration"

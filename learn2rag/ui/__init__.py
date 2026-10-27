@@ -213,6 +213,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'debug_logging': config.get('logging', {}).get('debug', False),
             'current_timestamp': math.floor(time.time()),
             'llm': learn2rag.pipeline.llm,
+            'docs_dir': docs_dir,
         }
 
     @app.context_processor
@@ -266,8 +267,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
         return render_template(
             'start.html',
-            running_pipelines=running_pipelines,
-            docs_dir=docs_dir
+            running_pipelines=running_pipelines
         )
 
     def list_ollama_models() -> list[Any]:
@@ -289,7 +289,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         return render_template(
             'models_page.html',
             ollama_models=list_ollama_models(),
-            docs_dir=docs_dir
         )
 
     @app.post('/models')
@@ -357,7 +356,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             raise Exception('Unexpected downloader state')
         return render_template(
             'model_pulling.html',
-            docs_dir=docs_dir
         )
 
     @app.post('/models/<name>')
@@ -377,13 +375,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/sources')
     def sources_list() -> 'str | werkzeug.wrappers.response.Response':
-
-        logging.debug(f"docs_dir is {docs_dir}")
         return render_template(
             'sources_page.html',
             example_local_path=example_local_path,
             example_drupal_content_types='article, page, recipe',
-            docs_dir=docs_dir
         )
 
     @app.post('/sources')
@@ -445,7 +440,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         context = {
             'pipelines': pipelines,
             'projects': Project.get_all(),
-            'docs_dir' : docs_dir
         }
         template = 'pipelines_list.html' if request.headers.get('HX-Request') else 'pipelines_page.html'
         return render_template(template, **context)
@@ -594,7 +588,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             training_examples=training_examples,
             training_total=training_total,
             projects=projects,
-            docs_dir=docs_dir
         )
 
     @app.post('/pipelines/<name>/training')
@@ -655,15 +648,13 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                 'logs.html',
                 content=content,
                 file=file,
-                docs_dir=docs_dir
-
             )
         return redirect(url_for('pipelines_list'))
 
     @app.get('/ps')
     def ps_list() -> 'str | werkzeug.wrappers.response.Response':
         projects = Project.get_all()
-        return render_template('ps_list.html', projects=projects,docs_dir=docs_dir)
+        return render_template('ps_list.html', projects=projects)
 
     @app.post('/ps/stop')
     def ps_stop() -> 'str | werkzeug.wrappers.response.Response':

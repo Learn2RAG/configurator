@@ -17,7 +17,7 @@ msgstr ""
 
 #, python-format
 msgctxt "firststep"
-msgid " Yes, add my <code>%(docs_dir)s</code> folder"
+msgid "Yes, add my <code>%(docs_dir)s</code> folder"
 msgstr ""
 
 #, python-format
