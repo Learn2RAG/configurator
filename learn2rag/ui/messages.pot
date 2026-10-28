@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-27 11:47+0200\n"
+"POT-Creation-Date: 2026-10-28 14:42+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -100,59 +100,71 @@ msgctxt "flash"
 msgid "Added a new pipeline configuration: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:479
+#: learn2rag/ui/__init__.py:475
 #, python-format
 msgctxt "flash"
 msgid "Started the pipeline: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:481
+#: learn2rag/ui/__init__.py:477
 #, python-format
 msgctxt "flash"
 msgid "Failed to start the pipeline: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:485
+#: learn2rag/ui/__init__.py:481
 #, python-format
 msgctxt "flash"
 msgid "Could not start the pipeline: %(message)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:493 learn2rag/ui/__init__.py:528
-#: learn2rag/ui/__init__.py:546 learn2rag/ui/__init__.py:562
-#: learn2rag/ui/__init__.py:586
+#: learn2rag/ui/__init__.py:489 learn2rag/ui/__init__.py:520
+#: learn2rag/ui/__init__.py:540 learn2rag/ui/__init__.py:556
+#: learn2rag/ui/__init__.py:580
 msgctxt "flash"
 msgid "The requested pipeline is not found"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:538
+#: learn2rag/ui/__init__.py:525
 msgctxt "flash"
-msgid "Data source removed from pipeline."
+msgid "Stop the pipeline before removing a data source"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:555
+#: learn2rag/ui/__init__.py:527
+msgctxt "flash"
+msgid "The data source is not part of this pipeline"
+msgstr ""
+
+#: learn2rag/ui/__init__.py:532
+msgctxt "flash"
+msgid ""
+"Removed the data source from the pipeline, its documents are deleted on "
+"the next import"
+msgstr ""
+
+#: learn2rag/ui/__init__.py:549
 msgctxt "flash"
 msgid "Could not save the file"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:569
+#: learn2rag/ui/__init__.py:563
 #, python-format
 msgctxt "flash"
 msgid "Removed pipeline: %(label)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:575
+#: learn2rag/ui/__init__.py:569
 msgctxt "flash"
 msgid "Stopped the pipeline"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:579
+#: learn2rag/ui/__init__.py:573
 #, python-format
 msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
 msgstr ""
 
-#: learn2rag/ui/__init__.py:618
+#: learn2rag/ui/__init__.py:612
 msgctxt "shutdown"
 msgid "Bye!"
 msgstr ""

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from learn2rag.importer.utils.import_state import ImportState
     from learn2rag.importer.utils.progress import ImportProgress
 from learn2rag.pipeline.ingestion import index
-from learn2rag.pipeline.store import get_documents, delete_documents, update_documents
+from learn2rag.pipeline.store import get_documents, delete_collection, delete_documents, update_documents
 from ..globals import stop_loading
 from langchain_core.documents import Document
 from .directory_loader import load_from_directory
@@ -220,6 +220,40 @@ def process_configuration_entries(config_entries: List[Dict[str, Any]], progress
                 progress.emit("Phase 2/4 Load", f"Loader failed | error {e}")
 
     return all_documents
+
+
+def remove_stale_loaders(
+    config_entries: List[Dict[str, Any]],
+    user_config: Dict[str, Any],
+    opt_config: Dict[str, Any],
+    import_state: "ImportState",
+) -> List[str]:
+    """
+    Remove the documents and import state of loaders that are no longer configured.
+
+    A loader is stale when it has a persisted import state but its loader_id is
+    not in the importer config anymore, e.g. after a data source was removed
+    from a pipeline. Its documents are deleted from Qdrant and its state entry
+    is dropped, so re-adding the source later triggers a full import.
+
+    Args:
+        config_entries (List[Dict[str, Any]]): Loader configuration entries from the
+                                               importer config file.
+        user_config (Dict[str, Any]): User configuration dict (must contain
+                                      ``collection_name``).
+        opt_config (Dict[str, Any]): Optimisation configuration dict.
+        import_state (ImportState): ImportState instance holding the known loaders.
+
+    Returns:
+        List[str]: The loader_ids that were removed.
+    """
+    configured_ids = {entry.get("loader_id") for entry in config_entries}
+    stale_ids = [loader_id for loader_id in import_state.loader_ids() if loader_id not in configured_ids]
+    for loader_id in stale_ids:
+        logger.info(f"Loader '{loader_id}' is no longer configured, removing its documents")
+        delete_collection(loader_id, user_config, opt_config)
+        import_state.remove(loader_id)
+    return stale_ids
 
 
 def process_delta_imports(

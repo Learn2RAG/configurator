@@ -15,6 +15,8 @@ from .generate_test_documents import create_test_documents
 from ..loaders.directory_loader import load_from_directory
 from ..loaders.html_loader import load_html_content, _is_same_site
 from ..loaders.jira_loader import load_from_jira, get_all_jira_document_ids
+from ..loaders.process_loaders import remove_stale_loaders
+from ..utils.import_state import ImportState
 
 # Set RUN_INTEGRATION_TESTS=1 to run tests that require network access.
 _RUN_INTEGRATION: bool = os.environ.get("RUN_INTEGRATION_TESTS", "0") == "1"
@@ -821,3 +823,23 @@ class JiraLoaderUnitTestCase(unittest.TestCase):
         params = kwargs.get("params", {})
         jql_query = params.get("jql", "")
         self.assertIn("updated >= \"2026-05-18 08:30\"", jql_query)
+
+
+class RemoveStaleLoadersTestCase(unittest.TestCase):
+    """Loaders with import state but no config entry get their documents and state removed."""
+
+    @patch("learn2rag.importer.loaders.process_loaders.delete_collection")
+    def test_removes_unconfigured_loader(self, mock_delete: MagicMock) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state_file = pathlib.Path(tmp) / "import_state.json"
+            state_file.write_text(json.dumps({
+                "kept": {"last_import_timestamp": "2026-01-01T00:00:00+00:00"},
+                "removed": {"last_import_timestamp": "2026-01-01T00:00:00+00:00"},
+            }))
+            user_config = {"collection_name": "test"}
+
+            removed = remove_stale_loaders([{"loader_id": "kept"}], user_config, {}, ImportState(str(state_file)))
+
+            self.assertEqual(removed, ["removed"])
+            mock_delete.assert_called_once_with("removed", user_config, {})
+            self.assertEqual(list(json.loads(state_file.read_text())), ["kept"])

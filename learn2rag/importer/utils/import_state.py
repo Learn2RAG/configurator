@@ -23,7 +23,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("Learn2RAGImporter")
 
@@ -126,3 +126,27 @@ class ImportState:
         }
         self._save()
         logger.info("Import state saved for loader_id=%s (start_time=%s)", loader_id, ts.isoformat())
+
+    def loader_ids(self) -> List[str]:
+        """
+        Return the loader_ids that have a persisted import state.
+
+        Returns:
+            List[str]: loader_ids with at least one successful import.
+        """
+        return list(self._state)
+
+    def remove(self, loader_id: str) -> None:
+        """
+        Remove the persisted state of a loader and save the state file.
+
+        Used when a loader is no longer configured, so re-adding it later
+        starts with a full import instead of a stale delta.
+
+        Args:
+            loader_id (str): Unique loader identifier.
+        """
+        self._pending.pop(loader_id, None)
+        if self._state.pop(loader_id, None) is not None:
+            self._save()
+            logger.info("Import state removed for loader_id=%s", loader_id)

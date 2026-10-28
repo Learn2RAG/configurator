@@ -406,7 +406,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             start_pipeline(name, pipeline, 'continuous')
         return redirect(url_for('pipelines_list'))
 
-    def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str, delete_loader_id: str | None = None) -> None:
+    def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
         has_ssl = bool(app.config.get("TLS"))
         url = urllib.parse.urlparse(request.base_url)
         assert url.scheme
@@ -425,7 +425,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
 
         # Format the import config
-        import_config: dict[str, Any]  = {
+        import_config = {
             'loaders': [{
                 'loader_id': name,
                 'loader_type': {
@@ -443,10 +443,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                 **{key: value for key, value in source.items() if key not in ['label', 'type']},
             } for name, source in sources.items()],
         }
-
-        if delete_loader_id:
-            logging.debug("inject deletion env var")
-            import_config['environment'] = {'IMPORTER_DELETE_LOADER_ID': delete_loader_id}
 
         render_context = {
             'config': app.config,
@@ -516,26 +512,24 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             pipeline_sources=pipeline_sources,
         )
 
-    def start_pipeline_cleanup(pipeline_name: str, source_name: str, pipeline: dict[str, Any]) -> None:
-        # Reuses start_pipeline() logic
-        # passing the source_name  it gets added to import.yml
-        start_pipeline(pipeline_name, pipeline, 'import', delete_loader_id=source_name)
-
     @app.delete('/pipelines/<pipeline_name>/sources/<source_name>')
     def pipeline_source_delete(pipeline_name: str, source_name: str) -> 'str | werkzeug.wrappers.response.Response':
-        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', pipeline_name)
-        if pipeline is None:
+        try:
+            pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', pipeline_name)
+        except FileNotFoundError:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
             return redirect(url_for('pipelines_list'))
 
-        # Source aus Pipeline-Config entfernen
-        if 'sources' in pipeline and source_name in pipeline['sources']:
+        if (project := Project.get(pipeline_name)) and project.running:
+            # the running importer keeps the old config, so its documents would not be removed
+            flash(pgettext('flash', 'Stop the pipeline before removing a data source'), 'error')
+        elif source_name not in pipeline.get('sources', []):
+            flash(pgettext('flash', 'The data source is not part of this pipeline'), 'error')
+        else:
+            # the importer deletes the documents of loaders missing from its config on the next import
             pipeline['sources'].remove(source_name)
             learn2rag.data.update_entry(app.instance_path, 'pipelines', pipeline_name, pipeline)
-
-            # Cleanup-Import-Job starten
-            start_pipeline_cleanup(pipeline_name, source_name, pipeline)
-            flash(pgettext('flash', 'Data source removed from pipeline.'))
+            flash(pgettext('flash', 'Removed the data source from the pipeline, its documents are deleted on the next import'))
 
         return redirect(url_for('pipeline_details', name=pipeline_name))
 

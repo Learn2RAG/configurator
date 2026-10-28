@@ -22,7 +22,7 @@ from pathlib import Path
 from .config.config_constants import LOGS_DIR, VERSION
 from .utils.logging_setup import setup_logging
 from .utils.config_loader import load_json_config, validate_config_entry
-from .loaders.process_loaders import process_configuration_entries, process_delta_imports
+from .loaders.process_loaders import process_configuration_entries, process_delta_imports, remove_stale_loaders
 from .utils.import_state import ImportState
 from .utils.progress import ImportProgress
 from learn2rag.pipeline.ingestion import index
@@ -137,6 +137,9 @@ def main(args: argparse.Namespace) -> None:
                 validation_errors = True
 
         if not validation_errors:
+            # drop documents of loaders that were removed from the config (e.g. a data source removed from the pipeline)
+            remove_stale_loaders(config.get("loaders", []), user_config, opt_config, import_state)
+
             if args.delta:
                 # Delta-Import: Hash-/Timestamp-comparison, direct ingest in Qdrant,
                 logger.info("Running delta import (state file: %s)", state_file_path)
