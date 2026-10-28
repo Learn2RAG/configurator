@@ -1,6 +1,7 @@
 from operator import itemgetter
-from typing import Any, TypedDict
+from typing import Any, Mapping, NotRequired, Sequence, TypedDict
 
+from ..chat import Message
 from ..prov import Prov
 from .base import BaseOperator
 from .search import SearchOperator
@@ -8,7 +9,10 @@ from .generation import GenerationOperator
 
 Inputs = TypedDict('Inputs', {
     'question': str,
-    'user': str | None,
+    'user_auths': Mapping[str, Any] | None,
+    # Callers without a conversation, for example the optimization scripts,
+    # may leave the history out.
+    'history': NotRequired[Sequence[Message]],
 }, total=True)
 
 Outputs = TypedDict('Outputs', {
@@ -22,7 +26,8 @@ class BasicPipeline(BaseOperator):
         documents = itemgetter('documents')(await SearchOperator()(
             inputs={
                 'question': inputs['question'],
-                'user': inputs['user'],
+                'user_auths': inputs.get('user_auths') or {},
+                'history': inputs.get('history', ()),
             },
             prov=prov,
         ))
@@ -30,6 +35,7 @@ class BasicPipeline(BaseOperator):
             inputs={
                 'question': inputs['question'],
                 'documents': documents,
+                'history': inputs.get('history', ()),
             },
             prov=prov,
         ))

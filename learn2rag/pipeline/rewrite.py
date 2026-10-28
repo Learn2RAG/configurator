@@ -1,8 +1,11 @@
-from langchain_core.messages import SystemMessage, HumanMessage
+from typing import Any, Sequence
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 import ast
 import logging
 import os
 import time
+from .chat import Message
+from .generate import select_history
 from .llm import llm
 
 
@@ -68,7 +71,6 @@ def _invoke_llm(messages: list[SystemMessage | HumanMessage], *, purpose: str) -
     return ''
 
 
-# future todo: add history handling / add state handling for loops in pipeline
 
 try:
     with open("./learn2rag/pipeline/data/synonyms.txt", "r") as f:
@@ -129,6 +131,43 @@ def generate_subqueries(user_query: str, n: int=3) -> list[str]:
         logger.warning("generate_subqueries_parse_failed query=%r error=%s content=%r", user_query, exc, content[:500])
 
     return []
+
+
+def _format_history_transcript(history: Sequence[Message], opt_config: dict[str, Any]) -> str:
+    messages = select_history(history, opt_config)
+    lines = [
+        f"{'Assistant' if isinstance(message, AIMessage) else 'User'}: {message.content}"
+        for message in messages
+    ]
+    return "\n".join(lines)
+
+
+def contextualize_query(question: str, history: Sequence[Message], opt_config: dict[str, Any]) -> str:
+    if llm is None:
+        return ''
+
+    transcript = _format_history_transcript(history, opt_config)
+    if not transcript:
+        return ''
+
+    system_message_contextualize_query = """
+    You are a query rewriter for a RAG pipeline.
+
+    Task:
+    - You are given a conversation transcript and a follow-up question from the user.
+    - Rewrite the follow-up question into a standalone search query that makes sense without the conversation, by resolving pronouns, references, and implied topics using the transcript.
+    - Preserve the original meaning and intent of the follow-up question.
+    - Do not answer the question.
+    - Do not invent information that is not present in the conversation.
+    - No explanations.
+    - Return only the rewritten query text.
+    """
+
+    content = _invoke_llm([
+        SystemMessage(content=system_message_contextualize_query),
+        HumanMessage(content=f"Conversation so far:\n{transcript}\n\nFollow-up question: {question}"),
+    ], purpose="contextualize_query")
+    return content
 
 
 def generate_keywords(user_query: str, n: int=3) -> list[str]:

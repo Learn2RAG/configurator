@@ -1,0 +1,7 @@
+---
+services:
+  main:
+    command:
+      - '/bin/sh'
+      - '-c'
+      - 'sleep 10000'

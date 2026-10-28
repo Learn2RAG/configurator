@@ -52,7 +52,7 @@ def generate_documents(dataset_dict: Any, id_key: str | None, content_getter: Ca
 def import_dataset_documents(dataset_name: str, subdirectory: str, id_key: str | None, content_getter: Callable[[Any], Any]) -> None:
     logging.debug(f'{dataset_name=}')
     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
-    dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
+    dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory) # type: ignore[attr-defined, unused-ignore]
     content_counter = collections.Counter[str]()
     with (dataset_work_dir / 'loaded_documents.json').open('w') as f:
         json.dump(generate_documents(dataset_dict, id_key, content_getter, dataset_name, content_counter), f)
@@ -99,19 +99,20 @@ def read_dataset_qa(file_path: pathlib.Path | str, split: str | None = None) -> 
                 detected_sep = ','
 
         logging.debug(f'load csv file with delimiter: "{detected_sep}"')
-        dataset_dict = datasets.load_dataset('csv', data_files=str(target_path), sep=detected_sep)
+        #dataset_dict = datasets.load_dataset(
+        #    'csv',
+        #    data_files=target_path.as_posix(),
+        #    delimiter=detected_sep
+        #)
+        df = pd.read_csv(target_path.as_posix(), sep=detected_sep)
+        dataset_dict = datasets.DatasetDict({
+            "train": datasets.Dataset.from_pandas(df, preserve_index = False)
+        })
     else:
         logging.debug(f'load HF dataset ')
         dataset_dict = datasets.load_from_disk(str(target_path))
 
     return dataset_dict[split] if split is not None else dataset_dict
-
-# def read_dataset_qa(dataset_name: str, subdirectory: str, split: str | None=None) -> Any:
-#     logging.debug(f'{dataset_name=}')
-#     dataset_work_dir = pathlib.Path('./datasets') / dataset_name
-#     dataset_dict = datasets.load_from_disk(dataset_work_dir / 'source' / subdirectory)
-#     return dataset_dict[split] if split is not None else dataset_dict
-
 
 def basic_pipeline(dataset_name: str, question: str) -> dict[str, Any]:
     user_config = {
@@ -120,9 +121,10 @@ def basic_pipeline(dataset_name: str, question: str) -> dict[str, Any]:
         'imported_documents_file_path': None,
         'llm': None,
     }
-    documents = learn2rag.pipeline.search.search(question, user_config, opt_config)
-    answer = learn2rag.pipeline.generate.generate(question, documents.points, opt_config)
-    return {
-        'documents': documents,
-        'answer': answer,
-    }
+    raise NotImplementedError()
+    # documents = learn2rag.pipeline.search.search(question, user_config, opt_config)
+    # answer = learn2rag.pipeline.generate.generate(question, documents.points, opt_config)
+    # return {
+    #     'documents': documents,
+    #     'answer': answer,
+    # }

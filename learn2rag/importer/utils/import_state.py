@@ -14,9 +14,9 @@ Description:
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.1
+Version: 0.0.2
 Creation Date: April 27, 2026
-Last Modified: April 27, 2026
+Last Modified: August 31, 2026
 """
 
 import json
@@ -50,14 +50,23 @@ class ImportState:
         self._pending: Dict[str, datetime] = {}  # in-memory only, not yet persisted
         self._load()
 
+    def _entry_for(self, loader_id: str) -> Dict[str, Any]:
+        entry = self._state.setdefault(loader_id, {})
+        if not isinstance(entry, dict):
+            entry = {}
+            self._state[loader_id] = entry
+        entry.setdefault("last_import_timestamp", None)
+        entry.setdefault("consecutive_failures", 0)
+        return entry
+
     def _load(self) -> None:
         if self._path.exists():
             try:
                 with self._path.open("r", encoding="utf-8") as f:
                     self._state = json.load(f)
-                logger.info("Import state loaded from %s", self._path)
+                logger.debug("Import state loaded from %s", self._path)
             except (json.JSONDecodeError, OSError) as e:
-                logger.warning("Could not load import state from %s: %s — starting fresh.", self._path, e)
+                logger.debug("Could not load import state from %s: %s — starting fresh.", self._path, e)
                 self._state = {}
         else:
             self._state = {}
@@ -107,6 +116,30 @@ class ImportState:
         """
         self._pending[loader_id] = timestamp
 
+    def get_consecutive_failures(self, loader_id: str) -> int:
+        """Return the number of consecutive failed imports for a loader."""
+        entry = self._entry_for(loader_id)
+        value = entry.get("consecutive_failures", 0)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
+    def record_failure(self, loader_id: str) -> int:
+        """Increment and persist the consecutive-failure counter for a loader."""
+        entry = self._entry_for(loader_id)
+        count = self.get_consecutive_failures(loader_id) + 1
+        entry["consecutive_failures"] = count
+        self._save()
+        logger.info("Import failure recorded for loader_id=%s (consecutive_failures=%s)", loader_id, count)
+        return count
+
+    def reset_failures(self, loader_id: str) -> None:
+        """Reset the consecutive failure counter for a loader and persist the state."""
+        entry = self._entry_for(loader_id)
+        entry["consecutive_failures"] = 0
+        self._save()
+
     def save_success(self, loader_id: str) -> None:
         """
         Persist the previously recorded import start timestamp to disk.
@@ -121,9 +154,9 @@ class ImportState:
             f"save_success() called for loader_id='{loader_id}' without prior record_import_start()"
         )
         ts = self._pending.pop(loader_id)
-        self._state[loader_id] = {
-            "last_import_timestamp": ts.isoformat()
-        }
+        entry = self._entry_for(loader_id)
+        entry["last_import_timestamp"] = ts.isoformat()
+        entry["consecutive_failures"] = 0
         self._save()
         logger.info("Import state saved for loader_id=%s (start_time=%s)", loader_id, ts.isoformat())
 
@@ -132,7 +165,7 @@ class ImportState:
         Return the loader_ids that have a persisted import state.
 
         Returns:
-            List[str]: loader_ids with at least one successful import.
+            List[str]: loader_ids with a recorded import or failure.
         """
         return list(self._state)
 

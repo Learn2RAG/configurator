@@ -1,5 +1,7 @@
 import json
 import os
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pathlib
 import shutil
 import sys
@@ -10,12 +12,21 @@ from collections import defaultdict
 from typing import Any, ClassVar, DefaultDict, Dict, List, Optional, Set
 from unittest.mock import patch, MagicMock
 
+import requests
 from langchain_core.documents import Document
 from .generate_test_documents import create_test_documents
 from ..loaders.directory_loader import load_from_directory
+from ..loaders.drupal_loader import _build_session, get_all_drupal_document_ids, load_from_drupal
 from ..loaders.html_loader import load_html_content, _is_same_site
 from ..loaders.jira_loader import load_from_jira, get_all_jira_document_ids
 from ..loaders.process_loaders import remove_stale_loaders
+from ..loaders.mediawiki_loader import (
+    MediaWikiSourceUnavailable,
+    get_all_mediawiki_document_ids,
+    load_from_mediawiki,
+)
+from ..loaders.errors import LoaderAccessError
+from ..utils.config_loader import validate_config_entry
 from ..utils.import_state import ImportState
 
 # Set RUN_INTEGRATION_TESTS=1 to run tests that require network access.
@@ -123,6 +134,26 @@ class ImporterLoadersTestCase(unittest.TestCase):
                 )
         else:
             print("\n[SKIP_HASH_ASSERT=1] Hash assertion skipped.")
+
+
+class LoaderFailureHandlingTestCase(unittest.TestCase):
+    """Regression tests for access errors and import-state thresholds."""
+
+    def test_directory_loader_raises_loader_access_error_for_missing_path(self) -> None:
+        with self.assertRaises(LoaderAccessError):
+            load_from_directory("/definitely/not/here", recursive=False, loader_id="missing_dir")
+
+    def test_import_state_tracks_consecutive_failures(self) -> None:
+        temp_state = pathlib.Path(tempfile.mkdtemp(prefix="learn2rag_import_state_")) / "import_state.json"
+        state = ImportState(str(temp_state))
+        state.record_import_start("loader_1", datetime(2026, 8, 1, tzinfo=timezone.utc))
+        state.save_success("loader_1")
+
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 0)
+        self.assertEqual(state.record_failure("loader_1"), 1)
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 1)
+        state.reset_failures("loader_1")
+        self.assertEqual(state.get_consecutive_failures("loader_1"), 0)
 
 
 class AllFileTypesTestCase(unittest.TestCase):
@@ -823,6 +854,424 @@ class JiraLoaderUnitTestCase(unittest.TestCase):
         params = kwargs.get("params", {})
         jql_query = params.get("jql", "")
         self.assertIn("updated >= \"2026-05-18 08:30\"", jql_query)
+
+
+class MediaWikiLoaderUnitTestCase(unittest.TestCase):
+    """Unit tests for MediaWiki loader with mocked HTTP session."""
+
+    @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
+    @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")
+    def test_load_from_mediawiki_maps_pages_to_documents(
+        self,
+        mock_resolve_api: MagicMock,  # 1. Argument (unten)
+        mock_session_cls: MagicMock,  # 2. Argument (oben)
+    ) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        allpages_page_1 = _make_json_response(
+            {
+                "query": {"allpages": [{"pageid": 1, "title": "Page One"}]},
+                "continue": {"apcontinue": "Page_Two"},
+            }
+        )
+        allpages_page_2 = _make_json_response(
+            {
+                "query": {"allpages": [{"pageid": 2, "title": "Page Two"}]},
+            }
+        )
+        pages_payload = _make_json_response(
+            {
+                "query": {
+                    "pages": [
+                        {
+                            "pageid": 1,
+                            "ns": 0,
+                            "title": "Page One",
+                            "extract": "First page content",
+                            "revisions": [{"timestamp": "2026-08-10T11:00:00Z"}],
+                        },
+                        {
+                            "pageid": 2,
+                            "ns": 0,
+                            "title": "Page Two",
+                            "extract": "Second page content",
+                            "revisions": [{"timestamp": "2026-08-10T12:00:00Z"}],
+                        },
+                    ]
+                }
+            }
+        )
+        mock_session.get.side_effect = [allpages_page_1, allpages_page_2, pages_payload]
+
+        docs = load_from_mediawiki(
+            base_url="https://wiki.example.com",
+            loader_id="wiki_test",
+            auth_type="none",
+            namespaces=[0],
+            page_size=50,
+        )
+
+        self.assertEqual(len(docs), 2)
+        sources = {doc.metadata.get("source") for doc in docs}
+        self.assertIn("https://wiki.example.com/?curid=1", sources)
+        self.assertIn("https://wiki.example.com/?curid=2", sources)
+        self.assertTrue(all(doc.metadata.get("loader") == "MediaWikiLoader" for doc in docs))
+        self.assertTrue(all("content_hash" in doc.metadata for doc in docs))
+
+    @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
+    @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")
+    def test_get_all_mediawiki_document_ids_with_pagination(
+        self,
+        mock_resolve_api: MagicMock,  # 1. Argument entspricht dem unteren Patch
+        mock_session_cls: MagicMock,  # 2. Argument entspricht dem oberen Patch
+    ) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+
+        mock_session.get.side_effect = [
+            _make_json_response(
+                {
+                    "query": {"allpages": [{"pageid": 10, "title": "Alpha"}]},
+                    "continue": {"apcontinue": "Beta"},
+                }
+            ),
+            _make_json_response(
+                {
+                    "query": {"allpages": [{"pageid": 11, "title": "Beta"}]},
+                }
+            ),
+        ]
+
+        ids = get_all_mediawiki_document_ids(
+            base_url="https://wiki.example.com",
+            auth_type="none",
+            namespaces=[0],
+            page_size=1,
+        )
+
+        self.assertEqual(
+            ids,
+            [
+                "https://wiki.example.com/?curid=10",
+                "https://wiki.example.com/?curid=11",
+            ],
+        )
+
+    @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")
+    @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
+    def test_load_from_mediawiki_applies_since_filter(self, mock_session_cls: MagicMock, mock_resolve_api: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_session.get.return_value = _make_json_response({"query": {"recentchanges": []}})
+
+        since = datetime(2026, 8, 10, 9, 30, tzinfo=timezone.utc)
+        docs = load_from_mediawiki(
+            base_url="https://wiki.example.com",
+            auth_type="none",
+            namespaces=[0],
+            since=since,
+        )
+
+        self.assertEqual(docs, [])
+        self.assertTrue(mock_session.get.called)
+        _, kwargs = mock_session.get.call_args
+        params = kwargs.get("params", {})
+        self.assertEqual(params.get("list"), "recentchanges")
+        self.assertEqual(params.get("rcstart"), "2026-08-10T09:30:00Z")
+
+
+class MediaWikiDeltaFailSafeTestCase(unittest.TestCase):
+    """Ensure MediaWiki delta mode does not alter index on source outages."""
+
+    @patch("learn2rag.importer.loaders.process_loaders.index")
+    @patch("learn2rag.importer.loaders.process_loaders.delete_documents")
+    @patch("learn2rag.importer.loaders.process_loaders.load_from_mediawiki")
+    @patch("learn2rag.importer.loaders.process_loaders.get_all_mediawiki_document_ids")
+    @patch("learn2rag.importer.loaders.process_loaders.get_documents")
+    def test_empty_snapshot_skips_delta_without_index_changes(
+        self,
+        mock_get_documents: MagicMock,
+        mock_get_all_ids: MagicMock,
+        mock_load_from_mediawiki: MagicMock,
+        mock_delete_documents: MagicMock,
+        mock_index: MagicMock,
+    ) -> None:
+        from ..loaders.process_loaders import process_delta_imports
+
+        mock_get_documents.return_value = {"https://wiki.example.com/?curid=1": "hash1"}
+        mock_get_all_ids.return_value = []
+
+        import_state = MagicMock()
+        import_state.get_last_import_time.return_value = datetime(2026, 8, 1, tzinfo=timezone.utc)
+
+        process_delta_imports(
+            config_entries=[
+                {
+                    "loader_type": "MediaWikiLoader",
+                    "loader_id": "wiki_loader",
+                    "base_url": "https://wiki.example.com",
+                    "auth_type": "none",
+                    "namespaces": [0],
+                }
+            ],
+            user_config=_USER_CONFIG,
+            opt_config=_OPT_CONFIG,
+            import_state=import_state,
+            progress=None,
+        )
+
+        mock_delete_documents.assert_not_called()
+        mock_load_from_mediawiki.assert_not_called()
+        mock_index.assert_not_called()
+        import_state.save_success.assert_not_called()
+
+    @patch("learn2rag.importer.loaders.process_loaders.index")
+    @patch("learn2rag.importer.loaders.process_loaders.delete_documents")
+    @patch("learn2rag.importer.loaders.process_loaders.get_all_mediawiki_document_ids")
+    @patch("learn2rag.importer.loaders.process_loaders.get_documents")
+    def test_source_unavailable_skips_delta_without_index_changes(
+        self,
+        mock_get_documents: MagicMock,
+        mock_get_all_ids: MagicMock,
+        mock_delete_documents: MagicMock,
+        mock_index: MagicMock,
+    ) -> None:
+        from ..loaders.process_loaders import process_delta_imports
+
+        mock_get_documents.return_value = {"https://wiki.example.com/?curid=1": "hash1"}
+        mock_get_all_ids.side_effect = MediaWikiSourceUnavailable("unreachable")
+
+        import_state = MagicMock()
+        import_state.get_last_import_time.return_value = datetime(2026, 8, 1, tzinfo=timezone.utc)
+
+        process_delta_imports(
+            config_entries=[
+                {
+                    "loader_type": "MediaWikiLoader",
+                    "loader_id": "wiki_loader",
+                    "base_url": "https://wiki.example.com",
+                    "auth_type": "none",
+                    "namespaces": [0],
+                }
+            ],
+            user_config=_USER_CONFIG,
+            opt_config=_OPT_CONFIG,
+            import_state=import_state,
+            progress=None,
+        )
+
+        mock_delete_documents.assert_not_called()
+        mock_index.assert_not_called()
+        import_state.save_success.assert_not_called()
+
+
+class DrupalLoaderUnitTestCase(unittest.TestCase):
+    """Unit tests for Drupal loader authentication and delta filtering with mocked HTTP."""
+
+    OAUTH_ENTRY: ClassVar[Dict[str, Any]] = {
+        "oauth_client_id": "test_client",
+        "oauth_client_secret": "test_secret",
+    }
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.post")
+    def test_none_and_basic_ignore_oauth_credentials(self, mock_post: MagicMock) -> None:
+        # OAuth credentials are also present for user login; they must not upgrade the importer's access
+        session = _build_session("none", "", "", "", entry_config=self.OAUTH_ENTRY, base_url="https://drupal.example.com")
+        self.assertNotIn("Authorization", session.headers)
+        session = _build_session("basic", "user", "pass", "", entry_config=self.OAUTH_ENTRY, base_url="https://drupal.example.com")
+        self.assertEqual(session.auth, ("user", "pass"))
+        self.assertNotIn("Authorization", session.headers)
+        mock_post.assert_not_called()
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.post")
+    def test_oauth_requests_client_credentials_token(self, mock_post: MagicMock) -> None:
+        mock_post.return_value = _make_json_response({"access_token": "abc"})
+        entry = {**self.OAUTH_ENTRY, "oauth_import_scope": "administrator"}
+
+        session = _build_session("oauth", "", "", "", entry_config=entry, base_url="https://drupal.example.com/")
+
+        prepared = session.prepare_request(requests.Request("GET", "https://drupal.example.com/jsonapi"))
+        self.assertEqual(prepared.headers["Authorization"], "Bearer abc")
+        self.assertEqual(mock_post.call_args.args[0], "https://drupal.example.com/oauth/token")
+        self.assertEqual(mock_post.call_args.kwargs["data"], {"grant_type": "client_credentials", "scope": "administrator"})
+        self.assertEqual(mock_post.call_args.kwargs["auth"], ("test_client", "test_secret"))
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.post")
+    def test_oauth_without_scope_uses_consumer_default(self, mock_post: MagicMock) -> None:
+        mock_post.return_value = _make_json_response({"access_token": "abc"})
+        _build_session("oauth", "", "", "", entry_config=self.OAUTH_ENTRY, base_url="https://drupal.example.com")
+        self.assertEqual(mock_post.call_args.kwargs["data"], {"grant_type": "client_credentials"})
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.post")
+    def test_oauth_failure_raises_instead_of_anonymous(self, mock_post: MagicMock) -> None:
+        mock_post.return_value = _make_response("invalid_scope", status_code=400)
+        mock_post.return_value.raise_for_status.side_effect = requests.exceptions.HTTPError("400")
+        with self.assertRaises(LoaderAccessError):
+            _build_session("oauth", "", "", "", entry_config=self.OAUTH_ENTRY, base_url="https://drupal.example.com")
+
+        mock_post.return_value = _make_json_response({})
+        with self.assertRaises(LoaderAccessError):
+            _build_session("oauth", "", "", "", entry_config=self.OAUTH_ENTRY, base_url="https://drupal.example.com")
+
+        with self.assertRaises(LoaderAccessError):
+            _build_session("oauth", "", "", "", entry_config={}, base_url="https://drupal.example.com")
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.Session")
+    def test_since_adds_changed_filter(self, mock_session_cls: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session.headers = {}
+        mock_session_cls.return_value = mock_session
+        # Endpoint discovery fails, then one page with one node
+        mock_session.get.side_effect = [_make_response("", status_code=404)] * 3 + [_make_json_response({
+            "data": [{"id": "uuid-1", "attributes": {"drupal_internal__nid": 7, "title": "Carrots", "body": {"value": "<p>Orange</p>"}}}],
+            "links": {},
+        })]
+
+        docs = load_from_drupal(
+            base_url="https://drupal.example.com",
+            content_types=["article"],
+            loader_id="drupal_test",
+            since=datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc),
+        )
+
+        params = mock_session.get.call_args.kwargs["params"]
+        self.assertEqual(params["filter[changed-filter][condition][path]"], "changed")
+        self.assertEqual(params["filter[changed-filter][condition][operator]"], ">=")
+        # JSON:API compares "changed" as a Unix timestamp, an ISO date string matches nothing
+        self.assertEqual(params["filter[changed-filter][condition][value]"], 1790856000)
+        self.assertEqual((params["page[limit]"], params["page[offset]"]), (50, 0))
+        self.assertEqual([doc.metadata["source"] for doc in docs], ["https://drupal.example.com/node/7"])
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.Session")
+    def test_recipe_fields_are_imported_with_default_text_fields(self, mock_session_cls: MagicMock) -> None:
+        # demo_umami recipes have no body, their text is in custom fields
+        mock_session = MagicMock()
+        mock_session.headers = {}
+        mock_session_cls.return_value = mock_session
+        mock_session.get.side_effect = [_make_response("", status_code=404)] * 3 + [_make_json_response({
+            "data": [{"id": "uuid-2", "attributes": {
+                "drupal_internal__nid": 2,
+                "title": "Vegan chocolate and nut brownies",
+                "field_summary": {"value": "<p>Scrumptious vegan chocolate brownies.</p>"},
+                "field_ingredients": ["6 tbsp sunflower oil", " 80g vegan dark chocolate"],
+                "field_recipe_instruction": {"value": "<ol><li>Preheat the oven to 180°C.</li></ol>"},
+            }}],
+            "links": {},
+        })]
+
+        docs = load_from_drupal(base_url="https://drupal.example.com", content_types=["recipe"], loader_id="drupal_test")
+
+        content = docs[0].page_content
+        self.assertTrue(content.startswith("Vegan chocolate and nut brownies"))
+        for text in ("Scrumptious vegan chocolate brownies.", "6 tbsp sunflower oil\n80g vegan dark chocolate", "Preheat the oven to 180°C."):
+            self.assertIn(text, content)
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.Session")
+    def test_id_listing_uses_paging_and_sparse_fieldset(self, mock_session_cls: MagicMock) -> None:
+        mock_session = MagicMock()
+        mock_session.headers = {}
+        mock_session_cls.return_value = mock_session
+        mock_session.get.side_effect = [_make_response("", status_code=404)] * 3 + [
+            _make_json_response({
+                "data": [{"id": "a", "attributes": {"drupal_internal__nid": 1}}],
+                "links": {"next": {"href": "https://drupal.example.com/jsonapi/node/recipe?page%5Boffset%5D=1"}},
+            }),
+            _make_json_response({"data": [{"id": "b", "attributes": {"drupal_internal__nid": 2}}], "links": {}}),
+        ]
+
+        ids = get_all_drupal_document_ids(base_url="https://drupal.example.com", content_types=["recipe"], page_size=1)
+
+        self.assertEqual(ids, ["https://drupal.example.com/node/1", "https://drupal.example.com/node/2"])
+        first_page = mock_session.get.call_args_list[3]
+        self.assertEqual(first_page.kwargs["params"], {
+            "fields[node--recipe]": "drupal_internal__nid,langcode", "page[limit]": 1, "page[offset]": 0,
+        })
+        # Later pages follow the "next" link, which already contains all parameters
+        self.assertNotIn("params", mock_session.get.call_args_list[4].kwargs)
+
+    @patch("learn2rag.importer.loaders.drupal_loader.requests.Session")
+    def test_failure_on_a_later_page_raises(self, mock_session_cls: MagicMock) -> None:
+        # Partial results would delete (ID listing) or permanently skip (delta load) the missing documents
+        def responses() -> List[MagicMock]:
+            failed = _make_response("", status_code=500)
+            failed.raise_for_status.side_effect = requests.exceptions.HTTPError("500")
+            return [_make_response("", status_code=404)] * 3 + [
+                _make_json_response({
+                    "data": [{"id": "a", "attributes": {"drupal_internal__nid": 1, "title": "One", "body": {"value": "Text"}}}],
+                    "links": {"next": "https://drupal.example.com/jsonapi/node/recipe?page%5Boffset%5D=1"},
+                }),
+                failed,
+            ]
+
+        mock_session = MagicMock()
+        mock_session.headers = {}
+        mock_session_cls.return_value = mock_session
+
+        mock_session.get.side_effect = responses()
+        with self.assertRaises(LoaderAccessError):
+            get_all_drupal_document_ids(base_url="https://drupal.example.com", content_types=["recipe"])
+
+        mock_session.get.side_effect = responses()
+        with self.assertRaises(LoaderAccessError):
+            load_from_drupal(base_url="https://drupal.example.com", content_types=["recipe"], loader_id="drupal_test")
+
+    def test_expired_oauth_token_is_renewed(self) -> None:
+        issued: List[str] = []
+        valid_token: List[str] = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                # /oauth/token: hand out a new token each time; only the newest one is valid
+                issued.append(f"token-{len(issued) + 1}")
+                valid_token[:] = [issued[-1]]
+                self._send(200, {"access_token": issued[-1]})
+
+            def do_GET(self) -> None:
+                if self.headers.get("Authorization") != f"Bearer {valid_token[0]}":
+                    self._send(401, {"errors": [{"detail": "expired"}]})
+                else:
+                    self._send(200, {"data": [], "links": {}})
+
+            def _send(self, status: int, payload: Dict[str, Any]) -> None:
+                body = json.dumps(payload).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, format: str, *args: Any) -> None:
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            base_url = f"http://127.0.0.1:{server.server_address[1]}"
+            session = _build_session("oauth", "", "", "", entry_config=self.OAUTH_ENTRY, base_url=base_url)
+            self.assertEqual(session.get(f"{base_url}/jsonapi").status_code, 200)
+
+            # Drupal expires the token, e.g. after 5 minutes of a long import
+            valid_token[:] = ["token-from-elsewhere"]
+            response = session.get(f"{base_url}/jsonapi")
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(issued, ["token-1", "token-2"])
+            self.assertEqual([r.status_code for r in response.history], [401])
+
+            # A token that is rejected right after renewal is not retried endlessly
+            valid_token[:] = ["never-issued"]
+            with patch("learn2rag.importer.loaders.drupal_loader._fetch_oauth_token", return_value="still-wrong"):
+                self.assertEqual(session.get(f"{base_url}/jsonapi").status_code, 401)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_config_validation_of_oauth(self) -> None:
+        entry = {"loader_type": "DrupalLoader", "base_url": "https://drupal.example.com", "content_types": ["article"], "auth_type": "oauth"}
+        with self.assertRaises(ValueError):
+            validate_config_entry(entry)
+        self.assertTrue(validate_config_entry({**entry, **self.OAUTH_ENTRY}))
 
 
 class RemoveStaleLoadersTestCase(unittest.TestCase):

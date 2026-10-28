@@ -1,6 +1,0 @@
-#!/bin/bash
-set -eux
-npm install
-npm run build
-uv venv .venv --clear --python 3.11 --seed
-uv run .venv/bin/pip install .

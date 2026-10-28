@@ -8,9 +8,9 @@ and incremental loading based on the issue update timestamp.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.1
+Version: 0.0.2
 Creation Date: May 18, 2026
-Last Modified: August 10, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
@@ -22,6 +22,7 @@ import requests
 from langchain_core.documents import Document
 
 from ..globals import stop_loading
+from ..loaders.errors import LoaderAccessError
 
 logger = logging.getLogger("Learn2RAGImporter")
 
@@ -301,6 +302,7 @@ def _iter_issues_post(
             logger.warning("JiraLoader: endpoint %s failed: %s", candidate, err)
             continue
 
+    # No POST endpoints worked; fall back to GET
     return False
 
 
@@ -371,6 +373,7 @@ def _iter_issues_get(
             continue
 
     logger.error("JiraLoader: no usable Jira search endpoint found under %s", base_url)
+    raise LoaderAccessError(f"JiraLoader could not reach a valid Jira search endpoint under '{base_url}'.")
 
 
 def _iter_issues(

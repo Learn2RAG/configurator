@@ -5,7 +5,7 @@ import huggingface_hub
 local_dir = "data"
 
 # Everything except the PDFs
-repliqa = datasets.load_dataset("ServiceNow/repliqa")
+repliqa = datasets.load_dataset("ServiceNow/repliqa") # type: ignore[attr-defined, unused-ignore]
 
 # get all PDFs at once
 snapshot_path = huggingface_hub.snapshot_download(

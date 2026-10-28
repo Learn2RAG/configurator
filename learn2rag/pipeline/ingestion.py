@@ -9,7 +9,7 @@ from collections.abc import Iterator
 from collections import deque
 from time import perf_counter
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from .qdrant import Qdrant
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue, SparseVector, VectorParams, MultiVectorConfig, MultiVectorComparator, Distance
@@ -48,7 +48,7 @@ def point_exists(qdrant: Qdrant, collection_name: str, loader_id: str, path: str
             FieldCondition(key="chunk_hash", match=MatchValue(value=chunk_hash)),
         ]
     )
-    result, _ = qdrant.client.scroll(
+    result, _ = qdrant.get_client().scroll(
         collection_name=collection_name, scroll_filter=filter, limit=1
     )
     return len(result) > 0
@@ -62,7 +62,7 @@ def insert(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None
         },
         payload=payload(sample),
     )
-    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+    qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
 
 
 def insert_dense_sparse(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
@@ -77,7 +77,7 @@ def insert_dense_sparse(qdrant: Qdrant, collection_name: str, sample: dict[str, 
         },
         payload=payload(sample),
     )
-    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+    qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
 
 def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
     point = PointStruct(
@@ -92,7 +92,7 @@ def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: di
         },
         payload=payload(sample),
     )
-    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+    qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
 
 def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
     point = PointStruct(
@@ -102,7 +102,7 @@ def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -
         },
         payload=payload(sample),
     )
-    qdrant.client.upsert(collection_name=collection_name, wait=True, points=[point])
+    qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
 
 def payload(sample: dict[str, Any]) -> dict[str, Any]:
     meta = sample["metadata"]

@@ -5,10 +5,10 @@ Description:
 This module handles loading documents from directories.
 
 Author: Kyrill Meyer
-Version: 0.0.7
+Version: 0.0.8
 Institution: IFDT
 Creation Date: June 10, 2025
-Last Modified: June 29, 2026
+Last Modified: August 31, 2026
 """
 import hashlib
 import logging
@@ -16,6 +16,7 @@ import os
 from datetime import datetime
 from typing import List, Union, Optional, TYPE_CHECKING
 from ..globals import stop_loading
+from ..loaders.errors import LoaderAccessError
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain_core.documents import Document
 
@@ -67,6 +68,8 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
         progress.emit("Phase 2/4 Load", f"Scanning directory | recursive {recursive}", source=path)
 
     documents = []
+    if not os.path.isdir(path):
+        raise LoaderAccessError(f"Directory '{path}' does not exist or is not accessible.")
     if isinstance(recursive, str):
         recursive = recursive.lower() == "true"
 
@@ -120,7 +123,7 @@ def load_from_directory(path: str, recursive: Union[bool, str], silent_errors: b
             )
     except Exception as e:
         logger.error(f"Error loading documents from directory: {e}")
-        return []
+        raise LoaderAccessError(f"Error loading documents from directory '{path}': {e}") from e
     
     for doc in loaded_documents:
         if stop_loading:

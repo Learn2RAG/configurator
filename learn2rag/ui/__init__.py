@@ -10,6 +10,7 @@ import signal
 import socket
 import threading
 import time
+import tomllib
 from typing import Any
 import urllib
 from itertools import islice
@@ -27,19 +28,27 @@ from learn2rag.compose import Project
 from learn2rag.evaluation.tools import read_dataset_qa
 import learn2rag.data
 import learn2rag.pipeline.llm
+from ..bootstrap import setup_flask as learn2rag_bootstrap_setup
+from ..importer.utils.import_state import ImportState
+
+
 from ..utils import (
     is_windows,
     normalize_path,
     open_web_browser,
+    python_package_version,
     save_data_path,
+    vc_commit_id,
 )
 
 from datetime import datetime
 
+import platformdirs
 
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
+docs_dir = platformdirs.user_documents_dir()
 
 import werkzeug
 def redirect(url: str) -> 'werkzeug.wrappers.response.Response':
@@ -76,38 +85,46 @@ def stop_project(name: str) -> None:
     assert project is not None, 'project should not be None'
     project.stop()
 
-def find_free_ports(n: int, *, configured_ports: list[int]=[], preferred_ports: list[int]=[]) -> list[int]:
+def find_free_ports(n: int, *, configured_ports: list[int] | None = None, preferred_ports: list[int] | None = None) -> list[int]:
     """
     Finds n free ports. Prioritizes preferred_ports if provided.
     """
+    configured_ports = configured_ports or []
+    preferred_ports = preferred_ports or []
+
     ports = [*configured_ports]
 
     # 1. Try preferred ports first
     for p in filter(lambda p: p not in ports, preferred_ports):
         if len(ports) >= n:
             break
+        logging.debug('Checking if preferred port %d is available...', p)
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 # Set REUSEADDR to handle ports in TIME_WAIT state
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind(('', p))
+                logging.debug('Port %d is free. Allocating.', p)
                 ports.append(p)
         except OSError:
+            logging.warning('Port %d is busy. Trying next...', p)
             continue  # Port is taken, skip to next or fallback
 
     # 2. Fallback to OS-assigned random ports if we still need more
     remaining = n - len(ports)
     if remaining > 0:
+        logging.debug('Still need %d ports. Falling back to OS-assigned random ports.', remaining)
         temp_sockets = []
         for _ in range(remaining):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.bind(('', 0))
             ports.append(s.getsockname()[1])
+            logging.info('OS assigned random port %d.', s.getsockname()[1])
             temp_sockets.append(s)
 
         for s in temp_sockets:
             s.close()
-
+    logging.debug('Final allocated ports: %s', ports)
     return ports
 
 
@@ -119,6 +136,17 @@ def merge(source: dict[str, Any], destination: dict[str, Any]) -> dict[str, Any]
         else:
             destination[key] = value
     return destination
+
+
+def pipeline_status_file(pipeline: dict[str, Any]) -> Path:
+    return normalize_path(Path(pipeline['storage_path'])) / 'logs' / 'status.log'
+
+
+def pipeline_status_message(pipeline: dict[str, Any]) -> str:
+    try:
+        return pipeline_status_file(pipeline).read_text().splitlines()[-1]
+    except (FileNotFoundError, IndexError):
+        return ''
 
 
 def create_app(config: dict[str, Any]={}) -> Flask:
@@ -138,6 +166,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     packaged_config = yaml.safe_load((importlib.resources.files(__package__) / 'config.yml').open())
     app.logger.debug('Packaged config: %s', packaged_config)
     app.config.from_mapping(merge(config, packaged_config))
+
+    learn2rag_bootstrap_setup(app)
 
     # ensure the instance folder exists
     try:
@@ -183,6 +213,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'debug_logging': config.get('logging', {}).get('debug', False),
             'current_timestamp': math.floor(time.time()),
             'llm': learn2rag.pipeline.llm,
+            'docs_dir': docs_dir,
         }
 
     @app.context_processor
@@ -196,10 +227,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
         }
 
-    @app.context_processor
-    def inject_current_year() -> dict[str, Any]:
-        return {'current_year': datetime.now().year}
-
     atexit.register(atexit_handler)
 
     # TODO: let the user configure the directory for ollama data before starting it?
@@ -209,6 +236,13 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     except Exception as e:
         app.logger.exception(e)
         app.logger.warning('Ollama is already running or failed to start')
+
+    @app.context_processor
+    def inject_version() -> dict[str, str | None]:
+        return {
+            'learn2rag_package_version': python_package_version('learn2rag'),
+            'vc_commit_id': vc_commit_id(),
+        }
 
     def remove_pipeline_storage_directory(storage_path: Path) -> bool:
         try:
@@ -351,12 +385,37 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def source_create() -> 'str | werkzeug.wrappers.response.Response':
         label = request.form['label']
         data: dict[str, Any] = request.form.to_dict()
-        if 'content_types' in data:
-            data['content_types'] = list(map(str.strip, data['content_types'].split(',')))
-        if 'depth' in data:
-            data['depth'] = int(data['depth'])
-        if 'object_ids' in data:
-            data['object_ids'] = request.form.getlist('object_ids')
+        for field in [
+                'content_types',
+                'issue_types',
+                'projects',
+        ]:
+            if field in data:
+                data[field] = list(map(str.strip, data[field].split(',')))
+                if len(data[field]) == 1 and len(data[field][0]) == 0:
+                    data[field] = []
+        for field in [
+                'include_comments',
+        ]:
+            if field in data:
+                data[field] = request.form.getlist(field)[-1] == 'yes'
+        for field in [
+                'depth',
+                'failure_threshold',
+                'page_size',
+        ]:
+            if field in data:
+                if data[field] not in (None, ''):
+                    data[field] = int(data[field])
+                else:
+                    del data[field]
+        if data.get('type') == 'web':
+            data.setdefault('depth', -1)
+        for field in [
+                'object_ids',
+        ]:
+            if field in data:
+                data[field] = request.form.getlist(field)
         learn2rag.data.create_entry(app.instance_path, 'sources', data)
         flash(pgettext('flash', 'Added a new data source configuration: %(label)s', label=label))
         return redirect(url_for('sources_list'))
@@ -379,10 +438,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
     def pipelines_list() -> 'str | werkzeug.wrappers.response.Response':
         pipelines = learn2rag.data.get_all(app.instance_path, 'pipelines')
         for pipeline in pipelines.values():
-            try:
-                pipeline['status_message'] = (Path(pipeline['storage_path']) / 'logs' / 'status.log').read_text().splitlines()[-1]
-            except (FileNotFoundError, IndexError):
-                pipeline['status_message'] = ''
+            pipeline['status_message'] = pipeline_status_message(pipeline)
         context = {
             'pipelines': pipelines,
             'projects': Project.get_all(),
@@ -404,9 +460,11 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
             assert pipeline is not None
             start_pipeline(name, pipeline, 'continuous')
-        return redirect(url_for('pipelines_list'))
+        return redirect(url_for('pipeline_details', name=name))
 
     def start_pipeline(name: str, pipeline: dict[str, Any], template_name: str) -> None:
+        storage_path = normalize_path(pipeline['storage_path'])
+
         has_ssl = bool(app.config.get("TLS"))
         url = urllib.parse.urlparse(request.base_url)
         assert url.scheme
@@ -435,13 +493,34 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     'sharepoint': 'SharepointLoader',
                     'drupal': 'DrupalLoader',
                     'jira': 'JiraLoader',
+                    'mediawiki': 'MediaWikiLoader',
                 }.get(source.get(
                     'type',
                     'local'  # FIXME: remove this later and throw Exception
                 )),
                 'recursive': 'True',  # DirectoryLoader; FIXME: add this in the interface
-                **{key: value for key, value in source.items() if key not in ['label', 'type']},
+                **{key: value for key, value in source.items() if key not in ['type']},
             } for name, source in sources.items()],
+        }
+
+        optimization_registry = {
+            "datasets": {
+                "training": {
+                    "subdirectory": "", "split": "train",
+                    "fields": {"q": "question", "a": "answer", "id": "id"},
+                    "path": str(storage_path / 'training.csv')
+                }
+            },
+            "prompts": {
+                "default":
+                "# Role and Objective\nYou will act as a smart AI chatbot that answers questions only by using the content from the provided information list.\n\n  # Instructions\n- Respond in the language of the question.\n - Answer clear and concise.\n- Only use the provided information.\n        - NEVER use your general knowledge.\n\n # Information:\n{context}"
+                ,
+                "concise":
+                "Answer the question using ONLY the provided information.   Be concise and direct. If the information does not contain the answer, say so.\n\n        Information:\n{context}"
+                ,
+                "detailed":
+                "You are a knowledgeable assistant. Using ONLY the provided information below,        answer the question thoroughly. Cite your sources.         If the information is insufficient, state that clearly.\n\n        Information:\n{context}"
+            }
         }
 
         render_context = {
@@ -450,6 +529,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'pipeline': pipeline,
             'language_model': language_model,
             'import_config': import_config,
+            'optimization_registry': optimization_registry,
             'debug_logging': config.get('logging', {}).get('debug', False),
             'qdrant_api_key': secrets.token_hex(16),
             # FIXME
@@ -467,8 +547,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             ports = find_free_ports(len(port_names), configured_ports=configured_ports, preferred_ports=app.config.get('PREFERRED_PORTS', range(9001, 9011)))
             render_context['ports'] = dict(zip(port_names, ports))
 
-        storage_path = normalize_path(pipeline['storage_path'])
-
         try:
             project = start_project(name, template_file, storage_path, render_context)
             if project and project.running:
@@ -484,32 +562,34 @@ def create_app(config: dict[str, Any]={}) -> Flask:
 
     @app.get('/pipelines/<name>')
     def pipeline_details(name: str) -> 'str | werkzeug.wrappers.response.Response':
-        pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
-        if pipeline is None:
+        try:
+            pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)
+        except FileNotFoundError:
             flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
             return redirect(url_for('pipelines_list'))
+        pipeline['status_message'] = pipeline_status_message(pipeline)
         storage_path = Path(pipeline['storage_path'])
+        projects = Project.get_all()  # FIXME: only get one
+        import_state = ImportState(str(storage_path / 'import_state.json'))
+        import_succeeded_once = any(import_state.get_last_import_time(source) for source in pipeline['sources'])
+        allow_open_chat = projects[name].health and import_succeeded_once
         try:
             training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
+            training_examples = training_dataset.select(range(min(3, len(training_dataset))))
+            training_total = len(training_dataset)
         except FileNotFoundError:
-            training_dataset = None
-
-        pipeline_sources = []
-        for source_id in pipeline.get('sources', []):
-            try:
-                source_data = learn2rag.data.get_entry(app.instance_path, 'sources', source_id)
-                source_data['id'] = source_id
-                pipeline_sources.append(source_data)
-            except FileNotFoundError:
-                pipeline_sources.append({'id': source_id, 'label': source_id})
-
+            training_examples = None
+            training_total = None
         return render_template(
             'pipelines_details_page.html',
             name=name,
             pipeline=pipeline,
-            training_dataset=training_dataset,
-            projects=Project.get_all(),
-            pipeline_sources=pipeline_sources,
+            import_state=import_state,
+            allow_start_chat=import_succeeded_once,
+            allow_open_chat=allow_open_chat,
+            training_examples=training_examples,
+            training_total=training_total,
+            projects=projects,
         )
 
     @app.delete('/pipelines/<pipeline_name>/sources/<source_name>')
@@ -544,9 +624,10 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             storage_path.mkdir(parents=True, exist_ok=True)
             training_file = request.files['trainingFile']
             training_file.save(storage_path / 'training.csv')
+            flash(pgettext('flash', 'Training data file saved'))
         except Exception as e:
             app.logger.exception(e)
-            flash(pgettext('flash', 'Could not save the file'), 'error')
+            flash(pgettext('flash', 'Could not save the training data file'), 'error')
         return redirect(url_for('pipeline_details', name=name))
 
     @app.post('/pipelines/<name>')
@@ -561,6 +642,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             if ok:
                 learn2rag.data.delete_entry(app.instance_path, 'pipelines', name)
                 flash(pgettext('flash', 'Removed pipeline: %(label)s', label=pipeline['label']))
+                return redirect(url_for('pipelines_list'))
         elif request.form['action'].startswith('start:'):
             start_pipeline(name, pipeline, request.form['action'].split(':', 2)[1])
         elif request.form['action'] == 'stop':
@@ -571,7 +653,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                 app.logger.exception(e)
                 app.logger.error('Could not stop the pipeline')
                 flash(pgettext('flash', 'Could not stop the pipeline: %(message)s', message=e), 'error')
-        return redirect(url_for('pipelines_list'))
+        return redirect(url_for('pipeline_details', name=name))
 
     @app.get('/pipelines/<name>/logs/<file>')
     def pipeline_logs(name: str, file: str) -> 'str | werkzeug.wrappers.response.Response':
@@ -664,9 +746,9 @@ def main(config: dict[str, Any]) -> None:
     protocol = 'https' if use_https else 'http'
     url = f"{protocol}://localhost:{port}"
     open_web_browser(url)
-    logging.info('*' * 40)
+    logging.info('*' * 60)
     logging.info('Learn2RAG: ' + url)
-    logging.info('*' * 40)
+    logging.info('*' * 60)
 
     uvicorn_kwargs: dict[str, Any] = {
         "app": app,
@@ -680,4 +762,13 @@ def main(config: dict[str, Any]) -> None:
         uvicorn_kwargs["ssl_keyfile"] = ssl_key
         uvicorn_kwargs["ssl_certfile"] = ssl_cert
 
-    uvicorn.run(**uvicorn_kwargs)
+    try:
+        uvicorn.run(**uvicorn_kwargs)
+    except SystemExit as e:
+        if e.code == 1:
+            # FIXME: the previous message with URL is already printed; delay it until further?
+            logging.warning('*' * 60)
+            logging.warning('It looks like the port is already in use')
+            logging.warning('See how to change configuration: https://docs.learn2rag.de/')
+            logging.warning('*' * 60)
+        raise
