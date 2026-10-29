@@ -28,6 +28,12 @@ class NoAuthorizationFilter(AuthorizationFilter):
         """
         return set(documents.keys())
 
+class DenyAllAuthorizationFilter(AuthorizationFilter):
+    """Authorization filter that denies access to all documents."""
+
+    async def filter_documents(self, user_auth: Any, documents: Mapping[str, Any]) -> Set[str]:
+        return set()
+
 def _create_authorization_filter(entry: Dict[str, str]) -> AuthorizationFilter:
     user_auth_type = entry.get('user_auth_type', 'none')
     logger.debug(f'{user_auth_type = }')
@@ -73,9 +79,11 @@ def _get_authorization_filter(loader_id: str) -> AuthorizationFilter:
         None,
     )
 
-    # If loader not found, raise exception
+    # The data source was removed from the pipeline, its documents stay in Qdrant until the next import
     if loader_config is None:
-        raise ValueError(f"Loader configuration not found for loader_id: {loader_id}")
+        logger.info('Hiding documents of loader_id %s, it is not in the importer config', loader_id)
+        _filters[loader_id] = DenyAllAuthorizationFilter()
+        return _filters[loader_id]
 
     # Create and cache the filter
     _filters[loader_id] = _create_authorization_filter(loader_config)

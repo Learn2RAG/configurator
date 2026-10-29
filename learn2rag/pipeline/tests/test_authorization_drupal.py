@@ -129,3 +129,15 @@ class FilterAuthorizedTestCase(unittest.IsolatedAsyncioTestCase):
         # One access check per document, not per chunk
         checked_urls: list[Any] = sorted(call.args[0] for call in session.get.call_args_list)
         self.assertEqual(checked_urls, [PUBLIC_URL, RESTRICTED_URL])
+
+    async def test_chunks_of_removed_loader_are_hidden(self) -> None:
+        """Documents of a data source removed from the pipeline stay in Qdrant until the next import."""
+        def point(point_id: int, loader_id: str) -> ScoredPoint:
+            return ScoredPoint(id=point_id, score=1.0, version=1, payload={"source": f"/docs/{point_id}.txt", "loader_id": loader_id})
+
+        loaders = [{"loader_id": "apple", "loader_type": "DirectoryLoader"}]
+        with patch("learn2rag.pipeline.authorization._configuredLoaders", loaders), \
+                patch("learn2rag.pipeline.authorization._filters", {}):
+            authorized = await filter_authorized({}, QueryResponse(points=[point(1, "apple"), point(2, "rabbit")]))
+
+        self.assertEqual([point.id for point in authorized], [1])

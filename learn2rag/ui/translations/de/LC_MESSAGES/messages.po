@@ -52,6 +52,10 @@ msgctxt "tooltip"
 msgid "A custom display name for this pipeline"
 msgstr "Ein individueller Anzeigename für diese Pipeline"
 
+msgctxt "flash"
+msgid "A pipeline needs at least one data source"
+msgstr "Eine Pipeline benötigt mindestens eine Datenquelle"
+
 msgctxt "column_heading"
 msgid "API URL"
 msgstr "API URL"
@@ -555,8 +559,8 @@ msgid "Removed pipeline: %(label)s"
 msgstr "Entfernte Pipeline: %(label)s"
 
 msgctxt "flash"
-msgid "Removed the data source from the pipeline, its documents are deleted on the next import"
-msgstr "Die Datenquelle wurde aus der Pipeline entfernt, ihre Dokumente werden beim nächsten Import gelöscht"
+msgid "Removed the data source from the pipeline, its documents are hidden from the chat and deleted on the next import"
+msgstr "Die Datenquelle wurde aus der Pipeline entfernt, ihre Dokumente sind im Chat ausgeblendet und werden beim nächsten Import gelöscht"
 
 msgctxt "status"
 msgid "Running"
@@ -863,4 +867,8 @@ msgstr "Sie haben keine Datenquellen ausgewählt."
 #~ msgctxt "firststep"
 #~ msgid " Yes, add my <code>~/Documents</code> folder"
 #~ msgstr "Ja, füge meinen Ordner <code>~/Documents</code> hinzu."
+
+#~ msgctxt "flash"
+#~ msgid "Removed the data source from the pipeline, its documents are deleted on the next import"
+#~ msgstr "Die Datenquelle wurde aus der Pipeline entfernt, ihre Dokumente werden beim nächsten Import gelöscht"
 

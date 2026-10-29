@@ -43,3 +43,10 @@ class PipelineSourceDeleteTestCase(unittest.TestCase):
     def test_unknown_pipeline(self) -> None:
         response = self.client.delete(f'/pipelines/missing/sources/{self.source_id}')
         self.assertEqual(response.status_code, 302)
+
+    @patch('learn2rag.ui.Project.get', return_value=None)
+    def test_last_source_is_kept(self, _: MagicMock) -> None:
+        self.client.delete(f'/pipelines/{self.pipeline_id}/sources/{self.source_id}')
+        response = self.client.delete(f'/pipelines/{self.pipeline_id}/sources/{self.other_id}')
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.sources(), [self.other_id])

@@ -51,6 +51,10 @@ msgctxt "tooltip"
 msgid "A custom display name for this pipeline"
 msgstr ""
 
+msgctxt "flash"
+msgid "A pipeline needs at least one data source"
+msgstr ""
+
 msgctxt "column_heading"
 msgid "API URL"
 msgstr ""
@@ -554,7 +558,7 @@ msgid "Removed pipeline: %(label)s"
 msgstr ""
 
 msgctxt "flash"
-msgid "Removed the data source from the pipeline, its documents are deleted on the next import"
+msgid "Removed the data source from the pipeline, its documents are hidden from the chat and deleted on the next import"
 msgstr ""
 
 msgctxt "status"
