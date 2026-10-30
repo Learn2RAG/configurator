@@ -1292,3 +1292,18 @@ class RemoveStaleLoadersTestCase(unittest.TestCase):
             self.assertEqual(removed, ["removed"])
             mock_delete.assert_called_once_with("removed", user_config, {})
             self.assertEqual(list(json.loads(state_file.read_text())), ["kept"])
+
+    @patch("learn2rag.importer.loaders.process_loaders.delete_collection", side_effect=[RuntimeError("Qdrant unreachable"), None])
+    def test_failed_removal_is_retried_later(self, mock_delete: MagicMock) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state_file = pathlib.Path(tmp) / "import_state.json"
+            state_file.write_text(json.dumps({
+                "failing": {"last_import_timestamp": "2026-01-01T00:00:00+00:00"},
+                "removed": {"last_import_timestamp": "2026-01-01T00:00:00+00:00"},
+            }))
+
+            removed = remove_stale_loaders([], {"collection_name": "test"}, {}, ImportState(str(state_file)))
+
+            self.assertEqual(removed, ["removed"])
+            self.assertEqual(mock_delete.call_count, 2)
+            self.assertEqual(list(json.loads(state_file.read_text())), ["failing"])

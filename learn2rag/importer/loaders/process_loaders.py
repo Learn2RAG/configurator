@@ -325,12 +325,20 @@ def remove_stale_loaders(
         List[str]: The loader_ids that were removed.
     """
     configured_ids = {entry.get("loader_id") for entry in config_entries}
-    stale_ids = [loader_id for loader_id in import_state.loader_ids() if loader_id not in configured_ids]
-    for loader_id in stale_ids:
+    removed_ids = []
+    for loader_id in import_state.loader_ids():
+        if loader_id in configured_ids:
+            continue
         logger.info(f"Loader '{loader_id}' is no longer configured, removing its documents")
-        delete_collection(loader_id, user_config, opt_config)
+        try:
+            delete_collection(loader_id, user_config, opt_config)
+        except Exception as e:
+            # keep the state entry so the next import retries, and import the configured loaders anyway
+            logger.error(f"Could not remove the documents of loader '{loader_id}': {e}", exc_info=True)
+            continue
         import_state.remove(loader_id)
-    return stale_ids
+        removed_ids.append(loader_id)
+    return removed_ids
 
 
 def process_delta_imports(
