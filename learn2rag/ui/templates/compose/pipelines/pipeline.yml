@@ -27,7 +27,9 @@ files:
     src: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
     force: false
 
-  # importer_config.json should already be present
+  # rewritten so removed data sources are hidden from the chat
+  - path: '{{storage_path}}/importer_config.json'
+    content: '{{import_config | tojson}}'
 
   - path: '{{storage_path}}/logging_config.yml'
     content: |

@@ -96,6 +96,9 @@
       <th scope="col">{{pgettext('column_heading', 'Label')}}</th>
       <th scope="col">{{pgettext('column_heading', 'Last successful import')}}</th>
       <th scope="col">{{pgettext('column_heading', 'Consecutive failures')}}</th>
+      {% if (not projects[name] or not projects[name].running) and pipeline.sources | length > 1 %}
+      <th scope="col"></th>
+      {% endif %}
     </tr>
     {% for source in pipeline.sources %}
     <tr
@@ -116,6 +119,16 @@
       <td>
         {{ import_state.get_consecutive_failures(source) }}
       </td>
+      {% if (not projects[name] or not projects[name].running) and pipeline.sources | length > 1 %}
+      <td class="text-end">
+        <button class="btn btn-sm btn-danger"
+                hx-delete="{{ url_for('pipeline_source_delete', pipeline_name=name, source_name=source) }}"
+                hx-headers='{"HX-Boosted": "true"}'
+                hx-confirm="{{gettext('Are you sure you want to remove this data source from the pipeline: %(label)s?', label=sources[source].label)}}">
+          {{pgettext('button', 'Remove')}}
+        </button>
+      </td>
+      {% endif %}
     </tr>
     {% endfor %}
   </table>

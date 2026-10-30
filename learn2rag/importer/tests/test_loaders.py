@@ -19,6 +19,7 @@ from ..loaders.directory_loader import load_from_directory
 from ..loaders.drupal_loader import _build_session, get_all_drupal_document_ids, load_from_drupal
 from ..loaders.html_loader import load_html_content, _is_same_site
 from ..loaders.jira_loader import load_from_jira, get_all_jira_document_ids
+from ..loaders.process_loaders import remove_stale_loaders
 from ..loaders.mediawiki_loader import (
     MediaWikiSourceUnavailable,
     get_all_mediawiki_document_ids,
@@ -1271,3 +1272,38 @@ class DrupalLoaderUnitTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_config_entry(entry)
         self.assertTrue(validate_config_entry({**entry, **self.OAUTH_ENTRY}))
+
+
+class RemoveStaleLoadersTestCase(unittest.TestCase):
+    """Loaders with import state but no config entry get their documents and state removed."""
+
+    @patch("learn2rag.importer.loaders.process_loaders.delete_collection")
+    def test_removes_unconfigured_loader(self, mock_delete: MagicMock) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state_file = pathlib.Path(tmp) / "import_state.json"
+            state_file.write_text(json.dumps({
+                "kept": {"last_import_timestamp": "2026-01-01T00:00:00+00:00"},
+                "removed": {"last_import_timestamp": "2026-01-01T00:00:00+00:00"},
+            }))
+            user_config = {"collection_name": "test"}
+
+            removed = remove_stale_loaders([{"loader_id": "kept"}], user_config, {}, ImportState(str(state_file)))
+
+            self.assertEqual(removed, ["removed"])
+            mock_delete.assert_called_once_with("removed", user_config, {})
+            self.assertEqual(list(json.loads(state_file.read_text())), ["kept"])
+
+    @patch("learn2rag.importer.loaders.process_loaders.delete_collection", side_effect=[RuntimeError("Qdrant unreachable"), None])
+    def test_failed_removal_is_retried_later(self, mock_delete: MagicMock) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state_file = pathlib.Path(tmp) / "import_state.json"
+            state_file.write_text(json.dumps({
+                "failing": {"last_import_timestamp": "2026-01-01T00:00:00+00:00"},
+                "removed": {"last_import_timestamp": "2026-01-01T00:00:00+00:00"},
+            }))
+
+            removed = remove_stale_loaders([], {"collection_name": "test"}, {}, ImportState(str(state_file)))
+
+            self.assertEqual(removed, ["removed"])
+            self.assertEqual(mock_delete.call_count, 2)
+            self.assertEqual(list(json.loads(state_file.read_text())), ["failing"])

@@ -592,6 +592,29 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             projects=projects,
         )
 
+    @app.delete('/pipelines/<pipeline_name>/sources/<source_name>')
+    def pipeline_source_delete(pipeline_name: str, source_name: str) -> 'str | werkzeug.wrappers.response.Response':
+        try:
+            pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', pipeline_name)
+        except FileNotFoundError:
+            flash(pgettext('flash', 'The requested pipeline is not found'), 'error')
+            return redirect(url_for('pipelines_list'))
+
+        if (project := Project.get(pipeline_name)) and project.running:
+            # the running importer keeps the old config, so its documents would not be removed
+            flash(pgettext('flash', 'Stop the pipeline before removing a data source'), 'error')
+        elif source_name not in pipeline.get('sources', []):
+            flash(pgettext('flash', 'The data source is not part of this pipeline'), 'error')
+        elif len(pipeline['sources']) == 1:
+            flash(pgettext('flash', 'A pipeline needs at least one data source'), 'error')
+        else:
+            # the importer deletes the documents of loaders missing from its config on the next import
+            pipeline['sources'].remove(source_name)
+            learn2rag.data.update_entry(app.instance_path, 'pipelines', pipeline_name, pipeline)
+            flash(pgettext('flash', 'Removed the data source from the pipeline, its documents are hidden from the chat and deleted on the next import'))
+
+        return redirect(url_for('pipeline_details', name=pipeline_name))
+
     @app.post('/pipelines/<name>/training')
     def pipeline_details_training_data(name: str) -> 'str | werkzeug.wrappers.response.Response':
         pipeline = learn2rag.data.get_entry(app.instance_path, 'pipelines', name)

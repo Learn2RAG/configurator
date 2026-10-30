@@ -299,6 +299,48 @@ def process_configuration_entries(
     return all_documents
 
 
+def remove_stale_loaders(
+    config_entries: List[Dict[str, Any]],
+    user_config: Dict[str, Any],
+    opt_config: Dict[str, Any],
+    import_state: "ImportState",
+) -> List[str]:
+    """
+    Remove the documents and import state of loaders that are no longer configured.
+
+    A loader is stale when it has a persisted import state but its loader_id is
+    not in the importer config anymore, e.g. after a data source was removed
+    from a pipeline. Its documents are deleted from Qdrant and its state entry
+    is dropped, so re-adding the source later triggers a full import.
+
+    Args:
+        config_entries (List[Dict[str, Any]]): Loader configuration entries from the
+                                               importer config file.
+        user_config (Dict[str, Any]): User configuration dict (must contain
+                                      ``collection_name``).
+        opt_config (Dict[str, Any]): Optimisation configuration dict.
+        import_state (ImportState): ImportState instance holding the known loaders.
+
+    Returns:
+        List[str]: The loader_ids that were removed.
+    """
+    configured_ids = {entry.get("loader_id") for entry in config_entries}
+    removed_ids = []
+    for loader_id in import_state.loader_ids():
+        if loader_id in configured_ids:
+            continue
+        logger.info(f"Loader '{loader_id}' is no longer configured, removing its documents")
+        try:
+            delete_collection(loader_id, user_config, opt_config)
+        except Exception as e:
+            # keep the state entry so the next import retries, and import the configured loaders anyway
+            logger.error(f"Could not remove the documents of loader '{loader_id}': {e}", exc_info=True)
+            continue
+        import_state.remove(loader_id)
+        removed_ids.append(loader_id)
+    return removed_ids
+
+
 def process_delta_imports(
     config_entries: List[Dict[str, Any]],
     user_config: Dict[str, Any],

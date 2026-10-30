@@ -16,11 +16,6 @@ msgstr ""
 "Generated-By: Babel 2.18.0\n"
 
 #, python-format
-msgctxt "firststep"
-msgid "Yes, add my <code>%(docs_dir)s</code> folder"
-msgstr ""
-
-#, python-format
 msgid "%(num)d data source configuration"
 msgid_plural "%(num)d data source configurations"
 msgstr[0] ""
@@ -54,6 +49,10 @@ msgstr ""
 
 msgctxt "tooltip"
 msgid "A custom display name for this pipeline"
+msgstr ""
+
+msgctxt "flash"
+msgid "A pipeline needs at least one data source"
 msgstr ""
 
 msgctxt "column_heading"
@@ -138,6 +137,10 @@ msgid "Are you sure you want to remove this data source configuration: %(label)s
 msgstr ""
 
 #, python-format
+msgid "Are you sure you want to remove this data source from the pipeline: %(label)s?"
+msgstr ""
+
+#, python-format
 msgid "Are you sure you want to remove this language model configuration: %(label)s?"
 msgstr ""
 
@@ -196,6 +199,10 @@ msgstr ""
 #, python-format
 msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
+msgstr ""
+
+msgctxt "form_label"
+msgid "Crawl depth"
 msgstr ""
 
 msgctxt "column_heading"
@@ -309,6 +316,10 @@ msgstr ""
 
 msgctxt "tooltip"
 msgid "For example: https://learn2rag.de/"
+msgstr ""
+
+msgctxt "tooltip"
+msgid "How many levels of links to follow from the URL: 0 loads only this page, -1 crawls the whole site under this URL"
 msgstr ""
 
 msgid "If you use a model from an external provider, they will see your data."
@@ -546,6 +557,10 @@ msgctxt "flash"
 msgid "Removed pipeline: %(label)s"
 msgstr ""
 
+msgctxt "flash"
+msgid "Removed the data source from the pipeline, its documents are hidden from the chat and deleted on the next import"
+msgstr ""
+
 msgctxt "status"
 msgid "Running"
 msgstr ""
@@ -608,6 +623,10 @@ msgid "Stop"
 msgstr ""
 
 msgctxt "flash"
+msgid "Stop the pipeline before removing a data source"
+msgstr ""
+
+msgctxt "flash"
 msgid "Stopped the pipeline"
 msgstr ""
 
@@ -617,6 +636,10 @@ msgstr ""
 
 msgctxt "header"
 msgid "Storage directory path"
+msgstr ""
+
+msgctxt "flash"
+msgid "The data source is not part of this pipeline"
 msgstr ""
 
 msgid "The language model is downloading, please wait"
@@ -702,6 +725,11 @@ msgstr ""
 
 msgctxt "title"
 msgid "Welcome"
+msgstr ""
+
+#, python-format
+msgctxt "firststep"
+msgid "Yes, add my <code>%(docs_dir)s</code> folder"
 msgstr ""
 
 msgid "You and users will see this label."
