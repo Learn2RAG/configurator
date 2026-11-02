@@ -1,0 +1,14 @@
+---
+extends: default
+ignore:
+  - /.venv/
+  - /build/
+  - /compose.yml
+  - /pyapp/
+  - /services/
+rules:
+  document-start:
+    level: error
+  line-length: disable
+  truthy:
+    level: error

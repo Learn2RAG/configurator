@@ -1,8 +1,9 @@
+---
 name: import
-label: Start one-time import
+label: Only import
 ports:
   # TODO: UI port is not used; labels in the interface currently assume a specific port order
-  - ui
+  - pipeline
   - qdrant_http
 files:
   - path: '{{storage_path}}/qdrant_config.yml'
@@ -14,6 +15,10 @@ files:
         http_port: {{ports.qdrant_http}}
         host: '127.0.0.1'
       telemetry_disabled: true
+
+  - path: '{{storage_path}}/opt_config.json'
+    src: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
+    force: false
 
   - path: '{{storage_path}}/importer_config.json'
     content: '{{import_config | tojson}}'
@@ -45,7 +50,7 @@ files:
       handlers:
         display:
           class: logging.StreamHandler
-          level: INFO
+          level: {% if debug_logging %}DEBUG{% else %}INFO{% endif %}
           formatter: colored
           stream: ext://sys.stderr
         profiling_display:
@@ -101,14 +106,14 @@ files:
     content: ''
 
 services:
-  #!!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
+  # !!! {% if not pipeline.qdrant_location and not pipeline.qdrant_path %}
   qdrant:
     working_dir: '{{storage_path}}'
     command:
       - '{{learn2rag_path}}/services/qdrant/qdrant{% if is_windows %}.exe{% endif %}'
       - '--config-path'
       - '{{storage_path}}/qdrant_config.yml'
-  #!!! {% endif %}
+  # !!! {% endif %}
   main:
     working_dir: '{{storage_path}}'
     command:
@@ -129,7 +134,7 @@ services:
       QDRANT__SERVICE__API_KEY: '{{qdrant_api_key}}'
       PIPELINE_USER_CONFIG: '{{storage_path}}/basic_user_config.json'
       IMPORTER_CONFIG: '{{storage_path}}/importer_config.json'
-      PIPELINE_OPT_CONFIG: '{{learn2rag_path}}/learn2rag/pipeline/opt_config.json'
+      PIPELINE_OPT_CONFIG: '{{storage_path}}/opt_config.json'
       LANGCHAIN_API_KEY: '1'
       LANGCHAIN_TRACING_V2: 'false'
       LLM_API_TYPE: '{{language_model.api}}'

@@ -2,10 +2,13 @@
   <div class="mb-3">
     <label for="label" class="form-label">{{pgettext('form_label', 'Label')}}</label>
     <input required="required" class="form-control" name="label" title="{{pgettext('tooltip', 'A custom display name for this pipeline')}}">
+    <div class="alert alert-secondary">
+      {{gettext('You and users will see this label.')}}
+    </div>
   </div>
   <div class="mb-3">
     <label for="url" class="form-label">{{pgettext('form_label', 'Storage directory path')}}</label>
-    <input required="required" class="form-control" name="storage_path" value="{{default_storage_prefix}}{{current_timestamp}}" data-default-prefix="{{default_storage_prefix}}"/>
+    <input type="text" pattern="\S(?:.*\S)?" required="required" class="form-control" name="storage_path" value="{{default_storage_prefix}}{{current_timestamp}}" data-default-prefix="{{default_storage_prefix}}"/>
   </div>
   <div class="mb-3">
     <label for="language_model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
@@ -17,10 +20,10 @@
   </div>
   <div class="mb-3">
     {{pgettext('form_label', 'Data sources')}}
-    <button class="btn btn-secondary select-sources" data-value="1">
+    <button type="button" class="btn btn-secondary select-sources" data-value="1">
       {{pgettext('button', 'Select all')}}
     </button>
-    <button class="btn btn-secondary select-sources" data-value="0">
+    <button type="button" class="btn btn-secondary select-sources" data-value="0">
       {{pgettext('button', 'Unselect all')}}
     </button>
     {% for name, source in sources.items() %}
@@ -54,19 +57,11 @@
     {# TODO: labels in the interface currently assume a specific port order in all corresponding .yml files #}
     <div class="form-floating mb-3">
       <input class="form-control" name="ports" type="number" min="1" max="65535">
-      <label for="ports" class="form-label">{{pgettext('form_label', 'User interface')}}</label>
-    </div>
-    <div class="form-floating mb-3">
-      <input class="form-control" name="ports" type="number" min="1" max="65535">
-      <label for="ports">{{pgettext('form_label', 'Internal RAG service')}}</label>
+      <label for="ports" class="form-label">{{pgettext('form_label', 'User interface and RAG service')}}</label>
     </div>
     <div class="form-floating mb-3">
       <input class="form-control" name="ports" type="number" min="1" max="65535">
       <label for="ports">{{pgettext('form_label', 'Internal vector store')}}</label>
-    </div>
-    <div class="form-floating mb-3">
-      <input class="form-control" name="ports" type="number" min="1" max="65535">
-      <label for="ports">{{pgettext('form_label', 'Additional internal port')}}</label>
     </div>
   </div>
   <div class="mb-3 collapse advanced-configuration">

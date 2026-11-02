@@ -1,3 +1,4 @@
+---
 services:
   main:
     command: ['{{learn2rag_path}}/configurator{% if is_windows %}.exe{% endif %}', 'learn2rag.ollama_tool', 'pull', '{{model}}']

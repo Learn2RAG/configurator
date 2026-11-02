@@ -1,0 +1,35 @@
+---
+- hosts: all
+  vars:
+    learn2rag_dir: '{{ hostvars[inventory_hostname]["learn2rag_dir"] | default("/opt/learn2rag") }}'
+  tasks:
+    - ansible.builtin.git:
+        repo: 'https://github.com/learn2rag/configurator'
+        dest: '{{ learn2rag_dir }}'
+        version: 'release/v1.0'
+      register: repo
+    - ansible.builtin.command: ./install
+      args:
+        chdir: '{{ learn2rag_dir }}'
+      when: repo is changed or repo is skipped
+    - ansible.builtin.file:
+        path: '~/.config/systemd/user'
+        state: directory
+    - ansible.builtin.copy:
+        dest: '~/.config/systemd/user/learn2rag.service'
+        content: >-
+          {{
+          lookup('file', '../systemd/learn2rag.service')
+          | regex_replace('^ExecStart=.*$', 'ExecStart=' ~ learn2rag_dir ~ '/start', multiline=True)
+          | regex_replace('^WorkingDirectory=.*$', 'WorkingDirectory=' ~ learn2rag_dir, multiline=True)
+          }}
+      notify:
+        - systemd_handler
+  handlers:
+    - name: systemd_handler
+      ansible.builtin.systemd_service:
+        scope: user
+        daemon_reload: true
+        name: learn2rag
+        enabled: true
+        state: restarted

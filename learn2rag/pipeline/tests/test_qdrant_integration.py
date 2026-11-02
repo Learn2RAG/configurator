@@ -89,15 +89,15 @@ def _setup_qdrant_env() -> None:
     os.environ.pop('QDRANT_PATH', None)
 
     from qdrant_client import QdrantClient
-    Qdrant.client = QdrantClient(
+    Qdrant._client = QdrantClient(
         location=QDRANT_TEST_LOCATION,
         api_key=QDRANT_TEST_API_KEY,
     )
 
 
 def _cleanup_collection(name: str) -> None:
-    if Qdrant.client.collection_exists(name):
-        Qdrant.client.delete_collection(name)
+    if Qdrant.get_client().collection_exists(name):
+        Qdrant.get_client().delete_collection(name)
 
 
 @unittest.skipUnless(
@@ -120,14 +120,14 @@ class QdrantConnectionTestCase(unittest.TestCase):
         _cleanup_collection(self.collection_name)
 
     def test_connection(self) -> None:
-        collections = Qdrant.client.get_collections()
+        collections = Qdrant.get_client().get_collections()
         self.assertIsNotNone(collections)
 
     def test_ensure_collection_dense(self) -> None:
         opt = make_opt_config(search_mode='dense')
         Qdrant.ensure_collection(self.collection_name, opt)
 
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         vectors = info.config.params.vectors
         assert isinstance(vectors, dict)
         self.assertIn('dense', vectors)
@@ -138,7 +138,7 @@ class QdrantConnectionTestCase(unittest.TestCase):
         opt = make_opt_config(search_mode='dense_sparse')
         Qdrant.ensure_collection(self.collection_name, opt)
 
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         vectors = info.config.params.vectors
         sparse_vectors = info.config.params.sparse_vectors
         assert isinstance(vectors, dict)
@@ -150,7 +150,7 @@ class QdrantConnectionTestCase(unittest.TestCase):
         opt = make_opt_config(search_mode='dense_sparse_colbert')
         Qdrant.ensure_collection(self.collection_name, opt)
 
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         vectors = info.config.params.vectors
         sparse_vectors = info.config.params.sparse_vectors
         assert isinstance(vectors, dict)
@@ -167,7 +167,7 @@ class QdrantConnectionTestCase(unittest.TestCase):
         Qdrant.ensure_collection(self.collection_name, opt)
 
         expected_size = (len(multi_search) + 1) * VECTOR_SIZE
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         vectors = info.config.params.vectors
         assert isinstance(vectors, dict)
         self.assertIn('multi', vectors)
@@ -177,14 +177,14 @@ class QdrantConnectionTestCase(unittest.TestCase):
         opt = make_opt_config()
         Qdrant.ensure_collection(self.collection_name, opt)
         Qdrant.ensure_collection(self.collection_name, opt)
-        self.assertTrue(Qdrant.client.collection_exists(self.collection_name))
+        self.assertTrue(Qdrant.get_client().collection_exists(self.collection_name))
 
     def test_delete_collection(self) -> None:
         Qdrant.ensure_collection(self.collection_name, make_opt_config())
-        self.assertTrue(Qdrant.client.collection_exists(self.collection_name))
+        self.assertTrue(Qdrant.get_client().collection_exists(self.collection_name))
 
-        Qdrant.client.delete_collection(self.collection_name)
-        self.assertFalse(Qdrant.client.collection_exists(self.collection_name))
+        Qdrant.get_client().delete_collection(self.collection_name)
+        self.assertFalse(Qdrant.get_client().collection_exists(self.collection_name))
 
 
 @unittest.skipUnless(
@@ -211,7 +211,7 @@ class QdrantDenseSearchTestCase(unittest.TestCase):
         _cleanup_collection(cls.collection_name)
 
     def test_documents_ingested(self) -> None:
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
 
     def test_search_finds_relevant_result(self) -> None:
@@ -237,7 +237,7 @@ class QdrantDenseSearchTestCase(unittest.TestCase):
 
     def test_deduplication(self) -> None:
         index(SAMPLE_DOCUMENTS, self.user_config, self.opt_config)
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
 
 
@@ -267,7 +267,7 @@ class QdrantSparseSearchTestCase(unittest.TestCase):
         _cleanup_collection(cls.collection_name)
 
     def test_documents_ingested(self) -> None:
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
 
     def test_sparse_search_finds_results(self) -> None:
@@ -306,7 +306,7 @@ class QdrantDenseSparseSearchTestCase(unittest.TestCase):
         _cleanup_collection(cls.collection_name)
 
     def test_documents_ingested(self) -> None:
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
 
     def test_hybrid_search_finds_results(self) -> None:
@@ -348,11 +348,11 @@ class QdrantDenseSparseColbertSearchTestCase(unittest.TestCase):
         _cleanup_collection(cls.collection_name)
 
     def test_documents_ingested(self) -> None:
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
 
     def test_collection_has_all_vector_types(self) -> None:
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         vectors = info.config.params.vectors
         sparse_vectors = info.config.params.sparse_vectors
         assert isinstance(vectors, dict)
@@ -405,12 +405,12 @@ class QdrantMultiVectorSearchTestCase(unittest.TestCase):
         _cleanup_collection(cls.collection_name)
 
     def test_documents_ingested(self) -> None:
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
 
     def test_collection_has_correct_vector_size(self) -> None:
         expected_size = (len(self.multi_search_fields) + 1) * VECTOR_SIZE
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         vectors = info.config.params.vectors
         assert isinstance(vectors, dict)
         self.assertIn('multi', vectors)
@@ -690,19 +690,19 @@ class QdrantDeduplicationTestCase(unittest.TestCase):
         index(SAMPLE_DOCUMENTS, self.user_config, self.opt_config)
         index(SAMPLE_DOCUMENTS, self.user_config, self.opt_config)
 
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
 
     def test_triple_ingest_no_duplicates(self) -> None:
         for _ in range(3):
             index(SAMPLE_DOCUMENTS, self.user_config, self.opt_config)
 
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
 
     def test_partial_reingest_no_duplicates(self) -> None:
         index(SAMPLE_DOCUMENTS, self.user_config, self.opt_config)
         index([SAMPLE_DOCUMENTS[0]], self.user_config, self.opt_config)
 
-        info = Qdrant.client.get_collection(self.collection_name)
+        info = Qdrant.get_client().get_collection(self.collection_name)
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))

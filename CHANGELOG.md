@@ -1,5 +1,33 @@
 # Changelog
 ## [Unreleased]
+
+
+
+## [1.0.0] - 2026-09-16
+### Added
+- MediaWiki data import
+- Jira data import
+- chat history awareness
+- per-document user access control (Drupal)
+- pipeline auto-optimization
+- retrieval optimization
+- displaying status during import
+- `remove-learn2rag-software` script to remove the Learn2RAG application runtimes
+- `remove-user-data` script to remove user data (asks for confirmation; `-y` skips it)
+
+### Fixed
+- offline installation
+- Windows process management
+
+### Changed
+- open webui chat UI replaced with llama.cpp's UI
+- interface improvements
+- performance improvements
+- `uninstall` now removes the software and asks whether to also remove user data
+
+### Removed
+- unused API endpoints were removed
+
 ## [0.3.0] - 2026-06-02
 ### Added
 - continuous import with updating the indexed data

@@ -1,5 +1,12 @@
+import asyncio
 import warnings
-from typing import List, Any, cast
+from typing import (
+    cast,
+    Any,
+    List,
+    Mapping,
+    Sequence,
+)
 import logging
 import copy
 from functools import lru_cache
@@ -7,10 +14,12 @@ from functools import lru_cache
 import numpy as np
 from FlagEmbedding import FlagReranker # type: ignore[import-untyped]
 from sentence_transformers import CrossEncoder
+from sentence_transformers.base.modality_types import PairInput
 from qdrant_client import models
 from qdrant_client.http.models import QueryResponse, ScoredPoint
 
 from .authorization import filter_authorized
+from .chat import Message
 from .config import opt_config, user_config
 from .embeddings import create_embeddings
 from .qdrant import Qdrant
@@ -28,7 +37,6 @@ def _get_flag_reranker(model_name: str, use_fp16: bool) -> FlagReranker:
 @lru_cache(maxsize=4)
 def _get_cross_encoder(model_name: str) -> CrossEncoder:
     return cast(CrossEncoder, CrossEncoder(model_name))
-
 
 def _sort_and_deduplicate(points: list[ScoredPoint]) -> list[ScoredPoint]:
     best_by_id: dict[str, ScoredPoint] = {}
@@ -99,7 +107,7 @@ def _rerank_points_with_sentence_transformers(
         return []
 
     # CrossEncoder expects list of (query, text) pairs
-    pairs = [[query, cast(str, p.payload["content"])] for p in valid_points if p.payload is not None]
+    pairs: list[PairInput] = [(query, cast(str, p.payload["content"])) for p in valid_points if p.payload is not None]
     scores = model.predict(pairs)
 
     # Attach scores to payload
@@ -119,6 +127,7 @@ def _rerank_points_with_colbert(
     *,
     top_k: int,
     opt_config: dict[str, Any],
+    user_config: dict[str, Any],
 ) -> list[ScoredPoint]:
     collection_name = user_config["collection_name"]
     qdrant = Qdrant(collection_name=collection_name, opt_config=opt_config)
@@ -128,7 +137,7 @@ def _rerank_points_with_colbert(
     colbert_query = colbert_vecs[0] if len(colbert_vecs) > 0 else []
 
     candidate_ids = [p.id for p in points]
-    results = qdrant.client.query_points(
+    results = qdrant.get_client().query_points(
         collection_name=collection_name,
         query_filter=models.Filter(
             must=[
@@ -138,6 +147,7 @@ def _rerank_points_with_colbert(
         query=colbert_query,  # type: ignore[arg-type]
         using="colbert",
         limit=top_k,
+        timeout=120
     )
     return list(results.points)
 
@@ -174,6 +184,7 @@ def _collect_query_points(
 
     if opt_config.get("rewrite") == "True":
         rewrite_mode = opt_config.get("rewrite_mode")
+        rewrite_components = (rewrite_mode or "").split("_")
 
         profilingLogger.info(
             "rewrite_enabled query=%r rewrite_mode=%s",
@@ -182,7 +193,7 @@ def _collect_query_points(
             extra={'activity': '_collect_query_points', 'request_id': request_id},
         )
 
-        if rewrite_mode in ["subqueries", "subqueries_keywords"]:
+        if "subqueries" in rewrite_components:
             opt_config_subqueries = copy.deepcopy(opt_config)
             opt_config_subqueries["top_k"] = opt_config["top_k_subqueries"]
 
@@ -196,11 +207,31 @@ def _collect_query_points(
                 extra={'activity': '_collect_query_points', 'request_id': request_id},
             )
 
-            for sq in subqueries:
-                sq_results = search(sq, user_config, opt_config_subqueries)
+
+            for idx, sq in enumerate(subqueries, start=1):
+                profilingLogger.info(
+                    "subquery_search_start query=%r subquery_index=%d/%d subquery=%r top_k=%s",
+                    query,
+                    idx,
+                    len(subqueries),
+                    sq,
+                    opt_config_subqueries["top_k"],
+                    extra={'activity': '_collect_query_points', 'request_id': request_id},
+                )
+                sq_results = search(sq, user_config, opt_config_subqueries,request_id=request_id)
+                profilingLogger.info(
+                    "subquery_search_done query=%r subquery_index=%d/%d subquery=%r points=%d",
+                    query,
+                    idx,
+                    len(subqueries),
+                    sq,
+                    len(sq_results.points),
+                    extra={'activity': '_collect_query_points', 'request_id': request_id},
+                )
+
                 points_all.extend(sq_results.points)
 
-        if rewrite_mode in ["keywords", "subqueries_keywords"]:
+        if "keywords" in rewrite_components:
             opt_config_keywords = copy.deepcopy(opt_config)
             opt_config_keywords["top_k"] = opt_config["top_k_keywords"]
             opt_config_keywords["search_mode"] = "sparse"
@@ -216,8 +247,28 @@ def _collect_query_points(
                 extra={'activity': '_collect_query_points', 'request_id': request_id},
             )
 
-            for kw in keywords:
-                kw_results = search(kw, user_config, opt_config_keywords)
+
+            for idx, kw in enumerate(keywords, start=1):
+                profilingLogger.info(
+                    "keyword_search_start query=%r keyword_index=%d/%d keyword=%r top_k=%s",
+                    query,
+                    idx,
+                    len(keywords),
+                    kw,
+                    opt_config_keywords["top_k"],
+                    extra={'activity': '_collect_query_points', 'request_id': request_id},
+                )
+                kw_results = search(kw, user_config, opt_config_keywords, request_id=request_id)
+                profilingLogger.info(
+                    "keyword_search_done query=%r keyword_index=%d/%d keyword=%r points=%d",
+                    query,
+                    idx,
+                    len(keywords),
+                    kw,
+                    len(kw_results.points),
+                    extra={'activity': '_collect_query_points', 'request_id': request_id},
+                )
+
                 points_all.extend(kw_results.points)
 
     points = _sort_and_deduplicate(points_all)
@@ -250,24 +301,25 @@ def _collect_query_points(
                 query,
                 points,
                 top_k=opt_config["top_k_reranker"],
-                opt_config=opt_config
+                opt_config=opt_config,
+                user_config=user_config,
             )
-
+    else:
+        points = points[:opt_config["top_k"]]
     return points
 
 
 # similarity search
-def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) -> QueryResponse:
-    profilingLogger.info('start', extra={'activity': 'search'})
+def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], *, request_id: str | None = None) -> QueryResponse:
+    profilingLogger.info('start', extra={'activity': 'search', 'request_id': request_id})
     profilingLogger.info(
         "search_called query=%r search_mode=%s collection_name=%s",
         query,
         opt_config.get("search_mode"),
         user_config.get("collection_name"),
-        extra={'activity': '_collect_query_points'},
+        extra={'activity': '_collect_query_points', 'request_id': request_id},
     )
     collection_name = user_config["collection_name"]
-
     if opt_config["fusion_mode"] == "RRF":
         fusion_mode = models.Fusion.RRF
     if opt_config["fusion_mode"] == "DBSF":
@@ -311,27 +363,28 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) 
             query_embedding = np.concatenate(vecs_to_concat, axis=0)
     else:
         query_embedding = create_embeddings([query], opt_config["embedding_model"])
-
     if opt_config["search_mode"] == "dense":
-        results = qdrant.client.query_points(
+        results = qdrant.get_client().query_points(
             collection_name=collection_name,
             query=query_embedding, # type: ignore[arg-type, unused-ignore]
             using="dense",
             limit=opt_config["top_k"],
+            timeout=120
         )
     elif opt_config["search_mode"] == "sparse":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()]  # type: ignore[union-attr]
         values = [float(v) for v in query_embedding["lexical_weights"].values()]  # type: ignore[union-attr]
-        results = qdrant.client.query_points(
+        results = qdrant.get_client().query_points(
             collection_name=collection_name,
             query=models.SparseVector(indices=indices, values=values),
             using="sparse",
             limit=opt_config["top_k"],
+            timeout=120
         )
     elif opt_config["search_mode"] == "dense_sparse":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()] # type: ignore[union-attr]
         values = [float(v) for v in query_embedding["lexical_weights"].values()] # type: ignore[union-attr]
-        results = qdrant.client.query_points(
+        results = qdrant.get_client().query_points(
             collection_name=collection_name,
             prefetch=[
                 models.Prefetch(
@@ -347,12 +400,13 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) 
             ],
             query=models.FusionQuery(fusion=fusion_mode),
             limit=opt_config["top_k"],
+            timeout=120
         )
     
     elif opt_config["search_mode"] == "dense_sparse_colbert":
         indices = [int(k) for k in query_embedding["lexical_weights"].keys()] # type: ignore[union-attr]
         values = [float(v) for v in query_embedding["lexical_weights"].values()] # type: ignore[union-attr]
-        results = qdrant.client.query_points(
+        results = qdrant.get_client().query_points(
             collection_name=collection_name,
             prefetch=[
                 models.Prefetch(
@@ -373,14 +427,16 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any]) 
             ],
             query=models.FusionQuery(fusion=fusion_mode),
             limit=opt_config["top_k"],
+            timeout=120
         )
 
     elif opt_config["search_mode"] == "multi_search":
-        results = qdrant.client.query_points(
+        results = qdrant.get_client().query_points(
             collection_name=collection_name,
             query=query_embedding, # type: ignore[arg-type, unused-ignore]
             using="multi",
             limit=opt_config["top_k"],
+            timeout=120
         )
     return results
 
@@ -409,41 +465,97 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
     if opt_config["search_mode"] != "dense":
         warnings.warn(f"Search mode {opt_config["search_mode"]} for multimodal vector is not implemented yet. Using dense.")
 
-    results = qdrant.client.query_points(
+    results = qdrant.get_client().query_points(
         collection_name=collection_name,
         query=query_embedding, # type: ignore[arg-type, unused-ignore]
         using="multi",
         limit=opt_config["top_k"],
+        timeout=120
     )
     return results
 
-async def search_authorized(question: str, user: str) -> List[ScoredPoint]:
-    points = _collect_query_points(question, user_config, opt_config)
-    query_response = QueryResponse(points=points)
-    authorized_points = await filter_authorized(user, query_response)
-    # keep deterministic order after auth filter
-    documents = _sort_and_deduplicate(list(authorized_points))
+async def search_authorized(
+    question: str,
+    user_auths: Mapping[str, Any],
+    *,
+    history: Sequence[Message] = (),
+    request_id: str | None = None,
+    user_config: dict[str, Any] = user_config,
+    opt_config: dict[str, Any] = opt_config,
+) -> List[ScoredPoint]:
+    if history and opt_config.get("rewrite") == "True":
+        rewrite_components = (opt_config.get("rewrite_mode") or "").split("_")
+        if "history" in rewrite_components:
+            contextualized_question = await asyncio.to_thread(rewrite.contextualize_query, question, history, opt_config)
+            if contextualized_question:
+                profilingLogger.info(
+                    "history_rewrite_applied original_query=%r contextualized_query=%r",
+                    question,
+                    contextualized_question,
+                    extra={'activity': 'search_authorized', 'request_id': request_id},
+                )
+                question = contextualized_question
+    for judge_attempt in range(2 if opt_config["context_relevance_judge"] else 1):
+        search_config = opt_config.copy()
+        if judge_attempt:
+            search_config["rewrite"] = "True"
+        max_retries = opt_config.get("max_auth_retries", 3)
+        target_k = opt_config.get("top_k", 10)
+        current_multiplier = opt_config.get("auth_oversample_start", 2)
+        step_multiplier = opt_config.get("auth_oversample_step", 2)
+        deduplicated: list[ScoredPoint] = []
+        for attempt in range(max_retries):
+            local_opt = copy.deepcopy(search_config)
+            local_opt["top_k"] = target_k * current_multiplier
+            if "top_k_reranker" in local_opt:
+                local_opt["top_k_reranker"] = local_opt["top_k_reranker"] * current_multiplier
+            if "top_k_subqueries" in local_opt:
+                local_opt["top_k_subqueries"] = local_opt["top_k_subqueries"] * current_multiplier
+            if "top_k_keywords" in local_opt:
+                local_opt["top_k_keywords"] = local_opt["top_k_keywords"] * current_multiplier
 
-    if opt_config["context_relevance_judge"]:
+            for key in ["prefetch_limit_sparse", "prefetch_limit_dense", "prefetch_limit_colbert"]:
+                if key in local_opt:
+                    local_opt[key] = local_opt[key] * current_multiplier
+
+            profilingLogger.info(
+                    "authorized_search_attempt attempt=%d/%d multiplier=%d target_k=%d",
+                    attempt + 1,
+                    max_retries,
+                    current_multiplier,
+                    target_k,
+                    extra={'activity': 'search_authorized', 'request_id': request_id},
+            )
+
+            points = await asyncio.to_thread(
+                _collect_query_points,
+                question,
+                user_config,
+                local_opt,
+                request_id=request_id)
+
+
+            query_response = QueryResponse(points=points)
+
+            authorized_points = await filter_authorized(user_auths, query_response)
+            deduplicated = _sort_and_deduplicate(list(authorized_points))
+
+            if len(deduplicated) >= target_k:
+                break
+            current_multiplier += step_multiplier
+        # If all retries are exhausted, return whatever we managed to authorize
+        documents = deduplicated[:target_k]
+
+        if not opt_config["context_relevance_judge"]:
+            return documents
+
         context_relevance_score = await judge_context_relevance(
             question=question,
             documents=documents,
         )
-        print("Context relevance score:", context_relevance_score)
-        if context_relevance_score < opt_config["judge_threshold"]:
-                retry_config = opt_config.copy()
-                retry_config["rewrite"] = "True"
+        logging.info("Context relevance score: %s", context_relevance_score)
 
-                points = _collect_query_points(question, user_config, retry_config)
-                query_response = QueryResponse(points=points)
-                authorized_points = await filter_authorized(user, query_response)
-                documents = _sort_and_deduplicate(list(authorized_points))
-
-                context_relevance_score = await judge_context_relevance(
-                    question=question,
-                    documents=documents,
-                )
-
-                print(f"Context relevance score after retry: {context_relevance_score}")
+        if context_relevance_score >= opt_config["judge_threshold"]:
+            return documents
 
     return documents

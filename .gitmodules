@@ -4,3 +4,6 @@
 [submodule "pyapp"]
 	path = pyapp
 	url = https://github.com/learn2rag/pyapp
+[submodule "services/llama.cpp"]
+	path = services/llama.cpp
+	url = https://github.com/learn2rag/llama.cpp

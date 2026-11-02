@@ -6,9 +6,9 @@ This module handles loading documents from HTML sources.
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.8
+Version: 0.0.9
 Creation Date: July 28, 2025
-Last Modified: June 29, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
@@ -24,6 +24,7 @@ from urllib.parse import urlparse, urljoin
 from ..globals import stop_loading
 from langchain_community.document_loaders import UnstructuredHTMLLoader
 from langchain_core.documents import Document
+from ..loaders.errors import LoaderAccessError
 import logging
 import requests
 
@@ -89,6 +90,10 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
         # Load the main page content
         response = requests.get(url)
         response.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        raise LoaderAccessError(f"HTML source '{url}' is not reachable or returned an error: {exc}") from exc
+
+    try:
 
         # Save the HTML content to a temporary file for UnstructuredHTMLLoader
         with tempfile.NamedTemporaryFile(mode="w", suffix=".html", encoding="utf-8", delete=False) as f:

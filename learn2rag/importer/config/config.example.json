@@ -54,6 +54,16 @@
             "issue_types": ["Task", "Story", "Bug"],
             "include_comments": true,
             "page_size": 50
+        },
+        {
+            "loader_type": "MediaWikiLoader",
+            "loader_id": "mediawiki_main",
+            "base_url": "https://www.mediawiki.org/api.php",
+            "auth_type": "basic",
+            "username": "Admin@Learn2RAG",
+            "password": "yourpassword",
+            "namespaces": [0],
+            "page_size": 50
         }
     ]
 }

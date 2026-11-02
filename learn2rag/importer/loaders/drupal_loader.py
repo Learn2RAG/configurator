@@ -11,9 +11,9 @@ Drupal requirements:
 
 Author: Kyrill Meyer
 Institution: IFDT
-Version: 0.0.3
+Version: 0.0.4
 Creation Date: March 17, 2026
-Last Modified: June 29, 2026
+Last Modified: August 31, 2026
 """
 
 import hashlib
@@ -24,6 +24,7 @@ from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 import requests
 from ..globals import stop_loading
+from ..loaders.errors import LoaderAccessError
 
 if TYPE_CHECKING:
     from ..utils.progress import ImportProgress
@@ -69,7 +70,69 @@ def _discover_endpoint_map(base_url: str, session: requests.Session) -> Dict[str
     return {}
 
 
-def _build_session(auth_type: str, username: str, password: str, token: str) -> requests.Session:
+def _fetch_oauth_token(base_url: str, entry_config: Dict[str, Any]) -> str:
+    """Request an access token from Drupal (simple_oauth) using the client credentials grant."""
+    client_id = entry_config.get("oauth_client_id")
+    client_secret = entry_config.get("oauth_client_secret")
+    if not client_id or not client_secret:
+        raise LoaderAccessError("DrupalLoader: auth_type 'oauth' requires oauth_client_id and oauth_client_secret")
+
+    token_url = entry_config.get("oauth_access_token_url") or f"{base_url.rstrip('/')}/oauth/token"
+    payload = {"grant_type": "client_credentials"}
+    # Only request a scope if one is explicitly configured; otherwise Drupal uses the consumer's default scopes
+    scope = entry_config.get("oauth_import_scope")
+    if scope:
+        payload["scope"] = str(scope)
+
+    try:
+        response = requests.post(token_url, data=payload, auth=(client_id, client_secret), timeout=15)
+        response.raise_for_status()
+        access_token = response.json().get("access_token")
+    except (requests.exceptions.RequestException, ValueError) as e:
+        raise LoaderAccessError(f"DrupalLoader: could not fetch OAuth token from '{token_url}': {e}") from e
+    if not access_token:
+        raise LoaderAccessError(f"DrupalLoader: token response from '{token_url}' contained no access_token")
+    logger.info("DrupalLoader: acquired OAuth access token via client credentials grant")
+    return str(access_token)
+
+
+class _ClientCredentialsAuth(requests.auth.AuthBase):
+    """
+    Bearer token from the client credentials grant that renews itself.
+
+    Drupal access tokens are short-lived (simple_oauth default: 5 minutes), so a long import can outlive
+    its token. On a 401 a new token is requested and the request is sent once more.
+    """
+
+    def __init__(self, base_url: str, entry_config: Dict[str, Any]):
+        self.base_url = base_url
+        self.entry_config = entry_config
+        self.token = _fetch_oauth_token(base_url, entry_config)
+
+    def __call__(self, request: requests.PreparedRequest) -> requests.PreparedRequest:
+        request.headers["Authorization"] = f"Bearer {self.token}"
+        request.register_hook("response", self._retry_with_new_token)  # type: ignore[no-untyped-call]
+        return request
+
+    def _retry_with_new_token(self, response: requests.Response, **kwargs: Any) -> requests.Response:
+        if response.status_code != 401 or getattr(response.request, "token_renewed", False):
+            return response
+        logger.info("DrupalLoader: access token rejected (401), requesting a new one")
+        self.token = _fetch_oauth_token(self.base_url, self.entry_config)
+        # Release the connection before reusing it, like requests' own HTTPDigestAuth
+        response.content
+        response.close()
+        retry = response.request.copy()
+        retry.headers["Authorization"] = f"Bearer {self.token}"
+        setattr(retry, "token_renewed", True)
+        retried: requests.Response = response.connection.send(retry, **kwargs)
+        retried.history.append(response)
+        retried.request = retry
+        return retried
+
+
+def _build_session(auth_type: str, username: str, password: str, token: str,
+                   entry_config: Optional[Dict[str, Any]] = None, base_url: str = "") -> requests.Session:
     """Build a requests Session with the configured authentication."""
     session = requests.Session()
     session.headers.update({"Accept": "application/vnd.api+json"})
@@ -77,6 +140,8 @@ def _build_session(auth_type: str, username: str, password: str, token: str) -> 
         session.auth = (username, password)
     elif auth_type == "token":
         session.headers.update({"Authorization": f"Bearer {token}"})
+    elif auth_type == "oauth":
+        session.auth = _ClientCredentialsAuth(base_url, entry_config or {})
     return session
 
 
@@ -126,12 +191,18 @@ def _autodetect_text_content(attributes: Dict[str, Any]) -> str:
         elif isinstance(value, str) and len(value) > 30:
             parts.append(_html_to_text(value))
         elif isinstance(value, list):
+            items: List[str] = []
             for sub in value:
                 if isinstance(sub, dict):
                     text = sub.get("processed") or sub.get("value") or ""
                     cleaned = _html_to_text(str(text))
                     if cleaned:
                         parts.append(cleaned)
+                elif isinstance(sub, str) and sub.strip():
+                    # Multi-value plain text fields, e.g. recipe ingredients
+                    items.append(sub.strip())
+            if items:
+                parts.append("\n".join(items))
     return "\n\n".join(filter(None, parts))
 
 
@@ -148,6 +219,7 @@ def load_from_drupal(
     language: str = "",
     since: Optional[datetime] = None,
     progress: Optional["ImportProgress"] = None,
+    entry_config: Optional[Dict[str, Any]] = None,
 ) -> List[Document]:
     """
     Load documents from a Drupal instance via the JSON:API.
@@ -171,8 +243,7 @@ def load_from_drupal(
     """
     if text_fields is None:
         text_fields = ["title", "field_body", "body"]  # fallback covers both naming conventions
-
-    session = _build_session(auth_type, username, password, token)
+    session = _build_session(auth_type, username, password, token, entry_config=entry_config, base_url=base_url)
     if language:
         session.headers.update({"Accept-Language": language})
 
@@ -211,11 +282,11 @@ def load_from_drupal(
 
         # Timestamp filter: only documents changed on or after `since`
         if since is not None:
-            # Ensure the timestamp is timezone-aware and formatted as ISO 8601 for JSON:API
             since_utc = since.astimezone(timezone.utc) if since.tzinfo else since.replace(tzinfo=timezone.utc)
             params["filter[changed-filter][condition][path]"] = "changed"
             params["filter[changed-filter][condition][operator]"] = ">="
-            params["filter[changed-filter][condition][value]"] = since_utc.isoformat()
+            # JSON:API compares "changed" as a Unix timestamp; an ISO 8601 string silently matches nothing
+            params["filter[changed-filter][condition][value]"] = int(since_utc.timestamp())
             logger.info(f"DrupalLoader: applying since-filter >= {since_utc.isoformat()} for '{content_type}'")
 
         page_count = 0
@@ -237,12 +308,14 @@ def load_from_drupal(
 
                 response.raise_for_status()
                 data = response.json()
+            # Fail on any page, not only the first: partial results would be saved as a successful import,
+            # and the import state would then skip the missing documents in later delta runs
             except requests.exceptions.HTTPError as e:
-                logger.error(f"DrupalLoader: HTTP error for content type '{content_type}': {e}")
-                break
+                logger.error(f"DrupalLoader: HTTP error for content type '{content_type}' on page {page_count + 1}: {e}")
+                raise LoaderAccessError(f"DrupalLoader could not access '{base_url}' for content type '{content_type}': {e}") from e
             except requests.exceptions.RequestException as e:
-                logger.error(f"DrupalLoader: Request failed for content type '{content_type}': {e}")
-                break
+                logger.error(f"DrupalLoader: Request failed for content type '{content_type}' on page {page_count + 1}: {e}")
+                raise LoaderAccessError(f"DrupalLoader request failed for '{base_url}' and content type '{content_type}': {e}") from e
 
             items = data.get("data", [])
             if not items:
@@ -272,15 +345,18 @@ def load_from_drupal(
                 langcode: str = str(attributes.get("langcode", language))
                 status: bool = bool(attributes.get("status", True))
 
-                page_content = _extract_page_content(attributes, text_fields)
-                if not page_content:
+                # The title alone doesn't count as content, otherwise e.g. recipes are indexed without their text
+                body_content = _extract_page_content(attributes, [field for field in text_fields if field != "title"])
+                if not body_content:
                     # Configured text_fields yielded nothing – auto-detect all readable text fields
-                    page_content = _autodetect_text_content(attributes)
-                    if page_content:
+                    body_content = _autodetect_text_content(attributes)
+                    if body_content:
                         logger.debug(
                             f"DrupalLoader: node {drupal_id} – configured text_fields had no content, "
                             f"used auto-detected fields instead."
                         )
+                title_content = _extract_page_content(attributes, ["title"]) if "title" in text_fields else ""
+                page_content = "\n\n".join(filter(None, [title_content, body_content]))
                 if not page_content:
                     # Last resort fallback: use title only
                     page_content = title
@@ -351,6 +427,7 @@ def get_all_drupal_document_ids(
     token: str = "",
     page_size: int = 100,
     language: str = "",
+    entry_config: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     """
     Retrieve the source URL for every current node in Drupal without loading content.
@@ -372,7 +449,7 @@ def get_all_drupal_document_ids(
     Returns:
         List[str]: Source URLs of all current nodes, e.g. ``["https://example.com/node/42"]``.
     """
-    session = _build_session(auth_type, username, password, token)
+    session = _build_session(auth_type, username, password, token, entry_config=entry_config, base_url=base_url)
     if language:
         session.headers.update({"Accept-Language": language})
 
@@ -408,8 +485,9 @@ def get_all_drupal_document_ids(
                 response.raise_for_status()
                 data = response.json()
             except requests.exceptions.RequestException as e:
-                logger.error(f"get_all_drupal_document_ids: Request failed for '{content_type}': {e}")
-                break
+                # A partial list would make the delta import delete every document missing from it
+                logger.error(f"get_all_drupal_document_ids: Request failed for '{content_type}' on page {page_count + 1}: {e}")
+                raise LoaderAccessError(f"DrupalLoader could not list document IDs for '{base_url}' / '{content_type}': {e}") from e
 
             items = data.get("data", [])
             if not items:

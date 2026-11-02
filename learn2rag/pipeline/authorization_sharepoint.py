@@ -1,5 +1,5 @@
 import logging
-from typing import Set, List
+from typing import Any, List, Mapping, Set
 
 from azure.identity import ClientSecretCredential
 from msgraph import GraphServiceClient # type: ignore[attr-defined]
@@ -124,7 +124,7 @@ class SharepointAuthorizationFilter(AuthorizationFilter):
         except Exception:
             return False
 
-    async def filter_documents(self, user: str, document_ids: Set[str]) -> Set[str]:
+    async def filter_documents(self, user: str, documents: Mapping[str, Any]) -> Set[str]:
         """
         Filter document IDs based on SharePoint permissions.
 
@@ -140,7 +140,7 @@ class SharepointAuthorizationFilter(AuthorizationFilter):
             member_group_ids = await self._get_groups(user)
             owned_group_ids = await self._get_owned_groups(user)
             authorized_ids = []
-            for doc_id in document_ids:
+            for doc_id in documents:
                 is_authorized = await self._user_has_access(user, doc_id, drive, member_group_ids, owned_group_ids)
                 if is_authorized:
                     authorized_ids.append(doc_id)

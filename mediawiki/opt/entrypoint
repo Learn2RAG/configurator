@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+URL="http://localhost:7338"
+URL="http://dice-learn2rag-basic-dev.cs.uni-paderborn.de:7338"
+
+if [ ! -e "./LocalSettings.php" ]; then
+    runuser -u www-data -- \
+    php ./maintenance/install.php \
+    --dbtype sqlite \
+    --dbname test \
+    --server "$URL" \
+    --scriptpath "" \
+    --lang en \
+    --pass uniquetest \
+    "Test" "admin"
+
+    cat /opt/LocalSettings.php >>./LocalSettings.php
+fi
+
+docker-php-entrypoint apache2-foreground

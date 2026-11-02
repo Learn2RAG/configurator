@@ -1,6 +1,7 @@
 # This file is not seen or supposed to be changed by users.
 # The user-provided configuration file extends this one.
 # (config.yml next to the project root or executable)
+---
 SUGGESTED_MODELS:
   gpt_oss_20b:
     label: OpenAI GPT-OSS (20B)
