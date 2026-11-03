@@ -94,6 +94,30 @@ def insert_dense_sparse_colbert(qdrant: Qdrant, collection_name: str, sample: di
     )
     qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
 
+def insert_named(qdrant: Qdrant, collection_name: str, sample: dict[str, Any], content_vector: str = "") -> None:
+    suffix = f"_{content_vector}" if content_vector else ""
+    vector: dict[str, Any] = {
+        f"dense{suffix}": sample["dense_vec"],
+        f"sparse{suffix}": SparseVector(
+            indices=[int(x) for x in sample["lexical_weights"].keys()],
+            values=sample["lexical_weights"].values(),
+        ),
+    }
+    for item, (dense, sparse) in sample["named_vecs"].items():
+        vector[f"dense_{item}"] = dense
+        vector[f"sparse_{item}"] = SparseVector(
+            indices=[int(x) for x in sparse.keys()],
+            values=sparse.values(),
+        )
+    # structured records: keep all metadata fields (incl. the named fields) in the payload
+    base_payload = payload(sample)
+    point = PointStruct(
+        id=uuid4().hex,
+        vector=vector,
+        payload=base_payload | {k: v for k, v in sample["metadata"].items() if k not in base_payload},
+    )
+    qdrant.get_client().upsert(collection_name=collection_name, wait=True, points=[point])
+
 def insert_multi(qdrant: Qdrant, collection_name: str, sample: dict[str, Any]) -> None:
     point = PointStruct(
         id=uuid4().hex,
@@ -253,9 +277,47 @@ def ingest_batch(docs: list[Document], qdrant: Qdrant, user_config: dict[str, An
                 for chunk, dense, c_hash in zip(batch_chunks, embeddings, batch_chunk_hash)
             ]
 
+        if opt_config["query_mode"] == "named":
+            if opt_config["search_mode"] != "dense_sparse":
+                raise ValueError("query_mode 'named' requires search_mode 'dense_sparse'")
+            # sparse matches exact tokens and bge-m3 tokens are case sensitive
+            sparse_lowercase = opt_config.get("sparse_lowercase", False)
+            if sparse_lowercase:
+                lowercase_weights = create_embeddings(
+                    [content.lower() for content in batch_content],
+                    opt_config["embedding_model"],
+                    "sparse",
+                )["lexical_weights"]
+                for sample, sparse in zip(chunks_with_embeddings, list(lowercase_weights)):
+                    sample["lexical_weights"] = sparse
+            for sample in chunks_with_embeddings:
+                sample["named_vecs"] = {}
+            for item in opt_config["multi_search"]:
+                item_values = list(get_chunks_metadata(batch_chunks, item))
+                item_embeddings = create_embeddings(
+                    item_values,
+                    opt_config["embedding_model"],
+                    opt_config["search_mode"],
+                )
+                item_sparse = item_embeddings["lexical_weights"]
+                if sparse_lowercase:
+                    item_sparse = create_embeddings(
+                        [value.lower() for value in item_values],
+                        opt_config["embedding_model"],
+                        "sparse",
+                    )["lexical_weights"]
+                for sample, dense, sparse in zip(
+                    chunks_with_embeddings,
+                    list(item_embeddings["dense_vecs"]),
+                    list(item_sparse),
+                ):
+                    sample["named_vecs"][item] = (dense, sparse)
+
         for sample in chunks_with_embeddings:
             if not point_exists(qdrant, collection_name, sample['metadata']['loader_id'], sample['metadata']['source'], sample['metadata']['content_hash'], sample['chunk_hash']):
-                if opt_config["search_mode"] == "dense_sparse":
+                if opt_config["query_mode"] == "named":
+                    insert_named(qdrant, collection_name, sample, opt_config.get("named_content_vector", ""))
+                elif opt_config["search_mode"] == "dense_sparse":
                     insert_dense_sparse(qdrant, collection_name, sample)
                 elif opt_config["search_mode"] == "dense_sparse_colbert":
                     insert_dense_sparse_colbert(qdrant, collection_name, sample)

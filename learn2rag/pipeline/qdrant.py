@@ -55,7 +55,24 @@ class Qdrant:
         query_mode = opt_config["query_mode"]
         multi_search = opt_config["multi_search"]
         try:
-            if search_mode == "dense_sparse":
+            if query_mode == "named":
+                # one named dense + sparse vector for the content and for each multi_search field
+                content_vector = opt_config.get("named_content_vector", "")
+                names = [f"_{content_vector}" if content_vector else ""] + [f"_{item}" for item in multi_search]
+                cls.get_client().create_collection(
+                    collection_name=collection_name,
+                    vectors_config={
+                        f"dense{name}": VectorParams(size=vector_size, distance=Distance.COSINE)
+                        for name in names
+                    },
+                    sparse_vectors_config={
+                        f"sparse{name}": SparseVectorParams(
+                            index=SparseIndexParams(on_disk=False)
+                        )
+                        for name in names
+                    },
+                )
+            elif search_mode == "dense_sparse":
                 cls.get_client().create_collection(
                     collection_name=collection_name,
                     vectors_config={

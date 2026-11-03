@@ -473,6 +473,95 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
     return results
 
 
+def embed_named_queries(queries: list[str], opt_config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Dense + sparse query embeddings; sparse from lowercased text if opt_config sparse_lowercase is set."""
+    embeddings = create_embeddings(queries, opt_config["embedding_model"], embedding_mode="dense_sparse")
+    lexical_weights = embeddings["lexical_weights"]
+    if opt_config.get("sparse_lowercase", False):
+        lexical_weights = create_embeddings(
+            [query.lower() for query in queries], opt_config["embedding_model"], embedding_mode="sparse"
+        )["lexical_weights"]
+    return [
+        {"dense_vecs": dense, "lexical_weights": sparse}
+        for dense, sparse in zip(embeddings["dense_vecs"], lexical_weights)
+    ]
+
+
+def search_named_hybrid(
+    field_queries: dict[str, str],
+    field_vectors: dict[str, list[str]],
+    user_config: dict[str, Any],
+    opt_config: dict[str, Any],
+) -> list[ScoredPoint]:
+    field_embeddings = {
+        field: embed_named_queries([query_text], opt_config)[0]
+        for field, query_text in field_queries.items()
+        if query_text and field in field_vectors
+    }
+    return search_named_hybrid_preembedded(field_embeddings, field_vectors, user_config, opt_config)
+
+
+def search_named_hybrid_preembedded(
+    field_embeddings: dict[str, dict[str, Any]],
+    field_vectors: dict[str, list[str]],
+    user_config: dict[str, Any],
+    opt_config: dict[str, Any],
+) -> list[ScoredPoint]:
+    collection_name = user_config["collection_name"]
+
+    if opt_config["fusion_mode"] == "RRF":
+        fusion_mode = models.Fusion.RRF
+    if opt_config["fusion_mode"] == "DBSF":
+        fusion_mode = models.Fusion.DBSF
+
+    prefetch = []
+    for field, vector_names in field_vectors.items():
+        query_embedding = field_embeddings.get(field)
+        if not query_embedding or not vector_names:
+            continue
+
+        for vector_name in vector_names:
+            if vector_name.startswith("sparse"):
+                indices = [int(k) for k in query_embedding["lexical_weights"].keys()]
+                values = [float(v) for v in query_embedding["lexical_weights"].values()]
+                prefetch.append(models.Prefetch(
+                    query=models.SparseVector(indices=indices, values=values),
+                    using=vector_name,
+                    limit=opt_config["prefetch_limit_sparse"],
+                ))
+            else:
+                prefetch.append(models.Prefetch(
+                    query=query_embedding["dense_vecs"],
+                    using=vector_name,
+                    limit=opt_config["prefetch_limit_dense"],
+                ))
+
+    if not prefetch:
+        return []
+
+    if len(prefetch) == 1:
+        # single vector: no fusion, keep the native similarity scores
+        results = Qdrant.get_client().query_points(
+            collection_name=collection_name,
+            query=prefetch[0].query,
+            using=prefetch[0].using,
+            limit=opt_config["top_k"],
+            with_payload=True,
+            timeout=120
+        )
+        return list(results.points)
+
+    results = Qdrant.get_client().query_points(
+        collection_name=collection_name,
+        prefetch=prefetch,
+        query=models.FusionQuery(fusion=fusion_mode),
+        limit=opt_config["top_k"],
+        with_payload=True,
+        timeout=120
+    )
+    return list(results.points)
+
+
 async def search_authorized(
     question: str,
     user_auths: Mapping[str, Any],
