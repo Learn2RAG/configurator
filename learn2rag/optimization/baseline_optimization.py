@@ -166,12 +166,19 @@ def objective(config: Configuration,
         return float(cost)
 
     t_score = time.time()
-    _, _, F1_gold = bert_score(predictions, goldens, lang="en", verbose=False, rescale_with_baseline=True)
+    # bert_score crashes on empty predictions with transformers 5, so score them as 0 directly.
+    # Can be removed once bert_score supports transformers 5.
+    bert_gold = [0.0] * len(predictions)
+    scored = [i for i, p in enumerate(predictions) if p.strip()]
+    if scored:
+        _, _, F1_gold = bert_score([predictions[i] for i in scored], [goldens[i] for i in scored],
+                                   lang="en", verbose=False, rescale_with_baseline=True)
+        for i, f in zip(scored, F1_gold):
+            bert_gold[i] = max(0.0, f.item())
     scoring_time = time.time() - t_score
 
     # objective function
-    bert_gold = [max(0.0, f.item()) for f in F1_gold]
-    avg_bert_gold = np.mean(bert_gold)
+    avg_bert_gold = float(np.mean(bert_gold))
     cost = 1.0 - avg_bert_gold
     total_time = time.time() - t_start
 
