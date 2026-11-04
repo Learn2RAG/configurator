@@ -91,21 +91,20 @@ async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config
         "history": select_history(history, opt_config),
     })).content
     assert isinstance(answer, str)
-    logging.info("\nFirst answer: %s", answer)
-    if opt_config["answer_relevance_judge"]:
+    if opt_config["answer_relevance_judge"]:  #Answer relevance judge
         answer_relevance_score = await judge_answer_relevance(
             question = query,
             answer = answer,
         )
         logging.info("Answer relevance score: %s", answer_relevance_score)
         if answer_relevance_score < opt_config["judge_threshold"]:
+            logging.info("Retrying answer relevance")
             answer = (await chain.ainvoke({
                 "context": context,
                 "question": query,
                 "history": select_history(history, opt_config),
             })).content
             assert isinstance(answer, str)
-            logging.info("\nRetry answer: %s", answer)
     return answer
 
 

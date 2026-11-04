@@ -495,9 +495,10 @@ async def search_authorized(
                     extra={'activity': 'search_authorized', 'request_id': request_id},
                 )
                 question = contextualized_question
-    for judge_attempt in range(2 if opt_config["context_relevance_judge"] else 1):
+    for judge_attempt in range(2 if opt_config["context_relevance_judge"] else 1):  # Context Relevance Judge
         search_config = opt_config.copy()
         if judge_attempt:
+            logging.info("Retrying context relevance")
             search_config["rewrite"] = "True"
         max_retries = opt_config.get("max_auth_retries", 3)
         target_k = opt_config.get("top_k", 10)
