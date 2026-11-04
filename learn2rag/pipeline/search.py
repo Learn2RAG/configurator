@@ -24,6 +24,7 @@ from .config import opt_config, user_config
 from .embeddings import create_embeddings
 from .qdrant import Qdrant
 from . import rewrite
+from .judges import judge_context_relevance
 
 profilingLogger = logging.getLogger('profiling')
 
@@ -473,7 +474,6 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
     )
     return results
 
-
 async def search_authorized(
     question: str,
     user_auths: Mapping[str, Any],
@@ -495,50 +495,68 @@ async def search_authorized(
                     extra={'activity': 'search_authorized', 'request_id': request_id},
                 )
                 question = contextualized_question
+    for judge_attempt in range(2 if opt_config.get("context_relevance_judge", False) else 1):  # Context Relevance Judge
+        search_config = opt_config.copy()
+        if judge_attempt:
+            logging.info("Retrying context relevance")
+            search_config["rewrite"] = "True"
+        max_retries = opt_config.get("max_auth_retries", 3)
+        target_k = opt_config.get("top_k", 10)
+        current_multiplier = opt_config.get("auth_oversample_start", 2)
+        step_multiplier = opt_config.get("auth_oversample_step", 2)
+        deduplicated: list[ScoredPoint] = []
+        for attempt in range(max_retries):
+            local_opt = copy.deepcopy(search_config)
+            local_opt["top_k"] = target_k * current_multiplier
+            if "top_k_reranker" in local_opt:
+                local_opt["top_k_reranker"] = local_opt["top_k_reranker"] * current_multiplier
+            if "top_k_subqueries" in local_opt:
+                local_opt["top_k_subqueries"] = local_opt["top_k_subqueries"] * current_multiplier
+            if "top_k_keywords" in local_opt:
+                local_opt["top_k_keywords"] = local_opt["top_k_keywords"] * current_multiplier
 
-    max_retries = opt_config.get("max_auth_retries", 3)
-    target_k = opt_config.get("top_k", 10)
-    current_multiplier = opt_config.get("auth_oversample_start", 2)
-    step_multiplier = opt_config.get("auth_oversample_step", 2)
-    deduplicated: list[ScoredPoint] = []
-    for attempt in range(max_retries):
-        local_opt = copy.deepcopy(opt_config)
-        local_opt["top_k"] = target_k * current_multiplier
-        if "top_k_reranker" in local_opt:
-            local_opt["top_k_reranker"] = local_opt["top_k_reranker"] * current_multiplier
-        if "top_k_subqueries" in local_opt:
-            local_opt["top_k_subqueries"] = local_opt["top_k_subqueries"] * current_multiplier
-        if "top_k_keywords" in local_opt:
-            local_opt["top_k_keywords"] = local_opt["top_k_keywords"] * current_multiplier
+            for key in ["prefetch_limit_sparse", "prefetch_limit_dense", "prefetch_limit_colbert"]:
+                if key in local_opt:
+                    local_opt[key] = local_opt[key] * current_multiplier
 
-        for key in ["prefetch_limit_sparse", "prefetch_limit_dense", "prefetch_limit_colbert"]:
-            if key in local_opt:
-                local_opt[key] = local_opt[key] * current_multiplier
+            profilingLogger.info(
+                    "authorized_search_attempt attempt=%d/%d multiplier=%d target_k=%d",
+                    attempt + 1,
+                    max_retries,
+                    current_multiplier,
+                    target_k,
+                    extra={'activity': 'search_authorized', 'request_id': request_id},
+            )
 
-        profilingLogger.info(
-                "authorized_search_attempt attempt=%d/%d multiplier=%d target_k=%d",
-                attempt + 1,
-                max_retries,
-                current_multiplier,
-                target_k,
-                extra={'activity': 'search_authorized', 'request_id': request_id},
+            points = await asyncio.to_thread(
+                _collect_query_points,
+                question,
+                user_config,
+                local_opt,
+                request_id=request_id)
+
+
+            query_response = QueryResponse(points=points)
+
+            authorized_points = await filter_authorized(user_auths, query_response)
+            deduplicated = _sort_and_deduplicate(list(authorized_points))
+
+            if len(deduplicated) >= target_k:
+                break
+            current_multiplier += step_multiplier
+        # If all retries are exhausted, return whatever we managed to authorize
+        documents = deduplicated[:target_k]
+
+        if not opt_config.get("context_relevance_judge", False):
+            return documents
+
+        context_relevance_score = await judge_context_relevance(
+            question=question,
+            documents=documents,
         )
+        logging.info("Context relevance score: %s", context_relevance_score)
 
-        points = await asyncio.to_thread(
-            _collect_query_points,
-            question,
-            user_config,
-            local_opt,
-            request_id=request_id)
+        if context_relevance_score >= opt_config["judge_threshold"]:
+            return documents
 
-
-        query_response = QueryResponse(points=points)
-
-        authorized_points = await filter_authorized(user_auths, query_response)
-        deduplicated = _sort_and_deduplicate(list(authorized_points))
-
-        if len(deduplicated) >= target_k:
-            return deduplicated[:target_k]
-        current_multiplier += step_multiplier
-    # If all retries are exhausted, return whatever we managed to authorize
-    return deduplicated[:target_k]
+    return documents

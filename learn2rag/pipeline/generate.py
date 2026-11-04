@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from qdrant_client.http.models import ScoredPoint
 from .chat import ASSISTANT_ROLES, Message
 from .llm import llm
+from .judges import judge_answer_relevance
 
 
 logger = logging.getLogger(__name__)
@@ -84,12 +85,28 @@ async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config
     context = build_context(search_results)
 
     chain = build_prompt(opt_config) | llm
-    answer = await chain.ainvoke({
+    answer = (await chain.ainvoke({
         "context": context,
         "question": query,
         "history": select_history(history, opt_config),
-    })
-    return answer.content
+    })).content
+    assert isinstance(answer, str)
+    if opt_config.get("answer_relevance_judge", False):  #Answer relevance judge
+        answer_relevance_score = await judge_answer_relevance(
+            question = query,
+            answer = answer,
+        )
+        logging.info("Answer relevance score: %s", answer_relevance_score)
+        if answer_relevance_score < opt_config["judge_threshold"]:
+            logging.info("Retrying answer relevance")
+            answer = (await chain.ainvoke({
+                "context": context,
+                "question": query,
+                "history": select_history(history, opt_config),
+            })).content
+            assert isinstance(answer, str)
+    return answer
+
 
 
 async def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> AsyncGenerator[str, None]:
