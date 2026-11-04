@@ -91,7 +91,7 @@ async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config
         "history": select_history(history, opt_config),
     })).content
     assert isinstance(answer, str)
-    if opt_config["answer_relevance_judge"]:  #Answer relevance judge
+    if opt_config.get("answer_relevance_judge", False):  #Answer relevance judge
         answer_relevance_score = await judge_answer_relevance(
             question = query,
             answer = answer,

@@ -495,7 +495,7 @@ async def search_authorized(
                     extra={'activity': 'search_authorized', 'request_id': request_id},
                 )
                 question = contextualized_question
-    for judge_attempt in range(2 if opt_config["context_relevance_judge"] else 1):  # Context Relevance Judge
+    for judge_attempt in range(2 if opt_config.get("context_relevance_judge", False) else 1):  # Context Relevance Judge
         search_config = opt_config.copy()
         if judge_attempt:
             logging.info("Retrying context relevance")
@@ -547,7 +547,7 @@ async def search_authorized(
         # If all retries are exhausted, return whatever we managed to authorize
         documents = deduplicated[:target_k]
 
-        if not opt_config["context_relevance_judge"]:
+        if not opt_config.get("context_relevance_judge", False):
             return documents
 
         context_relevance_score = await judge_context_relevance(
