@@ -41,12 +41,16 @@ def build_app(
     app.add_middleware(SessionMiddleware, secret_key="FIXME")
 
     auth_prefix = '/auth'
+    # Always reassign the top-level key: Starlette only re-sends the session cookie
+    # when a top-level key changes, so mutating the nested dict would be lost.
     def login_handler(request: Request, name: str, token: str) -> None:
-        if SESSION_USER_AUTHS not in request.session:
-            request.session[SESSION_USER_AUTHS] = {}
-        request.session[SESSION_USER_AUTHS][name] = {'token': token}
+        user_auths = dict(request.session.get(SESSION_USER_AUTHS, {}))
+        user_auths[name] = {'token': token}
+        request.session[SESSION_USER_AUTHS] = user_auths
     def logout_handler(request: Request, name: str) -> None:
-        del request.session[SESSION_USER_AUTHS][name]
+        user_auths = dict(request.session.get(SESSION_USER_AUTHS, {}))
+        user_auths.pop(name, None)
+        request.session[SESSION_USER_AUTHS] = user_auths
     auth_router = auth.build_router(importer_config, login_handler, logout_handler)
     app.include_router(
         auth_router,
