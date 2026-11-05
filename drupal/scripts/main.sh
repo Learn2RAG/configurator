@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eux
-composer require --no-audit --no-blocking --no-progress --with-all-dependencies 'drupal/simple_oauth:^6.1' 'drush/drush:*'
+composer require --no-audit --no-blocking --no-progress --with-all-dependencies \
+         'drupal/simple_oauth:6.1.3' \
+         'drush/drush:*'
 php -d memory_limit=256M web/core/scripts/drupal install --password=test --no-interaction demo_umami
 
 # Assign admin role explicitly
