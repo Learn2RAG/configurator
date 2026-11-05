@@ -8,11 +8,14 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
-from learn2rag.pipeline.config import opt_config, user_config
+from learn2rag.pipeline.config import opt_config as opt_config
+from learn2rag.pipeline.config import user_config as user_config
 from learn2rag.pipeline.operators.search import SearchOperator
 from learn2rag.pipeline.qdrant import Qdrant
 
 from .models import (
+    AggregateQueryRequest,
+    AggregateQueryResponse,
     IndexedDocumentChunksResponse,
     IndexErrorResponse,
     IndexResponse,
@@ -21,13 +24,17 @@ from .models import (
     QueryErrorResponse,
     QueryRequest,
     QueryResponse,
+    RetrievalCapabilitiesResponse,
 )
 from .service import (
+    HybridUnavailableError,
     execute_query,
+    execute_all_queries,
     inspect_chunk_details,
     inspect_document_chunks,
     inspect_index,
     load_public_example_questions,
+    retrieval_capabilities,
 )
 
 logger = logging.getLogger(__name__)
@@ -85,9 +92,9 @@ async def learn2rag_logo() -> FileResponse:
     return FileResponse(_CONFIGURATOR_STATIC_DIR / "images" / "logo_learn2rag_logo.png", media_type="image/png")
 
 
-@router.get("/assets/bmwi.svg", include_in_schema=False)
-async def bmwi_logo() -> FileResponse:
-    return FileResponse(_CONFIGURATOR_STATIC_DIR / "images" / "BMWi.svg", media_type="image/svg+xml")
+@router.get("/assets/BMFTR.png", include_in_schema=False)
+async def bmftr_logo() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "images" / "BMFTR.png", media_type="image/png")
 
 
 @router.get(
@@ -114,6 +121,23 @@ async def index_api() -> IndexResponse | JSONResponse:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content=error.model_dump(),
         )
+
+
+@router.get(
+    "/api/capabilities",
+    response_model=RetrievalCapabilitiesResponse,
+)
+async def capabilities_api() -> RetrievalCapabilitiesResponse:
+    collection_name = user_config.get("collection_name")
+    if not isinstance(collection_name, str) or not collection_name.strip():
+        return RetrievalCapabilitiesResponse(
+            retrieval_modes=["semantic", "keyword"]
+        )
+    return await run_in_threadpool(
+        retrieval_capabilities,
+        demo_qdrant_reader,
+        collection_name,
+    )
 
 
 @router.get(
@@ -195,6 +219,15 @@ async def query_api(query: QueryRequest) -> QueryResponse | JSONResponse:
             retrieval_mode=query.retrieval_mode,
             qdrant_reader=demo_qdrant_reader,
             collection_name=user_config.get("collection_name"),
+            runtime_user_config=user_config,
+        )
+    except HybridUnavailableError:
+        error = QueryErrorResponse(
+            message="Hybrid search is unavailable for the current index."
+        )
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=error.model_dump(),
         )
     except Exception:
         logger.exception("Unable to execute the RAG Demo query pipeline")
@@ -205,3 +238,19 @@ async def query_api(query: QueryRequest) -> QueryResponse | JSONResponse:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content=error.model_dump(),
         )
+
+
+@router.post(
+    "/api/query/all",
+    response_model=AggregateQueryResponse,
+)
+async def query_all_api(query: AggregateQueryRequest) -> AggregateQueryResponse:
+    """Prepare every comparison mode from one server-authoritative question."""
+    return await execute_all_queries(
+        demo_search_operator,
+        query.question,
+        opt_config,
+        qdrant_reader=demo_qdrant_reader,
+        collection_name=user_config.get("collection_name"),
+        runtime_user_config=user_config,
+    )

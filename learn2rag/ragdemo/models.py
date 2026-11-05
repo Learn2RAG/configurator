@@ -2,9 +2,10 @@ import math
 import re
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-RetrievalMode = Literal["semantic", "keyword"]
+RetrievalMode = Literal["semantic", "keyword", "hybrid"]
+ProjectionMethod = Literal["pca", "tsne", "umap"]
 
 MAX_PUBLIC_CHUNK_CHARS = 8_000
 
@@ -126,9 +127,24 @@ class IndexErrorResponse(BaseModel):
     message: str
 
 
+class RetrievalCapabilitiesResponse(BaseModel):
+    retrieval_modes: list[RetrievalMode]
+
+
 class QueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1_000)
     retrieval_mode: RetrievalMode = "semantic"
+
+    @field_validator("question", mode="before")
+    @classmethod
+    def trim_question(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+
+class AggregateQueryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=1, max_length=1_000)
 
     @field_validator("question", mode="before")
     @classmethod
@@ -180,13 +196,14 @@ class QueryVisualizationPoint(BaseModel):
     z: float
     retrieved: bool
     rank: int | None = Field(default=None, ge=1)
+    similarity: float
     preview: str | None = Field(default=None, max_length=240)
 
-    @field_validator("x", "y", "z")
+    @field_validator("x", "y", "z", "similarity")
     @classmethod
-    def coordinates_are_finite(cls, value: float) -> float:
+    def values_are_finite(cls, value: float) -> float:
         if not math.isfinite(value):
-            raise ValueError("Visualization coordinates must be finite")
+            raise ValueError("Visualization values must be finite")
         return value
 
 
@@ -203,6 +220,17 @@ class QueryVisualizationQueryPoint(BaseModel):
         return value
 
 
+class QueryVisualizationCoordinate(QueryVisualizationQueryPoint):
+    id: str
+
+
+class QueryVisualizationProjection(BaseModel):
+    method: ProjectionMethod
+    points: list[QueryVisualizationCoordinate]
+    query: QueryVisualizationQueryPoint
+    fallback: Literal["pca"] | None = None
+
+
 class QueryVisualizationResponse(BaseModel):
     status: Literal["ready", "partial", "unavailable", "unsupported"]
     label: str
@@ -210,6 +238,8 @@ class QueryVisualizationResponse(BaseModel):
     note: str
     points: list[QueryVisualizationPoint]
     query: QueryVisualizationQueryPoint | None
+    projection_method: ProjectionMethod = "pca"
+    projections: list[QueryVisualizationProjection] = Field(default_factory=list)
     truncated: bool = False
 
 
@@ -219,6 +249,59 @@ class QueryResponse(BaseModel):
     search: QuerySearchResponse
     visualization: QueryVisualizationResponse
     prompt: QueryPromptResponse
+
+
+class DirectQueryResponse(BaseModel):
+    question: str
+    answer: str
+    mode: Literal["generative"] = "generative"
+    label: str = "Generative AI"
+    description: str = (
+        "Answer directly from the language model without retrieved documents."
+    )
+    retrieval_used: Literal[False] = False
+    indexed_documents_used: Literal[False] = False
+    prompt: QueryPromptResponse
+
+
+class QueryModeResult(BaseModel):
+    status: Literal["ready", "unavailable"]
+    result: QueryResponse | None = None
+    message: str | None = None
+
+    @model_validator(mode="after")
+    def validate_state(self) -> "QueryModeResult":
+        if (self.status == "ready") != (self.result is not None):
+            raise ValueError("Ready query modes require a result")
+        if self.status == "unavailable" and not self.message:
+            raise ValueError("Unavailable query modes require a safe message")
+        return self
+
+
+class DirectModeResult(BaseModel):
+    status: Literal["ready", "unavailable"]
+    result: DirectQueryResponse | None = None
+    message: str | None = None
+
+    @model_validator(mode="after")
+    def validate_state(self) -> "DirectModeResult":
+        if (self.status == "ready") != (self.result is not None):
+            raise ValueError("Ready direct modes require a result")
+        if self.status == "unavailable" and not self.message:
+            raise ValueError("Unavailable direct modes require a safe message")
+        return self
+
+
+class QueryComparisonResults(BaseModel):
+    semantic: QueryModeResult
+    keyword: QueryModeResult
+    hybrid: QueryModeResult
+    generative: DirectModeResult
+
+
+class AggregateQueryResponse(BaseModel):
+    question: str
+    results: QueryComparisonResults
 
 
 class QueryErrorResponse(BaseModel):

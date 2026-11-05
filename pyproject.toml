@@ -171,6 +171,7 @@ dependencies = [
     "typing-extensions==4.15.0",
     "typing-inspect==0.9.0",
     "typing-inspection==0.4.1",
+    "umap-learn==0.5.12",
     "tzdata==2025.2",
     "unstructured[docx, epub, odt, rtf]==0.21.5",
     "unstructured-client==0.42.2",

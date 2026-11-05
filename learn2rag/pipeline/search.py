@@ -118,6 +118,7 @@ def _rerank_points_with_colbert(
     *,
     top_k: int,
     opt_config: dict[str, Any],
+    user_config: dict[str, Any],
 ) -> list[ScoredPoint]:
     collection_name = user_config["collection_name"]
     qdrant = Qdrant(collection_name=collection_name, opt_config=opt_config)
@@ -249,7 +250,8 @@ def _collect_query_points(
                 query,
                 points,
                 top_k=opt_config["top_k_reranker"],
-                opt_config=opt_config
+                opt_config=opt_config,
+                user_config=user_config,
             )
 
     return points
@@ -416,9 +418,34 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
     )
     return results
 
-async def search_authorized(question: str, user: str) -> List[ScoredPoint]:
-    points = _collect_query_points(question, user_config, opt_config)
+async def search_authorized_with_config(
+    question: str,
+    user: str,
+    request_user_config: dict[str, Any],
+    request_opt_config: dict[str, Any],
+) -> List[ScoredPoint]:
+    """Run the normal authorized search with request-local configuration.
+
+    Callers that need an explicit retrieval mode can pass isolated copies
+    without mutating the process-wide configuration used by the pipeline.
+    Retrieval, rewriting, reranking, and authorization remain on the same
+    implementation path as :func:`search_authorized`.
+    """
+    points = _collect_query_points(
+        question,
+        request_user_config,
+        request_opt_config,
+    )
     query_response = QueryResponse(points=points)
     authorized_points = await filter_authorized(user, query_response)
     # keep deterministic order after auth filter
     return _sort_and_deduplicate(list(authorized_points))
+
+
+async def search_authorized(question: str, user: str) -> List[ScoredPoint]:
+    return await search_authorized_with_config(
+        question,
+        user,
+        user_config,
+        opt_config,
+    )

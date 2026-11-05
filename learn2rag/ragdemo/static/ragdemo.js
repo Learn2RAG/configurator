@@ -1,6 +1,457 @@
 (() => {
   "use strict";
 
+  const languageStorageKey = "learn2rag-ragdemo-language";
+  const translations = Object.freeze({
+    en: Object.freeze({
+      page_title: "Learn2RAG · Interactive RAG Demo",
+      navigation_label: "RAG Demo navigation",
+      demo_tagline: "Interactive RAG Demo",
+      demo_sections: "Demo sections",
+      index: "Index",
+      ask_rag: "Ask RAG",
+      language_selector: "Interface language",
+      use_english: "Use English",
+      use_german: "Use German",
+      indexed_documents: "Indexed documents",
+      indexed_documents_intro: "These documents have already been processed and stored in the RAG index.",
+      refresh: "Refresh",
+      loading_index: "Loading indexed documents…",
+      index_summary: "Index summary",
+      documents: "Documents",
+      chunks: "Chunks",
+      partial_index_note: "The safety scan limit was reached, so these counts show a partial index snapshot.",
+      ask_intro: "Ask once, then compare four already-prepared answers for the same question.",
+      question: "Question",
+      question_placeholder: "What would you like to know?",
+      retrieval_method: "Retrieval method",
+      semantic_vectors: "Semantic vectors",
+      semantic_description: "Search by meaning, not only exact words.",
+      keyword_search: "Keyword search",
+      keyword_description: "Match the words you typed.",
+      hybrid_search: "Hybrid search",
+      hybrid_description: "Combine semantic and sparse lexical retrieval.",
+      question_prepares_all: "One question prepares Semantic, Keyword, Hybrid and Generative AI results.",
+      indexed_documents_only: "Questions are answered using the currently indexed documents.",
+      example_questions: "Example questions",
+      try_example: "Try an example",
+      loading_examples: "Loading examples…",
+      suggest_examples: "Suggest more examples",
+      query_loading: "Preparing Semantic, Keyword, Hybrid and Generative AI results…",
+      compare_loaded_results: "Compare results",
+      result_mode: "Result mode",
+      semantic_mode: "Semantic",
+      keyword_mode: "Keyword",
+      hybrid_mode: "Hybrid",
+      generative_ai: "Generative AI",
+      generative_card_description: "Answer without retrieved documents.",
+      semantic_card_description: "Meaning-based dense retrieval.",
+      keyword_card_description: "Keyword-based BM25 retrieval.",
+      hybrid_card_description: "Combines dense and sparse retrieval.",
+      semantic_mode_description: "Answer grounded in dense semantic retrieval.",
+      keyword_mode_description: "Answer grounded in BM25 keyword retrieval.",
+      hybrid_mode_description: "Answer grounded in native dense and sparse fusion.",
+      generative_mode_description: "Answer directly from the language model without retrieved documents.",
+      receive_question: "Receive question",
+      no_retrieval: "No retrieval",
+      build_direct_prompt: "Build direct prompt",
+      no_indexed_documents: "No indexed documents used.",
+      embed_question: "Embed question",
+      retrieve_chunks: "Retrieve top-ranked chunks",
+      add_chunks_prompt: "Add chunks to prompt",
+      generate_answer: "Generate answer",
+      explore_embedding_space: "Explore the embedding space",
+      projection: "Projection:",
+      projection_selector: "Projection method",
+      pca_projection: "3D PCA projection of dense embeddings",
+      tsne_projection: "3D t-SNE projection of dense embeddings",
+      umap_projection: "3D UMAP projection of dense embeddings",
+      visualization_intro: "All indexed chunks form the surrounding embedding space. The Query vector and its links identify the chunks selected for the RAG context.",
+      pca_caveat: "Spatial proximity is approximate because PCA compresses the original embedding space. Semantic similarity is calculated using the original full-dimensional vectors.",
+      tsne_caveat: "t-SNE emphasizes local neighbourhood structure. Distances in this visualization are approximate and do not determine retrieval. Semantic similarity is calculated using the original full-dimensional vectors.",
+      umap_caveat: "UMAP emphasizes neighbourhood structure while retaining broader embedding structure. Distances in this view are approximate and do not determine retrieval. Semantic similarity uses the original full-dimensional vectors.",
+      umap_pca_fallback: "The sample is too small for a stable UMAP graph, so PCA coordinates are shown.",
+      embedding_graph: "Interactive 3D embedding graph",
+      visualization_help: "Drag freely to rotate · Use the wheel or +/− to zoom · Hover for a label · Click to inspect",
+      embedding_controls: "3D embedding view controls",
+      zoom_out_label: "Zoom out of embedding space",
+      zoom_out: "Zoom out",
+      zoom_in_label: "Zoom into embedding space",
+      zoom_in: "Zoom in",
+      current_zoom: "Current embedding space zoom: {percentage}%",
+      reset_view: "Reset view",
+      reset_view_label: "Reset embedding space view",
+      graph_display_mode: "Embedding graph display mode",
+      expand: "Expand",
+      expand_graph: "Expand embedding graph",
+      restore: "Restore",
+      restore_graph: "Restore embedded graph",
+      close: "Close",
+      close_graph: "Close expanded graph",
+      chunk_details: "Chunk details",
+      close_chunk_details: "Close chunk details",
+      embedding_legend: "Embedding map legend",
+      query_vector: "Query vector",
+      retrieved_chunks: "Retrieved chunks",
+      other_chunks: "Other indexed chunks",
+      query_retrieved_link: "Query → retrieved link",
+      search: "Search",
+      semantic_vector_search: "Semantic vector search",
+      dense_similarity: "Dense similarity",
+      prompt: "Prompt",
+      prompt_sent: "Prompt sent to the model",
+      chat_messages: "Application-level chat messages",
+      answer: "Answer",
+      generated_answer: "Generated answer",
+      grounding_guard: "Grounding guard",
+      grounded_answer_status: "Grounded answer status",
+      learn2rag_website: "Learn2RAG website",
+      visit_bmftr: "Visit the BMFTR website",
+      bmftr_logo_alt: "BMFTR funding logo",
+      examples_unavailable: "Example questions are temporarily unavailable.",
+      chunk_order_note: "Chunk numbers indicate display order, which may differ from the original document order.",
+      chunk_number: "Chunk {number}",
+      chunk_shortened: "This chunk's text has been shortened for display.",
+      preview_limited: "This is a limited preview. Some chunks or text may be omitted.",
+      show_chunks: "Show chunks",
+      hide_chunks: "Hide chunks",
+      show_chunks_for: "Show chunks for {name}",
+      hide_chunks_for: "Hide chunks for {name}",
+      chunks_from: "Chunks from {name}",
+      loading_chunks: "Loading chunks…",
+      chunks_unavailable: "These chunks could not be loaded. Hide and show chunks to try again.",
+      one_chunk: "{count} chunk",
+      many_chunks: "{count} chunks",
+      empty_index: "The index is currently empty. Documents will appear here after they are processed.",
+      index_unavailable: "The index could not be loaded.",
+      asking: "Asking…",
+      no_keyword_chunks: "No matching keyword chunks were found.",
+      no_chunks: "No matching chunks were retrieved.",
+      retrieved_rank: "Retrieved · Rank #{rank}",
+      not_retrieved: "Not retrieved for this question",
+      semantic_similarity: "Semantic similarity",
+      source: "Source",
+      unknown_source: "Unknown source",
+      chunk_content: "Chunk content",
+      loading_chunk: "Loading chunk…",
+      chunk_load_error: "This chunk could not be loaded.",
+      pca_coordinates: "PCA coordinates",
+      tsne_coordinates: "t-SNE coordinates",
+      umap_coordinates: "UMAP coordinates",
+      query: "Query",
+      indexed_chunk: "Indexed chunk",
+      similarity: "Similarity {value}",
+      interactive_projection: "Interactive three-dimensional projection of indexed chunks and the Query",
+      retrieved_point_title: "Retrieved rank {rank}: {source}; similarity {similarity}",
+      indexed_point_title: "Indexed chunk: {source}; similarity {similarity}",
+      retrieved_point_label: "Retrieved rank {rank}, {source}, similarity {similarity}. Press Enter to pin this point.",
+      indexed_point_label: "Indexed chunk, {source}, similarity {similarity}. Press Enter to pin this point.",
+      query_endpoint_label: "Query vector endpoint. Press Enter to pin its projection coordinates.",
+      query_coordinates: "Query — X {x}, Y {y}, Z {z}",
+      enter_question: "Please enter a question.",
+      query_failed: "The RAG query could not be completed.",
+      hybrid_unavailable: "Hybrid search is unavailable for the current index.",
+      keyword_note: "Keyword search scores the indexed text with demo-local BM25.",
+      hybrid_note: "Hybrid ranking combines a dense semantic representation and a sparse lexical representation with native Qdrant fusion. The 3D embedding explorer is shown only for Semantic vectors.",
+      bm25_ranking: "BM25 lexical ranking",
+      bm25_score: "BM25 score",
+      fusion_score: "Fusion score",
+      exact_messages_note: "These are the exact application-level chat messages passed by Learn2RAG to the configured model. Provider-specific serialization or chat templates are not shown.",
+      partial_visualization: "The bounded display shows a partial index snapshot.",
+      dense_only_map: "This embedding map is available for dense retrieval only.",
+      map_unavailable: "The embedding map is temporarily unavailable.",
+      no_dense_points: "No dense embedding points are available to display.",
+      no_usable_dense_points: "No usable dense embedding points are available to display.",
+      projection_failed: "The dense embedding points could not be projected safely.",
+      semantic_map_only: "The embedding explorer is available for semantic vector search.",
+      hybrid_map_only: "Hybrid ranking combines dense semantic and sparse lexical signals. The 3D embedding explorer is shown only for Semantic vectors.",
+      role_system: "SYSTEM",
+      role_human: "HUMAN",
+    }),
+    de: Object.freeze({
+      page_title: "Learn2RAG · Interaktive RAG-Demo",
+      navigation_label: "Navigation der RAG-Demo",
+      demo_tagline: "Interaktive RAG-Demo",
+      demo_sections: "Demo-Bereiche",
+      index: "Index",
+      ask_rag: "RAG fragen",
+      language_selector: "Sprache der Benutzeroberfläche",
+      use_english: "Englisch verwenden",
+      use_german: "Deutsch verwenden",
+      indexed_documents: "Indexierte Dokumente",
+      indexed_documents_intro: "Diese Dokumente wurden bereits verarbeitet und im RAG-Index gespeichert.",
+      refresh: "Aktualisieren",
+      loading_index: "Indexierte Dokumente werden geladen…",
+      index_summary: "Indexübersicht",
+      documents: "Dokumente",
+      chunks: "Chunks",
+      partial_index_note: "Das Sicherheitslimit für die Abfrage wurde erreicht. Die Zahlen zeigen daher nur einen Ausschnitt des Index.",
+      ask_intro: "Stellen Sie eine Frage und vergleichen Sie anschließend vier bereits vorbereitete Antworten auf dieselbe Frage.",
+      question: "Frage",
+      question_placeholder: "Was möchten Sie wissen?",
+      retrieval_method: "Abrufmethode",
+      semantic_vectors: "Semantische Vektoren",
+      semantic_description: "Suche nach Bedeutung, nicht nur nach exakten Wörtern.",
+      keyword_search: "Stichwortsuche",
+      keyword_description: "Findet die eingegebenen Wörter.",
+      hybrid_search: "Hybride Suche",
+      hybrid_description: "Kombiniert semantischen und spärlichen lexikalischen Abruf.",
+      question_prepares_all: "Eine Frage bereitet Ergebnisse für Semantik, Stichwortsuche, Hybrid und Generative KI vor.",
+      indexed_documents_only: "Fragen werden anhand der aktuell indexierten Dokumente beantwortet.",
+      example_questions: "Beispielfragen",
+      try_example: "Beispiel ausprobieren",
+      loading_examples: "Beispiele werden geladen…",
+      suggest_examples: "Weitere Beispiele vorschlagen",
+      query_loading: "Ergebnisse für Semantik, Stichwortsuche, Hybrid und Generative KI werden vorbereitet…",
+      compare_loaded_results: "Ergebnisse vergleichen",
+      result_mode: "Ergebnismodus",
+      semantic_mode: "Semantisch",
+      keyword_mode: "Stichwort",
+      hybrid_mode: "Hybrid",
+      generative_ai: "Generative KI",
+      generative_card_description: "Antwort ohne abgerufene Dokumente.",
+      semantic_card_description: "Bedeutungsbasierter dichter Abruf.",
+      keyword_card_description: "Stichwortbasierter BM25-Abruf.",
+      hybrid_card_description: "Kombiniert dichten und spärlichen Abruf.",
+      semantic_mode_description: "Antwort auf Grundlage dichter semantischer Suche.",
+      keyword_mode_description: "Antwort auf Grundlage der BM25-Stichwortsuche.",
+      hybrid_mode_description: "Antwort auf Grundlage nativer dichter und spärlicher Fusion.",
+      generative_mode_description: "Direkte Antwort des Sprachmodells ohne abgerufene Dokumente.",
+      receive_question: "Frage empfangen",
+      no_retrieval: "Kein Abruf",
+      build_direct_prompt: "Direkten Prompt erstellen",
+      no_indexed_documents: "Keine indexierten Dokumente verwendet.",
+      embed_question: "Frage einbetten",
+      retrieve_chunks: "Bestplatzierte Chunks abrufen",
+      add_chunks_prompt: "Chunks zum Prompt hinzufügen",
+      generate_answer: "Antwort erzeugen",
+      explore_embedding_space: "Embedding-Raum erkunden",
+      projection: "Projektion:",
+      projection_selector: "Projektionsmethode",
+      pca_projection: "3D-PCA-Projektion dichter Embeddings",
+      tsne_projection: "3D-t-SNE-Projektion dichter Embeddings",
+      umap_projection: "3D-UMAP-Projektion dichter Embeddings",
+      visualization_intro: "Alle indexierten Chunks bilden den umgebenden Embedding-Raum. Der Fragevektor und seine Verbindungen kennzeichnen die für den RAG-Kontext ausgewählten Chunks.",
+      pca_caveat: "Die räumliche Nähe ist nur näherungsweise, da PCA den ursprünglichen Embedding-Raum komprimiert. Die semantische Ähnlichkeit wird mit den ursprünglichen, vollständigen Vektoren berechnet.",
+      tsne_caveat: "t-SNE betont lokale Nachbarschaftsstrukturen. Abstände in dieser Darstellung sind Näherungen und bestimmen nicht den Abruf. Die semantische Ähnlichkeit wird mit den ursprünglichen, vollständigen Vektoren berechnet.",
+      umap_caveat: "UMAP betont Nachbarschaftsstrukturen und bewahrt zugleich übergreifende Embedding-Strukturen. Abstände in dieser Ansicht sind Näherungen und bestimmen nicht den Abruf. Die semantische Ähnlichkeit nutzt die ursprünglichen, vollständigen Vektoren.",
+      umap_pca_fallback: "Die Stichprobe ist für einen stabilen UMAP-Graphen zu klein; daher werden PCA-Koordinaten angezeigt.",
+      embedding_graph: "Interaktiver 3D-Embedding-Graph",
+      visualization_help: "Ziehen zum freien Drehen · Mausrad oder +/− zum Zoomen · Zeigen für Beschriftung · Klicken zum Prüfen",
+      embedding_controls: "Steuerelemente der 3D-Embedding-Ansicht",
+      zoom_out_label: "Aus dem Embedding-Raum herauszoomen",
+      zoom_out: "Verkleinern",
+      zoom_in_label: "In den Embedding-Raum hineinzoomen",
+      zoom_in: "Vergrößern",
+      current_zoom: "Aktueller Zoom des Embedding-Raums: {percentage}%",
+      reset_view: "Ansicht zurücksetzen",
+      reset_view_label: "Ansicht des Embedding-Raums zurücksetzen",
+      graph_display_mode: "Anzeigemodus des Embedding-Graphen",
+      expand: "Vergrößern",
+      expand_graph: "Embedding-Graph vergrößern",
+      restore: "Einbetten",
+      restore_graph: "Graph wieder einbetten",
+      close: "Schließen",
+      close_graph: "Vergrößerten Graphen schließen",
+      chunk_details: "Chunk-Details",
+      close_chunk_details: "Chunk-Details schließen",
+      embedding_legend: "Legende der Embedding-Karte",
+      query_vector: "Fragevektor",
+      retrieved_chunks: "Abgerufene Chunks",
+      other_chunks: "Andere indexierte Chunks",
+      query_retrieved_link: "Frage → abgerufener Chunk",
+      search: "Suche",
+      semantic_vector_search: "Semantische Vektorsuche",
+      dense_similarity: "Dichte Ähnlichkeit",
+      prompt: "Prompt",
+      prompt_sent: "An das Modell gesendeter Prompt",
+      chat_messages: "Chat-Nachrichten auf Anwendungsebene",
+      answer: "Antwort",
+      generated_answer: "Erzeugte Antwort",
+      grounding_guard: "Belegsicherung",
+      grounded_answer_status: "Status der belegten Antwort",
+      learn2rag_website: "Learn2RAG-Webseite",
+      visit_bmftr: "BMFTR-Webseite besuchen",
+      bmftr_logo_alt: "Förderlogo des BMFTR",
+      examples_unavailable: "Beispielfragen sind vorübergehend nicht verfügbar.",
+      chunk_order_note: "Chunk-Nummern geben die Anzeigereihenfolge an, die von der Reihenfolge im Originaldokument abweichen kann.",
+      chunk_number: "Chunk {number}",
+      chunk_shortened: "Der Text dieses Chunks wurde für die Anzeige gekürzt.",
+      preview_limited: "Dies ist eine begrenzte Vorschau. Einige Chunks oder Texte können fehlen.",
+      show_chunks: "Chunks anzeigen",
+      hide_chunks: "Chunks ausblenden",
+      show_chunks_for: "Chunks für {name} anzeigen",
+      hide_chunks_for: "Chunks für {name} ausblenden",
+      chunks_from: "Chunks aus {name}",
+      loading_chunks: "Chunks werden geladen…",
+      chunks_unavailable: "Diese Chunks konnten nicht geladen werden. Blenden Sie die Chunks aus und wieder ein, um es erneut zu versuchen.",
+      one_chunk: "{count} Chunk",
+      many_chunks: "{count} Chunks",
+      empty_index: "Der Index ist derzeit leer. Dokumente erscheinen hier, nachdem sie verarbeitet wurden.",
+      index_unavailable: "Der Index konnte nicht geladen werden.",
+      asking: "Anfrage läuft…",
+      no_keyword_chunks: "Es wurden keine passenden Stichwort-Chunks gefunden.",
+      no_chunks: "Es wurden keine passenden Chunks abgerufen.",
+      retrieved_rank: "Abgerufen · Rang #{rank}",
+      not_retrieved: "Für diese Frage nicht abgerufen",
+      semantic_similarity: "Semantische Ähnlichkeit",
+      source: "Quelle",
+      unknown_source: "Unbekannte Quelle",
+      chunk_content: "Chunk-Inhalt",
+      loading_chunk: "Chunk wird geladen…",
+      chunk_load_error: "Dieser Chunk konnte nicht geladen werden.",
+      pca_coordinates: "PCA-Koordinaten",
+      tsne_coordinates: "t-SNE-Koordinaten",
+      umap_coordinates: "UMAP-Koordinaten",
+      query: "Frage",
+      indexed_chunk: "Indexierter Chunk",
+      similarity: "Ähnlichkeit {value}",
+      interactive_projection: "Interaktive dreidimensionale Projektion indexierter Chunks und der Frage",
+      retrieved_point_title: "Abgerufener Rang {rank}: {source}; Ähnlichkeit {similarity}",
+      indexed_point_title: "Indexierter Chunk: {source}; Ähnlichkeit {similarity}",
+      retrieved_point_label: "Abgerufener Rang {rank}, {source}, Ähnlichkeit {similarity}. Eingabetaste drücken, um diesen Punkt anzuheften.",
+      indexed_point_label: "Indexierter Chunk, {source}, Ähnlichkeit {similarity}. Eingabetaste drücken, um diesen Punkt anzuheften.",
+      query_endpoint_label: "Endpunkt des Fragevektors. Eingabetaste drücken, um seine Projektionskoordinaten anzuheften.",
+      query_coordinates: "Frage — X {x}, Y {y}, Z {z}",
+      enter_question: "Bitte geben Sie eine Frage ein.",
+      query_failed: "Die RAG-Anfrage konnte nicht abgeschlossen werden.",
+      hybrid_unavailable: "Die hybride Suche ist für den aktuellen Index nicht verfügbar.",
+      keyword_note: "Die Stichwortsuche bewertet den indexierten Text mit demo-lokalem BM25.",
+      hybrid_note: "Das hybride Ranking kombiniert eine dichte semantische und eine spärliche lexikalische Darstellung mit nativer Qdrant-Fusion. Der 3D-Embedding-Explorer wird nur für semantische Vektoren angezeigt.",
+      bm25_ranking: "Lexikalisches BM25-Ranking",
+      bm25_score: "BM25-Wert",
+      fusion_score: "Fusionswert",
+      exact_messages_note: "Dies sind die exakten Chat-Nachrichten auf Anwendungsebene, die Learn2RAG an das konfigurierte Modell übergibt. Anbieterspezifische Serialisierung oder Chat-Vorlagen werden nicht angezeigt.",
+      partial_visualization: "Die begrenzte Anzeige zeigt einen Ausschnitt des Index.",
+      dense_only_map: "Diese Embedding-Karte ist nur für dichten Abruf verfügbar.",
+      map_unavailable: "Die Embedding-Karte ist vorübergehend nicht verfügbar.",
+      no_dense_points: "Es sind keine dichten Embedding-Punkte zur Anzeige verfügbar.",
+      no_usable_dense_points: "Es sind keine verwendbaren dichten Embedding-Punkte zur Anzeige verfügbar.",
+      projection_failed: "Die dichten Embedding-Punkte konnten nicht sicher projiziert werden.",
+      semantic_map_only: "Der Embedding-Explorer ist für die semantische Vektorsuche verfügbar.",
+      hybrid_map_only: "Das hybride Ranking kombiniert dichte semantische und spärliche lexikalische Signale. Der 3D-Embedding-Explorer wird nur für semantische Vektoren angezeigt.",
+      role_system: "SYSTEM",
+      role_human: "MENSCH",
+    }),
+  });
+
+  const serverTranslationKeys = Object.freeze({
+    "Semantic vector search": "semantic_vector_search",
+    "Keyword search": "keyword_search",
+    "Hybrid search": "hybrid_search",
+    "BM25 lexical ranking": "bm25_ranking",
+    "BM25 score": "bm25_score",
+    "Fusion score": "fusion_score",
+    "Semantic similarity": "semantic_similarity",
+    "Explore the embedding space": "explore_embedding_space",
+    "3D PCA projection of dense embeddings": "pca_projection",
+    "Prompt sent to the model": "prompt_sent",
+    "Application-level chat messages": "chat_messages",
+    "These are the exact application-level chat messages passed by Learn2RAG to the configured model. Provider-specific serialization or chat templates are not shown.": "exact_messages_note",
+    "The bounded display shows a partial index snapshot.": "partial_visualization",
+    "This embedding map is available for dense retrieval only.": "dense_only_map",
+    "The embedding map is temporarily unavailable.": "map_unavailable",
+    "No dense embedding points are available to display.": "no_dense_points",
+    "No usable dense embedding points are available to display.": "no_usable_dense_points",
+    "The dense embedding points could not be projected safely.": "projection_failed",
+    "The embedding explorer is available for semantic vector search.": "semantic_map_only",
+    "Hybrid ranking combines dense semantic and sparse lexical signals. The 3D embedding explorer is shown only for Semantic vectors.": "hybrid_map_only",
+    "The RAG index is temporarily unavailable. Please try again shortly.": "index_unavailable",
+    "The RAG query is temporarily unavailable. Please try again shortly.": "query_failed",
+    "Hybrid search is unavailable for the current index.": "hybrid_unavailable",
+    "The index could not be loaded.": "index_unavailable",
+  });
+  const localizedTextBindings = new Map();
+  const localizedAttributeBindings = [];
+  let currentLanguage = "en";
+
+  function t(key, parameters = {}) {
+    const template = translations[currentLanguage][key] || translations.en[key] || key;
+    return template.replace(/\{(\w+)\}/g, (match, name) => (
+      Object.prototype.hasOwnProperty.call(parameters, name) ? String(parameters[name]) : match
+    ));
+  }
+
+  function translatedServerValue(value) {
+    const text = String(value || "");
+    const exactKey = serverTranslationKeys[text];
+    if (exactKey) return t(exactKey);
+    if (text.startsWith("3D PCA projection of dense embeddings / ")) {
+      return `${t("pca_projection")} / ${text.slice("3D PCA projection of dense embeddings / ".length)}`;
+    }
+    if (currentLanguage === "de") {
+      if (text === "Dense") return "Dicht";
+      if (text.startsWith("Dense / ")) return `Dicht / ${text.slice("Dense / ".length)}`;
+      return text.replace(" dense + sparse", " dicht + spärlich");
+    }
+    return text;
+  }
+
+  function setLocalizedText(element, key, parameters = {}) {
+    const render = () => t(key, parameters);
+    element.textContent = render();
+    localizedTextBindings.set(element, render);
+  }
+
+  function setTranslatedText(element, value) {
+    const render = () => translatedServerValue(value);
+    element.textContent = render();
+    localizedTextBindings.set(element, render);
+  }
+
+  function setLocalizedAttribute(element, attribute, key, parameters = {}) {
+    const binding = { element, attribute, key, parameters };
+    element.setAttribute(attribute, t(key, parameters));
+    localizedAttributeBindings.push(binding);
+  }
+
+  function readStoredLanguage() {
+    try {
+      const stored = typeof localStorage === "undefined" ? null : localStorage.getItem(languageStorageKey);
+      return stored === "de" || stored === "en" ? stored : "en";
+    } catch (error) {
+      return "en";
+    }
+  }
+
+  function applyStaticTranslations() {
+    document.querySelectorAll("[data-i18n]").forEach((element) => {
+      element.textContent = t(element.dataset.i18n);
+    });
+    ["aria-label", "placeholder", "title", "alt"].forEach((attribute) => {
+      const datasetName = `i18n${attribute.split("-").map((part) => (
+        part.charAt(0).toUpperCase() + part.slice(1)
+      )).join("")}`;
+      document.querySelectorAll(`[data-i18n-${attribute}]`).forEach((element) => {
+        element.setAttribute(attribute, t(element.dataset[datasetName]));
+      });
+    });
+  }
+
+  function setLanguage(language, persist = true) {
+    currentLanguage = language === "de" ? "de" : "en";
+    if (document.documentElement) document.documentElement.lang = currentLanguage;
+    applyStaticTranslations();
+    localizedTextBindings.forEach((render, element) => {
+      element.textContent = render();
+    });
+    localizedAttributeBindings.forEach(({ element, attribute, key, parameters }) => {
+      element.setAttribute(attribute, t(key, parameters));
+    });
+    document.querySelectorAll("[data-language]").forEach((button) => {
+      const active = button.dataset.language === currentLanguage;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    if (persist) {
+      try {
+        if (typeof localStorage !== "undefined") localStorage.setItem(languageStorageKey, currentLanguage);
+      } catch (error) {
+        // The interface still switches when storage is unavailable.
+      }
+    }
+  }
+
   const tabs = document.querySelectorAll("[role='tab']");
   const statusBox = document.querySelector("#index-status");
   const content = document.querySelector("#index-content");
@@ -11,20 +462,28 @@
   const refreshButton = document.querySelector("#refresh-index");
   const queryForm = document.querySelector("#query-form");
   const questionInput = document.querySelector("#question-input");
-  const retrievalModeInputs = document.querySelectorAll("input[name='retrieval_mode']");
   const askButton = document.querySelector("#ask-button");
   const queryError = document.querySelector("#query-error");
   const queryLoading = document.querySelector("#query-loading");
-  const retrievalChangeNote = document.querySelector("#retrieval-change-note");
   const queryResults = document.querySelector("#query-results");
   const comparisonActions = document.querySelector("#comparison-actions");
-  const compareRetrievalButton = document.querySelector("#compare-retrieval");
+  const comparisonButtons = document.querySelector("#comparison-buttons");
+  const generativeResult = document.querySelector("#generative-result");
+  const directAnswerContent = document.querySelector("#direct-answer-content");
+  const ragStages = document.querySelector("#rag-stages");
   const embedStage = document.querySelector("#embed-stage");
   const retrieveStage = document.querySelector("#retrieve-stage");
   const promptStage = document.querySelector("#prompt-stage");
   const answerStage = document.querySelector("#answer-stage");
+  const embedStageLabel = document.querySelector("#embed-stage-label");
+  const retrieveStageLabel = document.querySelector("#retrieve-stage-label");
+  const promptStageLabel = document.querySelector("#prompt-stage-label");
+  const answerStageLabel = document.querySelector("#answer-stage-label");
   const embeddedQuestion = document.querySelector("#embedded-question");
   const embeddedRetrievalMethod = document.querySelector("#embedded-retrieval-method");
+  const nonsemanticRetrievalNote = document.querySelector("#nonsemantic-retrieval-note");
+  const directRetrievalNote = document.querySelector("#direct-retrieval-note");
+  const searchContent = document.querySelector("#search-content");
   const answerKicker = document.querySelector("#answer-kicker");
   const answerHeading = document.querySelector("#answer-heading");
   const answerContent = document.querySelector("#answer-content");
@@ -34,6 +493,10 @@
   const searchResults = document.querySelector("#search-results");
   const visualizationLabel = document.querySelector("#visualization-label");
   const visualizationTechnicalLabel = document.querySelector("#visualization-technical-label");
+  const projectionExplanation = document.querySelector("#projection-explanation");
+  const pcaProjectionButton = document.querySelector("#projection-pca");
+  const tsneProjectionButton = document.querySelector("#projection-tsne");
+  const umapProjectionButton = document.querySelector("#projection-umap");
   const visualizationNote = document.querySelector("#visualization-note");
   const visualizationStatus = document.querySelector("#visualization-status");
   const visualizationSection = document.querySelector("#visualization-section");
@@ -44,6 +507,8 @@
   const visualizationInspectorTitle = document.querySelector("#visualization-inspector-title");
   const visualizationInspectorContent = document.querySelector("#visualization-inspector-content");
   const visualizationInspectorClose = document.querySelector("#visualization-inspector-close");
+  const queryLegendSymbol = document.querySelector("#query-legend-symbol");
+  const queryLegendLabel = document.querySelector("#query-legend-label");
   const zoomOutButton = document.querySelector("#visualization-zoom-out");
   const zoomLevel = document.querySelector("#visualization-zoom-level");
   const zoomInButton = document.querySelector("#visualization-zoom-in");
@@ -75,11 +540,14 @@
   const pointerDragThreshold = 5;
   const scenePadding = 12;
   const redundantVisualizationNote =
-    "3D proximity is approximate because PCA compresses the embedding space. Retrieval uses the original full-dimensional vectors.";
+    "3D proximity is approximate. Semantic similarity is calculated in the original full-dimensional embedding space used for retrieval.";
   // Screen-space labels and markers share this edge reserve; it is not added
   // to the rotation-safe world-space radius.
   const maximumMarkerExtent = 30;
   let viewerState = null;
+  let currentVisualization = null;
+  let currentVisualizationSearchMode = null;
+  let currentProjectionMethod = "pca";
   let hoveredChunkId = null;
   let focusedChunkId = null;
   let pinnedChunkId = null;
@@ -88,6 +556,9 @@
   let chunkInspectorLoadingId = null;
   let chunkInspectorErrorId = null;
   let inspectorRequestVersion = 0;
+  let comparisonResultSet = null;
+  let activeComparisonMode = null;
+  let queryRequestVersion = 0;
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -100,8 +571,12 @@
     });
   });
 
-  function showState(message, isError = false) {
-    statusBox.textContent = message;
+  function showState(message, isError = false, isTranslationKey = false) {
+    if (isTranslationKey) {
+      setLocalizedText(statusBox, message);
+    } else {
+      setTranslatedText(statusBox, message);
+    }
     statusBox.className = `alert ${isError ? "alert-danger" : "alert-primary"} mt-4 mb-0`;
     statusBox.hidden = false;
     content.hidden = true;
@@ -152,8 +627,8 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "btn btn-outline-secondary example-question";
-      button.textContent = question;
       button.disabled = questionInput.disabled;
+      button.textContent = question;
       button.addEventListener("click", () => {
         questionInput.value = question;
         questionInput.focus();
@@ -164,7 +639,7 @@
 
   async function loadExamples() {
     refreshExamplesButton.disabled = true;
-    examplesStatus.textContent = "Loading examples…";
+    setLocalizedText(examplesStatus, "loading_examples");
     examplesStatus.hidden = false;
     try {
       const response = await fetch("./api/examples", { headers: { Accept: "application/json" } });
@@ -175,7 +650,7 @@
       examplesStatus.textContent = "";
       examplesStatus.hidden = true;
     } catch (error) {
-      examplesStatus.textContent = "Example questions are temporarily unavailable.";
+      setLocalizedText(examplesStatus, "examples_unavailable");
       examplesStatus.hidden = false;
     } finally {
       refreshExamplesButton.disabled = false;
@@ -183,10 +658,11 @@
   }
 
   function renderDocumentChunks(container, data) {
+    localizedTextBindings.delete(container);
     container.replaceChildren();
     const orderNote = document.createElement("p");
     orderNote.className = "small text-body-secondary";
-    orderNote.textContent = "Chunk numbers indicate display order, which may differ from the original document order.";
+    setLocalizedText(orderNote, "chunk_order_note");
     container.appendChild(orderNote);
     data.chunks.forEach((chunk) => {
       const item = document.createElement("article");
@@ -194,7 +670,7 @@
       item.dataset.chunkId = chunk.id;
       const heading = document.createElement("h4");
       heading.className = "h6";
-      heading.textContent = `Chunk ${chunk.display_order}`;
+      setLocalizedText(heading, "chunk_number", { number: chunk.display_order });
       const text = document.createElement("p");
       text.className = "indexed-chunk-content mb-0";
       text.textContent = chunk.content;
@@ -202,7 +678,7 @@
       if (chunk.truncated) {
         const note = document.createElement("p");
         note.className = "small text-body-secondary mt-2 mb-0";
-        note.textContent = "This chunk's text has been shortened for display.";
+        setLocalizedText(note, "chunk_shortened");
         item.appendChild(note);
       }
       container.appendChild(item);
@@ -210,7 +686,7 @@
     if (data.truncated) {
       const note = document.createElement("p");
       note.className = "small text-body-secondary mb-0";
-      note.textContent = "This is a limited preview. Some chunks or text may be omitted.";
+      setLocalizedText(note, "preview_limited");
       container.appendChild(note);
     }
   }
@@ -219,15 +695,15 @@
     const button = document.createElement("button");
     button.type = "button";
     button.className = "btn btn-sm btn-outline-secondary mt-3";
-    button.textContent = "Show chunks";
+    setLocalizedText(button, "show_chunks");
     button.setAttribute("aria-expanded", "false");
-    button.setAttribute("aria-label", `Show chunks for ${indexedDocument.name}`);
+    setLocalizedAttribute(button, "aria-label", "show_chunks_for", { name: indexedDocument.name });
     const container = document.createElement("div");
     container.id = `document-chunks-${indexedDocument.id}`;
     container.className = "document-chunks mt-3";
     container.hidden = true;
     container.setAttribute("role", "region");
-    container.setAttribute("aria-label", `Chunks from ${indexedDocument.name}`);
+    setLocalizedAttribute(container, "aria-label", "chunks_from", { name: indexedDocument.name });
     button.setAttribute("aria-controls", container.id);
     let loaded = false;
     let loading = false;
@@ -236,13 +712,18 @@
       const expanding = container.hidden;
       container.hidden = !expanding;
       button.setAttribute("aria-expanded", String(expanding));
-      button.textContent = expanding ? "Hide chunks" : "Show chunks";
-      button.setAttribute("aria-label", `${button.textContent} for ${indexedDocument.name}`);
+      setLocalizedText(button, expanding ? "hide_chunks" : "show_chunks");
+      setLocalizedAttribute(
+        button,
+        "aria-label",
+        expanding ? "hide_chunks_for" : "show_chunks_for",
+        { name: indexedDocument.name },
+      );
       if (!expanding || loaded) return;
       loading = true;
       button.disabled = true;
       container.setAttribute("aria-busy", "true");
-      container.textContent = "Loading chunks…";
+      setLocalizedText(container, "loading_chunks");
       try {
         let data = documentChunksCache.get(indexedDocument.id);
         if (!data) {
@@ -256,7 +737,7 @@
         renderDocumentChunks(container, data);
         loaded = true;
       } catch (error) {
-        container.textContent = "These chunks could not be loaded. Hide and show chunks to try again.";
+        setLocalizedText(container, "chunks_unavailable");
       } finally {
         loading = false;
         button.disabled = false;
@@ -277,7 +758,7 @@
       emptyColumn.className = "col-12";
       const emptyState = document.createElement("p");
       emptyState.className = "alert alert-secondary mb-0 text-center";
-      emptyState.textContent = "The index is currently empty. Documents will appear here after they are processed.";
+      setLocalizedText(emptyState, "empty_index");
       emptyColumn.appendChild(emptyState);
       documentList.appendChild(emptyColumn);
     }
@@ -299,7 +780,11 @@
       meta.className = "d-flex flex-wrap gap-2 mb-0";
       const chunks = document.createElement("span");
       chunks.className = "badge text-bg-light border text-secondary";
-      chunks.textContent = `${indexedDocument.chunk_count} ${indexedDocument.chunk_count === 1 ? "chunk" : "chunks"}`;
+      setLocalizedText(
+        chunks,
+        indexedDocument.chunk_count === 1 ? "one_chunk" : "many_chunks",
+        { count: indexedDocument.chunk_count },
+      );
       meta.appendChild(chunks);
 
       if (indexedDocument.source_type) {
@@ -323,7 +808,7 @@
     if (clearChunkCache) {
       documentChunksCache.clear();
     }
-    showState("Loading indexed documents…");
+    showState("loading_index", false, true);
     refreshButton.disabled = true;
     try {
       const response = await fetch("./api/index", { headers: { Accept: "application/json" } });
@@ -333,7 +818,11 @@
       }
       renderDocuments(data);
     } catch (error) {
-      showState(error instanceof Error ? error.message : "The index could not be loaded.", true);
+      if (error instanceof Error) {
+        showState(error.message, true);
+      } else {
+        showState("index_unavailable", true, true);
+      }
     } finally {
       refreshButton.disabled = false;
     }
@@ -342,39 +831,77 @@
   function setQueryLoading(isLoading) {
     queryForm.setAttribute("aria-busy", String(isLoading));
     questionInput.disabled = isLoading;
-    retrievalModeInputs.forEach((input) => { input.disabled = isLoading; });
     askButton.disabled = isLoading;
     exampleContainer.querySelectorAll(".example-question").forEach((button) => { button.disabled = isLoading; });
-    askButton.textContent = isLoading ? "Asking…" : "Ask RAG";
+    setLocalizedText(askButton, isLoading ? "asking" : "ask_rag");
     queryLoading.hidden = !isLoading;
   }
 
   function showQueryError(message) {
-    queryError.textContent = message;
+    setTranslatedText(queryError, message);
     queryError.hidden = false;
     queryResults.hidden = true;
   }
 
-  function clearStaleQueryResults(showChangeNote = true) {
-    if (queryResults.hidden) {
-      return;
-    }
-    // A selector describes the next request, so the previous mode's answer,
-    // labels, and explorer must not remain presented beneath it.
+  function clearComparisonState() {
+    comparisonResultSet = null;
+    activeComparisonMode = null;
     queryResults.hidden = true;
     comparisonActions.hidden = true;
-    retrievalChangeNote.textContent = showChangeNote
-      ? "Retrieval method changed. Ask again to compare the same question."
-      : "";
-    retrievalChangeNote.hidden = !showChangeNote;
+    comparisonButtons.replaceChildren();
+    generativeResult.hidden = true;
+    directAnswerContent.replaceChildren();
+    ragStages.hidden = false;
   }
 
-  function configureComparisonShortcut(mode) {
-    const targetMode = mode === "semantic" ? "keyword" : "semantic";
-    const targetLabel = targetMode === "keyword" ? "Keyword search" : "Semantic vectors";
-    compareRetrievalButton.dataset.retrievalMode = targetMode;
-    compareRetrievalButton.textContent = `Try same question with ${targetLabel}`;
+  function deepFreeze(value) {
+    if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+    Object.freeze(value);
+    Object.values(value).forEach(deepFreeze);
+    return value;
+  }
+
+  function configureComparisonSelector(results, selectedMode) {
+    const labels = {
+      semantic: "semantic_mode",
+      keyword: "keyword_mode",
+      hybrid: "hybrid_mode",
+      generative: "generative_ai",
+    };
+    const descriptions = {
+      generative: "generative_card_description",
+      semantic: "semantic_card_description",
+      keyword: "keyword_card_description",
+      hybrid: "hybrid_card_description",
+    };
+    comparisonButtons.replaceChildren();
+    ["generative", "semantic", "keyword", "hybrid"].forEach((mode) => {
+      const envelope = results[mode];
+      const active = mode === selectedMode;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `comparison-card${active ? " is-selected" : ""}`;
+      button.dataset.comparisonMode = mode;
+      button.disabled = !envelope || envelope.status !== "ready";
+      button.setAttribute("aria-pressed", String(active));
+      if (button.disabled && envelope && envelope.message) button.title = envelope.message;
+      const title = document.createElement("span");
+      title.className = "comparison-card-title";
+      setLocalizedText(title, labels[mode]);
+      const description = document.createElement("span");
+      description.className = "comparison-card-description";
+      setLocalizedText(description, descriptions[mode]);
+      button.append(title, description);
+      comparisonButtons.appendChild(button);
+    });
     comparisonActions.hidden = false;
+  }
+
+  function setStagePresentation() {
+    setLocalizedText(embedStageLabel, "embed_question");
+    setLocalizedText(retrieveStageLabel, "retrieve_chunks");
+    setLocalizedText(promptStageLabel, "add_chunks_prompt");
+    setLocalizedText(answerStageLabel, "generate_answer");
   }
 
   function appendKeywordHighlights(container, content, matchedTerms) {
@@ -401,18 +928,16 @@
     container.appendChild(document.createTextNode(content.slice(cursor)));
   }
 
-  function renderSearchResults(results, mode) {
+  function renderSearchResults(results, mode, scoreLabelText) {
     searchResults.replaceChildren();
     searchCardByChunkId.clear();
     searchResultByChunkId.clear();
     if (results.length === 0) {
       const emptyState = document.createElement("p");
       emptyState.className = "alert alert-secondary mb-0";
-      emptyState.textContent = mode === "keyword"
-        ? "No matching keyword chunks were found."
-        : "No matching chunks were retrieved.";
+      setLocalizedText(emptyState, mode === "keyword" ? "no_keyword_chunks" : "no_chunks");
       searchResults.appendChild(emptyState);
-      return;
+      return [];
     }
 
     results.forEach((result) => {
@@ -443,20 +968,25 @@
 
       const score = document.createElement("span");
       score.className = "badge text-bg-light border text-secondary retrieval-score";
-      score.textContent = `Score: ${Number(result.score).toFixed(4)}`;
+      const scoreKey = mode === "keyword"
+        ? "bm25_score"
+        : mode === "hybrid" ? "fusion_score" : "semantic_similarity";
+      setLocalizedText(score, scoreKey);
+      score.textContent += `: ${Number(result.score).toFixed(3)}`;
+      const scoreValue = Number(result.score).toFixed(3);
+      localizedTextBindings.set(score, () => `${t(scoreKey)}: ${scoreValue}`);
       header.append(sourceGroup, score);
 
       const body = document.createElement("div");
       body.className = "card-body";
       const chunk = document.createElement("p");
       chunk.className = "chunk-content mb-0";
+      body.appendChild(chunk);
       if (mode === "keyword" && result.matched_terms.length > 0) {
         appendKeywordHighlights(chunk, result.content, result.matched_terms);
       } else {
-        // Semantic similarity does not imply literal term matches.
         chunk.textContent = result.content;
       }
-      body.appendChild(chunk);
 
       card.append(header, body);
       searchResults.appendChild(card);
@@ -827,15 +1357,19 @@
     container.appendChild(coordinates);
   }
 
-  function appendInspectorField(container, label, value, className = "") {
+  function appendInspectorField(container, labelKey, value, className = "", valueKey = null) {
     const field = document.createElement("div");
     field.className = "embedding-inspector-field";
     const heading = document.createElement("h4");
     heading.className = "embedding-inspector-label";
-    heading.textContent = label;
+    setLocalizedText(heading, labelKey);
     const content = document.createElement("p");
     content.className = className;
-    content.textContent = value;
+    if (valueKey) {
+      setLocalizedText(content, valueKey);
+    } else {
+      content.textContent = value;
+    }
     field.append(heading, content);
     container.appendChild(field);
     return content;
@@ -845,12 +1379,12 @@
     visualizationInspectorContent.replaceChildren();
     if (!viewerState || (!pinnedQuery && !pinnedChunkId)) {
       visualizationInspector.hidden = true;
-      visualizationInspectorTitle.textContent = "Chunk details";
+      setLocalizedText(visualizationInspectorTitle, "chunk_details");
       return;
     }
 
     if (pinnedQuery) {
-      visualizationInspectorTitle.textContent = "Query";
+      setLocalizedText(visualizationInspectorTitle, "query");
       appendCoordinateReadout(visualizationInspectorContent, viewerState.query.data);
       visualizationInspector.hidden = false;
       return;
@@ -863,62 +1397,68 @@
     }
     const point = selected.data;
     const details = chunkDetailsCache.get(point.id);
-    visualizationInspectorTitle.textContent = "Chunk details";
+    setLocalizedText(visualizationInspectorTitle, "chunk_details");
     const retrievalStatus = document.createElement("p");
     retrievalStatus.className = point.retrieved
       ? "embedding-inspector-status is-retrieved"
       : "embedding-inspector-status";
-    retrievalStatus.textContent = point.retrieved
-      ? `Retrieved · Rank #${point.rank}`
-      : "Not retrieved for this question";
+    setLocalizedText(
+      retrievalStatus,
+      point.retrieved ? "retrieved_rank" : "not_retrieved",
+      point.retrieved ? { rank: point.rank } : {},
+    );
     visualizationInspectorContent.appendChild(retrievalStatus);
     appendInspectorField(
       visualizationInspectorContent,
-      "Source",
-      (details && details.source) || point.source || "Unknown source",
+      "semantic_similarity",
+      Number(point.similarity).toFixed(3),
+      "embedding-inspector-score",
+    );
+    appendInspectorField(
+      visualizationInspectorContent,
+      "source",
+      (details && details.source) || point.source || t("unknown_source"),
       "embedding-inspector-source",
     );
 
     if (chunkInspectorLoadingId === point.id) {
       appendInspectorField(
         visualizationInspectorContent,
-        "Chunk content",
-        "Loading chunk…",
+        "chunk_content",
+        "",
         "embedding-inspector-message",
+        "loading_chunk",
       );
     } else if (chunkInspectorErrorId === point.id) {
       appendInspectorField(
         visualizationInspectorContent,
-        "Chunk content",
-        "This chunk could not be loaded.",
+        "chunk_content",
+        "",
         "embedding-inspector-message",
+        "chunk_load_error",
       );
     } else if (details) {
       appendInspectorField(
         visualizationInspectorContent,
-        "Chunk content",
+        "chunk_content",
         details.content,
         "embedding-inspector-chunk",
       );
       if (details.truncated) {
         const truncatedNote = document.createElement("p");
         truncatedNote.className = "small text-body-secondary";
-        truncatedNote.textContent = "This chunk's text has been shortened for display.";
+        setLocalizedText(truncatedNote, "chunk_shortened");
         visualizationInspectorContent.appendChild(truncatedNote);
       }
     }
-    const searchResult = searchResultByChunkId.get(point.id);
-    if (point.retrieved && searchResult) {
-      appendInspectorField(
-        visualizationInspectorContent,
-        "Retrieval score",
-        String(searchResult.score),
-        "embedding-inspector-score",
-      );
-    }
     const coordinateLabel = document.createElement("h4");
     coordinateLabel.className = "embedding-inspector-label";
-    coordinateLabel.textContent = "PCA coordinates";
+    setLocalizedText(
+      coordinateLabel,
+      currentProjectionMethod === "tsne"
+        ? "tsne_coordinates"
+        : currentProjectionMethod === "umap" ? "umap_coordinates" : "pca_coordinates",
+    );
     visualizationInspectorContent.appendChild(coordinateLabel);
     appendCoordinateReadout(visualizationInspectorContent, point);
     visualizationInspector.hidden = false;
@@ -984,8 +1524,14 @@
     heading.className = "d-block";
     heading.textContent = point.retrieved
       ? `#${point.rank} · ${point.source}`
-      : point.source || "Indexed chunk";
+      : point.source || t("indexed_chunk");
     visualizationTooltip.appendChild(heading);
+    const similarity = document.createElement("span");
+    similarity.className = "d-block";
+    setLocalizedText(similarity, "similarity", {
+      value: Number(point.similarity).toFixed(3),
+    });
+    visualizationTooltip.appendChild(similarity);
     appendHoverCoordinates(visualizationTooltip, point);
     visualizationTooltip.hidden = false;
     positionPointTooltip(projected, state);
@@ -995,7 +1541,7 @@
     visualizationTooltip.replaceChildren();
     const heading = document.createElement("strong");
     heading.className = "d-block";
-    heading.textContent = "Query";
+    setLocalizedText(heading, "query");
     visualizationTooltip.appendChild(heading);
     appendHoverCoordinates(visualizationTooltip, query);
     visualizationTooltip.hidden = false;
@@ -1097,18 +1643,20 @@
       axis.visual.group.style.opacity = String(0.48 + axisDepthRatio * 0.38);
     });
 
-    state.origin.visual.group.setAttribute(
-      "transform",
-      `translate(${projectedOrigin.x} ${projectedOrigin.y})`,
-    );
     const queryScale = 0.9 + projectedQuery.depthRatio * 0.25;
-    const projectedVectorEnd = shortenProjectedLineEnd(
-      projectedOrigin,
-      projectedQuery,
-      24 * queryScale,
-    );
-    setProjectedLine(state.query.visual.vector, projectedOrigin, projectedVectorEnd);
-    state.query.visual.vector.style.opacity = String(0.8 + projectedQuery.depthRatio * 0.2);
+    if (state.showsLinearOrigin) {
+      state.origin.visual.group.setAttribute(
+        "transform",
+        `translate(${projectedOrigin.x} ${projectedOrigin.y})`,
+      );
+      const projectedVectorEnd = shortenProjectedLineEnd(
+        projectedOrigin,
+        projectedQuery,
+        24 * queryScale,
+      );
+      setProjectedLine(state.query.visual.vector, projectedOrigin, projectedVectorEnd);
+      state.query.visual.vector.style.opacity = String(0.8 + projectedQuery.depthRatio * 0.2);
+    }
 
     const activeId = activeChunkId();
     state.connections.forEach((connection, chunkId) => {
@@ -1286,7 +1834,7 @@
   function updateZoomControls(state) {
     const percentage = Math.round(state.zoom * 100);
     zoomLevel.textContent = `${percentage}%`;
-    zoomLevel.setAttribute("aria-label", `Current embedding space zoom: ${percentage}%`);
+    setLocalizedAttribute(zoomLevel, "aria-label", "current_zoom", { percentage });
     zoomOutButton.disabled = state.zoom <= minimumZoom;
     zoomInButton.disabled = state.zoom >= maximumZoom;
   }
@@ -1398,11 +1946,76 @@
     return message;
   }
 
-  function renderVisualization(visualization, searchMode) {
-    visualizationLabel.textContent = visualization.label;
-    visualizationTechnicalLabel.textContent = visualization.technical_label;
-    const displayNote = visualizationDisplayNote(visualization.note);
-    visualizationNote.textContent = displayNote;
+  function selectVisualizationProjection(visualization, requestedMethod) {
+    if (requestedMethod === "pca") {
+      const pcaProjection = Array.isArray(visualization.projections)
+        ? visualization.projections.find((projection) => projection.method === "pca")
+        : null;
+      return pcaProjection
+        ? {...visualization, points: mergeProjectionPoints(visualization.points, pcaProjection), query: pcaProjection.query}
+        : visualization;
+    }
+    if (!["tsne", "umap"].includes(requestedMethod) || !Array.isArray(visualization.projections)) return null;
+    const projection = visualization.projections.find((candidate) => candidate.method === requestedMethod);
+    if (!projection) return null;
+    return {
+      ...visualization,
+      points: mergeProjectionPoints(visualization.points, projection),
+      query: projection.query,
+    };
+  }
+
+  function mergeProjectionPoints(points, projection) {
+    const coordinatesById = new Map(projection.points.map((point) => [point.id, point]));
+    if (coordinatesById.size !== points.length || points.some((point) => !coordinatesById.has(point.id))) {
+      return [];
+    }
+    return points.map((point) => ({...point, ...coordinatesById.get(point.id)}));
+  }
+
+  function setProjectionControls(method, visualization) {
+    const availableMethods = new Set(
+      Array.isArray(visualization.projections)
+        ? visualization.projections.map((projection) => projection.method)
+        : ["pca"],
+    );
+    [
+      [pcaProjectionButton, "pca"],
+      [tsneProjectionButton, "tsne"],
+      [umapProjectionButton, "umap"],
+    ].forEach(([button, value]) => {
+      const active = value === method;
+      button.disabled = !availableMethods.has(value);
+      button.classList.toggle("btn-primary", active);
+      button.classList.toggle("btn-outline-primary", !active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    const labelKeys = {pca: "pca_projection", tsne: "tsne_projection", umap: "umap_projection"};
+    const explanationKeys = {pca: "pca_caveat", tsne: "tsne_caveat", umap: "umap_caveat"};
+    const selectedProjection = Array.isArray(visualization.projections)
+      ? visualization.projections.find((projection) => projection.method === method)
+      : null;
+    const sourceLabel = String(visualization.technical_label || "");
+    const separator = sourceLabel.indexOf(" / ");
+    const suffix = separator >= 0 ? sourceLabel.slice(separator) : "";
+    const renderLabel = () => `${t(labelKeys[method])}${suffix}`;
+    visualizationTechnicalLabel.textContent = renderLabel();
+    localizedTextBindings.set(visualizationTechnicalLabel, renderLabel);
+    const renderExplanation = () => {
+      const base = t(explanationKeys[method]);
+      return selectedProjection && selectedProjection.fallback === "pca"
+        ? `${base} ${t("umap_pca_fallback")}`
+        : base;
+    };
+    projectionExplanation.textContent = renderExplanation();
+    localizedTextBindings.set(projectionExplanation, renderExplanation);
+    const showsLinearOrigin = method === "pca";
+    setLocalizedText(queryLegendLabel, showsLinearOrigin ? "query_vector" : "query");
+    queryLegendSymbol.classList.toggle("legend-query-vector", showsLinearOrigin);
+    queryLegendSymbol.classList.toggle("legend-query", !showsLinearOrigin);
+  }
+
+  function renderVisualization(visualization, searchMode, requestedMethod = "pca") {
     setPresentationMode(false, false);
     if (viewerState && viewerState.resizeObserver) {
       viewerState.resizeObserver.disconnect();
@@ -1422,11 +2035,23 @@
     const isSemantic = searchMode === "semantic";
     visualizationSection.hidden = !isSemantic;
     if (!isSemantic) {
+      currentVisualization = null;
+      currentVisualizationSearchMode = searchMode;
       visualizationNote.hidden = true;
       visualizationStatus.hidden = true;
       visualizationPanel.hidden = true;
       return;
     }
+
+    currentVisualization = visualization;
+    currentVisualizationSearchMode = searchMode;
+    const selectedVisualization = selectVisualizationProjection(visualization, requestedMethod);
+    currentProjectionMethod = selectedVisualization ? requestedMethod : "pca";
+    visualization = selectedVisualization || selectVisualizationProjection(visualization, "pca") || visualization;
+    setTranslatedText(visualizationLabel, visualization.label);
+    setProjectionControls(currentProjectionMethod, currentVisualization);
+    const displayNote = visualizationDisplayNote(visualization.note);
+    setTranslatedText(visualizationNote, displayNote);
 
     const allCoordinates = visualization.query
       ? [...visualization.points, visualization.query]
@@ -1441,7 +2066,7 @@
     visualizationStatus.hidden = canRender;
     visualizationPanel.hidden = !canRender;
     if (!canRender) {
-      visualizationStatus.textContent = visualization.note;
+      setTranslatedText(visualizationStatus, visualization.note);
       return;
     }
 
@@ -1455,11 +2080,12 @@
       height,
     });
     const sceneGeometry = buildSceneGeometry(allCoordinates);
+    const showsLinearOrigin = currentProjectionMethod === "pca";
     const fittedSceneScale = computeFittedSceneScale(sceneBounds.width, sceneBounds.height);
     const svg = svgElement("svg", "embedding-map");
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
     svg.setAttribute("role", "group");
-    svg.setAttribute("aria-label", "Interactive three-dimensional projection of indexed chunks and the Query");
+    setLocalizedAttribute(svg, "aria-label", "interactive_projection");
 
     const background = svgElement("rect", "embedding-map-background");
     background.setAttribute("x", "0");
@@ -1537,6 +2163,7 @@
       queryVectorLayer,
       pointLayer,
       originLayer,
+      showsLinearOrigin,
       sceneBounds,
       sceneCenterWorld: sceneGeometry.sceneCenter,
       cuboid: null,
@@ -1642,13 +2269,16 @@
       );
     });
 
-    ["x", "y", "z"].forEach((dimension) => {
+    ["x", "y", "z"].forEach((dimension, dimensionIndex) => {
       const group = svgElement("g", `embedding-axis embedding-axis-${dimension}`);
       const negativeLine = svgElement("line", "embedding-axis-line embedding-axis-negative");
       const positiveLine = svgElement("line", "embedding-axis-line embedding-axis-positive");
       positiveLine.setAttribute("marker-end", "url(#embedding-axis-arrowhead)");
       const label = svgElement("text", "embedding-axis-label");
-      label.textContent = dimension.toUpperCase();
+      const projectionAxisLabel = currentProjectionMethod === "tsne"
+        ? "t-SNE"
+        : currentProjectionMethod === "umap" ? "UMAP" : "PCA";
+      label.textContent = `${projectionAxisLabel} ${dimensionIndex + 1}`;
       const negativeWorld = { x: 0, y: 0, z: 0 };
       const positiveWorld = { x: 0, y: 0, z: 0 };
       negativeWorld[dimension] = sceneGeometry.axisRanges[dimension].minimum;
@@ -1694,7 +2324,7 @@
     originLabel.setAttribute("y", "-10");
     originLabel.textContent = "O";
     originGroup.append(originMarker, originLabel);
-    originLayer.appendChild(originGroup);
+    if (showsLinearOrigin) originLayer.appendChild(originGroup);
     state.origin = {
       world: sceneGeometry.origin,
       visual: { group: originGroup },
@@ -1702,7 +2332,7 @@
 
     const queryVector = svgElement("line", "query-vector");
     queryVector.setAttribute("marker-end", "url(#query-vector-arrowhead)");
-    queryVectorLayer.appendChild(queryVector);
+    if (showsLinearOrigin) queryVectorLayer.appendChild(queryVector);
 
     visualization.points.forEach((point, index) => {
       const group = svgElement(
@@ -1714,9 +2344,16 @@
       marker.setAttribute("r", point.retrieved ? "14" : "5");
       group.appendChild(marker);
       const nativeTooltip = svgElement("title", "");
-      nativeTooltip.textContent = point.retrieved
-        ? `Retrieved rank ${point.rank}: ${point.source}`
-        : `Indexed chunk: ${point.source}`;
+      const pointParameters = {
+        rank: point.rank,
+        source: point.source,
+        similarity: Number(point.similarity).toFixed(3),
+      };
+      setLocalizedText(
+        nativeTooltip,
+        point.retrieved ? "retrieved_point_title" : "indexed_point_title",
+        pointParameters,
+      );
       group.appendChild(nativeTooltip);
 
       group.addEventListener("mouseenter", () => {
@@ -1740,11 +2377,11 @@
 
       group.setAttribute("tabindex", "0");
       group.setAttribute("role", "button");
-      group.setAttribute(
+      setLocalizedAttribute(
+        group,
         "aria-label",
-        point.retrieved
-          ? `Retrieved rank ${point.rank}, ${point.source}. Press Enter to pin this point.`
-          : `Indexed chunk, ${point.source}. Press Enter to pin this point.`,
+        point.retrieved ? "retrieved_point_label" : "indexed_point_label",
+        pointParameters,
       );
       group.setAttribute("aria-pressed", "false");
       visualizationPointByChunkId.set(point.id, group);
@@ -1787,7 +2424,7 @@
     queryGroup.setAttribute("tabindex", "0");
     queryGroup.setAttribute("role", "button");
     queryGroup.setAttribute("aria-pressed", "false");
-    queryGroup.setAttribute("aria-label", "Query vector endpoint. Press Enter to pin its PCA coordinates.");
+    setLocalizedAttribute(queryGroup, "aria-label", "query_endpoint_label");
     const queryMarker = svgElement("polygon", "embedding-query-marker");
     queryMarker.setAttribute("points", "0,-21 21,0 0,21 -21,0");
     const queryLabel = svgElement("text", "embedding-query-label");
@@ -1795,7 +2432,11 @@
     queryLabel.setAttribute("dominant-baseline", "central");
     queryLabel.textContent = "Q";
     const queryTooltip = svgElement("title", "");
-    queryTooltip.textContent = `Query — X ${formatCoordinate(visualization.query.x)}, Y ${formatCoordinate(visualization.query.y)}, Z ${formatCoordinate(visualization.query.z)}`;
+    setLocalizedText(queryTooltip, "query_coordinates", {
+      x: formatCoordinate(visualization.query.x),
+      y: formatCoordinate(visualization.query.y),
+      z: formatCoordinate(visualization.query.z),
+    });
     queryGroup.append(queryMarker, queryLabel, queryTooltip);
     queryLayer.appendChild(queryGroup);
     state.query = {
@@ -1848,20 +2489,16 @@
     }
   }
 
-  function renderPrompt(prompt) {
-    promptLabel.textContent = prompt.label;
-    promptTechnicalLabel.textContent = prompt.technical_label;
-    promptNote.textContent = prompt.note;
+  function renderPromptMessages(messages) {
     promptMessages.replaceChildren();
-
-    prompt.messages.forEach((message) => {
+    messages.forEach((message) => {
       const card = document.createElement("article");
       card.className = "card prompt-message";
       const header = document.createElement("div");
       header.className = "card-header";
       const role = document.createElement("span");
       role.className = "badge text-bg-primary";
-      role.textContent = message.role.toUpperCase();
+      setLocalizedText(role, message.role === "system" ? "role_system" : "role_human");
       header.appendChild(role);
 
       const body = document.createElement("div");
@@ -1877,80 +2514,170 @@
     });
   }
 
+  function renderPrompt(prompt) {
+    setTranslatedText(promptLabel, prompt.label);
+    setTranslatedText(promptTechnicalLabel, prompt.technical_label);
+    setTranslatedText(promptNote, prompt.note);
+    renderPromptMessages(prompt.messages);
+  }
+
+  function renderRetrievalNote(search) {
+    const modeNotes = {
+      keyword: "keyword_note",
+      hybrid: "hybrid_note",
+    };
+    if (!modeNotes[search.mode]) {
+      nonsemanticRetrievalNote.textContent = "";
+      localizedTextBindings.delete(nonsemanticRetrievalNote);
+      nonsemanticRetrievalNote.hidden = true;
+      return;
+    }
+    const render = () => t(modeNotes[search.mode]);
+    nonsemanticRetrievalNote.textContent = render();
+    localizedTextBindings.set(nonsemanticRetrievalNote, render);
+    nonsemanticRetrievalNote.hidden = false;
+  }
+
   function renderQueryResponse(data) {
     const hasEvidence = data.search.results.length > 0;
+    generativeResult.hidden = true;
+    ragStages.hidden = false;
+    setStagePresentation();
     embeddedQuestion.textContent = data.question;
-    embeddedRetrievalMethod.textContent = data.search.label;
-    answerKicker.textContent = hasEvidence ? "Answer" : "Grounding guard";
-    answerHeading.textContent = hasEvidence ? "Generated answer" : "Grounded answer status";
-    answerContent.textContent = data.answer;
-    searchLabel.textContent = data.search.label;
-    searchTechnicalLabel.textContent = data.search.technical_label;
-    scoreLabel.textContent = data.search.score_label;
-    renderSearchResults(data.search.results, data.search.mode);
+    setTranslatedText(embeddedRetrievalMethod, data.search.label);
+    renderRetrievalNote(data.search);
+    searchContent.hidden = false;
+    directRetrievalNote.hidden = true;
+    setLocalizedText(answerKicker, hasEvidence ? "answer" : "grounding_guard");
+    setLocalizedText(answerHeading, hasEvidence ? "generated_answer" : "grounded_answer_status");
+    answerContent.replaceChildren();
+    const answerText = document.createElement("div");
+    answerText.className = "answer-display-text";
+    answerText.textContent = data.answer;
+    answerContent.appendChild(answerText);
+    setTranslatedText(searchLabel, data.search.label);
+    setTranslatedText(searchTechnicalLabel, data.search.technical_label);
+    setTranslatedText(scoreLabel, data.search.score_label);
+    renderSearchResults(
+      data.search.results,
+      data.search.mode,
+      data.search.score_label,
+    );
     renderVisualization(data.visualization, data.search.mode);
     renderPrompt(data.prompt);
-    configureComparisonShortcut(data.search.mode);
     embedStage.open = false;
     retrieveStage.open = false;
     promptStage.open = false;
     answerStage.open = true;
     queryError.hidden = true;
-    retrievalChangeNote.hidden = true;
-    retrievalChangeNote.textContent = "";
     queryResults.hidden = false;
+  }
+
+  function renderDirectQueryResponse(data) {
+    ragStages.hidden = true;
+    generativeResult.hidden = false;
+    searchContent.hidden = true;
+    searchResults.replaceChildren();
+    searchCardByChunkId.clear();
+    searchResultByChunkId.clear();
+    renderVisualization(null, "generative");
+    promptMessages.replaceChildren();
+    directAnswerContent.replaceChildren();
+    const answerText = document.createElement("div");
+    answerText.className = "answer-display-text";
+    answerText.textContent = data.answer;
+    directAnswerContent.appendChild(answerText);
+    queryError.hidden = true;
+    queryResults.hidden = false;
+  }
+
+  function renderComparisonMode(mode) {
+    if (!comparisonResultSet) return;
+    const envelope = comparisonResultSet.results[mode];
+    if (!envelope || envelope.status !== "ready" || !envelope.result) return;
+    activeComparisonMode = mode;
+    configureComparisonSelector(comparisonResultSet.results, mode);
+    if (mode === "generative") {
+      renderDirectQueryResponse(envelope.result);
+    } else {
+      renderQueryResponse(envelope.result);
+    }
+  }
+
+  function storeAndRenderComparison(data) {
+    comparisonResultSet = deepFreeze(data);
+    const initialMode = ["generative", "semantic", "keyword", "hybrid"]
+      .find((mode) => data.results[mode] && data.results[mode].status === "ready");
+    if (!initialMode) {
+      const firstFailure = Object.values(data.results).find((result) => result.message);
+      showQueryError(firstFailure ? firstFailure.message : t("query_failed"));
+      return;
+    }
+    renderComparisonMode(initialMode);
   }
 
   async function submitQuery(event) {
     event.preventDefault();
     const question = questionInput.value.trim();
-    const selectedMode = Array.from(retrievalModeInputs).find((input) => input.checked);
-    const retrievalMode = selectedMode ? selectedMode.value : "semantic";
+    const requestVersion = ++queryRequestVersion;
     queryError.hidden = true;
-    retrievalChangeNote.hidden = true;
-    retrievalChangeNote.textContent = "";
     if (!question) {
-      showQueryError("Please enter a question.");
+      setLocalizedText(queryError, "enter_question");
+      queryError.hidden = false;
+      queryResults.hidden = true;
       questionInput.focus();
       return;
     }
 
-    queryResults.hidden = true;
+    clearComparisonState();
     setQueryLoading(true);
     try {
-      const response = await fetch("./api/query", {
+      const response = await fetch("./api/query/all", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ question, retrieval_mode: retrievalMode }),
+        body: JSON.stringify({question}),
       });
       const data = await response.json();
+      if (requestVersion !== queryRequestVersion) return;
       if (!response.ok) {
         throw new Error(data.message || "The RAG query could not be completed.");
       }
-      renderQueryResponse(data);
+      storeAndRenderComparison(data);
     } catch (error) {
-      showQueryError(error instanceof Error ? error.message : "The RAG query could not be completed.");
+      if (requestVersion !== queryRequestVersion) return;
+      if (error instanceof Error) {
+        showQueryError(error.message);
+      } else {
+        setLocalizedText(queryError, "query_failed");
+        queryError.hidden = false;
+        queryResults.hidden = true;
+      }
     } finally {
-      setQueryLoading(false);
+      if (requestVersion === queryRequestVersion) setQueryLoading(false);
     }
   }
 
   refreshButton.addEventListener("click", () => loadIndex(true));
   queryForm.addEventListener("submit", submitQuery);
-  retrievalModeInputs.forEach((input) => {
-    input.addEventListener("change", () => clearStaleQueryResults());
+  questionInput.addEventListener("input", () => {
+    queryRequestVersion += 1;
+    clearComparisonState();
+    setQueryLoading(false);
   });
-  compareRetrievalButton.addEventListener("click", () => {
-    const targetMode = compareRetrievalButton.dataset.retrievalMode;
-    const targetInput = Array.from(retrievalModeInputs).find(
-      (input) => input.value === targetMode,
-    );
-    if (!targetInput || !questionInput.value.trim()) {
-      return;
-    }
-    targetInput.checked = true;
-    clearStaleQueryResults(false);
-    queryForm.requestSubmit();
+  comparisonButtons.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-comparison-mode]");
+    if (!button || button.disabled) return;
+    renderComparisonMode(button.dataset.comparisonMode);
+  });
+  [pcaProjectionButton, tsneProjectionButton, umapProjectionButton].forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!currentVisualization || currentVisualizationSearchMode !== "semantic") return;
+      renderVisualization(
+        currentVisualization,
+        currentVisualizationSearchMode,
+        button.dataset.projection,
+      );
+    });
   });
   zoomOutButton.addEventListener("click", () => zoomViewer(1 / 1.12));
   zoomInButton.addEventListener("click", () => zoomViewer(1.12));
@@ -1969,6 +2696,10 @@
     });
   }
   refreshExamplesButton.addEventListener("click", loadExamples);
+  document.querySelectorAll("[data-language]").forEach((button) => {
+    button.addEventListener("click", () => setLanguage(button.dataset.language));
+  });
+  setLanguage(readStoredLanguage(), false);
   loadExamples();
   loadIndex();
 })();

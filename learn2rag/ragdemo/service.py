@@ -14,6 +14,7 @@ import json
 import logging
 import math
 import re
+from copy import deepcopy
 from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
@@ -26,12 +27,17 @@ import numpy as np
 from qdrant_client.conversions import common_types as qdrant_types
 from qdrant_client.http.models import QueryResponse as QdrantQueryResponse
 from qdrant_client.http.models import ScoredPoint
+from sklearn.manifold import TSNE  # type: ignore[import-untyped]
+from umap import UMAP  # type: ignore[import-untyped]
 
 from learn2rag.pipeline.authorization import filter_authorized
 from learn2rag.pipeline.embeddings import create_embeddings
 from learn2rag.pipeline.generate import build_prompt_messages, invoke_prompt_messages
 
 from .models import (
+    AggregateQueryResponse,
+    DirectModeResult,
+    DirectQueryResponse,
     ExampleQuestions,
     IndexedChunk,
     IndexedDocumentChunksResponse,
@@ -41,13 +47,19 @@ from .models import (
     PublicChunkDetails,
     PublicExampleQuestions,
     PublicExampleQuestionSet,
+    ProjectionMethod,
+    RetrievalCapabilitiesResponse,
     QueryPromptMessage,
     QueryPromptResponse,
+    QueryComparisonResults,
+    QueryModeResult,
     QueryResponse,
     RetrievalMode,
     QuerySearchResponse,
     QuerySearchResult,
     QueryVisualizationPoint,
+    QueryVisualizationCoordinate,
+    QueryVisualizationProjection,
     QueryVisualizationQueryPoint,
     QueryVisualizationResponse,
 )
@@ -60,6 +72,11 @@ MAX_DOCUMENT_CHUNKS = 100
 _QUESTIONS_PATH = Path(__file__).resolve().with_name("demo_questions.json")
 _STOPWORDS_PATH = Path(__file__).resolve().with_name("stopwords_en_weka.txt")
 MAX_VISUALIZATION_CHUNKS = 2_000
+TSNE_RANDOM_STATE = 42
+TSNE_DEFAULT_PERPLEXITY = 30.0
+UMAP_RANDOM_STATE = 42
+UMAP_DEFAULT_NEIGHBORS = 15
+UMAP_METRIC = "cosine"
 MAX_CHUNK_LOOKUP_CHUNKS = MAX_VISUALIZATION_CHUNKS
 MAX_KEYWORD_SEARCH_CHUNKS = 2_000
 DEFAULT_KEYWORD_TOP_K = 5
@@ -109,12 +126,17 @@ NO_EVIDENCE_ANSWER = (
 NO_KEYWORD_EVIDENCE_ANSWER = (
     "No matching keyword chunks were found, so no grounded answer can be shown."
 )
-
+DIRECT_GENERATION_SYSTEM_PROMPT = (
+    "Answer the user's question directly using your own model knowledge.\n"
+    "No retrieved documents or RAG context are provided."
+)
 
 class QdrantReader(Protocol):
     """Minimum read-only Qdrant capability needed for public index inspection."""
 
     def collection_exists(self, collection_name: str) -> bool: ...
+
+    def get_collection(self, collection_name: str) -> Any: ...
 
     def scroll(
         self,
@@ -131,6 +153,14 @@ class QuerySearchOperator(Protocol):
     """Authorized retrieval boundary used by the demo query flow."""
 
     async def __call__(self, inputs: Any, prov: Any = None) -> Any: ...
+
+    async def run_with_config(
+        self,
+        inputs: Any,
+        *,
+        user_config: dict[str, Any],
+        opt_config: dict[str, Any],
+    ) -> Any: ...
 
 
 @dataclass
@@ -152,6 +182,53 @@ class _VisualizationChunk:
 class _QueryRetrieval:
     points: list[Any]
     matched_terms_by_id: Mapping[str, tuple[str, ...]]
+
+
+class HybridUnavailableError(ValueError):
+    """The configured persisted collection cannot perform native Hybrid search."""
+
+
+def retrieval_capabilities(
+    client: QdrantReader,
+    collection_name: str,
+) -> RetrievalCapabilitiesResponse:
+    """Expose only safe public modes derived from the persisted Qdrant schema."""
+    modes: list[RetrievalMode] = ["semantic", "keyword"]
+    try:
+        if client.collection_exists(collection_name) and _collection_supports_hybrid(
+            client.get_collection(collection_name)
+        ):
+            modes.append("hybrid")
+    except Exception:
+        logger.exception("Unable to inspect retrieval capabilities")
+    return RetrievalCapabilitiesResponse(retrieval_modes=modes)
+
+
+def _collection_supports_hybrid(collection_info: Any) -> bool:
+    config = _schema_value(collection_info, "config")
+    params = _schema_value(config, "params")
+    vectors = _schema_value(params, "vectors")
+    sparse_vectors = _schema_value(params, "sparse_vectors")
+    return "dense" in _named_schema_keys(vectors) and "sparse" in _named_schema_keys(
+        sparse_vectors
+    )
+
+
+def _schema_value(value: Any, field: str) -> Any:
+    if isinstance(value, Mapping):
+        return value.get(field)
+    return getattr(value, field, None)
+
+
+def _named_schema_keys(value: Any) -> set[str]:
+    if isinstance(value, Mapping):
+        return {str(key) for key in value}
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        dumped = model_dump()
+        if isinstance(dumped, Mapping):
+            return {str(key) for key in dumped}
+    return set()
 
 
 def load_example_questions() -> ExampleQuestions:
@@ -415,22 +492,36 @@ async def execute_query(
     retrieval_mode: RetrievalMode = "semantic",
     qdrant_reader: QdrantReader | None = None,
     collection_name: Any = None,
+    runtime_user_config: Mapping[str, Any] | None = None,
 ) -> QueryResponse:
     """Run the selected authorized retrieval and one shared generation path.
 
-    Semantic mode delegates unchanged to SearchOperator. Keyword mode is local
-    to the demo because BGE-M3 sparse vectors are not BM25 and the dense-only
-    collection should not be migrated merely to demonstrate lexical ranking.
-    Both paths converge on the same ordered points before prompt construction.
+    Semantic and Hybrid use isolated request configurations through the native
+    authorized pipeline path. Keyword remains demo-local BM25 because BGE-M3
+    sparse vectors are not BM25. All modes converge on the same ordered points
+    before prompt construction.
     """
+    if not isinstance(collection_name, str) or not collection_name.strip():
+        raise ValueError("Retrieval requires the configured collection")
+
+    request_user_config = deepcopy(
+        dict(runtime_user_config)
+        if runtime_user_config is not None
+        else {"collection_name": collection_name}
+    )
+    request_user_config["collection_name"] = collection_name
+    request_opt_config = deepcopy(dict(runtime_config))
+
     if retrieval_mode == "semantic":
-        retrieval = await _semantic_retrieval(search_operator, question)
+        request_opt_config["search_mode"] = "dense"
+        retrieval = await _native_retrieval(
+            search_operator,
+            question,
+            request_user_config,
+            request_opt_config,
+        )
     elif retrieval_mode == "keyword":
-        if (
-            qdrant_reader is None
-            or not isinstance(collection_name, str)
-            or not collection_name.strip()
-        ):
+        if qdrant_reader is None:
             raise ValueError("Keyword retrieval requires the configured collection")
         retrieval = await _keyword_retrieval(
             qdrant_reader,
@@ -438,13 +529,26 @@ async def execute_query(
             question,
             runtime_config,
         )
+    elif retrieval_mode == "hybrid":
+        if qdrant_reader is None:
+            raise HybridUnavailableError("Hybrid search is unavailable for this index.")
+        capabilities = retrieval_capabilities(qdrant_reader, collection_name)
+        if "hybrid" not in capabilities.retrieval_modes:
+            raise HybridUnavailableError("Hybrid search is unavailable for this index.")
+        request_opt_config["search_mode"] = "dense_sparse"
+        retrieval = await _native_retrieval(
+            search_operator,
+            question,
+            request_user_config,
+            request_opt_config,
+        )
     else:
         raise ValueError("Unsupported public retrieval mode")
 
     points = retrieval.points
     mode, label, technical_label, score_label = _search_metadata(
         retrieval_mode,
-        runtime_config,
+        request_opt_config,
     )
     results = []
     for rank, point in enumerate(points, start=1):
@@ -459,7 +563,7 @@ async def execute_query(
     messages = build_prompt_messages(
         question,
         list(points),
-        dict(runtime_config),
+        request_opt_config,
         source_transform=_safe_prompt_source,
     )
     public_prompt = _public_prompt(messages)
@@ -473,13 +577,18 @@ async def execute_query(
             qdrant_reader,
             collection_name,
             question,
-            runtime_config,
+            request_opt_config,
             results,
         )
         if retrieval_mode == "semantic"
         else _visualization_status(
             "unsupported",
-            "The embedding explorer is available for semantic vector search.",
+            (
+                "Hybrid ranking combines dense semantic and sparse lexical signals. "
+                "The 3D embedding explorer is shown only for Semantic vectors."
+                if retrieval_mode == "hybrid"
+                else "The embedding explorer is available for semantic vector search."
+            ),
         )
     )
     return QueryResponse(
@@ -493,6 +602,94 @@ async def execute_query(
             results=results,
         ),
         visualization=visualization,
+        prompt=public_prompt,
+    )
+
+
+async def execute_all_queries(
+    search_operator: QuerySearchOperator,
+    question: str,
+    runtime_config: Mapping[str, Any],
+    *,
+    qdrant_reader: QdrantReader | None = None,
+    collection_name: Any = None,
+    runtime_user_config: Mapping[str, Any] | None = None,
+) -> AggregateQueryResponse:
+    """Prepare the complete comparison while isolating every mode failure.
+
+    The configured model is a shared application singleton whose concurrent
+    invocation safety is provider-dependent. The four generations therefore
+    run sequentially inside this one aggregate request. This keeps local model
+    clients safe while still giving the browser one loading period and a fully
+    preloaded, immutable comparison response.
+    """
+    rag_results: dict[RetrievalMode, QueryModeResult] = {}
+    labels = {
+        "semantic": "Semantic",
+        "keyword": "Keyword",
+        "hybrid": "Hybrid",
+    }
+    for retrieval_mode in ("semantic", "keyword", "hybrid"):
+        try:
+            result = await execute_query(
+                search_operator,
+                question,
+                runtime_config,
+                retrieval_mode=retrieval_mode,
+                qdrant_reader=qdrant_reader,
+                collection_name=collection_name,
+                runtime_user_config=runtime_user_config,
+            )
+            rag_results[retrieval_mode] = QueryModeResult(
+                status="ready",
+                result=result,
+            )
+        except HybridUnavailableError:
+            rag_results[retrieval_mode] = QueryModeResult(
+                status="unavailable",
+                message="Hybrid search is unavailable for the current index.",
+            )
+        except Exception:
+            logger.exception("Unable to prepare %s comparison result", retrieval_mode)
+            rag_results[retrieval_mode] = QueryModeResult(
+                status="unavailable",
+                message=f"The {labels[retrieval_mode]} result is temporarily unavailable.",
+            )
+
+    try:
+        direct_result = execute_direct_query(question)
+        generative = DirectModeResult(status="ready", result=direct_result)
+    except Exception:
+        logger.exception("Unable to prepare the direct Generative AI result")
+        generative = DirectModeResult(
+            status="unavailable",
+            message="The Generative AI result is temporarily unavailable.",
+        )
+
+    return AggregateQueryResponse(
+        question=question,
+        results=QueryComparisonResults(
+            semantic=rag_results["semantic"],
+            keyword=rag_results["keyword"],
+            hybrid=rag_results["hybrid"],
+            generative=generative,
+        ),
+    )
+
+
+def execute_direct_query(question: str) -> DirectQueryResponse:
+    """Invoke the configured model directly, with no retrieval or RAG context."""
+    messages: list[BaseMessage] = [
+        SystemMessage(content=DIRECT_GENERATION_SYSTEM_PROMPT),
+        HumanMessage(content=question),
+    ]
+    public_prompt = _public_prompt(messages)
+    answer = invoke_prompt_messages(messages)
+    if not isinstance(answer, str):
+        raise TypeError("Model answer must be text")
+    return DirectQueryResponse(
+        question=question,
+        answer=answer,
         prompt=public_prompt,
     )
 
@@ -516,13 +713,17 @@ def _public_answer(
     return NO_EVIDENCE_ANSWER
 
 
-async def _semantic_retrieval(
+async def _native_retrieval(
     search_operator: QuerySearchOperator,
     question: str,
+    request_user_config: dict[str, Any],
+    request_opt_config: dict[str, Any],
 ) -> _QueryRetrieval:
-    """Keep SearchOperator authoritative for the existing semantic path."""
-    search_output = await search_operator(
-        inputs={"question": question, "user": DEMO_USER}
+    """Run one authorized native retrieval with a request-local mode."""
+    search_output = await search_operator.run_with_config(
+        {"question": question, "user": DEMO_USER},
+        user_config=request_user_config,
+        opt_config=request_opt_config,
     )
     if not isinstance(search_output, Mapping):
         raise TypeError("Search output must be a mapping")
@@ -531,7 +732,10 @@ async def _semantic_retrieval(
     points = getattr(documents, "points", documents)
     if not isinstance(points, Sequence) or isinstance(points, (str, bytes)):
         raise TypeError("Search documents must be a sequence")
-    return _QueryRetrieval(points=list(points), matched_terms_by_id={})
+    return _QueryRetrieval(
+        points=list(points),
+        matched_terms_by_id={},
+    )
 
 
 async def _keyword_retrieval(
@@ -557,7 +761,10 @@ async def _keyword_retrieval(
     )
     candidates, matched_terms = _bm25_candidates(question, records)
     if not candidates:
-        return _QueryRetrieval(points=[], matched_terms_by_id={})
+        return _QueryRetrieval(
+            points=[],
+            matched_terms_by_id={},
+        )
 
     authorized = await filter_authorized(
         DEMO_USER,
@@ -836,11 +1043,17 @@ def build_query_visualization(
     matrix = np.vstack(
         [chunk.vector for chunk in compatible_chunks] + [query_vector]
     )
-    coordinates = _pca_3d(matrix)
+    projection_methods: tuple[ProjectionMethod, ...] = ("pca", "tsne", "umap")
+    coordinates_by_method = {
+        method: _project_embeddings_3d(matrix, method)
+        for method in projection_methods
+    }
+    coordinates = coordinates_by_method["pca"]
     retrieved_ranks = {result.id: result.rank for result in search_results}
     public_points = []
     for chunk, coordinate in zip(compatible_chunks, coordinates[:-1], strict=True):
         rank = retrieved_ranks.get(chunk.id)
+        similarity = _cosine_similarity(query_vector, chunk.vector)
         public_points.append(
             QueryVisualizationPoint(
                 id=chunk.id,
@@ -850,11 +1063,41 @@ def build_query_visualization(
                 z=float(coordinate[2]),
                 retrieved=rank is not None,
                 rank=rank,
+                similarity=similarity,
                 preview=None,
             )
         )
 
     query_coordinate = coordinates[-1]
+    projections = [
+        QueryVisualizationProjection(
+            method=method,
+            points=[
+                QueryVisualizationCoordinate(
+                    id=chunk.id,
+                    x=float(coordinate[0]),
+                    y=float(coordinate[1]),
+                    z=float(coordinate[2]),
+                )
+                for chunk, coordinate in zip(
+                    compatible_chunks,
+                    method_coordinates[:-1],
+                    strict=True,
+                )
+            ],
+            query=QueryVisualizationQueryPoint(
+                x=float(method_coordinates[-1][0]),
+                y=float(method_coordinates[-1][1]),
+                z=float(method_coordinates[-1][2]),
+            ),
+            fallback=(
+                "pca"
+                if method == "umap" and matrix.shape[0] < 4
+                else None
+            ),
+        )
+        for method, method_coordinates in coordinates_by_method.items()
+    ]
     status: Literal["ready", "partial"] = "partial" if truncated else "ready"
     note = _visualization_note(truncated)
     return QueryVisualizationResponse(
@@ -868,6 +1111,8 @@ def build_query_visualization(
             y=float(query_coordinate[1]),
             z=float(query_coordinate[2]),
         ),
+        projection_method="pca",
+        projections=projections,
         truncated=truncated,
     )
 
@@ -962,6 +1207,22 @@ def _finite_vector(value: Any) -> np.ndarray[Any, Any] | None:
     return vector
 
 
+def _cosine_similarity(
+    first: np.ndarray[Any, Any],
+    second: np.ndarray[Any, Any],
+) -> float:
+    """Measure similarity in the original dense space used by Qdrant COSINE."""
+    if first.shape != second.shape:
+        raise ValueError("Cosine vectors must have matching dimensions")
+    denominator = float(np.linalg.norm(first) * np.linalg.norm(second))
+    if not math.isfinite(denominator) or denominator <= 0:
+        return 0.0
+    similarity = float(np.dot(first, second) / denominator)
+    if not math.isfinite(similarity):
+        raise ValueError("Cosine similarity must be finite")
+    return max(-1.0, min(1.0, similarity))
+
+
 def _pca_3d(matrix: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
     """Return a finite 3D explanatory PCA view, not retrieval-space distances.
 
@@ -991,6 +1252,79 @@ def _pca_3d(matrix: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
     return cast(np.ndarray[Any, Any], projected)
 
 
+def _project_embeddings_3d(
+    matrix: np.ndarray[Any, Any],
+    method: ProjectionMethod,
+) -> np.ndarray[Any, Any]:
+    """Project one bounded vector matrix without affecting retrieval data."""
+    if method == "pca":
+        return _pca_3d(matrix)
+    if method == "tsne":
+        return _tsne_3d(matrix)
+    if method == "umap":
+        return _umap_3d(matrix)
+    raise ValueError("Unsupported visualization projection")
+
+
+def _tsne_perplexity(sample_count: int) -> float:
+    """Choose a deterministic valid perplexity for small and normal samples."""
+    if sample_count < 2:
+        raise ValueError("At least two vectors are required for t-SNE")
+    return min(TSNE_DEFAULT_PERPLEXITY, max(1.0, (sample_count - 1) / 3.0))
+
+
+def _tsne_3d(matrix: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
+    """Return a deterministic finite 3D t-SNE view of the same vector matrix."""
+    if matrix.ndim != 2 or matrix.shape[0] < 2 or matrix.shape[1] < 1:
+        raise ValueError("At least two vectors with one dimension are required")
+    if not np.isfinite(matrix).all():
+        raise ValueError("t-SNE input must be finite")
+    projected = TSNE(
+        n_components=3,
+        perplexity=_tsne_perplexity(matrix.shape[0]),
+        init="random",
+        learning_rate="auto",
+        random_state=TSNE_RANDOM_STATE,
+        method="barnes_hut",
+    ).fit_transform(matrix)
+    if projected.shape != (matrix.shape[0], 3) or not np.isfinite(projected).all():
+        raise ValueError("t-SNE output must contain finite X/Y/Z coordinates")
+    return cast(np.ndarray[Any, Any], projected)
+
+
+def _umap_n_neighbors(sample_count: int) -> int:
+    """Bound UMAP neighbourhoods without exposing parameters to the browser."""
+    if sample_count < 2:
+        raise ValueError("At least two vectors are required for UMAP")
+    return min(UMAP_DEFAULT_NEIGHBORS, max(2, sample_count - 1))
+
+
+def _umap_3d(matrix: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
+    """Return a deterministic finite 3D UMAP view of the shared vector matrix.
+
+    UMAP's graph/spectral initialization is not meaningful for fewer than four
+    samples. Those tiny bounded sets use the deterministic PCA coordinates and
+    are marked as such in the public projection metadata.
+    """
+    if matrix.ndim != 2 or matrix.shape[0] < 2 or matrix.shape[1] < 1:
+        raise ValueError("At least two vectors with one dimension are required")
+    if not np.isfinite(matrix).all():
+        raise ValueError("UMAP input must be finite")
+    if matrix.shape[0] < 4:
+        return _pca_3d(matrix)
+    projected = UMAP(
+        n_components=3,
+        n_neighbors=_umap_n_neighbors(matrix.shape[0]),
+        metric=UMAP_METRIC,
+        random_state=UMAP_RANDOM_STATE,
+        init="random",
+        n_jobs=1,
+    ).fit_transform(matrix)
+    if projected.shape != (matrix.shape[0], 3) or not np.isfinite(projected).all():
+        raise ValueError("UMAP output must contain finite X/Y/Z coordinates")
+    return cast(np.ndarray[Any, Any], projected)
+
+
 def _visualization_status(
     status: Literal["unavailable", "unsupported"],
     note: str,
@@ -1015,8 +1349,8 @@ def _visualization_technical_label(runtime_config: Mapping[str, Any]) -> str:
 
 def _visualization_note(truncated: bool) -> str:
     base = (
-        "3D proximity is approximate because PCA compresses the embedding space. "
-        "Retrieval uses the original full-dimensional vectors."
+        "3D proximity is approximate. Semantic similarity is calculated in the "
+        "original full-dimensional embedding space used for retrieval."
     )
     if truncated:
         return f"{base} The bounded display shows a partial index snapshot."
@@ -1190,22 +1524,31 @@ def _search_metadata(
     if retrieval_mode == "keyword":
         return "keyword", "Keyword search", "BM25 lexical ranking", "BM25 score"
 
-    configured_mode = runtime_config.get("search_mode")
-    if not isinstance(configured_mode, str) or not configured_mode:
-        raise ValueError("A valid configured search mode is required")
-    technical_mode = (
-        "Dense" if configured_mode == "dense"
-        else configured_mode.replace("_", " ").title()
-    )
-
     embedding_model = runtime_config.get("embedding_model")
     embedding_label = "BGE-M3" if embedding_model == "BAAI/bge-m3" else None
+    if retrieval_mode == "hybrid":
+        fusion_mode = runtime_config.get("fusion_mode")
+        if fusion_mode not in {"DBSF", "RRF"}:
+            raise ValueError("A valid configured fusion mode is required")
+        technical_label = "Dense + sparse"
+        if embedding_label:
+            technical_label = f"{embedding_label} dense + sparse"
+        return (
+            "hybrid",
+            "Hybrid search",
+            f"{technical_label} · {fusion_mode}",
+            "Fusion score",
+        )
+
+    configured_mode = runtime_config.get("search_mode")
+    if configured_mode != "dense":
+        raise ValueError("Semantic retrieval must use dense search")
     technical_label = (
-        f"{technical_mode} / {embedding_label}"
+        f"Dense / {embedding_label}"
         if embedding_label
-        else technical_mode
+        else "Dense"
     )
-    return "semantic", "Semantic vector search", technical_label, "Dense similarity"
+    return "semantic", "Semantic vector search", technical_label, "Semantic similarity"
 
 
 def _display_metadata(

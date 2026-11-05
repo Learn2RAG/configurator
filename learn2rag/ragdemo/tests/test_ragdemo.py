@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 import re
 from types import SimpleNamespace
@@ -17,9 +18,14 @@ import learn2rag.pipeline.generate as pipeline_generate
 from learn2rag.ragdemo import router
 from learn2rag.ragdemo import routes, service
 from learn2rag.ragdemo.models import (
+    AggregateQueryRequest,
+    AggregateQueryResponse,
+    DirectModeResult,
     ExampleQuestions,
     MAX_PUBLIC_CHUNK_CHARS,
     QueryRequest,
+    QueryComparisonResults,
+    QueryModeResult,
     QuerySearchResult,
 )
 from learn2rag.ragdemo.service import (
@@ -36,6 +42,11 @@ DEMO_CONFIG = {
     "prompt": "Use only the following information:\n{context}",
 }
 KEYWORD_CONFIG = {**DEMO_CONFIG, "top_k": 5}
+AGGREGATE_CONFIG = {
+    **KEYWORD_CONFIG,
+    "search_mode": "dense_sparse",
+    "fusion_mode": "DBSF",
+}
 
 
 @pytest.fixture
@@ -70,17 +81,39 @@ def _client(*pages: tuple[list[SimpleNamespace], Any]) -> MagicMock:
     return client
 
 
+def _collection_schema(*, dense: bool = True, sparse: bool = False) -> SimpleNamespace:
+    return SimpleNamespace(
+        config=SimpleNamespace(
+            params=SimpleNamespace(
+                vectors={"dense": object()} if dense else {},
+                sparse_vectors={"sparse": object()} if sparse else {},
+            )
+        )
+    )
+
+
 class FakeSearchOperator:
     def __init__(self, documents: Any = None, error: Exception | None = None) -> None:
         self.documents = documents
         self.error = error
         self.calls: list[dict[str, Any]] = []
+        self.config_calls: list[tuple[dict[str, Any], dict[str, Any]]] = []
 
     async def __call__(self, inputs: dict[str, Any], prov: Any = None) -> dict[str, Any]:
         self.calls.append(inputs)
         if self.error is not None:
             raise self.error
         return {"documents": self.documents}
+
+    async def run_with_config(
+        self,
+        inputs: dict[str, Any],
+        *,
+        user_config: dict[str, Any],
+        opt_config: dict[str, Any],
+    ) -> dict[str, Any]:
+        self.config_calls.append((user_config, opt_config))
+        return await self(inputs)
 
 
 class CapturingModel:
@@ -129,6 +162,287 @@ def test_query_request_defaults_to_semantic_and_rejects_unknown_modes() -> None:
             {"question": "What is RAG?", "retrieval_mode": "sparse"}
         )
 
+    assert QueryRequest(
+        question="What is RAG?", retrieval_mode="hybrid"
+    ).retrieval_mode == "hybrid"
+
+
+def test_aggregate_query_request_accepts_only_one_trimmed_question() -> None:
+    request = AggregateQueryRequest(question="  What is RAG?  ")
+
+    assert request.model_dump() == {"question": "What is RAG?"}
+    with pytest.raises(ValidationError):
+        AggregateQueryRequest.model_validate(
+            {"question": "What is RAG?", "search_mode": "dense_sparse"}
+        )
+
+
+@pytest.mark.anyio
+async def test_aggregate_query_endpoint_accepts_only_the_question(monkeypatch: Any) -> None:
+    captured: dict[str, Any] = {}
+
+    async def execute(*args: Any, **kwargs: Any) -> AggregateQueryResponse:
+        captured["question"] = args[1]
+        captured["runtime_config"] = args[2]
+        captured["kwargs"] = kwargs
+        return AggregateQueryResponse(
+            question=args[1],
+            results=QueryComparisonResults(
+                semantic=QueryModeResult(status="unavailable", message="Unavailable."),
+                keyword=QueryModeResult(status="unavailable", message="Unavailable."),
+                hybrid=QueryModeResult(status="unavailable", message="Unavailable."),
+                generative=DirectModeResult(status="unavailable", message="Unavailable."),
+            ),
+        )
+
+    monkeypatch.setattr(routes, "execute_all_queries", execute)
+    async with AsyncClient(
+        transport=ASGITransport(app=_app()), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/ragdemo/api/query/all",
+            json={"question": "What is RAG?"},
+        )
+        rejected = await client.post(
+            "/ragdemo/api/query/all",
+            json={"question": "What is RAG?", "top_k": 99},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["question"] == "What is RAG?"
+    assert rejected.status_code == 422
+    assert captured["question"] == "What is RAG?"
+    assert captured["runtime_config"] is routes.opt_config
+    assert captured["kwargs"]["collection_name"] == routes.user_config.get("collection_name")
+
+
+@pytest.mark.anyio
+async def test_aggregate_query_prepares_four_isolated_modes(monkeypatch: Any) -> None:
+    semantic_point = _point(
+        "semantic-private-id",
+        source="/private/semantic.pdf",
+        content="Semantic Berlin evidence",
+    )
+    semantic_point.score = 0.91
+    hybrid_point = _point(
+        "hybrid-private-id",
+        source="/private/hybrid.pdf",
+        content="Hybrid Berlin evidence",
+    )
+    hybrid_point.score = 0.73
+    keyword_record = _point(
+        "keyword-private-id",
+        source="/private/keyword.pdf",
+        content="Berlin keyword evidence",
+    )
+
+    class ModeSearchOperator(FakeSearchOperator):
+        async def run_with_config(
+            self,
+            inputs: dict[str, Any],
+            *,
+            user_config: dict[str, Any],
+            opt_config: dict[str, Any],
+        ) -> dict[str, Any]:
+            self.calls.append(inputs)
+            self.config_calls.append((user_config, opt_config))
+            documents = (
+                [semantic_point]
+                if opt_config["search_mode"] == "dense"
+                else [hybrid_point]
+            )
+            return {"documents": documents}
+
+    search_operator = ModeSearchOperator()
+    model = CapturingModel(answer="Prepared answer")
+    client = _client(([keyword_record], None))
+    client.get_collection.return_value = _collection_schema(sparse=True)
+    monkeypatch.setattr(pipeline_generate, "llm", model)
+    monkeypatch.setattr(
+        service,
+        "filter_authorized",
+        lambda user, response: _run_inline(lambda: list(response.points)),
+    )
+    monkeypatch.setattr(
+        service,
+        "_safe_query_visualization",
+        lambda *args, **kwargs: service._visualization_status(
+            "unavailable", "The embedding map is temporarily unavailable."
+        ),
+    )
+
+    response = await service.execute_all_queries(
+        search_operator,
+        "What happened in Berlin?",
+        AGGREGATE_CONFIG,
+        qdrant_reader=client,
+        collection_name="configured-demo",
+        runtime_user_config={"collection_name": "configured-demo"},
+    )
+
+    assert response.question == "What happened in Berlin?"
+    assert response.results.semantic.status == "ready"
+    assert response.results.keyword.status == "ready"
+    assert response.results.hybrid.status == "ready"
+    assert response.results.generative.status == "ready"
+    assert [config["search_mode"] for _, config in search_operator.config_calls] == [
+        "dense",
+        "dense_sparse",
+    ]
+    assert AGGREGATE_CONFIG["search_mode"] == "dense_sparse"
+    assert len(model.calls) == 4
+
+    semantic = response.results.semantic.result
+    keyword = response.results.keyword.result
+    hybrid = response.results.hybrid.result
+    direct = response.results.generative.result
+    assert semantic is not None and keyword is not None and hybrid is not None
+    assert direct is not None
+    assert semantic.search.mode == "semantic"
+    assert keyword.search.mode == "keyword"
+    assert hybrid.search.mode == "hybrid"
+    assert semantic.search.results[0].content == "Semantic Berlin evidence"
+    assert keyword.search.results[0].content == "Berlin keyword evidence"
+    assert hybrid.search.results[0].content == "Hybrid Berlin evidence"
+    assert "Semantic Berlin evidence" in semantic.prompt.messages[0].content
+    assert "Berlin keyword evidence" in keyword.prompt.messages[0].content
+    assert "Hybrid Berlin evidence" in hybrid.prompt.messages[0].content
+    assert direct.retrieval_used is False
+    assert direct.indexed_documents_used is False
+    assert not hasattr(direct, "search")
+    assert not hasattr(direct, "visualization")
+    assert direct.prompt.messages[0].content == service.DIRECT_GENERATION_SYSTEM_PROMPT
+    assert direct.prompt.messages[1].content == "What happened in Berlin?"
+    assert "evidence" not in direct.prompt.messages[0].content.casefold()
+
+
+@pytest.mark.anyio
+async def test_aggregate_failure_is_mode_local_and_safe(monkeypatch: Any) -> None:
+    point = _point("private-id", source="/private/source.pdf", content="Berlin evidence")
+    point.score = 0.8
+
+    class HybridFailingOperator(FakeSearchOperator):
+        async def run_with_config(
+            self,
+            inputs: dict[str, Any],
+            *,
+            user_config: dict[str, Any],
+            opt_config: dict[str, Any],
+        ) -> dict[str, Any]:
+            self.config_calls.append((user_config, opt_config))
+            if opt_config["search_mode"] == "dense_sparse":
+                raise RuntimeError("secret hybrid backend failure")
+            return {"documents": [point]}
+
+    client = _client(([point], None))
+    client.get_collection.return_value = _collection_schema(sparse=True)
+    model = CapturingModel(answer="Available answer")
+    monkeypatch.setattr(pipeline_generate, "llm", model)
+    monkeypatch.setattr(
+        service,
+        "filter_authorized",
+        lambda user, response: _run_inline(lambda: list(response.points)),
+    )
+    monkeypatch.setattr(
+        service,
+        "_safe_query_visualization",
+        lambda *args, **kwargs: service._visualization_status(
+            "unavailable", "The embedding map is temporarily unavailable."
+        ),
+    )
+
+    response = await service.execute_all_queries(
+        HybridFailingOperator(),
+        "Berlin?",
+        AGGREGATE_CONFIG,
+        qdrant_reader=client,
+        collection_name="configured-demo",
+    )
+
+    assert response.results.semantic.status == "ready"
+    assert response.results.keyword.status == "ready"
+    assert response.results.hybrid.status == "unavailable"
+    assert response.results.generative.status == "ready"
+    assert response.results.hybrid.message == "The Hybrid result is temporarily unavailable."
+    assert "secret" not in response.model_dump_json()
+    assert len(model.calls) == 3
+
+
+def test_direct_query_invokes_model_without_any_retrieval_context(monkeypatch: Any) -> None:
+    model = CapturingModel(answer="Direct answer")
+    monkeypatch.setattr(pipeline_generate, "llm", model)
+
+    result = service.execute_direct_query("What is the Berlin Process?")
+
+    assert result.answer == "Direct answer"
+    assert len(model.calls) == 1
+    assert [message.content for message in model.calls[0]] == [
+        service.DIRECT_GENERATION_SYSTEM_PROMPT,
+        "What is the Berlin Process?",
+    ]
+    assert "Information:" not in result.prompt.messages[0].content
+    assert result.retrieval_used is False
+
+
+def test_capability_uses_persisted_dense_and_sparse_schema() -> None:
+    dense_client = MagicMock()
+    dense_client.collection_exists.return_value = True
+    dense_client.get_collection.return_value = _collection_schema(sparse=False)
+    hybrid_client = MagicMock()
+    hybrid_client.collection_exists.return_value = True
+    hybrid_client.get_collection.return_value = _collection_schema(sparse=True)
+
+    assert service.retrieval_capabilities(
+        dense_client, "configured-demo"
+    ).retrieval_modes == ["semantic", "keyword"]
+    assert service.retrieval_capabilities(
+        hybrid_client, "configured-demo"
+    ).retrieval_modes == ["semantic", "keyword", "hybrid"]
+
+
+def test_capability_missing_or_failed_collection_is_safely_dense_only() -> None:
+    missing = MagicMock()
+    missing.collection_exists.return_value = False
+    failed = MagicMock()
+    failed.collection_exists.side_effect = RuntimeError(
+        "secret host /private/path collection=private"
+    )
+
+    assert service.retrieval_capabilities(
+        missing, "configured-demo"
+    ).retrieval_modes == ["semantic", "keyword"]
+    assert service.retrieval_capabilities(
+        failed, "configured-demo"
+    ).retrieval_modes == ["semantic", "keyword"]
+    missing.get_collection.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_capability_api_uses_server_collection_and_hides_failures(
+    monkeypatch: Any,
+) -> None:
+    reader = MagicMock()
+    reader.collection_exists.return_value = True
+    reader.get_collection.return_value = _collection_schema(sparse=True)
+    monkeypatch.setattr(routes, "demo_qdrant_reader", reader)
+    monkeypatch.setattr(routes, "user_config", {"collection_name": "configured-demo"})
+    monkeypatch.setattr(routes, "run_in_threadpool", _run_inline)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=_app()),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get(
+            "/ragdemo/api/capabilities?collection_name=private"
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "retrieval_modes": ["semantic", "keyword", "hybrid"]
+    }
+    reader.get_collection.assert_called_once_with("configured-demo")
+    assert "configured-demo" not in response.text
+
 
 @pytest.mark.anyio
 async def test_existing_test_route_still_works() -> None:
@@ -157,9 +471,58 @@ async def test_index_page_returns_html() -> None:
     assert "./assets/bootstrap.css" in response.text
     assert "./assets/configurator.css" in response.text
     assert "./assets/learn2rag-logo.png" in response.text
-    assert "./assets/bmwi.svg" in response.text
+    assert "./assets/BMFTR.png" in response.text
+    assert "https://www.bmftr.bund.de/" in response.text
+    assert "BMFTR funding logo" in response.text
+    assert "bmwi.svg" not in response.text.lower()
+    assert "BMWK funding logo" not in response.text
     assert "cdnjs.cloudflare.com" not in response.text
     assert 'href="/models"' not in response.text
+
+
+@pytest.mark.anyio
+async def test_bmftr_asset_is_served_only_by_the_explicit_demo_route() -> None:
+    response = await routes.bmftr_logo()
+    asset_path = Path(response.path)
+    route_paths = {getattr(route, "path", "") for route in router.routes}
+
+    assert response.status_code == 200
+    assert response.media_type == "image/png"
+    assert asset_path == Path(routes.__file__).resolve().parent / "static/images/BMFTR.png"
+    assert asset_path.read_bytes().startswith(b"\xff\xd8\xff")
+    assert "/assets/BMFTR.png" in route_paths
+    assert "/assets/bmwi.svg" not in route_paths
+    assert not any("{path" in path for path in route_paths)
+
+
+def test_phase12_readme_documents_the_supported_demo_workflow() -> None:
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "uv sync --no-install-project" in readme
+    assert "./start" in readme
+    assert "http://localhost:9000" in readme
+    assert "http://localhost:<pipeline-port>/ragdemo/" in readme
+    assert "not necessarily `9003`" in readme
+    assert "demo_questions.json" in readme
+    assert "One question prepares Semantic, Keyword, Hybrid, and Generative AI" in readme
+    assert "does not rerun retrieval or generation" in readme
+    assert "uses no retrieved documents" in readme
+    assert "PCA, t-SNE, and UMAP" in readme
+    assert "visualization-only" in readme
+    assert "`dense_sparse` is the intended default" in readme
+    assert "existing dense-only collections" in readme
+    assert "reindexed" in readme
+    assert "opt_config.json" not in readme
+    assert "EN / DE" in readme
+    assert "Indexed source documents are never modified" in readme
+    assert "changes static interface text only" in readme
+    assert "Retrieved chunks, example questions, user questions, prompts" in readme
+    assert "multilingual embedding" not in readme
+    assert "mixed or indeterminate corpus" not in readme
+    assert "restart the pipeline" in readme.lower()
+    assert "Ctrl + F5" in readme
 
 
 @pytest.mark.anyio
@@ -172,16 +535,17 @@ async def test_ask_rag_page_contains_query_and_result_containers() -> None:
 
     assert response.status_code == 200
     assert 'id="question-input"' in response.text
-    assert 'name="retrieval_mode" value="semantic" checked' in response.text
-    assert 'name="retrieval_mode" value="keyword"' in response.text
-    assert "Semantic vectors" in response.text
-    assert "Search by meaning, not only exact words." in response.text
-    assert "Keyword search" in response.text
-    assert "Match the words you typed." in response.text
+    assert 'name="retrieval_mode"' not in response.text
+    assert "One question prepares Semantic, Keyword, Hybrid and Generative AI results." in response.text
     assert 'id="ask-button"' in response.text
-    assert 'id="retrieval-change-note"' in response.text
+    assert 'id="retrieval-change-note"' not in response.text
     assert 'id="comparison-actions"' in response.text
-    assert 'id="compare-retrieval"' in response.text
+    assert 'id="comparison-buttons"' in response.text
+    assert 'class="comparison-card-grid"' in response.text
+    assert "Compare results" in response.text
+    assert 'id="generative-result"' in response.text
+    assert 'id="direct-answer-content"' in response.text
+    assert 'id="rag-stages"' in response.text
     assert 'id="answer-container"' in response.text
     assert 'id="search-results"' in response.text
     assert 'id="visualization-canvas"' in response.text
@@ -192,14 +556,18 @@ async def test_ask_rag_page_contains_query_and_result_containers() -> None:
     assert 'id="visualization-reset"' in response.text
     assert "Explore the embedding space" in response.text
     assert "3D PCA projection of dense embeddings" in response.text
+    assert 'id="projection-selector"' in response.text
+    assert 'data-projection="pca"' in response.text
+    assert 'data-projection="tsne"' in response.text
+    assert 'data-projection="umap"' in response.text
     assert 'id="prompt-messages"' in response.text
     assert "Prompt sent to the model" in response.text
     assert "Application-level chat messages" in response.text
     assert "<details" in response.text
-    assert "1</span><span>Embed question" in response.text
-    assert "2</span><span>Retrieve top-ranked chunks" in response.text
-    assert "3</span><span>Add chunks to prompt" in response.text
-    assert "4</span><span>Generate answer" in response.text
+    assert 'data-i18n="embed_question">Embed question' in response.text
+    assert 'data-i18n="retrieve_chunks">Retrieve top-ranked chunks' in response.text
+    assert 'data-i18n="add_chunks_prompt">Add chunks to prompt' in response.text
+    assert 'data-i18n="generate_answer">Generate answer' in response.text
     assert '<details id="answer-stage" class="rag-stage" open>' in response.text
     assert response.text.index('id="embed-stage"') < response.text.index('id="retrieve-stage"')
     assert response.text.index('id="retrieve-stage"') < response.text.index('id="prompt-stage"')
@@ -220,38 +588,373 @@ def test_prompt_frontend_uses_safe_text_insertion() -> None:
     ).read_text(encoding="utf-8")
 
     assert "messageContent.textContent = message.content;" in javascript
-    assert "promptNote.textContent = prompt.note;" in javascript
+    assert "setTranslatedText(promptNote, prompt.note);" in javascript
     assert "innerHTML" not in javascript
 
 
-def test_retrieval_change_hides_stale_results_and_comparison_submits_once() -> None:
+def test_localization_contract_covers_static_ui_and_preserves_data_content() -> None:
+    ragdemo_dir = Path(__file__).resolve().parents[1]
+    template = (ragdemo_dir / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    javascript = (ragdemo_dir / "static" / "ragdemo.js").read_text(
+        encoding="utf-8"
+    )
+    language_switch = javascript[
+        javascript.index("function setLanguage"):
+        javascript.index('  const tabs = document.querySelectorAll')
+    ]
+
+    assert '<html lang="en">' in template
+    assert 'data-language="en"' in template
+    assert 'data-language="de"' in template
+    assert 'data-i18n="ask_rag"' in template
+    assert 'data-i18n="question_prepares_all"' in template
+    assert 'data-i18n="compare_loaded_results"' in template
+    assert 'data-i18n-aria-label="language_selector"' in template
+    assert 'data-i18n-aria-label="close_chunk_details"' in template
+    assert 'data-i18n-title="zoom_out"' in template
+    assert 'data-i18n-alt="bmftr_logo_alt"' in template
+    assert 'const languageStorageKey = "learn2rag-ragdemo-language";' in javascript
+    assert "en: Object.freeze" in javascript
+    assert "de: Object.freeze" in javascript
+    assert 'stored === "de" || stored === "en" ? stored : "en"' in javascript
+    assert 'document.documentElement.lang = currentLanguage;' in language_switch
+    assert 'localStorage.setItem(languageStorageKey, currentLanguage);' in language_switch
+    assert "fetch(" not in language_switch
+    assert "requestSubmit" not in language_switch
+    assert "renderVisualization" not in language_switch
+    assert "renderViewerScene" not in language_switch
+    assert "questionInput.value" not in language_switch
+    assert "retrievalModeInputs" not in language_switch
+    assert "innerHTML" not in javascript
+    assert "messageContent.textContent = message.content;" in javascript
+    assert "answerText.textContent = data.answer;" in javascript
+    assert "chunk.textContent = result.content;" in javascript
+    assert "button.textContent = question;" in javascript
+    assert "questionInput.value = question;" in javascript
+    assert "text.textContent = chunk.content;" in javascript
+    assert "messageContent.textContent = message.content;" in javascript
+    assert "source.textContent = result.source;" in javascript
+    assert "details.content" in javascript
+    assert './api/translate' not in javascript
+    assert "registerTranslation" not in javascript
+    assert "translation_unavailable" not in javascript
+    assert "prompt-translated-view" not in template
+    assert 'setLocalizedText(visualizationInspectorTitle, "chunk_details")' in javascript
+    assert re.search(r"setLocalizedText\(\s*retrievalStatus,", javascript)
+    assert 'point.retrieved ? "retrieved_rank" : "not_retrieved"' in javascript
+    assert '"semantic_similarity"' in javascript
+    assert '"fusion_score"' in javascript
+    assert '"bm25_score"' in javascript
+
+
+def test_runtime_translation_and_retrieval_bridge_are_absent() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "ragdemo.js"
+    ).read_text(encoding="utf-8")
+    service_source = (
+        Path(__file__).resolve().parents[1] / "service.py"
+    ).read_text(encoding="utf-8")
+    routes_source = (
+        Path(__file__).resolve().parents[1] / "routes.py"
+    ).read_text(encoding="utf-8")
+
+    assert "translationCache" not in javascript
+    assert "requestDisplayTranslations" not in javascript
+    assert 'fetch("./api/translate"' not in javascript
+    assert 'fetch("./api/query/all"' in javascript
+    assert "translate_texts" not in service_source
+    assert "question_for_retrieval" not in service_source
+    assert "detect_corpus_language" not in service_source
+    assert '"/api/translate"' not in routes_source
+    assert "innerHTML" not in javascript
+
+
+def test_language_switch_executes_without_changing_demo_state() -> None:
+    """Exercise initialization, persistence, and switching in the actual script."""
+    import subprocess
+
+    javascript_path = Path(__file__).resolve().parents[1] / "static/ragdemo.js"
+    harness = r'''
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+class ClassList {
+  constructor(owner) { this.owner = owner; }
+  values() { return new Set(this.owner.className.split(/\s+/).filter(Boolean)); }
+  toggle(name, force) {
+    const values = this.values();
+    const enabled = force === undefined ? !values.has(name) : Boolean(force);
+    if (enabled) values.add(name); else values.delete(name);
+    this.owner.className = [...values].join(" ");
+    return enabled;
+  }
+}
+
+class Element {
+  constructor(tag = "div") {
+    this.tag = tag; this.children = []; this.events = {}; this.attrs = {};
+    this.dataset = {}; this.hidden = false; this.disabled = false; this.value = "";
+    this.checked = false; this.className = ""; this._text = "";
+    this.classList = new ClassList(this);
+  }
+  set textContent(value) { this._text = String(value); this.children = []; }
+  get textContent() { return this._text + this.children.map(child => child.textContent).join(""); }
+  appendChild(child) { this.children.push(child); child.parent = this; return child; }
+  append(...children) { children.forEach(child => this.appendChild(child)); }
+  replaceChildren(...children) { this.children = []; this._text = ""; this.append(...children); }
+  setAttribute(key, value) { this.attrs[key] = String(value); }
+  addEventListener(name, handler) { (this.events[name] ||= []).push(handler); }
+  async click() { if (!this.disabled) for (const handler of this.events.click || []) await handler({target: this}); }
+  querySelectorAll(selector) {
+    return this.children.filter(child => selector === ".example-question"
+      && child.className.includes("example-question"));
+  }
+  focus() { this.focused = true; }
+  requestSubmit() { throw new Error("Language switching must not submit a RAG query"); }
+}
+
+async function run(initialLanguage) {
+  const elements = new Map();
+  const get = selector => {
+    if (!elements.has(selector)) elements.set(selector, new Element());
+    return elements.get(selector);
+  };
+  const semantic = new Element("input"); semantic.value = "semantic";
+  const keyword = new Element("input"); keyword.value = "keyword"; keyword.checked = true;
+  const hybrid = new Element("input"); hybrid.value = "hybrid";
+  const retrievalInputs = [semantic, keyword, hybrid];
+  const english = new Element("button"); english.dataset.language = "en";
+  const german = new Element("button"); german.dataset.language = "de";
+  const languageButtons = [english, german];
+  const majorLabel = new Element("h1"); majorLabel.dataset.i18n = "ask_rag";
+  const storage = new Map();
+  if (initialLanguage !== null) storage.set("learn2rag-ragdemo-language", initialLanguage);
+  const calls = [];
+  const document = {
+    documentElement: {lang: "en"},
+    querySelector: get,
+    querySelectorAll(selector) {
+      if (selector === "input[name='retrieval_mode']") return retrievalInputs;
+      if (selector === "[data-language]") return languageButtons;
+      if (selector === "[data-i18n]") return [majorLabel];
+      return [];
+    },
+    createElement: tag => new Element(tag),
+    createTextNode(text) { const node = new Element("#text"); node.textContent = text; return node; },
+    addEventListener() {},
+  };
+  const localStorage = {
+    getItem: key => storage.has(key) ? storage.get(key) : null,
+    setItem: (key, value) => storage.set(key, value),
+  };
+  const context = {
+    document,
+    localStorage,
+      fetch: async (url, options = {}) => {
+        calls.push(url);
+      if (url === "./api/capabilities") return {ok: true, json: async () => ({retrieval_modes: ["semantic", "keyword"]})};
+      if (url === "./api/examples") return {ok: true, json: async () => ({display_count: 1, question_sets: [{questions: ["English dataset question?"]}]})};
+          if (url === "./api/index") return {ok: true, json: async () => ({document_count: 0, chunk_count: 0, truncated: false, documents: []})};
+          throw new Error(`Unexpected request ${url}`);
+    },
+  };
+  const question = get("#question-input");
+  question.value = "Was ist der Berlin-Prozess?";
+  get("#query-results").hidden = false;
+  get("#answer-content").textContent = "Existing generated answer";
+  get("#search-results").textContent = "Rank 1 · 0.875 · Evidence text";
+  get("#visualization-canvas").textContent = "Stable geometry";
+  vm.runInNewContext(fs.readFileSync(process.argv[1], "utf8"), context);
+  await new Promise(resolve => setImmediate(resolve));
+  return {document, get, semantic, keyword, english, german, majorLabel, storage, calls};
+}
+
+(async () => {
+  const fresh = await run(null);
+  assert.equal(fresh.document.documentElement.lang, "en");
+  assert.equal(fresh.majorLabel.textContent, "Ask RAG");
+  assert.equal(fresh.calls.filter(url => url === "./api/query/all").length, 0);
+
+  const demo = await run("invalid");
+  assert.equal(demo.document.documentElement.lang, "en");
+  assert.equal(demo.majorLabel.textContent, "Ask RAG");
+  assert.equal(demo.english.attrs["aria-pressed"], "true");
+  assert.equal(demo.calls.filter(url => url === "./api/query/all").length, 0);
+  const callsBeforeSwitch = demo.calls.length;
+  const questionBefore = demo.get("#question-input").value;
+  const answerBefore = demo.get("#answer-content").textContent;
+  const resultsBefore = demo.get("#search-results").textContent;
+  const geometryBefore = demo.get("#visualization-canvas").textContent;
+  await demo.german.click();
+  assert.equal(demo.document.documentElement.lang, "de");
+  assert.equal(demo.majorLabel.textContent, "RAG fragen");
+  assert.equal(demo.storage.get("learn2rag-ragdemo-language"), "de");
+  assert.equal(demo.get("#question-input").value, questionBefore);
+  assert.equal(demo.get("#answer-content").textContent, answerBefore);
+  assert.equal(demo.get("#search-results").textContent, resultsBefore);
+  assert.equal(demo.get("#visualization-canvas").textContent, geometryBefore);
+  assert.equal(demo.keyword.checked, true);
+  assert.equal(demo.semantic.checked, false);
+  assert.equal(demo.calls.filter(url => url === "./api/query/all").length, 0);
+  await demo.english.click();
+  assert.equal(demo.document.documentElement.lang, "en");
+  assert.equal(demo.majorLabel.textContent, "Ask RAG");
+  assert.equal(demo.calls.filter(url => url === "./api/query/all").length, 0);
+
+  const persisted = await run("de");
+  assert.equal(persisted.document.documentElement.lang, "de");
+  assert.equal(persisted.majorLabel.textContent, "RAG fragen");
+  assert.equal(persisted.german.attrs["aria-pressed"], "true");
+  assert.equal(persisted.calls.filter(url => url === "./api/query/all").length, 0);
+
+  assert.equal(demo.get("#example-questions").children[0].textContent, "English dataset question?");
+})().catch(error => { console.error(error); process.exitCode = 1; });
+'''
+    result = subprocess.run(
+        ["node", "-e", harness, str(javascript_path)],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_loaded_comparison_toggle_never_submits_or_fetches_again() -> None:
     javascript = (
         Path(__file__).resolve().parents[1] / "static" / "ragdemo.js"
     ).read_text(encoding="utf-8")
     stale_clear = javascript[
-        javascript.index("function clearStaleQueryResults"):
-        javascript.index("function configureComparisonShortcut")
+        javascript.index("function clearComparisonState"):
+        javascript.index("function deepFreeze")
     ]
     comparison_handler = javascript[
-        javascript.index('compareRetrievalButton.addEventListener("click"'):
+        javascript.index('comparisonButtons.addEventListener("click"'):
         javascript.index('zoomOutButton.addEventListener("click"')
     ]
 
     assert "queryResults.hidden = true;" in stale_clear
     assert "comparisonActions.hidden = true;" in stale_clear
-    assert "Retrieval method changed. Ask again to compare the same question." in stale_clear
-    assert "questionInput.value" not in stale_clear
-    assert (
-        'input.addEventListener("change", () => clearStaleQueryResults());'
-        in javascript
-    )
-    assert "targetMode = mode === \"semantic\" ? \"keyword\" : \"semantic\"" in javascript
-    assert "targetInput.checked = true;" in comparison_handler
-    assert "clearStaleQueryResults(false);" in comparison_handler
-    assert comparison_handler.count("queryForm.requestSubmit();") == 1
+    assert "comparisonResultSet = null;" in stale_clear
+    assert "retrieval_changed" not in javascript
+    assert '["generative", "semantic", "keyword", "hybrid"]' in javascript
+    assert "renderComparisonMode(button.dataset.comparisonMode);" in comparison_handler
+    assert "requestSubmit" not in comparison_handler
     assert "questionInput.value =" not in comparison_handler
     assert "fetch(" not in comparison_handler
+    assert 'fetch("./api/query/all"' in javascript
+    assert "const requestVersion = ++queryRequestVersion;" in javascript
+    assert "requestVersion !== queryRequestVersion" in javascript
+    assert "comparisonResultSet = deepFreeze(data);" in javascript
     assert "innerHTML" not in javascript
+
+
+def test_aggregate_browser_flow_is_preloaded_immutable_and_truthful() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "ragdemo.js"
+    ).read_text(encoding="utf-8")
+    template = (
+        Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    ).read_text(encoding="utf-8")
+    submit = javascript[
+        javascript.index("async function submitQuery"):
+        javascript.index('refreshButton.addEventListener("click"')
+    ]
+    direct = javascript[
+        javascript.index("function renderDirectQueryResponse"):
+        javascript.index("function renderComparisonMode")
+    ]
+    projection_handler = javascript[
+        javascript.index("[pcaProjectionButton, tsneProjectionButton, umapProjectionButton]"):
+        javascript.index('zoomOutButton.addEventListener("click"')
+    ]
+
+    assert submit.count('fetch("./api/query/all"') == 1
+    assert "body: JSON.stringify({question})" in submit
+    assert "retrieval_mode" not in submit
+    assert "clearComparisonState();" in submit
+    assert "const requestVersion = ++queryRequestVersion;" in submit
+    assert submit.count("requestVersion !== queryRequestVersion") == 2
+    assert "comparisonResultSet = deepFreeze(data);" in javascript
+    assert '["generative", "semantic", "keyword", "hybrid"]' in javascript
+    assert "fetch(" not in projection_handler
+    assert 'renderVisualization(null, "generative");' in direct
+    assert "ragStages.hidden = true;" in direct
+    assert "generativeResult.hidden = false;" in direct
+    assert "directAnswerContent.appendChild(answerText);" in direct
+    assert "searchContent.hidden = true;" in direct
+    assert "searchResults.replaceChildren();" in direct
+    assert "renderPrompt(" not in direct
+    assert "setStagePresentation(" not in direct
+    assert "answerContent" not in direct
+    assert "renderSearchResults" not in direct
+    assert 'id="generative-result"' in template
+    assert 'id="direct-answer-content"' in template
+    assert 'id="rag-stages"' in template
+    assert 'id="projection-umap"' in template
+    assert "Answer without retrieved documents." in javascript
+    assert "Antwort ohne abgerufene Dokumente." in javascript
+
+
+def test_comparison_selector_uses_accessible_responsive_result_cards() -> None:
+    ragdemo_dir = Path(__file__).resolve().parents[1]
+    javascript = (ragdemo_dir / "static" / "ragdemo.js").read_text(encoding="utf-8")
+    stylesheet = (ragdemo_dir / "static" / "ragdemo.css").read_text(encoding="utf-8")
+    selector = javascript[
+        javascript.index("function configureComparisonSelector"):
+        javascript.index("function setStagePresentation")
+    ]
+    initial_selection = javascript[
+        javascript.index("function storeAndRenderComparison"):
+        javascript.index("async function submitQuery")
+    ]
+
+    assert '["generative", "semantic", "keyword", "hybrid"].forEach' in selector
+    assert 'button.type = "button";' in selector
+    assert 'button.className = `comparison-card${active ? " is-selected" : ""}`;' in selector
+    assert 'button.setAttribute("aria-pressed", String(active));' in selector
+    assert 'title.className = "comparison-card-title";' in selector
+    assert 'description.className = "comparison-card-description";' in selector
+    assert '["generative", "semantic", "keyword", "hybrid"]' in initial_selection
+    for text in (
+        "Answer without retrieved documents.",
+        "Meaning-based dense retrieval.",
+        "Keyword-based BM25 retrieval.",
+        "Combines dense and sparse retrieval.",
+        "Antwort ohne abgerufene Dokumente.",
+        "Bedeutungsbasierter dichter Abruf.",
+        "Stichwortbasierter BM25-Abruf.",
+        "Kombiniert dichten und spärlichen Abruf.",
+    ):
+        assert text in javascript
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in stylesheet
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in stylesheet
+    assert ".comparison-card.is-selected" in stylesheet
+    assert ".comparison-card:focus-visible" in stylesheet
+
+
+def test_projection_selector_is_semantic_only_and_does_not_change_rag_data() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "ragdemo.js"
+    ).read_text(encoding="utf-8")
+    selector = javascript[
+        javascript.index("function selectVisualizationProjection"):
+        javascript.index("function setProjectionControls")
+    ]
+    renderer = javascript[
+        javascript.index("function renderVisualization"):
+        javascript.index("function renderPromptMessages")
+    ]
+
+    assert '["tsne", "umap"].includes(requestedMethod)' in selector
+    assert "points: mergeProjectionPoints(visualization.points, projection)" in selector
+    assert "...point, ...coordinatesById.get(point.id)" in selector
+    assert 'const isSemantic = searchMode === "semantic";' in renderer
+    assert "visualizationSection.hidden = !isSemantic;" in renderer
+    for forbidden in ("fetch(", "renderSearchResults", "renderPrompt", "answerContent"):
+        assert forbidden not in selector
 
 
 def test_public_demo_collection_scope_is_documented() -> None:
@@ -285,8 +988,9 @@ def test_visualization_frontend_has_one_coordinate_graph_stage() -> None:
     assert stage_rule.count("border:") == 1
     assert "width: calc(100% + 3rem);" in stage_rule
     assert ".embedding-map-background {\n  fill: transparent;\n}" in stylesheet
-    assert "3D proximity is approximate because PCA compresses the embedding space." in template
-    assert "Retrieval uses the original full-dimensional vectors." in template
+    assert "Spatial proximity is approximate because PCA compresses" in template
+    assert 'id="projection-explanation"' in template
+    assert "original full-dimensional vectors" in template
     assert "Query vector" in template
     assert "Retrieved chunks" in template
     assert "Other indexed chunks" in template
@@ -432,7 +1136,7 @@ def test_visualization_frontend_builds_axes_origin_query_vector_and_retrieval_li
     assert '["x", "y", "z"].forEach((dimension) =>' in javascript
     assert "embedding-axis-negative" in javascript
     assert "embedding-axis-positive" in javascript
-    assert 'label.textContent = dimension.toUpperCase();' in javascript
+    assert 'currentProjectionMethod === "umap" ? "UMAP" : "PCA"' in javascript
     assert 'originLabel.textContent = "O";' in javascript
     assert "embedding-grid-origin-line" in javascript
     assert "sceneGeometry.ticks.x.values.forEach" in javascript
@@ -446,6 +1150,10 @@ def test_visualization_frontend_builds_axes_origin_query_vector_and_retrieval_li
     assert "setProjectedLine(axis.visual.positiveLine, projectedOrigin" in scene_render
     assert 'svgElement("line", "query-vector")' in javascript
     assert 'queryVector.setAttribute("marker-end", "url(#query-vector-arrowhead)")' in javascript
+    assert 'const showsLinearOrigin = currentProjectionMethod === "pca";' in javascript
+    assert "if (showsLinearOrigin) originLayer.appendChild(originGroup);" in javascript
+    assert "if (showsLinearOrigin) queryVectorLayer.appendChild(queryVector);" in javascript
+    assert "if (state.showsLinearOrigin)" in scene_render
     assert "shortenProjectedLineEnd" in scene_render
     assert "setProjectedLine(state.query.visual.vector, projectedOrigin, projectedVectorEnd)" in scene_render
     assert "world: sceneGeometry.points[visualization.points.length]" in javascript
@@ -494,11 +1202,11 @@ def test_visualization_frontend_uses_safe_linked_coordinate_tooltips() -> None:
     assert "safePointPreview" not in hover_renderer
     assert "preview" not in hover_renderer
     assert "function renderPinnedInspector()" in javascript
-    assert "visualizationInspectorTitle.textContent = \"Query\";" in javascript
+    assert 'setLocalizedText(visualizationInspectorTitle, "query");' in javascript
     assert '"Loading chunk…"' in javascript
     assert '"This chunk could not be loaded."' in javascript
-    assert '"Not retrieved for this question"' in javascript
-    assert '`Retrieved · Rank #${point.rank}`' in javascript
+    assert 'point.retrieved ? "retrieved_rank" : "not_retrieved"' in javascript
+    assert 'retrieved_rank: "Retrieved · Rank #{rank}"' in javascript
     assert '"Chunk content"' in javascript
     assert "details.content" in javascript
     assert "appendCoordinateReadout(visualizationInspectorContent" in javascript
@@ -519,7 +1227,7 @@ def test_visualization_frontend_uses_safe_linked_coordinate_tooltips() -> None:
     assert "display: none;" in hidden_rule
     assert '["X", "Y", "Z"].forEach((label) =>' in javascript
     assert "heading.textContent = point.retrieved" in javascript
-    assert "nativeTooltip.textContent" in javascript
+    assert "setLocalizedText(\n        nativeTooltip," in javascript
     assert "point.vector" not in javascript
     assert "visualization.vector" not in javascript
     assert "innerHTML" not in javascript
@@ -725,7 +1433,7 @@ async def test_valid_query_returns_answer_and_same_retrieved_chunks(monkeypatch:
     assert body["search"]["mode"] == "semantic"
     assert body["search"]["label"] == "Semantic vector search"
     assert body["search"]["technical_label"] == "Dense / BGE-M3"
-    assert body["search"]["score_label"] == "Dense similarity"
+    assert body["search"]["score_label"] == "Semantic similarity"
     assert [result["content"] for result in body["search"]["results"]] == [
         document.payload["content"] for document in documents
     ]
@@ -781,6 +1489,238 @@ async def test_valid_query_returns_answer_and_same_retrieved_chunks(monkeypatch:
     assert "private-content-hash" not in serialized
     assert "private-chunk-hash" not in serialized
     assert "qdrant-uuid-1" not in serialized
+
+
+@pytest.mark.anyio
+async def test_semantic_and_hybrid_use_isolated_native_configs_and_same_points(
+    monkeypatch: Any,
+) -> None:
+    point = _point(
+        "native-point",
+        content="Berlin evidence",
+        source="/private/berlin.pdf",
+    )
+    point.score = 0.73
+    operator = FakeSearchOperator(documents=[point])
+    reader = _client(([], None))
+    reader.get_collection.return_value = _collection_schema(sparse=True)
+    model = CapturingModel(answer="Berlin answer")
+    monkeypatch.setattr(pipeline_generate, "llm", model)
+    shared_config = {
+        **KEYWORD_CONFIG,
+        "search_mode": "dense_sparse",
+        "fusion_mode": "DBSF",
+        "prefetch_limit_dense": 25,
+        "prefetch_limit_sparse": 17,
+    }
+    original_config = dict(shared_config)
+    shared_user_config = {"collection_name": "hybrid-demo", "llm": "demo"}
+
+    semantic = await service.execute_query(
+        operator,
+        "Question",
+        shared_config,
+        retrieval_mode="semantic",
+        qdrant_reader=reader,
+        collection_name="hybrid-demo",
+        runtime_user_config=shared_user_config,
+    )
+    hybrid = await service.execute_query(
+        operator,
+        "Question",
+        shared_config,
+        retrieval_mode="hybrid",
+        qdrant_reader=reader,
+        collection_name="hybrid-demo",
+        runtime_user_config=shared_user_config,
+    )
+    semantic_after_hybrid = await service.execute_query(
+        operator,
+        "Question",
+        shared_config,
+        retrieval_mode="semantic",
+        qdrant_reader=reader,
+        collection_name="hybrid-demo",
+        runtime_user_config=shared_user_config,
+    )
+
+    assert shared_config == original_config
+    assert shared_user_config == {"collection_name": "hybrid-demo", "llm": "demo"}
+    assert [config[1]["search_mode"] for config in operator.config_calls] == [
+        "dense",
+        "dense_sparse",
+        "dense",
+    ]
+    assert operator.config_calls[0][1] is not operator.config_calls[1][1]
+    assert operator.config_calls[1][1] is not operator.config_calls[2][1]
+    assert operator.config_calls[1][1]["fusion_mode"] == "DBSF"
+    assert operator.config_calls[1][1]["prefetch_limit_dense"] == 25
+    assert operator.config_calls[1][1]["prefetch_limit_sparse"] == 17
+    assert operator.config_calls[1][1]["top_k"] == 5
+    assert operator.config_calls[0][0]["collection_name"] == "hybrid-demo"
+    assert operator.config_calls[1][0]["collection_name"] == "hybrid-demo"
+    assert semantic.search.mode == "semantic"
+    assert semantic.search.score_label == "Semantic similarity"
+    assert semantic.visualization.status == "unavailable"
+    assert hybrid.search.mode == "hybrid"
+    assert hybrid.search.technical_label == "BGE-M3 dense + sparse · DBSF"
+    assert hybrid.search.score_label == "Fusion score"
+    assert hybrid.visualization.status == "unsupported"
+    assert "shown only for Semantic vectors" in hybrid.visualization.note
+    assert [result.id for result in semantic.search.results] == [
+        result.id for result in hybrid.search.results
+    ]
+    assert semantic_after_hybrid.search.mode == "semantic"
+    assert operator.config_calls[2][1]["search_mode"] == "dense"
+    for response in (semantic, hybrid, semantic_after_hybrid):
+        assert response.search.results[0].content == "Berlin evidence"
+        assert "Berlin evidence" in response.prompt.messages[0].content
+    assert len(operator.calls) == 3
+    assert len(model.calls) == 3
+
+
+@pytest.mark.anyio
+async def test_semantic_uses_original_question_for_search_and_prompt(
+    monkeypatch: Any,
+) -> None:
+    question = "Was sind die vier Ziele des Berliner Prozesses?"
+    point = _point(
+        "semantic",
+        content="The Berlin Process has four declared objectives.",
+        source="berlin.pdf",
+    )
+    point.score = 0.91
+    operator = FakeSearchOperator(documents=[point])
+    model = CapturingModel(answer="Der Berliner Prozess hat vier Ziele.")
+    monkeypatch.setattr(pipeline_generate, "llm", model)
+    response = await service.execute_query(
+        operator,
+        question,
+        KEYWORD_CONFIG,
+        retrieval_mode="semantic",
+        qdrant_reader=_client(([], None)),
+        collection_name="demo",
+    )
+
+    assert operator.calls[0]["question"] == question
+    assert model.calls[0][1].content == question
+    assert response.question == question
+    assert response.search.results[0].rank == 1
+    assert response.search.results[0].score == 0.91
+
+
+@pytest.mark.anyio
+async def test_keyword_uses_original_question_for_bm25_and_prompt(
+    monkeypatch: Any,
+) -> None:
+    question = "What are the four objectives of the Berlin Process?"
+    record = _point(
+        "keyword",
+        content=(
+            "The Berlin Process has four objectives and this English source "
+            "describes those objectives in detail."
+        ),
+        source="berlin.pdf",
+        loader_id="local",
+        document_id="berlin",
+    )
+
+    async def authorize(user: str, response: Any) -> list[Any]:
+        assert user == DEMO_USER
+        return list(response.points)
+
+    monkeypatch.setattr(service, "filter_authorized", authorize)
+    model = CapturingModel(answer="Vier Ziele werden beschrieben.")
+    monkeypatch.setattr(pipeline_generate, "llm", model)
+
+    response = await service.execute_query(
+        FakeSearchOperator(),
+        question,
+        KEYWORD_CONFIG,
+        retrieval_mode="keyword",
+        qdrant_reader=_client(([record], None)),
+        collection_name="demo",
+    )
+
+    assert response.search.results[0].content == record.payload["content"]
+    assert response.search.results[0].rank == 1
+    assert response.search.results[0].score > 0
+    assert model.calls[0][1].content == question
+
+
+@pytest.mark.anyio
+async def test_hybrid_uses_original_question_in_native_path_and_generation(
+    monkeypatch: Any,
+) -> None:
+    question = "Was sind die vier Ziele des Berliner Prozesses?"
+    sample = _point(
+        "sample",
+        content="This English corpus explains the four objectives of the Berlin Process.",
+        source="berlin.pdf",
+    )
+    result_point = _point(
+        "hybrid-result",
+        content="The Berlin Process has four declared objectives.",
+        source="berlin.pdf",
+    )
+    result_point.score = 0.73
+    reader = _client(([sample], None))
+    reader.get_collection.return_value = _collection_schema(sparse=True)
+    operator = FakeSearchOperator(documents=[result_point])
+
+    model = CapturingModel(answer="Vier Ziele werden beschrieben.")
+    monkeypatch.setattr(pipeline_generate, "llm", model)
+    config = {**KEYWORD_CONFIG, "fusion_mode": "DBSF"}
+
+    response = await service.execute_query(
+        operator,
+        question,
+        config,
+        retrieval_mode="hybrid",
+        qdrant_reader=reader,
+        collection_name="demo",
+        runtime_user_config={"collection_name": "demo"},
+    )
+
+    assert operator.calls == [{"question": question, "user": DEMO_USER}]
+    assert operator.config_calls[0][1]["search_mode"] == "dense_sparse"
+    assert operator.config_calls[0][1]["top_k"] == KEYWORD_CONFIG["top_k"]
+    assert response.search.score_label == "Fusion score"
+    assert response.search.results[0].score == 0.73
+    assert model.calls[0][1].content == question
+
+
+@pytest.mark.anyio
+async def test_hybrid_is_rejected_before_retrieval_for_dense_only_collection(
+    monkeypatch: Any,
+) -> None:
+    operator = FakeSearchOperator(documents=[])
+    reader = MagicMock()
+    reader.collection_exists.return_value = True
+    reader.get_collection.return_value = _collection_schema(sparse=False)
+    monkeypatch.setattr(routes, "demo_search_operator", operator)
+    monkeypatch.setattr(
+        routes,
+        "opt_config",
+        {**KEYWORD_CONFIG, "fusion_mode": "DBSF"},
+    )
+    monkeypatch.setattr(routes, "user_config", {"collection_name": "dense-demo"})
+    monkeypatch.setattr(routes, "demo_qdrant_reader", reader)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=_app()),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.post(
+            "/ragdemo/api/query",
+            json={"question": "Question", "retrieval_mode": "hybrid"},
+        )
+
+    assert response.status_code == 409
+    assert response.json()["message"] == (
+        "Hybrid search is unavailable for the current index."
+    )
+    assert operator.calls == []
 
 
 @pytest.mark.anyio
@@ -1499,6 +2439,7 @@ def test_dense_visualization_projects_safe_points_and_matches_search_ids(
     )
 
     assert result.status == "ready"
+    assert result.projection_method == "pca"
     assert result.query is not None
     assert len(result.points) == 2
     assert all(np.isfinite([point.x, point.y, point.z]).all() for point in result.points)
@@ -1509,6 +2450,29 @@ def test_dense_visualization_projects_safe_points_and_matches_search_ids(
     assert retrieved_point.rank == search_result.rank == 1
     assert retrieved_point.source == "demo_event.txt"
     assert other_point.rank is None
+    expected_retrieved_similarity = float(
+        np.dot([0.8, 0.1, 0.2], [1.0, 0.0, 0.2])
+        / (np.linalg.norm([0.8, 0.1, 0.2]) * np.linalg.norm([1.0, 0.0, 0.2]))
+    )
+    expected_other_similarity = float(
+        np.dot([0.8, 0.1, 0.2], [0.0, 1.0, 0.1])
+        / (np.linalg.norm([0.8, 0.1, 0.2]) * np.linalg.norm([0.0, 1.0, 0.1]))
+    )
+    assert retrieved_point.similarity == pytest.approx(expected_retrieved_similarity)
+    assert other_point.similarity == pytest.approx(expected_other_similarity)
+    assert all(math.isfinite(point.similarity) for point in result.points)
+    assert [projection.method for projection in result.projections] == ["pca", "tsne", "umap"]
+    expected_ids = [point.id for point in result.points]
+    for projection in result.projections:
+        assert [point.id for point in projection.points] == expected_ids
+        assert all(
+            np.isfinite([point.x, point.y, point.z]).all()
+            for point in projection.points
+        )
+        assert np.isfinite(
+            [projection.query.x, projection.query.y, projection.query.z]
+        ).all()
+    assert result.projections[2].fallback == "pca"
     assert embedding_calls == [
         (["Where is the demo?"], "BAAI/bge-m3", "dense")
     ]
@@ -1529,7 +2493,7 @@ def test_dense_visualization_projects_safe_points_and_matches_search_ids(
         assert private_value not in serialized
     assert all(
         set(point.model_dump())
-        == {"id", "source", "x", "y", "z", "retrieved", "rank", "preview"}
+        == {"id", "source", "x", "y", "z", "retrieved", "rank", "similarity", "preview"}
         for point in result.points
     )
     assert '"vector":' not in serialized
@@ -1567,6 +2531,42 @@ def test_visualization_scan_is_bounded_and_reports_partial(monkeypatch: Any) -> 
     assert len(result.points) == 2
     assert "partial index snapshot" in result.note
     assert client.scroll.call_args.kwargs["limit"] == 2
+
+
+def test_semantic_similarity_uses_original_vectors_not_pca_coordinates(
+    monkeypatch: Any,
+) -> None:
+    first = _vector_point("first", [1.0, 0.0], source="/private/first.pdf")
+    second = _vector_point("second", [0.0, 1.0], source="/private/second.pdf")
+    monkeypatch.setattr(
+        service,
+        "create_embeddings",
+        lambda *args, **kwargs: {"dense_vecs": np.asarray([[1.0, 0.0]])},
+    )
+    monkeypatch.setattr(
+        service,
+        "_pca_3d",
+        lambda matrix: np.asarray(
+            [
+                [9.0, 9.0, 9.0],
+                [0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
+            ]
+        ),
+    )
+
+    result = build_query_visualization(
+        _client(([first, second], None)),
+        "learn2rag",
+        "question",
+        DEMO_CONFIG,
+        [],
+    )
+
+    assert [point.similarity for point in result.points] == [1.0, 0.0]
+    assert result.points[0].x == 9.0
+    assert result.points[1].x == 0.0
+    assert all(point.rank is None for point in result.points)
 
 
 def test_malformed_visualization_vectors_are_ignored_without_leaking(
@@ -1675,6 +2675,97 @@ def test_pca_projection_handles_three_components_and_degenerate_inputs() -> None
     assert np.allclose(degenerate_projection, 0.0)
 
 
+def test_projection_dispatch_accepts_pca_tsne_and_umap_only() -> None:
+    matrix = np.asarray([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
+
+    assert np.allclose(service._project_embeddings_3d(matrix, "pca"), service._pca_3d(matrix))
+    assert service._project_embeddings_3d(matrix, "tsne").shape == (4, 3)
+    assert service._project_embeddings_3d(matrix, "umap").shape == (4, 3)
+    with pytest.raises(ValueError, match="Unsupported visualization projection"):
+        service._project_embeddings_3d(matrix, "unknown")  # type: ignore[arg-type]
+
+
+def test_tsne_projection_is_deterministic_finite_and_safe_for_small_samples() -> None:
+    ordinary = np.asarray([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
+    two_samples = ordinary[:2]
+
+    first = service._tsne_3d(ordinary)
+    repeated = service._tsne_3d(ordinary)
+    small = service._tsne_3d(two_samples)
+
+    assert first.shape == (4, 3)
+    assert np.isfinite(first).all()
+    assert np.allclose(first, repeated)
+    assert small.shape == (2, 3)
+    assert np.isfinite(small).all()
+    assert service._tsne_perplexity(2) == 1.0
+    assert service._tsne_perplexity(1000) == service.TSNE_DEFAULT_PERPLEXITY
+    assert service._tsne_perplexity(2) < 2
+
+
+def test_umap_projection_is_deterministic_finite_and_safe_for_small_samples() -> None:
+    ordinary = np.asarray([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+        [0.5, 0.5, 0.0, 0.0],
+    ])
+    two_samples = ordinary[:2]
+
+    first = service._umap_3d(ordinary)
+    repeated = service._umap_3d(ordinary)
+    small = service._umap_3d(two_samples)
+
+    assert first.shape == (5, 3)
+    assert np.isfinite(first).all()
+    assert np.allclose(first, repeated)
+    assert np.allclose(small, service._pca_3d(two_samples))
+    assert service._umap_n_neighbors(2) == 2
+    assert service._umap_n_neighbors(4) == 3
+    assert service._umap_n_neighbors(1_000) == service.UMAP_DEFAULT_NEIGHBORS
+    assert service.UMAP_RANDOM_STATE == 42
+    assert service.UMAP_METRIC == "cosine"
+
+
+def test_umap_projection_preserves_stable_explicit_parameters(
+    monkeypatch: Any,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class CapturingUmap:
+        def __init__(self, **kwargs: Any) -> None:
+            captured.update(kwargs)
+
+        def fit_transform(self, matrix: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
+            return np.zeros((matrix.shape[0], 3), dtype=float)
+
+    monkeypatch.setattr(service, "UMAP", CapturingUmap)
+    matrix = np.eye(5, dtype=float)
+
+    projected = service._umap_3d(matrix)
+
+    assert projected.shape == (5, 3)
+    assert captured == {
+        "n_components": 3,
+        "n_neighbors": 4,
+        "metric": "cosine",
+        "random_state": 42,
+        "init": "random",
+        "n_jobs": 1,
+    }
+
+
 @pytest.mark.anyio
 async def test_visualization_failure_preserves_rag_response_and_call_counts(
     monkeypatch: Any,
@@ -1758,7 +2849,7 @@ async def test_successful_visualization_keeps_one_retrieval_and_one_model_call(
     assert body["visualization"]["points"][0]["id"] == body["search"]["results"][0]["id"]
     assert body["visualization"]["points"][0]["rank"] == 1
     assert set(body["visualization"]["points"][0]) == {
-        "id", "source", "x", "y", "z", "retrieved", "rank", "preview",
+        "id", "source", "x", "y", "z", "retrieved", "rank", "similarity", "preview",
     }
     assert set(body["visualization"]["query"]) == {"x", "y", "z"}
     assert len(search_operator.calls) == 1
@@ -1929,7 +3020,7 @@ def test_packaged_examples_and_html_separation() -> None:
     assert all(question not in template for question in questions)
     assert "data-question=" not in template
     assert 'id="refresh-examples"' in template
-    assert 'type="button" disabled>Suggest more examples' in template
+    assert 'type="button" disabled data-i18n="suggest_examples">Suggest more examples' in template
     assert "Refresh examples" not in template
 
 
@@ -2377,9 +3468,9 @@ class Element {
   keywordInput.checked = false;
   const retrievalInputs = [semanticInput, keywordInput];
   const calls = [];
-  let resolveChunks;
-  let examplesRequestCount = 0;
-  let chunkARequestCount = 0;
+      let resolveChunks;
+      let examplesRequestCount = 0;
+      let chunkARequestCount = 0;
   const chunkData = {document_id: "a", document_name: "Doc A", truncated: true,
     chunks: [{id: "safe-chunk", content: "<script>untrusted text</script>", display_order: 1, truncated: true}]};
   const initialExamples = {display_count: 3, question_sets: [
@@ -2399,16 +3490,17 @@ class Element {
       createElement: tag => new Element(tag),
     },
     Math: Object.assign(Object.create(Math), {random: () => 0.5}),
-    fetch: async url => {
-      calls.push(url);
+      fetch: async (url, options = {}) => {
+        calls.push(url);
+      if (url === "./api/capabilities") return {ok: true, json: async () => ({retrieval_modes: ["semantic", "keyword"]})};
       if (url === "./api/examples") {
         examplesRequestCount += 1;
         if (examplesRequestCount === 1) return {ok: true, json: async () => initialExamples};
         if (examplesRequestCount === 2) return {ok: true, json: async () => refreshedExamples};
         return {ok: false};
       }
-      if (url === "./api/index") return {ok: true, json: async () => ({document_count: 2, chunk_count: 2, truncated: false,
-        documents: [{id: "a", name: "Doc A", chunk_count: 1}, {id: "b", name: "Doc B", chunk_count: 1}]})};
+          if (url === "./api/index") return {ok: true, json: async () => ({document_count: 2, chunk_count: 2, truncated: false,
+            documents: [{id: "a", name: "Doc A", chunk_count: 1}, {id: "b", name: "Doc B", chunk_count: 1}]})};
       if (url === "./api/index/a/chunks") {
         chunkARequestCount += 1;
         if (chunkARequestCount === 1) return await new Promise(resolve => { resolveChunks = resolve; });
@@ -2482,17 +3574,18 @@ class Element {
   const otherChunks = cards[1].children.at(-1);
   assert.equal(firstChunks.parent, cards[0]);
   assert.equal(firstChunks.hidden, true);
-  assert.equal(firstButton.textContent, "Show chunks");
-  assert.equal(firstButton.type, "button");
-  const pending = firstButton.click();
+      assert.equal(firstButton.textContent, "Show chunks");
+      assert.equal(firstButton.type, "button");
+      const pending = firstButton.click();
   assert.equal(firstButton.disabled, true);
   assert.equal(firstChunks.textContent, "Loading chunks…");
   await firstButton.click();
   await otherButton.click();
   assert.match(otherChunks.textContent, /could not be loaded/);
   assert.equal(otherButton.disabled, false);
-  resolveChunks({ok: true, json: async () => chunkData});
-  await pending;
+      resolveChunks({ok: true, json: async () => chunkData});
+      await pending;
+      await flush();
   assert.equal(firstButton.disabled, false);
   assert.equal(firstButton.textContent, "Hide chunks");
   assert.equal(firstButton.attrs["aria-expanded"], "true");
@@ -2515,7 +3608,7 @@ class Element {
   await otherButton.click();
   await otherButton.click();
   assert.equal(calls.filter(url => url.endsWith("/b/chunks")).length, 2);
-  assert(!calls.includes("./api/query"));
+  assert(!calls.includes("./api/query/all"));
 })().catch(error => { console.error(error); process.exitCode = 1; });
 '''
     result = subprocess.run(
@@ -2598,6 +3691,10 @@ class Element {
   contains(candidate) {
     return candidate === this || this.children.some(child => child.contains(candidate));
   }
+  closest(selector) {
+    if (selector === "button[data-comparison-mode]" && this.dataset.comparisonMode) return this;
+    return this.parent ? this.parent.closest(selector) : null;
+  }
   querySelectorAll(selector) {
     return walk(this).filter(child => selector === ".example-question"
       && child.classList.contains("example-question"));
@@ -2625,6 +3722,7 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   const elements = new Map();
   const document = {
     activeElement: null,
+    documentElement: {lang: "en"},
     querySelector(selector) {
       if (!elements.has(selector)) {
         const element = new Element("div", document);
@@ -2634,7 +3732,9 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
       return elements.get(selector);
     },
     querySelectorAll(selector) {
-      return selector === "input[name='retrieval_mode']" ? retrievalInputs : [];
+      if (selector === "input[name='retrieval_mode']") return retrievalInputs;
+      if (selector === "[data-language]") return languageButtons;
+      return [];
     },
     createElement(tag) { return new Element(tag, document); },
     createElementNS(_namespace, tag) { return new Element(tag, document); },
@@ -2645,6 +3745,12 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   const keyword = new Element("input", document);
   keyword.value = "keyword";
   const retrievalInputs = [semantic, keyword];
+  const englishLanguage = new Element("button", document);
+  englishLanguage.dataset.language = "en";
+  const germanLanguage = new Element("button", document);
+  germanLanguage.dataset.language = "de";
+  const languageButtons = [englishLanguage, germanLanguage];
+  const storedValues = new Map();
   let queryRequestCount = 0;
   const chunkDetailRequests = new Map();
   const semanticResponse = {
@@ -2654,11 +3760,27 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
       {id: "one", rank: 1, source: "one.pdf", score: 0.9, content: "First safe chunk", matched_terms: []},
       {id: "two", rank: 2, source: "two.pdf", score: 0.8, content: "Second safe chunk", matched_terms: []},
     ]},
-    visualization: {status: "ready", label: "Explore the embedding space", technical_label: "3D PCA", note: "3D proximity is approximate because PCA compresses the embedding space. Retrieval uses the original full-dimensional vectors.", points: [
-      {id: "one", source: "one.pdf", x: -2, y: 1, z: 0.5, retrieved: true, rank: 1, preview: "First safe chunk"},
-      {id: "two", source: "two.pdf", x: 1, y: 2, z: -1, retrieved: true, rank: 2, preview: "Second safe chunk"},
-      {id: "other", source: "other.pdf", x: 3, y: -1, z: 2, retrieved: false, rank: null, preview: "Background chunk"},
-    ], query: {x: 0.75, y: -0.5, z: 1.25}},
+    visualization: {status: "ready", label: "Explore the embedding space", technical_label: "3D PCA", note: "3D proximity is approximate. Semantic similarity is calculated in the original full-dimensional embedding space used for retrieval.", points: [
+      {id: "one", source: "one.pdf", x: -2, y: 1, z: 0.5, retrieved: true, rank: 1, similarity: 0.9, preview: "First safe chunk"},
+      {id: "two", source: "two.pdf", x: 1, y: 2, z: -1, retrieved: true, rank: 2, similarity: 0.8, preview: "Second safe chunk"},
+      {id: "other", source: "other.pdf", x: 3, y: -1, z: 2, retrieved: false, rank: null, similarity: 0.4, preview: "Background chunk"},
+    ], query: {x: 0.75, y: -0.5, z: 1.25}, projection_method: "pca", projections: [
+      {method: "pca", points: [
+        {id: "one", x: -2, y: 1, z: 0.5},
+        {id: "two", x: 1, y: 2, z: -1},
+        {id: "other", x: 3, y: -1, z: 2},
+      ], query: {x: 0.75, y: -0.5, z: 1.25}},
+      {method: "tsne", points: [
+        {id: "one", x: 20, y: -8, z: 4},
+        {id: "two", x: -12, y: 16, z: 7},
+        {id: "other", x: 5, y: 2, z: -18},
+      ], query: {x: -4, y: -3, z: 11}},
+      {method: "umap", points: [
+        {id: "one", x: 2, y: -3, z: 4},
+        {id: "two", x: -5, y: 6, z: 7},
+        {id: "other", x: 8, y: 9, z: -10},
+      ], query: {x: -1, y: -2, z: 3}, fallback: null},
+    ]},
     prompt: {label: "Prompt", technical_label: "Messages", note: "Safe", messages: [
       {role: "user", content: "Question"},
     ]},
@@ -2668,15 +3790,47 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
     search: {...semanticResponse.search, mode: "keyword"},
     visualization: {status: "unsupported", label: "", technical_label: "", note: "", points: [], query: null},
   };
+  const hybridResponse = {
+    ...semanticResponse,
+    search: {...semanticResponse.search, mode: "hybrid", score_label: "Fusion score"},
+    visualization: {status: "unsupported", label: "", technical_label: "", note: "", points: [], query: null, projections: []},
+  };
+  const generativeResponse = {
+    question: semanticResponse.question,
+    answer: "Direct model answer",
+    mode: "generative",
+    label: "Generative AI",
+    description: "Answer directly from the language model without retrieved documents.",
+    retrieval_used: false,
+    indexed_documents_used: false,
+    prompt: {label: "Prompt", technical_label: "Messages", note: "Safe", messages: [
+      {role: "system", content: "No retrieved documents or RAG context are provided."},
+      {role: "human", content: semanticResponse.question},
+    ]},
+  };
+  const aggregateResponse = {
+    question: semanticResponse.question,
+    results: {
+      semantic: {status: "ready", result: semanticResponse, message: null},
+      keyword: {status: "ready", result: keywordResponse, message: null},
+      hybrid: {status: "ready", result: hybridResponse, message: null},
+      generative: {status: "ready", result: generativeResponse, message: null},
+    },
+  };
   const context = {
     document,
+    localStorage: {
+      getItem: key => storedValues.has(key) ? storedValues.get(key) : null,
+      setItem: (key, value) => storedValues.set(key, value),
+    },
     fetch: async (url, options = {}) => {
       if (url === "./api/examples") return {ok: true, json: async () => ({display_count: 1, question_sets: [{questions: ["Example?"]}]})};
       if (url === "./api/index") return {ok: true, json: async () => ({document_count: 0, chunk_count: 0, truncated: false, documents: []})};
-      if (url === "./api/query") {
+      if (url === "./api/query/all") {
         queryRequestCount += 1;
         const request = JSON.parse(options.body);
-        return {ok: true, json: async () => request.retrieval_mode === "keyword" ? keywordResponse : semanticResponse};
+        assert.deepEqual(Object.keys(request), ["question"]);
+        return {ok: true, json: async () => JSON.parse(JSON.stringify(aggregateResponse))};
       }
       if (url.startsWith("./api/chunks/")) {
         const id = decodeURIComponent(url.slice("./api/chunks/".length));
@@ -2693,12 +3847,38 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
       throw new Error(`Unexpected request: ${url}`);
     },
   };
+  document.querySelector("#projection-pca").dataset.projection = "pca";
+  document.querySelector("#projection-tsne").dataset.projection = "tsne";
+  document.querySelector("#projection-umap").dataset.projection = "umap";
   vm.runInNewContext(fs.readFileSync(process.argv[1], "utf8"), context);
   await new Promise(resolve => setImmediate(resolve));
 
   const question = document.querySelector("#question-input");
   question.value = "Where is the evidence?";
   await document.querySelector("#query-form").dispatch("submit");
+  assert.equal(queryRequestCount, 1);
+  const comparisonButtons = document.querySelector("#comparison-buttons");
+  const comparisonButton = mode => comparisonButtons.children.find(button => button.dataset.comparisonMode === mode);
+  const switchMode = mode => comparisonButtons.dispatch("click", {target: comparisonButton(mode)});
+  assert.deepEqual(
+    comparisonButtons.children.map(button => button.dataset.comparisonMode),
+    ["generative", "semantic", "keyword", "hybrid"],
+  );
+  assert.deepEqual(
+    comparisonButtons.children.map(button => button.attrs["aria-pressed"]),
+    ["true", "false", "false", "false"],
+  );
+  assert.equal(document.querySelector("#generative-result").hidden, false);
+  assert.equal(document.querySelector("#rag-stages").hidden, true);
+  assert.equal(document.querySelector("#direct-answer-content").textContent, "Direct model answer");
+  assert.equal(document.querySelector("#prompt-messages").textContent, "");
+  await switchMode("semantic");
+  assert.deepEqual(
+    comparisonButtons.children.map(button => button.attrs["aria-pressed"]),
+    ["false", "true", "false", "false"],
+  );
+  assert.equal(document.querySelector("#generative-result").hidden, true);
+  assert.equal(document.querySelector("#rag-stages").hidden, false);
   assert.equal(queryRequestCount, 1);
   assert.equal(document.querySelector("#embed-stage").open, false);
   assert.equal(document.querySelector("#retrieve-stage").open, false);
@@ -2869,9 +4049,51 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   assert.match(inspectorContent.textContent, /Retrieved · Rank #1/);
   assert.match(inspectorContent.textContent, /one\.pdf/);
   assert.match(inspectorContent.textContent, /First safe chunk/);
-  assert.match(inspectorContent.textContent, /Retrieval score0\.9/);
+  assert.match(inspectorContent.textContent, /Semantic similarity0\.900/);
   assert.match(inspectorContent.textContent, /X-2\.0/);
   assert.equal(chunkDetailRequests.get("one"), 1);
+  const geometryBeforeLanguageSwitch = axisLines.map(geometry);
+  const resultTextBeforeLanguageSwitch = document.querySelector("#search-results").textContent;
+  const questionBeforeLanguageSwitch = document.querySelector("#question-input").value;
+  const answerBeforeLanguageSwitch = document.querySelector("#answer-content").textContent;
+  const requestCountBeforeLanguageSwitch = queryRequestCount;
+  await germanLanguage.click();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(document.documentElement.lang, "de");
+  assert.equal(storedValues.get("learn2rag-ragdemo-language"), "de");
+  assert.equal(inspectorTitle.textContent, "Chunk-Details");
+  assert.match(inspectorContent.textContent, /Abgerufen · Rang #1/);
+  assert.match(inspectorContent.textContent, /Semantische Ähnlichkeit0\.900/);
+  assert.match(inspectorContent.textContent, /Quelleone\.pdf/);
+  assert.match(inspectorContent.textContent, /Chunk-InhaltFirst safe chunk/);
+  assert.equal(document.querySelector("#question-input").value, questionBeforeLanguageSwitch);
+  assert.equal(document.querySelector("#answer-content").textContent, answerBeforeLanguageSwitch);
+  assert.match(document.querySelector("#search-results").textContent, /#1one\.pdf/);
+  assert.match(document.querySelector("#search-results").textContent, /0\.900First safe chunk/);
+  assert.match(document.querySelector("#search-results").textContent, /#2two\.pdf/);
+  assert.match(document.querySelector("#search-results").textContent, /0\.800Second safe chunk/);
+  assert.equal(semantic.checked, true);
+  assert.equal(keyword.checked, false);
+  assert.equal(queryRequestCount, requestCountBeforeLanguageSwitch);
+  assert.equal(chunkDetailRequests.get("one"), 1);
+  assert.deepEqual(axisLines.map(geometry), geometryBeforeLanguageSwitch);
+  await englishLanguage.click();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(document.documentElement.lang, "en");
+  assert.equal(inspectorTitle.textContent, "Chunk details");
+  assert.match(inspectorContent.textContent, /Retrieved · Rank #1/);
+  assert.match(inspectorContent.textContent, /Semantic similarity0\.900/);
+  assert.equal(document.querySelector("#search-results").textContent, resultTextBeforeLanguageSwitch);
+  assert.equal(document.querySelector("#answer-content").textContent, answerBeforeLanguageSwitch);
+  assert.equal(queryRequestCount, requestCountBeforeLanguageSwitch);
+  assert.deepEqual(axisLines.map(geometry), geometryBeforeLanguageSwitch);
+  await germanLanguage.click();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(document.querySelector("#search-results").textContent, /First safe chunk/);
+  assert.equal(queryRequestCount, requestCountBeforeLanguageSwitch);
+  assert.match(document.querySelector("#prompt-messages").textContent, /Question/);
+  await englishLanguage.click();
+  await new Promise(resolve => setImmediate(resolve));
   await retrieved.dispatch("click", {detail: 1, target: retrieved});
   assert.equal(chunkDetailRequests.get("one"), 1);
   assert.deepEqual(axisLines.map(geometry), geometryBeforeInspectorOpen);
@@ -2998,32 +4220,126 @@ const geometry = element => ({...element.attrs, transform: element.attrs.transfo
   assert.equal(inspector.hidden, true);
   assert.notEqual(geometry(backgroundPoint).transform, backgroundBeforeDrag.transform);
   const backgroundGeometry = geometry(backgroundPoint);
+  await germanLanguage.click();
+  await new Promise(resolve => setImmediate(resolve));
   const backgroundReorderedDuringPress = await dispatchScenePointer(
     backgroundPoint, 5, {x: 1, y: 2},
   );
   assert.equal(backgroundReorderedDuringPress, true);
-  assert.equal(inspectorTitle.textContent, "Chunk details");
-  assert.match(inspectorContent.textContent, /Not retrieved for this question/);
+  assert.equal(inspectorTitle.textContent, "Chunk-Details");
+  assert.match(inspectorContent.textContent, /Für diese Frage nicht abgerufen/);
   assert.match(inspectorContent.textContent, /other\.pdf/);
-  assert.match(inspectorContent.textContent, /This chunk could not be loaded/);
+  assert.match(inspectorContent.textContent, /Dieser Chunk konnte nicht geladen werden/);
   assert.equal(chunkDetailRequests.get("other"), 1);
   await dispatchScenePointer(backgroundPoint, 6);
-  assert.match(inspectorContent.textContent, /Background chunk content/);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(inspectorContent.textContent, /Chunk-InhaltBackground chunk content/);
+  assert.match(inspectorContent.textContent, /Semantische Ähnlichkeit0\.400/);
   assert.equal(chunkDetailRequests.get("other"), 2);
   assert.equal(geometry(backgroundPoint).transform, backgroundGeometry.transform);
   assert(byClass(svg, "query-retrieval-connection").every(line => !line.classList.contains("is-active")));
   await document.querySelector("#visualization-inspector-close").click();
+  await englishLanguage.click();
+  await new Promise(resolve => setImmediate(resolve));
 
   semanticResponse.visualization.status = "partial";
-  semanticResponse.visualization.note = "3D proximity is approximate because PCA compresses the embedding space. Retrieval uses the original full-dimensional vectors. The bounded display shows a partial index snapshot.";
+  semanticResponse.visualization.note = "3D proximity is approximate. Semantic similarity is calculated in the original full-dimensional embedding space used for retrieval. The bounded display shows a partial index snapshot.";
   await document.querySelector("#query-form").dispatch("submit");
+  await switchMode("semantic");
   assert.equal(document.querySelector("#visualization-note").hidden, false);
   assert.equal(document.querySelector("#visualization-note").textContent, "The bounded display shows a partial index snapshot.");
 
-  semantic.checked = false; keyword.checked = true;
-  await document.querySelector("#query-form").dispatch("submit");
+  const countBeforeProjectionSwitch = queryRequestCount;
+  const answerBeforeProjectionSwitch = document.querySelector("#answer-content").textContent;
+  const promptBeforeProjectionSwitch = document.querySelector("#prompt-messages").textContent;
+  const resultsBeforeProjectionSwitch = document.querySelector("#search-results").textContent;
+  const pcaSvg = document.querySelector("#visualization-canvas").children.find(child => child.tag === "svg");
+  assert.deepEqual(byClass(pcaSvg, "embedding-axis-label").map(label => label.textContent), ["PCA 1", "PCA 2", "PCA 3"]);
+  await document.querySelector("#projection-tsne").click();
+  const tsneSvg = document.querySelector("#visualization-canvas").children.find(child => child.tag === "svg");
+  assert.notEqual(tsneSvg, pcaSvg);
+  assert.deepEqual(byClass(tsneSvg, "embedding-axis-label").map(label => label.textContent), ["t-SNE 1", "t-SNE 2", "t-SNE 3"]);
+  assert.equal(byClass(tsneSvg, "embedding-origin").length, 0);
+  assert.equal(byClass(tsneSvg, "query-vector").length, 0);
+  assert.equal(byClass(tsneSvg, "embedding-query-point").length, 1);
+  assert.equal(byClass(tsneSvg, "query-retrieval-connection").length, 2);
+  assert.equal(document.querySelector("#query-legend-label").textContent, "Query");
+  assert.deepEqual(byClass(tsneSvg, "embedding-point").map(point => point.dataset.chunkId).sort(), ["one", "other", "two"]);
+  assert.deepEqual(byClass(tsneSvg, "embedding-rank").map(rank => rank.textContent).sort(), ["#1", "#2"]);
+  assert.equal(queryRequestCount, countBeforeProjectionSwitch);
+  assert.equal(document.querySelector("#answer-content").textContent, answerBeforeProjectionSwitch);
+  assert.equal(document.querySelector("#prompt-messages").textContent, promptBeforeProjectionSwitch);
+  assert.equal(document.querySelector("#search-results").textContent, resultsBeforeProjectionSwitch);
+  assert.match(document.querySelector("#visualization-technical-label").textContent, /t-SNE/);
+  assert.match(document.querySelector("#projection-explanation").textContent, /local neighbourhood/);
+  const tsneRetrieved = byClass(tsneSvg, "retrieved-point").find(point => point.dataset.chunkId === "one");
+  await tsneRetrieved.dispatch("click", {detail: 0, target: tsneRetrieved});
+  assert.match(inspectorContent.textContent, /Semantic similarity0\.900/);
+  assert.match(inspectorContent.textContent, /t-SNE coordinates/);
+  await germanLanguage.click();
+  assert.match(document.querySelector("#projection-explanation").textContent, /lokale Nachbarschaftsstrukturen/);
+  assert.match(document.querySelector("#visualization-technical-label").textContent, /t-SNE-Projektion/);
+  await document.querySelector("#projection-umap").click();
+  const umapSvg = document.querySelector("#visualization-canvas").children.find(child => child.tag === "svg");
+  assert.deepEqual(byClass(umapSvg, "embedding-axis-label").map(label => label.textContent), ["UMAP 1", "UMAP 2", "UMAP 3"]);
+  assert.equal(byClass(umapSvg, "embedding-origin").length, 0);
+  assert.equal(byClass(umapSvg, "query-vector").length, 0);
+  assert.equal(byClass(umapSvg, "embedding-query-point").length, 1);
+  assert.equal(byClass(umapSvg, "query-retrieval-connection").length, 2);
+  assert.equal(document.querySelector("#query-legend-label").textContent, "Frage");
+  assert.deepEqual(byClass(umapSvg, "embedding-point").map(point => point.dataset.chunkId).sort(), ["one", "other", "two"]);
+  assert.deepEqual(byClass(umapSvg, "embedding-rank").map(rank => rank.textContent).sort(), ["#1", "#2"]);
+  assert.equal(queryRequestCount, countBeforeProjectionSwitch);
+  assert.match(document.querySelector("#projection-explanation").textContent, /Nachbarschaftsstrukturen/);
+  const umapRetrieved = byClass(umapSvg, "retrieved-point").find(point => point.dataset.chunkId === "one");
+  await umapRetrieved.dispatch("click", {detail: 0, target: umapRetrieved});
+  assert.match(inspectorContent.textContent, /Semantische Ähnlichkeit0\.900/);
+  assert.match(inspectorContent.textContent, /UMAP-Koordinaten/);
+  await document.querySelector("#projection-pca").click();
+  const restoredPcaSvg = document.querySelector("#visualization-canvas").children.find(child => child.tag === "svg");
+  assert.equal(byClass(restoredPcaSvg, "embedding-origin").length, 1);
+  assert.equal(byClass(restoredPcaSvg, "query-vector").length, 1);
+  assert.equal(document.querySelector("#query-legend-label").textContent, "Fragevektor");
+  assert.equal(queryRequestCount, countBeforeProjectionSwitch);
+  assert.match(document.querySelector("#visualization-technical-label").textContent, /PCA-Projektion/);
+
+  const sameQuestion = document.querySelector("#embedded-question").textContent;
+  await switchMode("keyword");
   assert.equal(document.querySelector("#visualization-section").hidden, true);
   assert.equal(document.querySelector("#visualization-panel").hidden, true);
+  assert.equal(document.querySelector("#embedded-question").textContent, sameQuestion);
+  assert.equal(queryRequestCount, countBeforeProjectionSwitch);
+  assert.match(document.querySelector("#search-results").textContent, /First safe chunk/);
+  await switchMode("hybrid");
+  assert.equal(document.querySelector("#score-label").textContent, "Fusionswert");
+  assert.equal(queryRequestCount, countBeforeProjectionSwitch);
+  await switchMode("generative");
+  assert.equal(document.querySelector("#generative-result").hidden, false);
+  assert.equal(document.querySelector("#rag-stages").hidden, true);
+  assert.equal(document.querySelector("#direct-answer-content").textContent, "Direct model answer");
+  assert.equal(document.querySelector("#prompt-messages").textContent, "");
+  assert.equal(queryRequestCount, countBeforeProjectionSwitch);
+  await switchMode("semantic");
+  assert.equal(document.querySelector("#generative-result").hidden, true);
+  assert.equal(document.querySelector("#rag-stages").hidden, false);
+  assert.equal(document.querySelector("#embedded-question").textContent, sameQuestion);
+  assert.equal(document.querySelector("#visualization-section").hidden, false);
+  assert.equal(queryRequestCount, countBeforeProjectionSwitch);
+
+  question.value = "A second question";
+  await question.dispatch("input", {target: question});
+  assert.equal(document.querySelector("#query-results").hidden, true);
+  assert.equal(document.querySelector("#comparison-buttons").children.length, 0);
+  aggregateResponse.question = question.value;
+  [semanticResponse, keywordResponse, hybridResponse, generativeResponse]
+    .forEach(result => { result.question = question.value; });
+  await document.querySelector("#query-form").dispatch("submit");
+  assert.equal(queryRequestCount, countBeforeProjectionSwitch + 1);
+  assert.equal(document.querySelector("#comparison-buttons").children.length, 4);
+  assert.equal(comparisonButton("generative").attrs["aria-pressed"], "true");
+  assert.equal(document.querySelector("#direct-answer-content").textContent, "Direct model answer");
+  await switchMode("semantic");
+  assert.equal(document.querySelector("#embedded-question").textContent, "A second question");
 })().catch(error => { console.error(error); process.exitCode = 1; });
 '''
     result = subprocess.run(
