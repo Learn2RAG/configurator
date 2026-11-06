@@ -500,7 +500,7 @@ async def search_authorized(
     target_k = opt_config.get("top_k", 10)
     current_multiplier = opt_config.get("auth_oversample_start", 2)
     step_multiplier = opt_config.get("auth_oversample_step", 2)
-    deduplicated: list[ScoredPoint] = []
+    authorized_points: list[ScoredPoint] = []
     for attempt in range(max_retries):
         local_opt = copy.deepcopy(opt_config)
         local_opt["top_k"] = target_k * current_multiplier
@@ -534,11 +534,12 @@ async def search_authorized(
 
         query_response = QueryResponse(points=points)
 
+        # filter_authorized keeps the order of _collect_query_points (already
+        # deduplicated and, if enabled, sorted by reranking score).
         authorized_points = await filter_authorized(user_auths, query_response)
-        deduplicated = _sort_and_deduplicate(list(authorized_points))
 
-        if len(deduplicated) >= target_k:
-            return deduplicated[:target_k]
+        if len(authorized_points) >= target_k:
+            return authorized_points[:target_k]
         current_multiplier += step_multiplier
     # If all retries are exhausted, return whatever we managed to authorize
-    return deduplicated[:target_k]
+    return authorized_points[:target_k]
