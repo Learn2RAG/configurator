@@ -1,3 +1,4 @@
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -80,6 +81,37 @@ class Learn2RAGTestCase(TestCase):
                 ],
             },
         }
+
+        # Run the pipeline before any import to verify that the prompt then
+        # contains no document chunks. Later checks rely on this assertion.
+        # pipeline.yml expects importer_config.json to be written by a previous import.
+        (self.storage_path / 'importer_config.json').write_text(
+            json.dumps(template_context['import_config']), encoding='utf-8')
+        project =Project.create(template_dir / 'pipeline.yml', self.project_name, template=True, template_context=template_context)
+        assert project is not None, 'project should not be None'
+        project.start()
+        assert project.running
+
+        def check_rag_before_import() -> None:
+            try:
+                completion = self.openai_client.chat.completions.create(
+                    model='learn2rag',
+                    messages=[
+                        {'role': 'user', 'content': 'What are rabbits?'},
+                    ],
+                )
+                content = completion.choices[-1].message.content
+                logger.debug('Response content: %s', content)
+                assert 'for testing only' in content, 'contains test marker'
+                assert "Information:\n" in content, 'contains the prompt'
+                assert content.endswith("Information:\n"), 'contains no document chunks in the prompt'
+                assert 'Lagomorpha' not in content, 'no text from test files before import'
+            except APIConnectionError:
+                assert False
+        waitUntil(check_rag_before_import, timeout=1 * 120 * 1000)
+        project.stop()
+        time.sleep(1)
+        project.remove()
 
         project = Project.create(template_dir / 'import.yml', self.project_name, template=True, template_context=template_context)
         assert project is not None, 'project should not be None'
