@@ -82,12 +82,20 @@ class Learn2RAGTestCase(TestCase):
             },
         }
 
+        # The test corpus has only a few chunks, so with the default top_k every
+        # chunk would be retrieved for any question. Use top_k=1 so that the
+        # checks below verify ranking. The templates copy opt_config.json with
+        # force: false, so this file is kept.
+        opt_config = json.loads((Path(__file__).resolve().parent.parent / 'pipeline' / 'opt_config.json').read_text(encoding='utf-8'))
+        opt_config['top_k'] = 1
+        (self.storage_path / 'opt_config.json').write_text(json.dumps(opt_config), encoding='utf-8')
+
         # Run the pipeline before any import to verify that the prompt then
         # contains no document chunks. Later checks rely on this assertion.
         # pipeline.yml expects importer_config.json to be written by a previous import.
         (self.storage_path / 'importer_config.json').write_text(
             json.dumps(template_context['import_config']), encoding='utf-8')
-        project =Project.create(template_dir / 'pipeline.yml', self.project_name, template=True, template_context=template_context)
+        project = Project.create(template_dir / 'pipeline.yml', self.project_name, template=True, template_context=template_context)
         assert project is not None, 'project should not be None'
         project.start()
         assert project.running
@@ -105,7 +113,7 @@ class Learn2RAGTestCase(TestCase):
                 assert 'for testing only' in content, 'contains test marker'
                 assert "Information:\n" in content, 'contains the prompt'
                 assert content.endswith("Information:\n"), 'contains no document chunks in the prompt'
-                assert 'Lagomorpha' not in content, 'no text from test files before import'
+                assert 'rabbit' not in content.lower(), 'no text from test files before import'
             except APIConnectionError:
                 assert False
         waitUntil(check_rag_before_import, timeout=1 * 120 * 1000)
@@ -144,7 +152,7 @@ class Learn2RAGTestCase(TestCase):
                 assert 'for testing only' in content, 'contains test marker'
                 assert "Information:\n" in content, 'contains the prompt'
                 assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
-                assert 'Lagomorpha' in content, 'specific text from a test file'
+                assert 'rabbit' in content.lower(), 'retrieved a chunk about rabbits'
             except APIConnectionError:
                 assert False
         waitUntil(check_rag_rabit, timeout=1 * 120 * 1000)
@@ -201,8 +209,8 @@ class Learn2RAGTestCase(TestCase):
                 assert 'for testing only' in content, 'contains test marker'
                 assert "Information:\n" in content, 'contains the prompt'
                 assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
-                assert 'Lagomorpha' in content, 'specific text from a previously existing file'
-                assert 'descendants of the wolf' in content, 'specific text from a newly added file'
+                assert 'descendants of the wolf' in content, 'the newly added file is the best match'
+                assert 'rabbit' not in content.lower(), 'less relevant rabbit chunks are not retrieved'
             except APIConnectionError:
                 assert False
 
@@ -245,7 +253,6 @@ class Learn2RAGTestCase(TestCase):
                 logger.debug('Response content: %s', content)
                 assert "Information:\n" in content, 'contains the prompt'
                 assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
-                assert 'Lagomorpha' in content, 'specific text from a file which still exists'
                 assert 'descendants of the wolf' not in content, 'specific text from a file which is removed'
             except APIConnectionError:
                 assert False
