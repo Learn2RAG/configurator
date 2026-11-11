@@ -1,12 +1,12 @@
 from typing import Any, AsyncGenerator, Sequence
 import logging
-from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from qdrant_client.http.models import ScoredPoint
 from .chat import ASSISTANT_ROLES, Message
 from .llm import llm
-import asyncio
+
 
 logger = logging.getLogger(__name__)
 
@@ -84,15 +84,11 @@ async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config
     context = build_context(search_results)
 
     chain = build_prompt(opt_config) | llm
-
-    answer = await asyncio.to_thread(
-        chain.invoke,
-        {
-            "context": context,
-            "question": query,
-            "history": select_history(history, opt_config),
-        }
-    )
+    answer = await chain.ainvoke({
+        "context": context,
+        "question": query,
+        "history": select_history(history, opt_config),
+    })
     return answer.content
 
 

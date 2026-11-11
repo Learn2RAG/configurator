@@ -3,6 +3,7 @@ RAG pipeline optimization with self-judge using answer relevance only.
 """
 
 import argparse
+import asyncio
 import json
 import logging
 import pathlib
@@ -118,7 +119,7 @@ def run_pipeline(question, user_config, working_config):
     search_time = time.time() - t0
 
     t0 = time.time()
-    answer = learn2rag.pipeline.generate.generate(question, docs, working_config)
+    answer = asyncio.run(learn2rag.pipeline.generate.generate(question, docs, working_config))
     gen_time = time.time() - t0
 
     doc_list = docs.points if hasattr(docs, "points") else docs

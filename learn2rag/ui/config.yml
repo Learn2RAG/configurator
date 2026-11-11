@@ -1,11 +1,13 @@
 # This file is not seen or supposed to be changed by users.
 # The user-provided configuration file extends this one.
 # (config.yml next to the project root or executable)
+---
 SUGGESTED_MODELS:
   gpt_oss_20b:
     label: OpenAI GPT-OSS (20B)
     description: |
       Download size: 14GB
+    image: models/openai.svg
     link: https://ollama.com/library/gpt-oss:20b
     ollama: pull
     config:
@@ -15,6 +17,7 @@ SUGGESTED_MODELS:
     label: Google Gemma 4 (26B)
     description: |
       Download size: ~15GB
+    image: models/gemma.png
     link: https://ollama.com/library/gemma4
     ollama: pull
     config:
@@ -24,6 +27,7 @@ SUGGESTED_MODELS:
     label: Meta Llama 3.3
     description: |
       Download size: 43GB
+    image: models/meta.svg
     link: https://ollama.com/library/llama3.3
     ollama: pull
     config:

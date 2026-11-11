@@ -1,10 +1,26 @@
 import logging
 from typing import Any, Mapping, Set
+from urllib.parse import urljoin, urlsplit
 
 from .authorization_filter import AuthorizationFilter
 from ..importer.loaders.drupal_loader import _build_session
 
 logger = logging.getLogger(__name__)
+
+MAX_REDIRECTS = 5
+
+
+def _is_followable_redirect(target_url: str, document_url: str) -> bool:
+    """
+    Only follow redirects within the same site (e.g. /node/2 to its path alias).
+
+    A redirect to the login page means the user has no access. Following it would return the
+    login form with 200 and wrongly grant access.
+    """
+    target, document = urlsplit(target_url), urlsplit(document_url)
+    if (target.scheme, target.netloc) != (document.scheme, document.netloc):
+        return False
+    return not target.path.rstrip('/').endswith('/user/login')
 
 
 class DrupalAuthorizationFilter(AuthorizationFilter):
@@ -29,7 +45,7 @@ class DrupalAuthorizationFilter(AuthorizationFilter):
             self,
             access_token: str | None,
             document: Mapping[str, Any],
-        ) -> bool:
+    ) -> bool:
         """
         Check if a user has access to a specific file.
 
@@ -41,19 +57,28 @@ class DrupalAuthorizationFilter(AuthorizationFilter):
             True if the user has access, False otherwise
         """
         try:
-            if access_token is not None:
+            if access_token:
                 session = _build_session('token', '', '', access_token)
             else:
                 # The user is not logged in, try without any credentials
                 session = _build_session('none', '', '', '')
             access_url = document['source']
-            response = session.get(access_url, timeout=30)
+            response = session.get(access_url, timeout=10, allow_redirects=False)
+            for _ in range(MAX_REDIRECTS):
+                if not response.is_redirect:
+                    break
+                target_url = urljoin(response.url, response.headers['Location'])
+                if not _is_followable_redirect(target_url, access_url):
+                    logger.debug("Not following redirect from %s to %s", response.url, target_url)
+                    break
+                response = session.get(target_url, timeout=10, allow_redirects=False)
             if response.status_code >= 500:
                 logger.error("Server error (%s) while checking for user's access; text: `%s`", response.status_code, response.text)
-            logger.debug("User is allowed access: %s for the document: %s", response.ok, access_url)
-            return response.ok
+            is_authorized = response.status_code == 200
+            logger.debug("User is allowed access: %s for the document: %s", is_authorized, access_url)
+            return is_authorized
         except Exception as e:
-            logger.error("Exception while checking user's access to a document", e)
+            logger.error("Exception while checking user's access to a document: %s", e)
             return False
 
     async def filter_documents(self, user_auth: Any, documents: Mapping[str, Any]) -> Set[str]:

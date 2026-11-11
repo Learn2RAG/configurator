@@ -11,18 +11,24 @@ from .utils import AuthImplRouter
 logger = logging.getLogger(__name__)
 
 
-def discover_applications(import_config: Mapping[str, Any]) -> Generator[tuple[str, dict[str, str], dict[str, Any]], None, None]:
+def discover_applications(import_config: Mapping[str, Any]) -> Generator[
+    tuple[str, dict[str, str], dict[str, Any]], None, None]:
     for loader_config in import_config['loaders']:
         if loader_config.get('user_auth_type', 'none') == 'oauth':
             name = loader_config['loader_id']
             client_id = loader_config.get('oauth_client_id', '')
             client_secret = loader_config.get('oauth_client_secret', '')
             base_url = loader_config.get('base_url', '')
-            authorize_url = loader_config.get('oauth_authorize_url', base_url + '/oauth/authorize')
-            access_token_url = loader_config.get('oauth_access_token_url', base_url + '/oauth/token')
+            # The UI stores empty form fields as '', which must also fall back to the defaults
+            authorize_url = loader_config.get('oauth_authorize_url') or base_url.rstrip('/') + '/oauth/authorize'
+            access_token_url = loader_config.get('oauth_access_token_url') or base_url.rstrip('/') + '/oauth/token'
+
+            scope = loader_config.get('oauth_scope') or 'authenticated'
+
             if client_id != '' and client_secret != '' and (base_url != '' or authorize_url != ''):
                 info_url = base_url or authorize_url
-                logger.info('Discovered OAuth application: %s (%s), client_id=%s)', name, info_url, client_id)
+                logger.info('Discovered OAuth application: %s (%s), client_id=%s, scope=%s)', name, info_url, client_id,
+                            scope)
                 yield name, {
                     'label': loader_config.get('label', info_url),
                     'type': 'OAuth',
@@ -32,7 +38,7 @@ def discover_applications(import_config: Mapping[str, Any]) -> Generator[tuple[s
                     'client_secret': client_secret,
                     'authorize_url': authorize_url,
                     'access_token_url': access_token_url,
-                    'client_kwargs': {'scope': 'authenticated'},
+                    'client_kwargs': {'scope': scope},
                 }
 
 

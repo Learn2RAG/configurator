@@ -52,7 +52,7 @@ if __name__ == "__main__":
     for point in points:
         print(f"ID: {point.id}, Path: {point.payload['source']}, Score: {point.score}") # type: ignore[index]
 
-    answer = generate.generate(query, points, opt_config)
+    answer = asyncio.run(generate.generate(query, points, opt_config))
 
     print(query)
     print(answer)

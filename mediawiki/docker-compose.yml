@@ -1,3 +1,4 @@
+---
 services:
   mediawiki:
     image: docker.io/library/mediawiki:1.45.4

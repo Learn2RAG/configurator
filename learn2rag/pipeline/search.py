@@ -14,6 +14,7 @@ from functools import lru_cache
 import numpy as np
 from FlagEmbedding import FlagReranker # type: ignore[import-untyped]
 from sentence_transformers import CrossEncoder
+from sentence_transformers.base.modality_types import PairInput
 from qdrant_client import models
 from qdrant_client.http.models import QueryResponse, ScoredPoint
 
@@ -105,7 +106,7 @@ def _rerank_points_with_sentence_transformers(
         return []
 
     # CrossEncoder expects list of (query, text) pairs
-    pairs = [[query, cast(str, p.payload["content"])] for p in valid_points if p.payload is not None]
+    pairs: list[PairInput] = [(query, cast(str, p.payload["content"])) for p in valid_points if p.payload is not None]
     scores = model.predict(pairs)
 
     # Attach scores to payload

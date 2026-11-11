@@ -57,12 +57,14 @@ def validate_config_entry(entry: Dict[str, Any]) -> bool:
         if not entry.get("content_types"):
             raise ValueError("Missing 'content_types' for 'DrupalLoader' in configuration entry.")
         auth_type = entry.get("auth_type", "none")
-        if auth_type not in ("none", "basic", "token"):
-            raise ValueError(f"Invalid 'auth_type' for 'DrupalLoader': '{auth_type}'. Must be 'none', 'basic' or 'token'.")
+        if auth_type not in ("none", "basic", "token", "oauth"):
+            raise ValueError(f"Invalid 'auth_type' for 'DrupalLoader': '{auth_type}'. Must be 'none', 'basic', 'token' or 'oauth'.")
         if auth_type == "basic" and (not entry.get("username") or not entry.get("password")):
             raise ValueError("Missing 'username' or 'password' for DrupalLoader with auth_type 'basic'.")
         if auth_type == "token" and not entry.get("token"):
             raise ValueError("Missing 'token' for DrupalLoader with auth_type 'token'.")
+        if auth_type == "oauth" and (not entry.get("oauth_client_id") or not entry.get("oauth_client_secret")):
+            raise ValueError("Missing 'oauth_client_id' or 'oauth_client_secret' for DrupalLoader with auth_type 'oauth'.")
     elif loader_type == "JiraLoader":
         if not entry.get("base_url"):
             raise ValueError("Missing 'base_url' for 'JiraLoader' in configuration entry.")

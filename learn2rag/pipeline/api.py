@@ -28,7 +28,10 @@ from ..userui.constants import SESSION_USER_AUTHS
 
 logger = logging.getLogger(__name__)
 
-KEEPALIVE_INTERVAL_SECONDS = 5
+# While the pipeline works (search and LLM can take tens of seconds), the stream would otherwise stay silent.
+# The llama.cpp chat UI treats a silent stream as a dropped connection when its tab becomes visible again
+# (after 3 seconds), cancels it and fails to resume, because only llama-server implements resuming.
+KEEP_ALIVE_INTERVAL_SECONDS = 1.0
 
 example_query = "What approach did Arjun Singh's campaign use to respond to voters' concerns on social media platforms during the municipal elections in Delhi?"
 example_messages = {
@@ -59,14 +62,15 @@ async def run_pipeline(pipeline: BaseOperator, request: Request, chat_state: Cha
 
 
 async def event_stream(pipeline: BaseOperator, request: Request, inputs: ChatState) -> AsyncGenerator[Any, Any]:
-    # SSE comments keep idle connections (e.g. port forwarding, proxies) from timing out while the pipeline runs
-    task = asyncio.ensure_future(run_pipeline(pipeline, request, inputs))
     try:
-        yield ": keepalive\n\n"
-        while not task.done():
-            await asyncio.wait({task}, timeout=KEEPALIVE_INTERVAL_SECONDS)
-            if not task.done():
-                yield ": keepalive\n\n"
+        task = asyncio.ensure_future(run_pipeline(pipeline, request, inputs))
+        try:
+            while not (await asyncio.wait({task}, timeout=KEEP_ALIVE_INTERVAL_SECONDS))[0]:
+                # An SSE comment: keeps the connection active, clients ignore it
+                yield ": keep-alive\n\n"
+        finally:
+            # No-op when finished; stops the pipeline when the client went away in the meantime
+            task.cancel()
         answer = itemgetter('answer')(task.result())
 
         delta = {'content': answer}
@@ -76,9 +80,6 @@ async def event_stream(pipeline: BaseOperator, request: Request, inputs: ChatSta
         content = 'There is a problem with Learn2RAG configuration. Please contact your administrator.'  # FIXME
         delta = {'content': content}
         yield f"data: {json.dumps({'choices': [{'delta': delta, 'finish_reason': 'stop'}]})}\n\n"
-    finally:
-        # stops the pipeline if the client disconnected early, no-op otherwise
-        task.cancel()
     yield "data: [DONE]\n\n"
 
 

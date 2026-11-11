@@ -17,6 +17,11 @@ msgstr ""
 "Generated-By: Babel 2.18.0\n"
 
 #, python-format
+msgctxt "firststep"
+msgid "Yes, add my <code>%(docs_dir)s</code> folder"
+msgstr "Ja, meinen Ordner <code>%(docs_dir)s</code> hinzufügen"
+
+#, python-format
 msgid "%(num)d data source configuration"
 msgid_plural "%(num)d data source configurations"
 msgstr[0] "%(num)d Datenquellenkonfiguration"
@@ -114,6 +119,10 @@ msgstr "Neue Pipeline-Konfiguration hinzugefügt: %(label)s"
 msgid "Advanced configuration"
 msgstr "Erweiterte Optionen"
 
+msgctxt "firststep"
+msgid "All the files in this directory would be imported. That can take some time."
+msgstr "Alle Dateien in diesem Verzeichnis würden importiert werden. Das kann einige Zeit in Anspruch nehmen."
+
 msgid "Another model"
 msgstr "Ein weiteres Sprachmodell"
 
@@ -174,7 +183,7 @@ msgstr "Wenden Sie sich an den Administrator oder studieren Sie die Dokumentatio
 
 msgctxt "form_label"
 msgid "Content types"
-msgstr ""
+msgstr "Inhaltstypen"
 
 msgctxt "flash"
 msgid "Could not save the training data file"
@@ -189,6 +198,10 @@ msgstr "Pipeline konnte nicht gestartet werden: %(message)s"
 msgctxt "flash"
 msgid "Could not stop the pipeline: %(message)s"
 msgstr "Pipeline konnte nicht gestoppt werden: %(message)s"
+
+msgctxt "form_label"
+msgid "Crawl depth"
+msgstr "Crawl-Tiefe"
 
 msgctxt "column_heading"
 msgid "Data source type"
@@ -226,6 +239,10 @@ msgstr "Weitere"
 msgctxt "flash"
 msgid "Directory removed: %(path)s"
 msgstr "Verzeichnis entfernt: %(path)s"
+
+msgctxt "firststep"
+msgid "Do you want to add a folder now?"
+msgstr "Möchten Sie jetzt einen Ordner hinzufügen?"
 
 msgctxt "heading"
 msgid "Download a language model"
@@ -270,7 +287,7 @@ msgstr "Pipeline konnte nicht gestartet werden: %(label)s"
 
 msgctxt "form_label"
 msgid "Failure threshold"
-msgstr ""
+msgstr "Fehlerschwelle"
 
 #, python-format
 msgctxt "tooltip"
@@ -299,6 +316,10 @@ msgctxt "tooltip"
 msgid "For example: https://learn2rag.de/"
 msgstr "Zum Beispiel: https://learn2rag.de/"
 
+msgctxt "tooltip"
+msgid "How many levels of links to follow from the URL: 0 loads only this page, -1 crawls the whole site under this URL"
+msgstr "Anzahl der Link-Ebenen, denen ab der URL gefolgt werden soll: 0 lädt nur diese Seite, -1 crawlt die gesamte Website unter dieser URL."
+
 msgid "If you use a model from an external provider, they will see your data."
 msgstr "Wenn Sie ein Modell eines externen Anbieters verwenden, hat dieser Zugriff auf Ihre Daten."
 
@@ -320,19 +341,19 @@ msgstr "Nur einmal importieren"
 
 msgctxt "status"
 msgid "Importing"
-msgstr "Importieren"
+msgstr "Import läuft"
 
 msgctxt "status"
 msgid "Importing and running AI chat"
-msgstr "Importieren und laufen eines KI-Chats"
+msgstr "Import und KI-Chat laufen"
 
 msgctxt "form_label:jira"
 msgid "Include comments"
-msgstr "Kommentare aufnehmen"
+msgstr "Kommentare einbeziehen"
 
 msgctxt "form_label"
 msgid "Internal vector store"
-msgstr "Interner Vektorspeicher"
+msgstr ""
 
 msgctxt "form_label:jira"
 msgid "Issue types"
@@ -406,6 +427,10 @@ msgctxt "button"
 msgid "More options"
 msgstr "Weitere Optionen"
 
+msgctxt "firststep"
+msgid "More options"
+msgstr "Weitere Optionen"
+
 msgctxt "form_auth_option"
 msgid "None"
 msgstr "keine"
@@ -416,7 +441,15 @@ msgstr "keine (alle Benutzer erhalten Zugriff auf alle Daten)"
 
 msgctxt "form_auth_option"
 msgid "OAuth"
-msgstr ""
+msgstr "OAuth"
+
+msgctxt "form_auth_option"
+msgid "OAuth client credentials"
+msgstr "OAuth-Client-Zugangsdaten"
+
+msgctxt "form_label"
+msgid "OAuth import scope"
+msgstr "OAuth-Scope für den Import"
 
 msgid "Ollama is not running. Please restart the Learn2RAG configurator."
 msgstr "Ollama ist nicht verfügbar. Es wird empfohlen Learn2RAG neuzustarten."
@@ -439,7 +472,7 @@ msgstr "KI-Chat öffnen"
 
 msgctxt "header"
 msgid "Optimization"
-msgstr "Optimierung"
+msgstr ""
 
 msgid "Optional"
 msgstr "Optional"
@@ -536,7 +569,7 @@ msgstr "Speichern"
 
 msgctxt "label"
 msgid "Save"
-msgstr "Speichern"
+msgstr ""
 
 msgctxt "button"
 msgid "Select all"
@@ -568,7 +601,7 @@ msgstr "Datenquellen"
 
 msgctxt "button"
 msgid "Start optimization"
-msgstr "Optimierung starten"
+msgstr ""
 
 msgctxt "tooltip"
 msgid "Start the AI chat. Requires import to be already completed."
@@ -619,15 +652,15 @@ msgstr "Dieses Passwort würde in der Konfiguration im Klartext gespeichert werd
 #. training data preview
 #, python-format
 msgid "Total rows: %(amount)s"
-msgstr "Gesamtzahl der Zeilen: %(amount)s"
+msgstr "Zeilen insgesamt: %(amount)s"
 
 msgctxt "header"
 msgid "Training data"
-msgstr "Trainingsdaten"
+msgstr ""
 
 msgctxt "flash"
 msgid "Training data file saved"
-msgstr "Trainingsdaten gespeichert"
+msgstr "Trainingsdatei gespeichert"
 
 msgctxt "tooltip"
 msgid "Unknown value"
@@ -645,13 +678,16 @@ msgctxt "button"
 msgid "Use this suggested language model"
 msgstr "Empfohlenes Sprachmodell verwenden"
 
+msgid "Used with \"OAuth client credentials\": the importer requests a token with the OAuth client ID and secret below. The scope decides which documents are imported."
+msgstr "Wird mit „OAuth-Client-Zugangsdaten“ verwendet: Der Importer fordert mit der unten angegebenen OAuth-Client-ID und dem Client-Secret ein Token an. Der Scope bestimmt, welche Dokumente importiert werden."
+
 msgctxt "form_label"
 msgid "User authentication"
 msgstr "Benutzerauthentifizierung"
 
 msgctxt "form_label"
 msgid "User interface and RAG service"
-msgstr "Benutzeroberfläsche und RAG-Dienst"
+msgstr "Benutzeroberfläche und RAG-Dienst"
 
 msgctxt "form_label"
 msgid "Username"
@@ -678,7 +714,11 @@ msgid "Welcome"
 msgstr "Wilkommen"
 
 msgid "You and users will see this label."
-msgstr "Sie und die Nutzer werden diese Name sehen"
+msgstr "Sie und die Benutzer sehen diesen Namen."
+
+msgctxt "firststep"
+msgid "You do not have any data sources selected"
+msgstr "Sie haben keine Datenquellen ausgewählt."
 
 #~ msgid "Download failed"
 #~ msgstr ""
@@ -785,10 +825,6 @@ msgstr "Sie und die Nutzer werden diese Name sehen"
 #~ msgid "Internal RAG service"
 #~ msgstr ""
 
-#~ msgctxt "form_label"
-#~ msgid "User interface"
-#~ msgstr ""
-
 #~ msgctxt "flash"
 #~ msgid "Could not save the file"
 #~ msgstr "Die Datei konnte nicht gespeichert werden"
@@ -799,4 +835,16 @@ msgstr "Sie und die Nutzer werden diese Name sehen"
 
 #~ msgid "running"
 #~ msgstr "läuft"
+
+#~ msgctxt "form_label"
+#~ msgid "User interface"
+#~ msgstr ""
+
+#~ msgctxt "button"
+#~ msgid "Optimization"
+#~ msgstr ""
+
+#~ msgctxt "firststep"
+#~ msgid " Yes, add my <code>~/Documents</code> folder"
+#~ msgstr "Ja, füge meinen Ordner <code>~/Documents</code> hinzu."
 

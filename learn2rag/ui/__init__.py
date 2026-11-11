@@ -43,10 +43,12 @@ from ..utils import (
 
 from datetime import datetime
 
+import platformdirs
 
 logging.getLogger().addHandler(flask.logging.default_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
+docs_dir = platformdirs.user_documents_dir()
 
 import werkzeug
 def redirect(url: str) -> 'werkzeug.wrappers.response.Response':
@@ -211,6 +213,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             'debug_logging': config.get('logging', {}).get('debug', False),
             'current_timestamp': math.floor(time.time()),
             'llm': learn2rag.pipeline.llm,
+            'docs_dir': docs_dir,
         }
 
     @app.context_processor
@@ -406,6 +409,8 @@ def create_app(config: dict[str, Any]={}) -> Flask:
                     data[field] = int(data[field])
                 else:
                     del data[field]
+        if data.get('type') == 'web':
+            data.setdefault('depth', -1)
         for field in [
                 'object_ids',
         ]:
@@ -567,7 +572,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         projects = Project.get_all()  # FIXME: only get one
         import_state = ImportState(str(storage_path / 'import_state.json'))
         import_succeeded_once = any(import_state.get_last_import_time(source) for source in pipeline['sources'])
-        allow_open_chat = projects[name].health and import_succeeded_once
+        allow_open_chat = name in projects and projects[name].health and import_succeeded_once
         try:
             training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
             training_examples = training_dataset.select(range(min(3, len(training_dataset))))
