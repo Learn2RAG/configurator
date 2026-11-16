@@ -21,6 +21,7 @@ from learn2rag.evaluation.tools import read_dataset_qa
 from learn2rag.pipeline.config import opt_config
 from learn2rag.pipeline.operators import BasicPipeline
 from learn2rag.pipeline.prov import Prov
+from learn2rag.optimization.optimization_progress import OptimizationProgress
 
 def load_registry(registry_source: Union[str, pathlib.Path, Dict[str, Any]] = "registry.json") -> dict[str, Any]:
     if isinstance(registry_source, dict):
@@ -86,14 +87,15 @@ def objective(config: Configuration,
     cfg = dict(config)
     logging.info(f"Trial {tid}: {cfg}")
     t_start = time.time()
+    state["progress"].trial_started(tid)
 
     if (
             (cfg["rewrite"] == "False" and cfg["rewrite_mode"] != "none") or
             (cfg["rewrite"] == "True" and cfg["rewrite_mode"] == "none") or
             (cfg["reranking"] == "False" and cfg["reranking_mode"] != "none") or
-            (cfg["reranking"] == "True" and cfg["reranking_mode"] == "none")
-            #(cfg["search_mode"] =="dense" and cfg["fusion_mode"] != "none") or
-            #(cfg["search_mode"] == "dense_sparse" and cfg["fusion_mode"] == "none")
+            (cfg["reranking"] == "True" and cfg["reranking_mode"] == "none") or
+            (cfg["search_mode"] =="dense" and cfg["fusion_mode"] != "none") or
+            (cfg["search_mode"] == "dense_sparse" and cfg["fusion_mode"] == "none")
     ):
         logging.warning(f"Trial {tid}: Invalid config skipped: {cfg}")
         cost = 1.0
@@ -114,7 +116,7 @@ def objective(config: Configuration,
     working_cfg = copy.deepcopy(opt_config)
     working_cfg.update({
         "top_k": cfg["top_k"],
-        #"search_mode": cfg["search_mode"],
+        "search_mode": cfg["search_mode"],
         "reranking_mode": cfg["reranking_mode"],
         "rewrite_mode": cfg["rewrite_mode"],
         "fusion_mode": cfg["fusion_mode"],
@@ -274,30 +276,27 @@ def run(
         #Categorical("chunk_size", [250, 1000, 2000], default=1000),
         #Categorical("chunk_overlap", [50, 200], default=50),
         Integer("top_k", (1, 20), default=4),
-        #Categorical("search_mode", ["dense", "dense_sparse"], default="dense"),   # Can be uncommented when sparse issue is resolved
-        #Categorical("search_mode", ["dense"], default="dense"), # Using only until dense_sparse is working
+        Categorical("search_mode", ["dense", "dense_sparse"], default="dense_sparse"),
         Categorical("reranking_mode", ["none", "reranking_with_flagreranker", "reranking_with_sentence_transformers"], default="none"),
         Categorical("rewrite_mode", ["none", "subqueries"], default="none"),
-        Categorical("fusion_mode", ["none", "DBSF", "RRF"], default="none"),
+        Categorical("fusion_mode", ["none", "DBSF", "RRF"], default="DBSF"),
         Categorical("reranking", ["True", "False"], default="False"),
         Categorical("rewrite", ["True", "False"], default="False"),
         Categorical("prompt_template", list(prompt_map.keys()), default="default"),
     ])
     #cs.add(ForbiddenGreaterThanRelation(cs["chunk_overlap"], cs["chunk_size"]))
-    # for sm in ["dense"]:
-    #     for fm in ["DBSF", "RRF"]:
-    #         cs.add(ForbiddenAndConjunction(
-    #             ForbiddenEqualsClause(cs["search_mode"], sm),
-    #             ForbiddenEqualsClause(cs["fusion_mode"], fm),
-    #         ))
-    # Can be uncommented when sparse issue is resolved
-    # """
-    # for sm in ["dense_sparse"]:
-    #     cs.add(ForbiddenAndConjunction(
-    #         ForbiddenEqualsClause(cs["search_mode"], sm),
-    #         ForbiddenEqualsClause(cs["fusion_mode"], "none"),
-    #    ))
-    # """
+    for sm in ["dense"]:
+        for fm in ["DBSF", "RRF"]:
+            cs.add(ForbiddenAndConjunction(
+                ForbiddenEqualsClause(cs["search_mode"], sm),
+                ForbiddenEqualsClause(cs["fusion_mode"], fm),
+            ))
+
+    for sm in ["dense_sparse"]:
+        cs.add(ForbiddenAndConjunction(
+            ForbiddenEqualsClause(cs["search_mode"], sm),
+            ForbiddenEqualsClause(cs["fusion_mode"], "none"),
+        ))
 
     for rrm in ["reranking_with_flagreranker", "reranking_with_sentence_transformers"]:
         cs.add(ForbiddenAndConjunction(
@@ -326,7 +325,7 @@ def run(
         cs,
         deterministic=True,
         n_trials=n_trials,
-        walltime_limit=7200,
+        #walltime_limit=7200,
         seed=42,
         output_directory=out / "smac_output",
     )
@@ -343,6 +342,12 @@ def run(
             config, questions, state, answers_dir,prompt_map, user),
         initial_design = initial_design
     )
+    progress = OptimizationProgress(
+        total_trials=n_trials,
+        status_file=pathlib.Path(os.environ["PIPELINE_OPT_CONFIG"]).parent / "logs" / "status.log", 
+    )
+    state["progress"] = progress
+    progress.start()
     t0 = time.time()
     incumbent = smac.optimize()
     if isinstance(incumbent, list):
@@ -364,7 +369,7 @@ def run(
         "metric": "bertscore_golden",
         "answers_dir":str(answers_dir),
     }, indent=2, default = str))
-
+    progress.finish()
     return best_cfg, state["history"], importance
 
 if __name__ == "__main__":
