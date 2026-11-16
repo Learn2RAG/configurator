@@ -6,37 +6,41 @@ SUGGESTED_MODELS:
   gpt_oss_20b:
     label: OpenAI GPT-OSS (20B)
     description: |
-      Download size: 14GB
+      Download size: ~14GB
     link: https://ollama.com/library/gpt-oss:20b
     ollama: pull
     config:
       api: ChatOllama
       model: gpt-oss:20b
-  gemma4_26b:
-    label: Google Gemma 4 (26B)
+  gemma4_31b:
+    label: Google Gemma 4 (31B)
     description: |
-      Download size: ~15GB
+      Download size: ~20GB
     link: https://ollama.com/library/gemma4
     ollama: pull
     config:
       api: ChatOllama
-      model: gemma4:26b
-  llama3.3_70b:
-    label: Meta Llama 3.3
+      model: gemma4:31b
+      reasoning: false
+  qwen3_5_4b:
+    label: Alibaba Qwen 3.5 (4B)
     description: |
-      Download size: 43GB
-    link: https://ollama.com/library/llama3.3
+      Download size: ~4GB
+    link: https://ollama.com/library/qwen3.5
     ollama: pull
     config:
       api: ChatOllama
-      model: llama3.3:70b
-  tinyllama:
-    label: TinyLlama
+      model: qwen3.5:4b
+      reasoning: false
+      num_ctx: 65536
+  gemma3n_e2b:
+    label: Google Gemma 3n (E2B)
     description: |
+      Download size: ~8GB
       A very small model to try things out. Do not expect good results from it!
-    image: models/tinyllama.png
-    link: https://github.com/jzhang38/TinyLlama
+    link: https://ollama.com/library/gemma3n
     ollama: pull
     config:
       api: ChatOllama
-      model: tinyllama:latest
+      model: gemma3n:e2b
+      num_ctx: 16384

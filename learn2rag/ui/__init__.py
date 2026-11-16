@@ -221,7 +221,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         suggested_models = app.config.get('SUGGESTED_MODELS', {})
         return {
             'suggested_models': suggested_models,
-            'firststeps_model': suggested_models.get('gemma4_26b'),
+            'firststeps_model': suggested_models.get('gemma4_31b'),
             'models': learn2rag.data.get_all(app.instance_path, 'models'),
             'sources': learn2rag.data.get_all(app.instance_path, 'sources'),
             'pipelines': learn2rag.data.get_all(app.instance_path, 'pipelines'),
@@ -481,6 +481,15 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             # FIXME
             language_model['url'] = language_model['url'].replace('http://', 'https://', 1)
             app.logger.info(f"SSL detected. Altered LLM API URL to: {language_model['url']}")
+
+        # Per-model defaults (reasoning, num_ctx) from SUGGESTED_MODELS, matched by model name
+        for suggested in app.config.get('SUGGESTED_MODELS', {}).values():
+            suggested_config = suggested.get('config', {})
+            if suggested_config.get('model') == language_model.get('model'):
+                for key in ('reasoning', 'num_ctx'):
+                    if key in suggested_config:
+                        language_model.setdefault(key, suggested_config[key])
+                break
 
         # Format the import config
         import_config = {
