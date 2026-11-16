@@ -342,9 +342,14 @@ def run(
             config, questions, state, answers_dir,prompt_map, user),
         initial_design = initial_design
     )
+    status_file = (
+        pathlib.Path(os.environ["PIPELINE_OPT_CONFIG"]).parent / "logs" / "status.log"
+        if os.environ.get("PIPELINE_OPT_CONFIG")
+        else out / "status.log"
+    )
     progress = OptimizationProgress(
         total_trials=n_trials,
-        status_file=pathlib.Path(os.environ["PIPELINE_OPT_CONFIG"]).parent / "logs" / "status.log", 
+        status_file= status_file, 
     )
     state["progress"] = progress
     progress.start()
