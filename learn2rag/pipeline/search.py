@@ -25,6 +25,7 @@ from .embeddings import create_embeddings
 from .qdrant import Qdrant
 from . import rewrite
 
+logger = logging.getLogger(__name__)
 profilingLogger = logging.getLogger('profiling')
 
 
@@ -329,6 +330,10 @@ def search(query: str, user_config: dict[str, Any], opt_config: dict[str, Any], 
         collection_name=collection_name,
         opt_config=opt_config
         )
+    if not qdrant.get_client().collection_exists(collection_name):
+        # Nothing has been imported yet
+        logger.warning("Collection %s does not exist, returning no documents", collection_name)
+        return QueryResponse(points=[])
 
     if opt_config["embedding_model"] == "BAAI/bge-m3":
         if opt_config["search_mode"] == "dense":
@@ -447,6 +452,10 @@ def search_multi(multi_query: dict[str, str], user_config: dict[str, Any], opt_c
         collection_name=collection_name,
         opt_config=opt_config
         )
+    if not qdrant.get_client().collection_exists(collection_name):
+        # Nothing has been imported yet
+        logger.warning("Collection %s does not exist, returning no documents", collection_name)
+        return QueryResponse(points=[])
 
     query_embedding: np.ndarray[Any, Any]
     if opt_config["embedding_model"] == "BAAI/bge-m3":
