@@ -10,9 +10,9 @@ BIN_SUFFIX=.exe
 
 . ./package-common
 
-wget --continue -O $BUNDLE_DIR/ollama-windows.zip https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-windows-amd64.zip
+wget --continue -O $BUNDLE_DIR/ollama-windows-v0.40.16.zip https://github.com/ollama/ollama/releases/download/v0.40.16/ollama-windows-amd64.zip
 mkdir -p $BUNDLE/services/ollama
-unzip -o $BUNDLE_DIR/ollama-windows.zip -d $BUNDLE/services/ollama
+unzip -o $BUNDLE_DIR/ollama-windows-v0.40.16.zip -d $BUNDLE/services/ollama
 
 wget --continue -O $BUNDLE_DIR/qdrant-windows-v1.17.1.zip https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-x86_64-pc-windows-msvc.zip
 mkdir -p $BUNDLE/services/qdrant

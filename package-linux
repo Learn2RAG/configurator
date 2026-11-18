@@ -12,9 +12,9 @@ export CROSS_TARGET_X86_64_UNKNOWN_LINUX_GNU_IMAGE=ghcr.io/cross-rs/x86_64-unkno
 
 . ./package-common
 
-wget --continue -O $BUNDLE_DIR/ollama-linux.tgz https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-linux-amd64.tgz
+wget --continue -O $BUNDLE_DIR/ollama-linux-v0.40.16.tar.zst https://github.com/ollama/ollama/releases/download/v0.40.16/ollama-linux-amd64.tar.zst
 mkdir -p $BUNDLE/services/ollama
-tar -C $BUNDLE/services/ollama -xzvf $BUNDLE_DIR/ollama-linux.tgz
+tar -C $BUNDLE/services/ollama --zstd -xvf $BUNDLE_DIR/ollama-linux-v0.40.16.tar.zst
 
 wget --continue -O $BUNDLE_DIR/qdrant-linux-v1.17.1.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-x86_64-unknown-linux-musl.tar.gz
 mkdir -p $BUNDLE/services/qdrant
