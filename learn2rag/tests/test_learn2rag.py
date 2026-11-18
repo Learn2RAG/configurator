@@ -112,7 +112,7 @@ class Learn2RAGTestCase(TestCase):
                 logger.debug('Response content: %s', content)
                 assert 'for testing only' in content, 'contains test marker'
                 assert "Information:\n" in content, 'contains the prompt'
-                assert content.endswith("Information:\n"), 'contains no document chunks in the prompt'
+                assert "Information:\n\n\n# Reminder" in content, 'contains no document chunks in the prompt'
                 assert 'rabbit' not in content.lower(), 'no text from test files before import'
             except APIConnectionError:
                 assert False
@@ -151,7 +151,7 @@ class Learn2RAGTestCase(TestCase):
                 logger.debug('Response content: %s', content)
                 assert 'for testing only' in content, 'contains test marker'
                 assert "Information:\n" in content, 'contains the prompt'
-                assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
+                assert "Information:\n\n\n# Reminder" not in content, 'contains any document chunks in the prompt'
                 assert 'rabbit' in content.lower(), 'retrieved a chunk about rabbits'
             except APIConnectionError:
                 assert False
@@ -208,7 +208,7 @@ class Learn2RAGTestCase(TestCase):
                 logger.debug('Response content: %s', content)
                 assert 'for testing only' in content, 'contains test marker'
                 assert "Information:\n" in content, 'contains the prompt'
-                assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
+                assert "Information:\n\n\n# Reminder" not in content, 'contains any document chunks in the prompt'
                 assert 'descendants of the wolf' in content, 'the newly added file is the best match'
                 assert 'rabbit' not in content.lower(), 'less relevant rabbit chunks are not retrieved'
             except APIConnectionError:
@@ -252,7 +252,7 @@ class Learn2RAGTestCase(TestCase):
                 content = completion.choices[-1].message.content
                 logger.debug('Response content: %s', content)
                 assert "Information:\n" in content, 'contains the prompt'
-                assert not content.endswith("Information:\n"), 'contains any document chunks in the prompt'
+                assert "Information:\n\n\n# Reminder" not in content, 'contains any document chunks in the prompt'
                 assert 'descendants of the wolf' not in content, 'specific text from a file which is removed'
             except APIConnectionError:
                 assert False
