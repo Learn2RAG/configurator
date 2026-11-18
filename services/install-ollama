@@ -1,3 +1,3 @@
 mkdir -p ollama
-wget --continue -O ollama/ollama-linux.tgz https://github.com/ollama/ollama/releases/download/v0.12.1/ollama-linux-amd64.tgz
-tar -C ollama -xzvf ollama/ollama-linux.tgz
+wget --continue -O ollama/ollama-linux-v0.40.16.tar.zst https://github.com/ollama/ollama/releases/download/v0.40.16/ollama-linux-amd64.tar.zst
+tar -C ollama --zstd -xvf ollama/ollama-linux-v0.40.16.tar.zst
