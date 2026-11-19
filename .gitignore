@@ -18,7 +18,7 @@ __pycache__
 # custom user config
 /config.yml
 #generate during install step
-compose.db
+compose.db*
 /learn2rag/pipeline/data/loaded_documents_kcenter.json
 /.env
 /.local.envrc
