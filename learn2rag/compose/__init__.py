@@ -130,18 +130,33 @@ def healthy(value: list[str]) -> bool:
         return False
 
 
-# Resolved once so every thread opens the same file even if the CWD changes later.
-DB_PATH = Path(os.environ.get('COMPOSE_DB', 'compose.db')).absolute()
 # How long a connection waits for another thread/process holding a write lock.
 DB_TIMEOUT = 30.0
 
 _local = threading.local()
+_db_path: Path
 
 
-def _connect() -> sqlite3.Connection:
-    con = sqlite3.connect(DB_PATH, timeout=DB_TIMEOUT)
+def _connect(path: Path) -> sqlite3.Connection:
+    con = sqlite3.connect(path, timeout=DB_TIMEOUT)
     con.row_factory = sqlite3.Row
     return con
+
+
+def use_database(path: str | Path) -> None:
+    """Point all threads at the compose database in `path`, creating it if needed.
+
+    The path is made absolute here, so every thread opens the same file even if
+    the CWD changes later. Threads reconnect on their next database access.
+    """
+    global _db_path
+    path = Path(path).absolute()
+    with contextlib.closing(_connect(path)) as con:
+        # WAL lets readers proceed while another connection is writing.
+        con.execute('PRAGMA journal_mode=WAL')
+        init_db(con)
+        con.commit()
+    _db_path = path
 
 
 def get_connection() -> sqlite3.Connection:
@@ -153,8 +168,11 @@ def get_connection() -> sqlite3.Connection:
     between separate processes using the same database.
     """
     con: sqlite3.Connection | None = getattr(_local, 'con', None)
-    if con is None:
-        con = _local.con = _connect()
+    if con is None or getattr(_local, 'path', None) != _db_path:
+        if con is not None:
+            con.close()
+        con = _local.con = _connect(_db_path)
+        _local.path = _db_path
     return con
 
 
@@ -183,15 +201,7 @@ class ProjectNotRunning(AssertionError):
     """The project was already stopped, e.g. by another thread."""
 
 
-def _setup_db() -> None:
-    with contextlib.closing(_connect()) as con:
-        # WAL lets readers proceed while another connection is writing.
-        con.execute('PRAGMA journal_mode=WAL')
-        init_db(con)
-        con.commit()
-
-
-_setup_db()
+use_database(os.environ.get('COMPOSE_DB', 'compose.db'))
 
 
 class Project():
@@ -242,6 +252,12 @@ class Project():
         rows = cur.fetchall()
         cur.close()
 
+        if not rows:
+            # Another thread may have stopped the project (and deleted its services)
+            # after this object was loaded, so re-read its state.
+            self._refresh()
+            return
+
         if not hasattr(signal, "SIGCHLD"):
             for row in rows:
                 pid = row['pid']
@@ -263,6 +279,18 @@ class Project():
                 pid = process['pid']
                 if pid in active_popens:
                     del active_popens[pid]
+
+    def _refresh(self) -> None:
+        cur = get_connection().cursor()
+        cur.execute('SELECT running, succeeded, failed FROM projects WHERE name = :name', {'name': self.name})
+        row = cur.fetchone()
+        cur.close()
+        if row is None:
+            self.running = False
+            return
+        self.running = row['running']
+        self.succeeded = bool(row['succeeded'])
+        self.failed = bool(row['failed'])
 
     def healthcheck(self) -> None:
         # what it should be when there are no healthchecks defined?
