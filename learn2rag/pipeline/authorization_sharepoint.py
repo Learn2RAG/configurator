@@ -147,5 +147,7 @@ class SharepointAuthorizationFilter(AuthorizationFilter):
 
             return set(authorized_ids)
         except Exception as e:
-            logger.warning(f"Could not authorizes user %s", e.__str__())
+            logger.warning(
+                "Could not authorize user %s for loader %s, treating %s documents as not authorized: %s",
+                user, self.loader_id, len(documents), e)
             return set()

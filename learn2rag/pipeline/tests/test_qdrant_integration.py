@@ -5,11 +5,12 @@ from typing import Any, ClassVar
 
 from dotenv import load_dotenv
 from langchain_core.documents import Document
+from qdrant_client.http.models import ScoredPoint
 from qdrant_client.models import Distance
 
 from ..qdrant import Qdrant
 from ..ingestion import index
-from ..search import search, search_multi, _collect_query_points
+from ..search import search, search_multi, _Queries, _build_prefetch_tree, _embed_queries, _rerank_pool, _retrieve_pool
 from ..store import get_documents, delete_documents, update_documents
 
 load_dotenv(Path(__file__).resolve().parents[3] / '.env')
@@ -39,7 +40,6 @@ def make_opt_config(
         'top_k': 3,
         'reranking': 'False',
         'reranking_mode': 'reranking_with_sentence_transformers',
-        'top_k_reranker': 3,
         'fusion_mode': 'DBSF',
         'rewrite': 'False',
         'rewrite_mode': 'subqueries_keywords',
@@ -98,6 +98,24 @@ def _setup_qdrant_env() -> None:
 def _cleanup_collection(name: str) -> None:
     if Qdrant.get_client().collection_exists(name):
         Qdrant.get_client().delete_collection(name)
+
+
+def _retrieve(
+    queries: _Queries,
+    user_config: dict[str, Any],
+    opt_config: dict[str, Any],
+) -> list[ScoredPoint]:
+    """The pool of `search_authorized` before reranking and authorization."""
+    root = _build_prefetch_tree(_embed_queries(queries, opt_config), opt_config)
+    return _retrieve_pool(root, user_config, opt_config)
+
+
+def _point_ids(points: list[ScoredPoint]) -> list[Any]:
+    return [point.id for point in points]
+
+
+def _sources(points: list[ScoredPoint]) -> set[str]:
+    return {str(point.payload['source']) for point in points if point.payload}
 
 
 @unittest.skipUnless(
@@ -497,7 +515,6 @@ class QdrantRerankingFlagRerankerTestCase(unittest.TestCase):
         cls.opt_config = make_opt_config(search_mode='dense')
         cls.opt_config['reranking'] = 'True'
         cls.opt_config['reranking_mode'] = 'reranking_with_flagreranker'
-        cls.opt_config['top_k_reranker'] = 3
         _cleanup_collection(cls.collection_name)
         index(SAMPLE_DOCUMENTS, cls.user_config, cls.opt_config)
 
@@ -505,27 +522,32 @@ class QdrantRerankingFlagRerankerTestCase(unittest.TestCase):
     def tearDownClass(cls) -> None:
         _cleanup_collection(cls.collection_name)
 
+    def _rerank(self, question: str) -> tuple[list[ScoredPoint], list[ScoredPoint]]:
+        pool = _retrieve(_Queries(question, [], []), self.user_config, self.opt_config)
+        return pool, _rerank_pool(question, list(pool), self.user_config, self.opt_config)
+
     def test_reranking_returns_results(self) -> None:
-        points = _collect_query_points('What are rabbits?', self.user_config, self.opt_config)
+        _, points = self._rerank('What are rabbits?')
         self.assertGreater(len(points), 0)
 
     def test_reranking_adds_score_to_payload(self) -> None:
-        points = _collect_query_points('small mammals herbivore', self.user_config, self.opt_config)
+        _, points = self._rerank('small mammals herbivore')
         self.assertGreater(len(points), 0)
         for point in points:
             assert point.payload is not None
             self.assertIn('reranking_score', point.payload)
 
     def test_reranking_relevance(self) -> None:
-        points = _collect_query_points('vector similarity search engine', self.user_config, self.opt_config)
+        _, points = self._rerank('vector similarity search engine')
         self.assertGreater(len(points), 0)
         payload = points[0].payload
         assert payload is not None
         self.assertIn('Qdrant', payload['content'])
 
-    def test_reranking_respects_top_k(self) -> None:
-        points = _collect_query_points('programming', self.user_config, self.opt_config)
-        self.assertLessEqual(len(points), self.opt_config['top_k_reranker'])
+    def test_reranking_keeps_the_whole_pool(self) -> None:
+        pool, points = self._rerank('programming')
+        self.assertEqual(len(pool), len(SAMPLE_DOCUMENTS))
+        self.assertEqual(sorted(_point_ids(points)), sorted(_point_ids(pool)))
 
 
 @unittest.skipUnless(
@@ -546,7 +568,6 @@ class QdrantRerankingCrossEncoderTestCase(unittest.TestCase):
         cls.opt_config = make_opt_config(search_mode='dense')
         cls.opt_config['reranking'] = 'True'
         cls.opt_config['reranking_mode'] = 'reranking_with_sentence_transformers'
-        cls.opt_config['top_k_reranker'] = 3
         _cleanup_collection(cls.collection_name)
         index(SAMPLE_DOCUMENTS, cls.user_config, cls.opt_config)
 
@@ -554,27 +575,119 @@ class QdrantRerankingCrossEncoderTestCase(unittest.TestCase):
     def tearDownClass(cls) -> None:
         _cleanup_collection(cls.collection_name)
 
+    def _rerank(self, question: str) -> tuple[list[ScoredPoint], list[ScoredPoint]]:
+        pool = _retrieve(_Queries(question, [], []), self.user_config, self.opt_config)
+        return pool, _rerank_pool(question, list(pool), self.user_config, self.opt_config)
+
     def test_reranking_returns_results(self) -> None:
-        points = _collect_query_points('What are rabbits?', self.user_config, self.opt_config)
+        _, points = self._rerank('What are rabbits?')
         self.assertGreater(len(points), 0)
 
     def test_reranking_adds_score_to_payload(self) -> None:
-        points = _collect_query_points('small mammals herbivore', self.user_config, self.opt_config)
+        _, points = self._rerank('small mammals herbivore')
         self.assertGreater(len(points), 0)
         for point in points:
             assert point.payload is not None
             self.assertIn('reranking_score', point.payload)
 
     def test_reranking_relevance(self) -> None:
-        points = _collect_query_points('vector similarity search engine', self.user_config, self.opt_config)
+        _, points = self._rerank('vector similarity search engine')
         self.assertGreater(len(points), 0)
         payload = points[0].payload
         assert payload is not None
         self.assertIn('Qdrant', payload['content'])
 
-    def test_reranking_respects_top_k(self) -> None:
-        points = _collect_query_points('programming', self.user_config, self.opt_config)
-        self.assertLessEqual(len(points), self.opt_config['top_k_reranker'])
+    def test_reranking_keeps_the_whole_pool(self) -> None:
+        pool, points = self._rerank('programming')
+        self.assertEqual(len(pool), len(SAMPLE_DOCUMENTS))
+        self.assertEqual(sorted(_point_ids(points)), sorted(_point_ids(pool)))
+
+
+@unittest.skipUnless(
+    os.environ.get('RUN_INTEGRATION_TESTS'),
+    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
+)
+class QdrantAuthorizedPoolTestCase(unittest.TestCase):
+    """Test the candidate pool of search_authorized: one Qdrant call with the fusion tree."""
+
+    collection_name = 'test_integration_pool'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        _setup_qdrant_env()
+        cls.user_config = {'collection_name': cls.collection_name}
+        cls.opt_config = make_opt_config(search_mode='dense')
+        _cleanup_collection(cls.collection_name)
+        index(SAMPLE_DOCUMENTS, cls.user_config, cls.opt_config)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        _cleanup_collection(cls.collection_name)
+
+    def _pool(self, queries: _Queries, **overrides: Any) -> list[ScoredPoint]:
+        return _retrieve(queries, self.user_config, {**self.opt_config, **overrides})
+
+    def test_dense_pool_size_follows_prefetch_limit_and_not_top_k(self) -> None:
+        for limit in (1, 2):
+            with self.subTest(prefetch_limit_dense=limit):
+                pool = self._pool(_Queries('What are rabbits?', [], []), prefetch_limit_dense=limit, top_k=3)
+                self.assertEqual(len(pool), limit)
+
+    def test_pool_is_the_union_of_question_and_subqueries(self) -> None:
+        pool = self._pool(
+            _Queries('What are rabbits?', ['Python programming language'], []),
+            prefetch_limit_dense=1, top_k_subqueries=1,
+        )
+        self.assertEqual(_sources(pool), {'test/rabbits.txt', 'test/python.txt'})
+
+    def test_pool_without_rewrite_misses_what_only_a_subquery_finds(self) -> None:
+        pool = self._pool(_Queries('What are rabbits?', [], []), prefetch_limit_dense=1)
+        self.assertEqual(_sources(pool), {'test/rabbits.txt'})
+
+    def test_document_found_by_question_and_subquery_is_in_the_pool_once(self) -> None:
+        pool = self._pool(
+            _Queries('What are rabbits?', ['small herbivore pets', 'rabbit'], []),
+            prefetch_limit_dense=1, top_k_subqueries=1,
+        )
+        self.assertEqual(len(pool), 1)
+        self.assertEqual(_sources(pool), {'test/rabbits.txt'})
+
+
+@unittest.skipUnless(
+    os.environ.get('RUN_INTEGRATION_TESTS'),
+    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
+)
+class QdrantAuthorizedPoolHybridTestCase(unittest.TestCase):
+    """Test that the server accepts the full fusion tree with weights and rrf_k."""
+
+    collection_name = 'test_integration_pool_hybrid'
+    user_config: ClassVar[dict[str, Any]]
+    opt_config: ClassVar[dict[str, Any]]
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        _setup_qdrant_env()
+        cls.user_config = {'collection_name': cls.collection_name}
+        cls.opt_config = make_opt_config(search_mode='dense_sparse')
+        _cleanup_collection(cls.collection_name)
+        index(SAMPLE_DOCUMENTS, cls.user_config, cls.opt_config)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        _cleanup_collection(cls.collection_name)
+
+    def test_server_accepts_the_full_weighted_tree(self) -> None:
+        """Hybrid question, subqueries and keywords with fusion_weights and rrf_k in one request."""
+        opt_config = {**self.opt_config, 'fusion_mode': 'RRF', 'fusion_weights': {'original': 2, 'rewrite': 0.5}, 'rrf_k': 60}
+        queries = _Queries('What are rabbits?', ['small herbivore pets', 'programming language'], ['Qdrant', 'vector'])
+
+        pool = _retrieve(queries, self.user_config, opt_config)
+
+        self.assertGreater(len(pool), 0)
+        self.assertEqual(len(_point_ids(pool)), len(set(_point_ids(pool))))
+        self.assertTrue(all(point.score is not None for point in pool))
 
 
 @unittest.skipUnless(

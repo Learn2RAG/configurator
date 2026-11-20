@@ -1,7 +1,22 @@
 # Changelog
 ## [Unreleased]
+### Added
+- `fusion_weights` and optional `rrf_k` in `opt_config.json` to weight the original question against subqueries and keywords
 
+### Fixed
+- authorized search no longer repeats the rewrite LLM calls and the embeddings when too few results are authorized
+- authorized search checks each document at most once per request
 
+### Changed
+- **BREAKING:** `top_k` is now only the maximum number of contexts handed to the LLM; it no longer limits the candidates of the search
+- **BREAKING:** `prefetch_limit_dense`, `prefetch_limit_sparse` and `prefetch_limit_colbert` also apply to the search modes `dense` and `sparse` and define the size of the candidate pool
+- authorized search builds one candidate pool per request, sorts it (reranker or rank fusion) and checks the authorization lazily in rank order
+- reranking sorts the whole candidate pool instead of cutting it off
+- default search mode is `dense_sparse`
+- default of `prefetch_limit_dense`, `prefetch_limit_sparse` and `prefetch_limit_colbert` is 15 instead of 25
+
+### Removed
+- **BREAKING:** `top_k_reranker`, `max_auth_retries`, `auth_oversample_start` and `auth_oversample_step` from `opt_config.json`; they are ignored if still present
 
 ## [1.0.0] - 2026-09-16
 ### Added
