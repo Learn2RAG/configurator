@@ -37,16 +37,31 @@ logger = logging.getLogger("Learn2RAGImporter")
 statusLogger = logging.getLogger('status')
 
 
+def _site_root(path: str) -> str:
+    """The folder a crawl is limited to, always ending in '/'.
+
+    '/docs/' and '/docs' both mean the folder '/docs/'; a start page such as
+    '/docs/index.html' means the folder it is in.
+    """
+    if path.endswith('/'):
+        return path
+    last_segment = path.rsplit('/', 1)[-1]
+    if '.' in last_segment:
+        return path[:-len(last_segment)]
+    return path + '/'
+
+
 def _is_same_site(url: str, base_url: str) -> bool:
-    """Check if url is on the same domain and under the same path prefix as base_url."""
+    """Check if url is on the same domain and under the same folder as base_url."""
     parsed_url = urlparse(url)
     parsed_base = urlparse(base_url)
     if parsed_url.scheme not in ('http', 'https'):
         return False
     if parsed_url.netloc != parsed_base.netloc:
         return False
-    base_path = parsed_base.path.rstrip('/')
-    return not base_path or parsed_url.path.startswith(base_path)
+    root = _site_root(parsed_base.path or '/')
+    path = parsed_url.path or '/'
+    return path.startswith(root) or path == root.rstrip('/')
 
 
 def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = None, loader_id: str = "N/A", _base_url: Optional[str] = None, skipped: Optional[Set[str]] = None, progress: Optional["ImportProgress"] = None) -> List[Document]:

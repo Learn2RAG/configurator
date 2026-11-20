@@ -470,6 +470,22 @@ class IsSameSiteTestCase(unittest.TestCase):
         # Fragment-only links resolve to the same page and remain on-site
         self.assertTrue(_is_same_site("https://example.com/docs/page#section", "https://example.com/docs/"))
 
+    def test_start_page_means_its_folder(self) -> None:
+        # Starting a crawl at a page crawls the folder that page is in
+        self.assertTrue(_is_same_site("https://example.com/page2.html", "https://example.com/index.html"))
+        self.assertTrue(_is_same_site("https://example.com/sub/page3.html", "https://example.com/index.html"))
+        self.assertTrue(_is_same_site("https://example.com/docs/b.html", "https://example.com/docs/a.html"))
+        self.assertFalse(_is_same_site("https://example.com/blog/post", "https://example.com/docs/a.html"))
+
+    def test_folder_without_trailing_slash(self) -> None:
+        self.assertTrue(_is_same_site("https://example.com/docs/guide", "https://example.com/docs"))
+        self.assertTrue(_is_same_site("https://example.com/docs", "https://example.com/docs"))
+        # A sibling that merely shares the prefix is a different folder
+        self.assertFalse(_is_same_site("https://example.com/docs-old/guide", "https://example.com/docs"))
+
+    def test_different_port_is_another_site(self) -> None:
+        self.assertFalse(_is_same_site("http://localhost:9/page", "http://localhost:7339/index.html"))
+
 
 def _make_response(text: str, status_code: int = 200) -> MagicMock:
     """Helper: creates a fake requests.Response."""
@@ -917,6 +933,51 @@ class MediaWikiLoaderUnitTestCase(unittest.TestCase):
         self.assertIn("https://wiki.example.com/?curid=2", sources)
         self.assertTrue(all(doc.metadata.get("loader") == "MediaWikiLoader" for doc in docs))
         self.assertTrue(all("content_hash" in doc.metadata for doc in docs))
+
+    @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
+    @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")
+    def test_load_from_mediawiki_falls_back_to_wikitext(
+        self,
+        mock_resolve_api: MagicMock,
+        mock_session_cls: MagicMock,
+    ) -> None:
+        """Wikis without the TextExtracts extension return no "extract"; use the page source, not just the title."""
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        allpages = _make_json_response({"query": {"allpages": [{"pageid": 1, "title": "Main Page"}, {"pageid": 2, "title": "Empty"}]}})
+        pages_payload = _make_json_response(
+            {
+                "query": {
+                    "pages": [
+                        {
+                            "pageid": 1,
+                            "ns": 0,
+                            "title": "Main Page",
+                            "revisions": [{
+                                "timestamp": "2026-08-10T11:00:00Z",
+                                "slots": {"main": {"contentmodel": "wikitext", "content": "<strong>MediaWiki has been installed.</strong>"}},
+                            }],
+                        },
+                        {
+                            "pageid": 2,
+                            "ns": 0,
+                            "title": "Empty",
+                            "revisions": [{"timestamp": "2026-08-10T12:00:00Z", "slots": {"main": {"content": ""}}}],
+                        },
+                    ]
+                }
+            }
+        )
+        mock_session.get.side_effect = [allpages, pages_payload]
+
+        docs = load_from_mediawiki(base_url="https://wiki.example.com", loader_id="wiki_test", namespaces=[0])
+
+        contents = {doc.metadata["title"]: doc.page_content for doc in docs}
+        self.assertEqual(contents["Main Page"], "<strong>MediaWiki has been installed.</strong>")
+        # Nothing at all to import: the title is still better than dropping the page
+        self.assertEqual(contents["Empty"], "Empty")
+        _, kwargs = mock_session.get.call_args
+        self.assertIn("content", kwargs["params"]["rvprop"].split("|"))
 
     @patch("learn2rag.importer.loaders.mediawiki_loader.requests.Session")
     @patch("learn2rag.importer.loaders.mediawiki_loader._resolve_api_url", return_value="https://wiki.example.com/api.php")

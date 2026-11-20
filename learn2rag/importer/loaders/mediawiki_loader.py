@@ -287,6 +287,14 @@ def _chunked(values: Iterable[int], chunk_size: int) -> Iterable[List[int]]:
         yield chunk
 
 
+def _revision_wikitext(revision: Dict[str, Any]) -> str:
+    """The page source from a revision (formatversion=2, rvslots=main)."""
+    slots = revision.get("slots")
+    main = slots.get("main") if isinstance(slots, dict) else None
+    content = main.get("content") if isinstance(main, dict) else None
+    return content.strip() if isinstance(content, str) else ""
+
+
 def _fetch_pages(
     api_url: str,
     base_url: str,
@@ -311,7 +319,8 @@ def _fetch_pages(
             "explaintext": 1,
             "exlimit": "max",
             "exsectionformat": "plain",
-            "rvprop": "timestamp",
+            # The wikitext is the fallback for wikis without the TextExtracts extension
+            "rvprop": "timestamp|content",
             "rvslots": "main",
             "pageids": "|".join(str(i) for i in id_chunk),
             "redirects": 1,
@@ -338,10 +347,14 @@ def _fetch_pages(
 
             revisions = page.get("revisions", [])
             updated = ""
+            wikitext = ""
             if isinstance(revisions, list) and revisions and isinstance(revisions[0], dict):
                 updated = str(revisions[0].get("timestamp", ""))
+                wikitext = _revision_wikitext(revisions[0])
 
-            page_content = extract if extract else title
+            # Without TextExtracts there is no "extract"; fall back to the page source
+            # instead of importing only the title.
+            page_content = extract or wikitext or title
             if not page_content.strip():
                 continue
 
