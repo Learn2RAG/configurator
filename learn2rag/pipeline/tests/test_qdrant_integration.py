@@ -10,7 +10,7 @@ from qdrant_client.models import Distance
 
 from ..qdrant import Qdrant
 from ..ingestion import index
-from ..search import search, search_multi, _Queries, _build_prefetch_tree, _embed_queries, _rerank_pool, _retrieve_pool
+from ..search import search, search_multi, _Queries, _build_prefetch_tree, _embed_queries, _read_fusion_params, _rerank_pool, _retrieve_pool
 from ..store import get_documents, delete_documents, update_documents
 
 load_dotenv(Path(__file__).resolve().parents[3] / '.env')
@@ -106,7 +106,7 @@ def _retrieve(
     opt_config: dict[str, Any],
 ) -> list[ScoredPoint]:
     """The pool of `search_authorized` before reranking and authorization."""
-    root = _build_prefetch_tree(_embed_queries(queries, opt_config), opt_config)
+    root = _build_prefetch_tree(_embed_queries(queries, opt_config), opt_config, _read_fusion_params(opt_config))
     return _retrieve_pool(root, user_config, opt_config)
 
 

@@ -113,19 +113,25 @@ class SearchAuthorizedHistoryTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def _run(self, opt_config: dict[str, Any], history: list[Any], contextualize_return: str = 'carrot colors') -> MagicMock:
         # Six chunks of six documents: with top_k=3 the lazy check needs two blocks
-        pool = [
-            ScoredPoint(id=i, score=1.0 - i * 0.01, version=1,
-                        payload={"loader_id": "loader", "document_id": f"doc {i}", "content": f"doc {i}"})
-            for i in range(6)
-        ]
+        pool = _points(range(6))
         auth_filter = MagicMock()
         auth_filter.filter_documents = AsyncMock(side_effect=lambda _auth, documents: set(list(documents)[:1]))
-        with patch("learn2rag.pipeline.search._retrieve_pool", return_value=pool), \
+        pools = iter([pool])
+        with patch("learn2rag.pipeline.search._retrieve_pool", side_effect=lambda *args, **kwargs: next(pools, [])), \
              patch("learn2rag.pipeline.authorization._get_authorization_filter", return_value=auth_filter), \
              patch.object(rewrite, 'contextualize_query', return_value=contextualize_return) as fake_contextualize:
             await search_authorized(
                 "tell me again", {}, history=history, user_config=self.user_config, opt_config=opt_config)
         return fake_contextualize
+
+    async def _run_rounds_without_rights(self, opt_config: dict[str, Any], rounds: list[list[ScoredPoint]]) -> MagicMock:
+        """Search with one pool per round; no document is authorized, so every round runs."""
+        auth_filter = MagicMock()
+        auth_filter.filter_documents = AsyncMock(return_value=set())
+        with patch("learn2rag.pipeline.search._retrieve_pool", side_effect=rounds) as retrieve_pool, \
+             patch("learn2rag.pipeline.authorization._get_authorization_filter", return_value=auth_filter):
+            await search_authorized("tell me again", {}, user_config=self.user_config, opt_config=opt_config)
+        return retrieve_pool
 
     async def test_embedding_and_reranker_get_contextualized_question(self) -> None:
         await self._run(_base_opt_config(reranking="True"), [MagicMock()])
@@ -150,6 +156,33 @@ class SearchAuthorizedHistoryTestCase(unittest.IsolatedAsyncioTestCase):
         fake_contextualize = await self._run(_base_opt_config(), [MagicMock()])
 
         fake_contextualize.assert_called_once()
+
+    async def test_rewrite_and_embeddings_run_once_across_rounds(self) -> None:
+        opt_config = _base_opt_config(rewrite_mode="subqueries_keywords", max_search_rounds=3)
+        rounds = [_points(range(0, 3)), _points(range(3, 6)), _points(range(6, 9))]
+        with patch.object(rewrite, 'generate_subqueries', return_value=['carrot color varieties']) as fake_subqueries, \
+             patch.object(rewrite, 'generate_keywords', return_value=['carrot']) as fake_keywords:
+            retrieve_pool = await self._run_rounds_without_rights(opt_config, rounds)
+
+        fake_subqueries.assert_called_once()
+        fake_keywords.assert_called_once()
+        self.embed_queries.assert_called_once()
+        self.assertEqual(retrieve_pool.call_count, 3)
+
+    async def test_reranker_gets_only_the_pool_of_its_round(self) -> None:
+        rounds = [_points(range(0, 3)), _points(range(3, 6)), []]
+        await self._run_rounds_without_rights(_base_opt_config(rewrite="False", reranking="True"), rounds)
+
+        self.assertEqual([call.args[1] for call in self.rerank_pool.call_args_list], rounds[:2])
+
+
+def _points(ids: range) -> list[ScoredPoint]:
+    """One chunk per document."""
+    return [
+        ScoredPoint(id=i, score=1.0 - i * 0.01, version=1,
+                    payload={"loader_id": "loader", "document_id": f"doc {i}", "content": f"doc {i}"})
+        for i in ids
+    ]
 
 
 if __name__ == "__main__":

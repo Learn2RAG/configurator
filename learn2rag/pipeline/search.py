@@ -3,6 +3,7 @@ import warnings
 from typing import (
     cast,
     Any,
+    Iterable,
     List,
     Mapping,
     Sequence,
@@ -18,13 +19,14 @@ from sentence_transformers.base.modality_types import PairInput
 from qdrant_client import models
 from qdrant_client.http.models import QueryResponse, ScoredPoint
 
-from .authorization import filter_authorized_cached
+from .authorization import DOC_ID_FIELDS, _get_doc_id, _get_loader_id, filter_authorized_cached, get_doc_id_field
 from .chat import Message
 from .config import opt_config, user_config
 from .embeddings import create_embeddings
 from .qdrant import Qdrant
 from . import rewrite
 
+logger = logging.getLogger(__name__)
 profilingLogger = logging.getLogger('profiling')
 
 
@@ -445,16 +447,23 @@ def _rrf_query(weights: list[float] | None = None, k: int | None = None) -> mode
     return models.RrfQuery(rrf=models.Rrf(k=k, weights=weights))
 
 
-def _vector_branch(embedding: _Embedding, opt_config: dict[str, Any], limit: int | None = None) -> models.Prefetch:
+def _vector_branch(
+    embedding: _Embedding,
+    opt_config: dict[str, Any],
+    limit: int | None = None,
+    exclusion: models.Filter | None = None,
+) -> models.Prefetch:
     """Search with all vector types of the search mode and fuse them with `fusion_mode`.
 
     Without `limit` the leaves use `prefetch_limit_*` and the fusion keeps all their candidates.
     With `limit` (subqueries) a single leaf and the fusion are limited to it.
+    `exclusion` is set as filter on every leaf.
     """
     leaves = [
         models.Prefetch(
             query=getattr(embedding, vector_type),
             using=vector_type,
+            filter=exclusion,
             limit=opt_config[f"prefetch_limit_{vector_type}"],
         )
         for vector_type in _SEARCH_MODE_VECTORS[opt_config["search_mode"]]
@@ -468,41 +477,80 @@ def _vector_branch(embedding: _Embedding, opt_config: dict[str, Any], limit: int
     return _fuse(leaves, models.FusionQuery(fusion=fusion_mode), limit)
 
 
-def _read_fusion_params(opt_config: dict[str, Any]) -> tuple[tuple[float, float], int | None]:
-    """Read and validate `fusion_weights` (default 1.0 each) and the optional `rrf_k`."""
+def _is_positive_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+_DEFAULT_MAX_SEARCH_ROUNDS = 3
+
+
+def _read_max_search_rounds(opt_config: dict[str, Any]) -> int:
+    """Read `max_search_rounds`; a missing or invalid value means the default."""
+    value = opt_config.get("max_search_rounds", _DEFAULT_MAX_SEARCH_ROUNDS)
+    if not _is_positive_int(value):
+        logger.warning("max_search_rounds must be an integer >= 1, got %r; using %d", value, _DEFAULT_MAX_SEARCH_ROUNDS)
+        return _DEFAULT_MAX_SEARCH_ROUNDS
+    return cast(int, value)
+
+
+@dataclass(frozen=True)
+class _FusionParams:
+    weights: tuple[float, float]
+    """Weights of branch A (original) and branch B (rewrite) in the root fusion."""
+    rrf_k: int | None
+
+
+def _read_fusion_params(opt_config: dict[str, Any]) -> _FusionParams:
+    """Read `fusion_weights` (default 1.0 each) and the optional `rrf_k`.
+
+    Invalid values fall back to their default with a warning.
+    """
     weights = opt_config.get("fusion_weights", {})
     if not isinstance(weights, dict):
-        raise ValueError("fusion_weights must be an object with the keys 'original' and 'rewrite'")
+        logger.warning("fusion_weights must be an object with the keys 'original' and 'rewrite', got %r; using 1.0 for both",
+                       weights)
+        weights = {}
     values = []
     for key in ("original", "rewrite"):
         value = weights.get(key, 1.0)
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not value > 0:
-            raise ValueError(f"fusion_weights.{key} must be a number > 0, got {value!r}")
+            logger.warning("fusion_weights.%s must be a number > 0, got %r; using 1.0", key, value)
+            value = 1.0
         values.append(float(value))
 
     rrf_k = opt_config.get("rrf_k")
-    if rrf_k is not None and (isinstance(rrf_k, bool) or not isinstance(rrf_k, int) or rrf_k <= 0):
-        raise ValueError(f"rrf_k must be an integer > 0, got {rrf_k!r}")
-    return (values[0], values[1]), rrf_k
+    if rrf_k is not None and not _is_positive_int(rrf_k):
+        logger.warning("rrf_k must be an integer > 0, got %r; using the Qdrant default", rrf_k)
+        rrf_k = None
+    return _FusionParams((values[0], values[1]), rrf_k)
 
 
-def _build_prefetch_tree(embeddings: _QueryEmbeddings, opt_config: dict[str, Any]) -> models.Prefetch:
-    """Build the fusion tree of one request.
+def _build_prefetch_tree(
+    embeddings: _QueryEmbeddings,
+    opt_config: dict[str, Any],
+    fusion_params: _FusionParams,
+    exclusion: models.Filter | None = None,
+) -> models.Prefetch:
+    """Build the fusion tree of one search round.
 
     root   weighted RRF over A (original) and B (rewrites)
     A      vector types of the question, fused with `fusion_mode`
     B      RRF over B1 (RRF over the subqueries) and B2 (RRF over the keywords)
 
-    `fusion_weights` weights A and B, `rrf_k` sets the RRF constant of B1, B2, B and the root.
-    A node with a single child is replaced by the child. All fusion nodes
-    above the individual searches keep all candidates of their children.
+    `fusion_params.weights` weights A and B, `fusion_params.rrf_k` sets the RRF constant of
+    B1, B2, B and the root. A node with a single child is replaced by the child. All fusion
+    nodes above the individual searches keep all candidates of their children.
+    `exclusion` is set as filter on every individual search, so that excluded points do
+    not take places within their limits.
     """
-    fusion_weights, rrf_k = _read_fusion_params(opt_config)
-    branch_a = _vector_branch(embeddings.question, opt_config)
+    rrf_k = fusion_params.rrf_k
+    branch_a = _vector_branch(embeddings.question, opt_config, exclusion=exclusion)
 
-    subqueries = [_vector_branch(e, opt_config, opt_config["top_k_subqueries"]) for e in embeddings.subqueries]
+    subqueries = [
+        _vector_branch(e, opt_config, opt_config["top_k_subqueries"], exclusion) for e in embeddings.subqueries
+    ]
     keywords = [
-        models.Prefetch(query=e.sparse, using="sparse", limit=opt_config["top_k_keywords"])
+        models.Prefetch(query=e.sparse, using="sparse", filter=exclusion, limit=opt_config["top_k_keywords"])
         for e in embeddings.keywords
     ]
     groups = [_fuse(group, _rrf_query(k=rrf_k)) for group in (subqueries, keywords) if group]
@@ -510,7 +558,44 @@ def _build_prefetch_tree(embeddings: _QueryEmbeddings, opt_config: dict[str, Any
         return branch_a
 
     branch_b = _fuse(groups, _rrf_query(k=rrf_k))
-    return _fuse([branch_a, branch_b], _rrf_query(list(fusion_weights), rrf_k))
+    return _fuse([branch_a, branch_b], _rrf_query(list(fusion_params.weights), rrf_k))
+
+
+def _is_empty(field: str) -> models.Filter:
+    """Missing, `null` or `""`, the values `_get_doc_id` skips (apart from other falsy ones like `0`)."""
+    return models.Filter(should=[
+        models.IsEmptyCondition(is_empty=models.PayloadField(key=field)),
+        models.FieldCondition(key=field, match=models.MatchValue(value="")),
+    ])
+
+
+def _document_exclusion(point: ScoredPoint) -> models.Filter | None:
+    """Condition matching all chunks of the document of `point`.
+
+    It compares `loader_id` and exactly the field the document ID comes from, with the stored
+    value; the fields before it must be empty. Returns `None` if the point ID is the document
+    ID (the point itself is excluded by its ID) or a value cannot be matched by Qdrant.
+    """
+    field, value = get_doc_id_field(point)
+    loader_id = (point.payload or {}).get("loader_id")
+    if field == "id" or not isinstance(value, (str, int)) or not isinstance(loader_id, (str, int)):
+        return None
+    preceding = DOC_ID_FIELDS[:DOC_ID_FIELDS.index(field)]
+    return models.Filter(must=[
+        models.FieldCondition(key="loader_id", match=models.MatchValue(value=loader_id)),
+        models.FieldCondition(key=field, match=models.MatchValue(value=value)),
+        *(_is_empty(earlier) for earlier in preceding),
+    ])
+
+
+def _exclusion_filter(
+    point_ids: Sequence[models.ExtendedPointId],
+    documents: Iterable[models.Filter],
+) -> models.Filter | None:
+    """Filter excluding the given points and all chunks of the given documents; `None` if there is nothing to exclude."""
+    must_not: list[models.Condition] = [models.HasIdCondition(has_id=list(point_ids))] if point_ids else []
+    must_not += documents
+    return models.Filter(must_not=must_not) if must_not else None
 
 
 def _retrieve_pool(
@@ -525,11 +610,12 @@ def _retrieve_pool(
     qdrant = Qdrant(collection_name=collection_name, opt_config=opt_config)
 
     if root.prefetch is None:
-        # The tree is a single search.
+        # The tree is a single search, its filter becomes the filter of the query.
         response = qdrant.get_client().query_points(
             collection_name=collection_name,
             query=root.query,
             using=root.using,
+            query_filter=root.filter,
             limit=_limit(root),
             timeout=120,
         )
@@ -591,36 +677,83 @@ async def search_authorized(
     user_config: dict[str, Any] = user_config,
     opt_config: dict[str, Any] = opt_config,
 ) -> List[ScoredPoint]:
-    """Search once, sort the pool and return up to `top_k` authorized points in rank order.
+    """Search in rounds and return up to `top_k` authorized points, ordered by round and rank.
 
-    The pool is checked lazily in blocks of `top_k` candidates; each document is
-    sent to the authorization filter at most once per request.
+    Queries and embeddings are built once. Each round retrieves a pool with the same limits,
+    sorts it and checks it lazily in blocks of `top_k` candidates. If fewer than `top_k`
+    points are authorized, the next round excludes all points delivered so far and all
+    rejected documents. The rounds end at `top_k` authorized points, after
+    `max_search_rounds` rounds or with an empty pool. Each document is sent to the
+    authorization filter at most once per request.
     """
     top_k = opt_config.get("top_k", 10)
+    max_search_rounds = _read_max_search_rounds(opt_config)
+    fusion_params = _read_fusion_params(opt_config)
     queries = await _build_queries(question, history, opt_config, request_id=request_id)
     embeddings = await asyncio.to_thread(_embed_queries, queries, opt_config)
-    root = _build_prefetch_tree(embeddings, opt_config)
-    pool = await asyncio.to_thread(_retrieve_pool, root, user_config, opt_config, request_id=request_id)
-    pool = await asyncio.to_thread(
-        _rerank_pool, queries.question, pool, user_config, opt_config, request_id=request_id)
 
     checked: dict[tuple[str, str], bool] = {}
     authorized_points: list[ScoredPoint] = []
-    n_checked = 0
-    for start in range(0, len(pool), top_k):
-        block = pool[start:start + top_k]
-        authorized_points += await filter_authorized_cached(user_auths, block, checked)
-        n_checked += len(block)
+    delivered_ids: list[models.ExtendedPointId] = []
+    rejected: dict[tuple[str, str], models.Filter | None] = {}
+    n_pool = n_checked = rounds = 0
+    stop_reason = "max_rounds"
+    while rounds < max_search_rounds:
+        rounds += 1
+        excluded_documents = [condition for condition in rejected.values() if condition is not None]
+        exclusion = _exclusion_filter(delivered_ids, excluded_documents)
+        root = _build_prefetch_tree(embeddings, opt_config, fusion_params, exclusion)
+        pool = await asyncio.to_thread(_retrieve_pool, root, user_config, opt_config, request_id=request_id)
+        if pool:
+            pool = await asyncio.to_thread(
+                _rerank_pool, queries.question, pool, user_config, opt_config, request_id=request_id)
+
+        n_authorized_before = len(authorized_points)
+        n_round_checked = 0
+        for start in range(0, len(pool), top_k):
+            block = pool[start:start + top_k]
+            authorized_points += await filter_authorized_cached(user_auths, block, checked)
+            n_round_checked += len(block)
+            if len(authorized_points) >= top_k:
+                break
+        n_pool += len(pool)
+        n_checked += n_round_checked
+
+        profilingLogger.info(
+            "search_round round=%d pool=%d checked=%d authorized=%d excluded_points=%d excluded_documents=%d",
+            rounds,
+            len(pool),
+            n_round_checked,
+            len(authorized_points) - n_authorized_before,
+            len(delivered_ids),
+            len(excluded_documents),
+            extra={'activity': 'search_authorized', 'request_id': request_id},
+        )
+        if not pool:
+            stop_reason = "exhausted"
+            break
         if len(authorized_points) >= top_k:
+            stop_reason = "top_k"
             break
 
+        # Not enough authorized points: the whole pool is checked.
+        delivered_ids += [point.id for point in pool]
+        for point in pool:
+            if not point.payload:
+                continue
+            key = (await _get_loader_id(point), await _get_doc_id(point))
+            if checked.get(key) is False and key not in rejected:
+                rejected[key] = _document_exclusion(point)
+
     profilingLogger.info(
-        "authorization_checked pool=%d checked=%d documents=%d authorized=%d top_k=%d",
-        len(pool),
+        "authorization_checked pool=%d checked=%d documents=%d authorized=%d top_k=%d rounds=%d stop_reason=%s",
+        n_pool,
         n_checked,
         len(checked),
         len(authorized_points),
         top_k,
+        rounds,
+        stop_reason,
         extra={'activity': 'search_authorized', 'request_id': request_id},
     )
     return authorized_points[:top_k]

@@ -88,24 +88,33 @@ async def _get_loader_id(point: ScoredPoint) -> str:
     return str(point.payload.get('loader_id', 'unknown'))
 
 
-async def _get_doc_id(point: ScoredPoint) -> str:
-    """This must return the unique document/URL identifier to prevent overwrite bugs."""
-    # If there is no payload at all, fallback to the guaranteed unique Qdrant ID
-    if not point.payload:
-        return str(point.id)
+DOC_ID_FIELDS = ("document_id", "source", "node_id")
 
+
+def get_doc_id_field(point: ScoredPoint) -> Tuple[str, Any]:
+    """Return the payload field the document ID of a point comes from and its stored value.
+
+    The field is the first of `DOC_ID_FIELDS` with a non-empty value, or `"id"` with the
+    Qdrant point ID. `_get_doc_id` and the exclusion filter of the search both rely on it.
+    """
     # Different loaders inject different metadata keys for their primary identifier.
     # We must return a strictly unique ID per document. If multiple documents return an
     # empty string, they overwrite each other in the authorization dictionary, causing a
     # critical security bypass where one public document authorizes restricted documents.
-    unique_id = (
-            point.payload.get("document_id") or
-            point.payload.get("source") or
-            point.payload.get("node_id")
-    )
+    if point.payload:
+        for field in DOC_ID_FIELDS:
+            value = point.payload.get(field)
+            if value:
+                return field, value
 
-    # Ultimate fallback: use the Qdrant vector point ID if no metadata keys match
-    return str(unique_id if unique_id else point.id)
+    # Ultimate fallback: use the guaranteed unique Qdrant point ID if there is no payload
+    # or no metadata key matches
+    return "id", point.id
+
+
+async def _get_doc_id(point: ScoredPoint) -> str:
+    """This must return the unique document/URL identifier to prevent overwrite bugs."""
+    return str(get_doc_id_field(point)[1])
 
 
 async def filter_authorized(user_auths: Mapping[str, Any], search_results: QueryResponse) -> List[ScoredPoint]:

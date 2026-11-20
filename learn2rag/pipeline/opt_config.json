@@ -9,6 +9,7 @@
   },
   "search_mode": "dense_sparse",
   "top_k": 5,
+  "max_search_rounds": 3,
   "reranking": "False",
   "reranking_mode": "reranking_with_sentence_transformers",
   "fusion_mode": "DBSF",

@@ -1,7 +1,8 @@
 # Changelog
 ## [Unreleased]
 ### Added
-- `fusion_weights` and optional `rrf_k` in `opt_config.json` to weight the original question against subqueries and keywords
+- `fusion_weights` and optional `rrf_k` in `opt_config.json` to weight the original question against subqueries and keywords; invalid values fall back to their default with a warning
+- `max_search_rounds` in `opt_config.json` (default 3): authorized search searches again if fewer than `top_k` results are authorized
 
 ### Fixed
 - authorized search no longer repeats the rewrite LLM calls and the embeddings when too few results are authorized
@@ -10,7 +11,8 @@
 ### Changed
 - **BREAKING:** `top_k` is now only the maximum number of contexts handed to the LLM; it no longer limits the candidates of the search
 - **BREAKING:** `prefetch_limit_dense`, `prefetch_limit_sparse` and `prefetch_limit_colbert` also apply to the search modes `dense` and `sparse` and define the size of the candidate pool
-- authorized search builds one candidate pool per request, sorts it (reranker or rank fusion) and checks the authorization lazily in rank order
+- authorized search builds a candidate pool, sorts it (reranker or rank fusion) and checks the authorization lazily in rank order; with too few authorized results it repeats this in up to `max_search_rounds` rounds, excluding the candidates and the rejected documents of the previous rounds
+- **BREAKING:** for users with few permissions a request runs up to `max_search_rounds` Qdrant searches, reranker runs and authorization checks
 - reranking sorts the whole candidate pool instead of cutting it off
 - default search mode is `dense_sparse`
 - default of `prefetch_limit_dense`, `prefetch_limit_sparse` and `prefetch_limit_colbert` is 15 instead of 25
