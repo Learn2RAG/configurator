@@ -5,5 +5,8 @@ services:
     volumes:
       - ./opt:/opt
     entrypoint: "/opt/entrypoint"
+    environment:
+      # Passed through from the host, if set
+      - MEDIAWIKI_URL
     ports:
       - "7338:80"

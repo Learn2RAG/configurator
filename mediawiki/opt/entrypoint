@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-URL="http://localhost:7338"
-URL="http://dice-learn2rag-basic-dev.cs.uni-paderborn.de:7338"
+# Public address of the wiki; set MEDIAWIKI_URL when it is served under another host name
+URL="${MEDIAWIKI_URL:-http://localhost:7338}"
 
 if [ ! -e "./LocalSettings.php" ]; then
     runuser -u www-data -- \
