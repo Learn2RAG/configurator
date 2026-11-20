@@ -51,6 +51,19 @@ def test_web_import_depth(web_instance: str, rag_env: RagEnvironment, depth: int
 
 
 @requires_docker_compose
+def test_web_import_site_root_once(web_instance: str, rag_env: RagEnvironment) -> None:
+    """'/' and '/index.html' are the same page and must be imported only once."""
+    loader = html_loader(-1) | {'url': f'{BASE_URL}/'}
+    assert not rag_env.run_import([loader]).failed, 'import succeeded'
+
+    sources = rag_env.imported_sources()
+    assert {f'{BASE_URL}/', f'{BASE_URL}/index.html'} & sources, 'start page was imported'
+    assert not {f'{BASE_URL}/', f'{BASE_URL}/index.html'} <= sources, 'start page imported once'
+    assert rag_env.imported_text().count(INDEX_TEXT) == 1, 'start page text stored once'
+    assert PAGE3_TEXT in rag_env.imported_text(), 'the rest of the site was crawled'
+
+
+@requires_docker_compose
 def test_web_pipeline(web_instance: str, rag_env: RagEnvironment) -> None:
     loaders = [html_loader(-1)]
     assert not rag_env.run_import(loaders).failed, 'import succeeded'

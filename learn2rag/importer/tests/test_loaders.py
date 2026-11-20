@@ -579,6 +579,66 @@ class HtmlLoaderDepthMinusOneTestCase(unittest.TestCase):
             self.assertEqual(doc.metadata.get("loader_type"), "HTMLLoader")
 
 
+class HtmlLoaderCrawlRobustnessTestCase(unittest.TestCase):
+    """Broken links, duplicate pages and fragments during a crawl, with mocked HTTP requests."""
+
+    PAGES = {
+        "https://example.com/": """<html><body><p>Home page</p>
+            <a href="https://broken.example.com/">Broken (listed first)</a>
+            <a href="/missing">Missing page</a>
+            <a href="/index.html">Home again</a>
+            <a href="/about#team">About, team section</a>
+            <a href="/about">About</a>
+        </body></html>""",
+        "https://example.com/about": "<html><body><p>About page</p></body></html>",
+    }
+    # Same HTML as the home page: '/' and '/index.html' are one page
+    PAGES["https://example.com/index.html"] = PAGES["https://example.com/"]
+
+    def _fake_get(self, url: str, **kwargs: Any) -> MagicMock:
+        if url == "https://broken.example.com/":
+            raise requests.exceptions.ConnectionError("connection refused")
+        if url not in self.PAGES:
+            response = _make_response("Not found", status_code=404)
+            response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
+            return response
+        return _make_response(self.PAGES[url])
+
+    @patch("learn2rag.importer.loaders.html_loader.requests.get")
+    def test_broken_links_do_not_stop_the_crawl(self, mock_get: MagicMock) -> None:
+        mock_get.side_effect = self._fake_get
+        skipped: Set[str] = set()
+        docs = load_html_content("https://example.com/", depth=1, loader_id="test", skipped=skipped)
+
+        sources = {doc.metadata["source"] for doc in docs}
+        self.assertIn("https://example.com/about", sources, "links after the broken ones were still crawled")
+        self.assertIn("https://broken.example.com/", skipped)
+        self.assertIn("https://example.com/missing", skipped)
+
+    @patch("learn2rag.importer.loaders.html_loader.requests.get")
+    def test_unreachable_start_page_still_raises(self, mock_get: MagicMock) -> None:
+        mock_get.side_effect = self._fake_get
+        with self.assertRaises(LoaderAccessError):
+            load_html_content("https://broken.example.com/", depth=1, loader_id="test")
+
+    @patch("learn2rag.importer.loaders.html_loader.requests.get")
+    def test_same_page_under_two_urls_is_loaded_once(self, mock_get: MagicMock) -> None:
+        mock_get.side_effect = self._fake_get
+        docs = load_html_content("https://example.com/", depth=-1, loader_id="test")
+
+        sources = [doc.metadata["source"] for doc in docs]
+        self.assertEqual(sorted(sources), ["https://example.com/", "https://example.com/about"])
+
+    @patch("learn2rag.importer.loaders.html_loader.requests.get")
+    def test_fragment_links_are_not_fetched_again(self, mock_get: MagicMock) -> None:
+        mock_get.side_effect = self._fake_get
+        load_html_content("https://example.com/", depth=-1, loader_id="test")
+
+        fetched = [call.args[0] for call in mock_get.call_args_list]
+        self.assertEqual(fetched.count("https://example.com/about"), 1)
+        self.assertNotIn("https://example.com/about#team", fetched)
+
+
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------

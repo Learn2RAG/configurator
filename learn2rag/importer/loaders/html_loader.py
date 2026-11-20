@@ -20,7 +20,7 @@ from datetime import datetime
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 from typing import List, Optional, Set, TYPE_CHECKING
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urldefrag, urlparse, urljoin
 from ..globals import stop_loading
 from langchain_community.document_loaders import UnstructuredHTMLLoader
 from langchain_core.documents import Document
@@ -64,7 +64,7 @@ def _is_same_site(url: str, base_url: str) -> bool:
     return path.startswith(root) or path == root.rstrip('/')
 
 
-def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = None, loader_id: str = "N/A", _base_url: Optional[str] = None, skipped: Optional[Set[str]] = None, progress: Optional["ImportProgress"] = None) -> List[Document]:
+def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = None, loader_id: str = "N/A", _base_url: Optional[str] = None, skipped: Optional[Set[str]] = None, progress: Optional["ImportProgress"] = None, _seen_hashes: Optional[Set[str]] = None) -> List[Document]:
     """
     Load HTML content from a URL and optionally follow links recursively.
 
@@ -75,6 +75,8 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
             and under the same path as the root URL).
         visited (set): A set of visited URLs to avoid duplicates.
         _base_url: Internal parameter to track the root URL for domain filtering.
+        _seen_hashes: Internal parameter with the content hashes already loaded, so the
+            same page reached under two URLs (e.g. '/' and '/index.html') is imported once.
 
     Returns:
         list: A list of LangChain Document objects with extracted content.
@@ -87,6 +89,12 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
 
     if skipped is None:
         skipped = set()
+
+    if _seen_hashes is None:
+        _seen_hashes = set()
+
+    # '#section' links point to the same document
+    url = urldefrag(url).url
 
     if url in visited:
         logger.info(f"Skipping already visited URL: {url}")
@@ -108,6 +116,16 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
     except requests.exceptions.RequestException as exc:
         raise LoaderAccessError(f"HTML source '{url}' is not reachable or returned an error: {exc}") from exc
 
+    # Compute one hash for the entire page so all sub-documents share the same value.
+    # This ensures that get_documents_by_loader_id can safely deduplicate by source URL
+    # without ambiguity caused by different hashes for chunks of the same page.
+    page_hash = hashlib.sha256(response.text.encode('utf-8')).hexdigest()
+    if page_hash in _seen_hashes:
+        # Same page under another URL; its links were already followed too
+        logger.info(f"Skipping {url}: same content as an already loaded page")
+        return []
+    _seen_hashes.add(page_hash)
+
     try:
 
         # Save the HTML content to a temporary file for UnstructuredHTMLLoader
@@ -118,10 +136,6 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
         # Use UnstructuredHTMLLoader to extract content
         loader = UnstructuredHTMLLoader(temp_file)
         page_documents = loader.load()
-        # Compute one hash for the entire page so all sub-documents share the same value.
-        # This ensures that get_documents_by_loader_id can safely deduplicate by source URL
-        # without ambiguity caused by different hashes for chunks of the same page.
-        page_hash = hashlib.sha256(response.text.encode('utf-8')).hexdigest()
         # Extract meta properties using BeautifulSoup
         soup = BeautifulSoup(response.text, "html.parser")
         meta_tags = {meta.get("name", meta.get("property", "")): meta.get("content", "")
@@ -172,14 +186,16 @@ def load_html_content(url: str, depth: int = 0, visited: Optional[Set[str]] = No
                 if isinstance(link, str):
                     # Resolve relative URLs
                     absolute_link = urljoin(url, link)
-                    if depth == -1:
-                        # Only follow links on the same domain and under the root path
-                        if not _is_same_site(absolute_link, _base_url):
-                            skipped.add(absolute_link)
-                            continue
-                        documents.extend(load_html_content(absolute_link, depth=-1, visited=visited, loader_id=loader_id, _base_url=_base_url, skipped=skipped, progress=progress))
-                    else:
-                        documents.extend(load_html_content(absolute_link, depth=depth - 1, visited=visited, loader_id=loader_id, _base_url=_base_url, skipped=skipped, progress=progress))
+                    # Only follow links on the same domain and under the root path
+                    if depth == -1 and not _is_same_site(absolute_link, _base_url):
+                        skipped.add(absolute_link)
+                        continue
+                    try:
+                        documents.extend(load_html_content(absolute_link, depth=-1 if depth == -1 else depth - 1, visited=visited, loader_id=loader_id, _base_url=_base_url, skipped=skipped, progress=progress, _seen_hashes=_seen_hashes))
+                    except LoaderAccessError as exc:
+                        # A broken link must not stop the crawl of this page's other links
+                        logger.warning(f"Skipping unreachable link {absolute_link}: {exc}")
+                        skipped.add(absolute_link)
 
     except Exception as e:
         logger.error(f"Error loading content from {url}: {e}")
