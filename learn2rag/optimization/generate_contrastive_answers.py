@@ -8,7 +8,7 @@ import logging
 import pathlib
 import time
 
-from learn2rag.pipeline.llm import llm as learn2rag_llm
+from learn2rag.pipeline.llm import get_llm
 from learn2rag.evaluation.tools import read_dataset_qa
 from langchain_core.messages import HumanMessage
 
@@ -46,7 +46,7 @@ DATASET_CONFIG = {
 
 
 def generate(prompt):
-    response = learn2rag_llm.invoke([HumanMessage(content=prompt)])
+    response = get_llm().invoke([HumanMessage(content=prompt)])
     return response.content.strip()
 
 

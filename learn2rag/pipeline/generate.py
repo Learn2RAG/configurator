@@ -5,7 +5,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from qdrant_client.http.models import ScoredPoint
 from .chat import ASSISTANT_ROLES, Message
-from .llm import llm
+from .llm import get_llm
 
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,7 @@ def build_context(search_results: Sequence[ScoredPoint]) -> str:
 
 
 async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> Any:
+    llm = get_llm()
     assert llm is not None
     if hasattr(search_results, "points"):
         search_results = search_results.points
@@ -93,6 +94,7 @@ async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config
 
 
 async def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> AsyncGenerator[str, None]:
+    llm = get_llm()
     assert llm is not None
 
     if hasattr(search_results, "points"):
