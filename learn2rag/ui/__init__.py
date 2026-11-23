@@ -297,9 +297,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         model = request.form['model']
         api = request.form['api']
 
-        has_ssl = bool(app.config.get('TLS'))
-        protocol = 'https' if has_ssl else 'http'
-
         if api == learn2rag.pipeline.llm.OllamaClient.ID:
             url = request.form.get('url') or 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
             # TODO setup tokens for locally running ollama
@@ -335,7 +332,6 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             ollama_downloader.remove()
             ollama_models = list_ollama_models()
             if any(ollama_model.model == model for ollama_model in ollama_models):
-                status = 'success'
                 learn2rag.data.create_entry(app.instance_path, 'models', {
                     'label': model,
                     'url': 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/',
