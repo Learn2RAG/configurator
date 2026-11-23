@@ -9,7 +9,7 @@ from .integration import RagEnvironment, docker_service, repo_dir, requires_dock
 BASE_URL = 'http://localhost:7339'
 
 # One sentence from each page in web/html/
-INDEX_TEXT = 'The ferry to Fernholm leaves the harbour of Kesslund every Tuesday at dawn.'
+INDEX_TEXT = 'The ferry to Bandarabas leaves the harbour of Dubai every Tuesday at dawn.'
 PAGE2_TEXT = 'Its lamp is tended by the keeper Marta Lindqvist'
 PAGE3_TEXT = 'the keeper grows blue potatoes and sea kale'
 OUTSIDE_URL = 'http://localhost:9/outside.html'
@@ -69,6 +69,6 @@ def test_web_pipeline(web_instance: str, rag_env: RagEnvironment) -> None:
     assert not rag_env.run_import(loaders).failed, 'import succeeded'
 
     rag_env.start('pipeline.yml', loaders)
-    content = rag_env.ask('Who tends the lamp of the Fernholm lighthouse?')
+    content = rag_env.ask('Who tends the lamp of the Bandarabas lighthouse?')
     assert not content.endswith('Information:\n'), 'contains any document chunks in the prompt'
     assert PAGE2_TEXT in content, 'specific text from a crawled page'

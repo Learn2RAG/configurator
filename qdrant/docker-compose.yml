@@ -1,0 +1,8 @@
+---
+# Qdrant for learn2rag/pipeline/tests/test_qdrant_integration.py.
+# Same version as the bundled binary (services/install-qdrant) and qdrant-client.
+services:
+  qdrant:
+    image: docker.io/qdrant/qdrant:v1.17.1
+    ports:
+      - "6336:6333"

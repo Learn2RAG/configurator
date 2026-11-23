@@ -1,8 +1,10 @@
 import os
 import unittest
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, ClassVar
 
+import pytest
 from dotenv import load_dotenv
 from langchain_core.documents import Document
 from qdrant_client.http.models import ScoredPoint
@@ -12,11 +14,54 @@ from ..qdrant import Qdrant
 from ..ingestion import index
 from ..search import search, search_multi, _Queries, _build_prefetch_tree, _embed_queries, _read_fusion_params, _rerank_pool, _retrieve_pool
 from ..store import get_documents, delete_documents, update_documents
+from ...tests.integration import docker_compose_available, docker_service, repo_dir
 
 load_dotenv(Path(__file__).resolve().parents[3] / '.env')
 
-QDRANT_TEST_LOCATION = os.environ.get('QDRANT_TEST_LOCATION') or os.environ.get('QDRANT_LOCATION', 'http://localhost:6336')
-QDRANT_TEST_API_KEY = os.environ.get('QDRANT_TEST_API_KEY') or os.environ.get('QDRANT__SERVICE__API_KEY', '')
+# With RUN_INTEGRATION_TESTS=1 the tests use the Qdrant server configured below;
+# otherwise they start their own from qdrant/docker-compose.yml (if Docker is usable).
+USE_EXTERNAL_QDRANT = bool(os.environ.get('RUN_INTEGRATION_TESTS'))
+if USE_EXTERNAL_QDRANT:
+    QDRANT_TEST_LOCATION = os.environ.get('QDRANT_TEST_LOCATION') or os.environ.get('QDRANT_LOCATION', 'http://localhost:6336')
+    QDRANT_TEST_API_KEY = os.environ.get('QDRANT_TEST_API_KEY') or os.environ.get('QDRANT__SERVICE__API_KEY', '')
+else:
+    QDRANT_TEST_LOCATION = 'http://localhost:6336'
+    QDRANT_TEST_API_KEY = ''
+
+requires_qdrant = unittest.skipUnless(
+    USE_EXTERNAL_QDRANT or docker_compose_available(),
+    'Requires Docker, or RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
+)
+
+
+QDRANT_ENV_VARS = ('QDRANT_LOCATION', 'QDRANT__SERVICE__API_KEY', 'QDRANT_PATH')
+
+
+@pytest.fixture(scope='module', autouse=True)
+def qdrant_server() -> Iterator[None]:
+    """Start a fresh Qdrant for this module unless an external one is configured.
+
+    _setup_qdrant_env() points the shared client and QDRANT_* variables at the test
+    server; they are restored afterwards so later test modules are not affected.
+    """
+    saved_env = {name: os.environ.get(name) for name in QDRANT_ENV_VARS}
+    saved_client = Qdrant._client
+    try:
+        if USE_EXTERNAL_QDRANT or not docker_compose_available():
+            # External server, or every test here is skipped anyway
+            yield
+        else:
+            with docker_service(repo_dir / 'qdrant' / 'docker-compose.yml', f'{QDRANT_TEST_LOCATION}/readyz'):
+                yield
+    finally:
+        if Qdrant._client is not saved_client and Qdrant._client is not None:
+            Qdrant._client.close()
+        Qdrant._client = saved_client
+        for name, value in saved_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 EMBEDDING_MODEL = 'BAAI/bge-m3'
 VECTOR_SIZE = 1024
@@ -118,10 +163,7 @@ def _sources(points: list[ScoredPoint]) -> set[str]:
     return {str(point.payload['source']) for point in points if point.payload}
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantConnectionTestCase(unittest.TestCase):
     """Basic connection and collection management tests."""
 
@@ -205,10 +247,7 @@ class QdrantConnectionTestCase(unittest.TestCase):
         self.assertFalse(Qdrant.get_client().collection_exists(self.collection_name))
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantDenseSearchTestCase(unittest.TestCase):
     """Ingest and search with dense-only mode (bge-m3)."""
 
@@ -259,10 +298,7 @@ class QdrantDenseSearchTestCase(unittest.TestCase):
         self.assertEqual(info.points_count, len(SAMPLE_DOCUMENTS))
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantSparseSearchTestCase(unittest.TestCase):
     """Ingest with dense_sparse mode but search using only sparse (BM25)."""
 
@@ -300,10 +336,7 @@ class QdrantSparseSearchTestCase(unittest.TestCase):
         self.assertIn('Qdrant', payload['content'])
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantDenseSparseSearchTestCase(unittest.TestCase):
     """Ingest and search with hybrid dense+sparse mode (fusion)."""
 
@@ -342,10 +375,7 @@ class QdrantDenseSparseSearchTestCase(unittest.TestCase):
         self.assertIn('Python', payload['content'])
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantDenseSparseColbertSearchTestCase(unittest.TestCase):
     """Ingest and search with dense+sparse+colbert mode."""
 
@@ -394,10 +424,7 @@ class QdrantDenseSparseColbertSearchTestCase(unittest.TestCase):
         self.assertIn('Qdrant', payload['content'])
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantMultiVectorSearchTestCase(unittest.TestCase):
     """Ingest and search with multi-vector mode (content + metadata embeddings concatenated)."""
 
@@ -456,10 +483,7 @@ class QdrantMultiVectorSearchTestCase(unittest.TestCase):
         self.assertIn('Qdrant', payload['content'])
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantFusionRRFTestCase(unittest.TestCase):
     """Test hybrid search with RRF fusion mode instead of DBSF."""
 
@@ -497,10 +521,11 @@ class QdrantFusionRRFTestCase(unittest.TestCase):
             self.assertIsNotNone(point.score)
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
+# Known bug: FlagEmbedding 1.4.0 calls XLMRobertaTokenizer.prepare_for_model, which
+# transformers 5 removed, so 'reranking_with_flagreranker' crashes. strict: once the
+# dependencies are fixed these tests pass, and the xfail must be removed.
+@pytest.mark.xfail(raises=AttributeError, strict=True, reason='FlagEmbedding 1.4.0 is incompatible with transformers 5 (prepare_for_model)')
 class QdrantRerankingFlagRerankerTestCase(unittest.TestCase):
     """Test search with FlagReranker reranking."""
 
@@ -550,10 +575,7 @@ class QdrantRerankingFlagRerankerTestCase(unittest.TestCase):
         self.assertEqual(sorted(_point_ids(points)), sorted(_point_ids(pool)))
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantRerankingCrossEncoderTestCase(unittest.TestCase):
     """Test search with sentence-transformers CrossEncoder reranking."""
 
@@ -603,10 +625,7 @@ class QdrantRerankingCrossEncoderTestCase(unittest.TestCase):
         self.assertEqual(sorted(_point_ids(points)), sorted(_point_ids(pool)))
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantAuthorizedPoolTestCase(unittest.TestCase):
     """Test the candidate pool of search_authorized: one Qdrant call with the fusion tree."""
 
@@ -655,10 +674,7 @@ class QdrantAuthorizedPoolTestCase(unittest.TestCase):
         self.assertEqual(_sources(pool), {'test/rabbits.txt'})
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantAuthorizedPoolHybridTestCase(unittest.TestCase):
     """Test that the server accepts the full fusion tree with weights and rrf_k."""
 
@@ -690,10 +706,7 @@ class QdrantAuthorizedPoolHybridTestCase(unittest.TestCase):
         self.assertTrue(all(point.score is not None for point in pool))
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantStoreOperationsTestCase(unittest.TestCase):
     """Test get_documents, delete_documents, update_documents against a real Qdrant server."""
 
@@ -776,10 +789,7 @@ class QdrantStoreOperationsTestCase(unittest.TestCase):
         self.assertEqual(docs['test/python.txt'], 'new_python_hash')
 
 
-@unittest.skipUnless(
-    os.environ.get('RUN_INTEGRATION_TESTS'),
-    'Requires RUN_INTEGRATION_TESTS=1 and a running Qdrant server',
-)
+@requires_qdrant
 class QdrantDeduplicationTestCase(unittest.TestCase):
     """Verify that ingesting the same document multiple times does not create duplicates."""
 

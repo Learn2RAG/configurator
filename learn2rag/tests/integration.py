@@ -1,5 +1,6 @@
 """Helpers for integration tests that import from real sources running in `docker compose`."""
 import contextlib
+import functools
 import logging
 import shutil
 import subprocess
@@ -22,6 +23,7 @@ repo_dir = Path(__file__).resolve().parent.parent.parent
 template_dir = repo_dir / 'learn2rag' / 'ui' / 'templates' / 'compose' / 'pipelines'
 
 
+@functools.cache
 def docker_compose_available() -> bool:
     try:
         subprocess.run(['docker', 'compose', '--version'], check=True, capture_output=True)
