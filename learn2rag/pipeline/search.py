@@ -102,6 +102,12 @@ def _rerank_points_with_sentence_transformers(
     )[:top_k]
 
 
+def _colbert_query_vector(query: str, opt_config: dict[str, Any]) -> Any:
+    emb = create_embeddings([query], opt_config["embedding_model"], embedding_mode="colbert")
+    colbert_vecs = emb["colbert_vecs"]
+    return colbert_vecs[0] if len(colbert_vecs) > 0 else []
+
+
 def _rerank_points_with_colbert(
     query: str,
     points: list[ScoredPoint],
@@ -109,16 +115,17 @@ def _rerank_points_with_colbert(
     top_k: int | None = None,
     opt_config: dict[str, Any],
     user_config: dict[str, Any],
+    colbert_query: Any = None,
 ) -> list[ScoredPoint]:
+    """`colbert_query` is the ColBERT vector of `query`; it is only computed if it is not given."""
     if not points:
         return []
 
     collection_name = user_config["collection_name"]
     qdrant = Qdrant(collection_name=collection_name, opt_config=opt_config)
 
-    emb = create_embeddings([query], opt_config["embedding_model"], embedding_mode="colbert")
-    colbert_vecs = emb["colbert_vecs"]
-    colbert_query = colbert_vecs[0] if len(colbert_vecs) > 0 else []
+    if colbert_query is None:
+        colbert_query = _colbert_query_vector(query, opt_config)
 
     candidate_ids = [p.id for p in points]
     results = qdrant.get_client().query_points(
@@ -128,7 +135,7 @@ def _rerank_points_with_colbert(
                 models.HasIdCondition(has_id=candidate_ids)
             ]
         ),
-        query=colbert_query,  # type: ignore[arg-type]
+        query=colbert_query,
         using="colbert",
         limit=len(candidate_ids) if top_k is None else top_k,
         timeout=120
@@ -650,11 +657,14 @@ def _rerank_pool(
     user_config: dict[str, Any],
     opt_config: dict[str, Any],
     *,
+    colbert_query: Any = None,
     request_id: str | None = None,
 ) -> list[ScoredPoint]:
     """Sort the whole pool with the configured reranker; the pool keeps its fusion order without one.
 
     `question` is the effective question. Candidates are only sorted, never cut off.
+    `colbert_query` is the ColBERT vector of `question` for the ColBERT reranker, see
+    `_colbert_rerank_vector`.
     """
     if opt_config.get("reranking") != "True":
         return pool
@@ -672,8 +682,21 @@ def _rerank_pool(
     if reranking_mode == "reranking_with_sentence_transformers":
         return _rerank_points_with_sentence_transformers(question, pool)
     if reranking_mode == "reranking_with_colbert":
-        return _rerank_points_with_colbert(question, pool, opt_config=opt_config, user_config=user_config)
+        return _rerank_points_with_colbert(
+            question, pool, opt_config=opt_config, user_config=user_config, colbert_query=colbert_query)
     raise ValueError(f"Unknown reranking_mode '{reranking_mode}'")
+
+
+def _colbert_rerank_vector(queries: _Queries, embeddings: _QueryEmbeddings, opt_config: dict[str, Any]) -> Any:
+    """ColBERT vector of the effective question for the ColBERT reranker, computed once per request.
+
+    It reuses the vector of the search in `dense_sparse_colbert` mode. `None` without ColBERT reranking.
+    """
+    if opt_config.get("reranking") != "True" or opt_config.get("reranking_mode") != "reranking_with_colbert":
+        return None
+    if embeddings.question.colbert is not None:
+        return embeddings.question.colbert
+    return _colbert_query_vector(queries.question, opt_config)
 
 
 async def search_authorized(
@@ -699,6 +722,7 @@ async def search_authorized(
     fusion_params = _read_fusion_params(opt_config)
     queries = await _build_queries(question, history, opt_config, request_id=request_id)
     embeddings = await asyncio.to_thread(_embed_queries, queries, opt_config)
+    colbert_query = await asyncio.to_thread(_colbert_rerank_vector, queries, embeddings, opt_config)
 
     checked: dict[tuple[str, str], bool] = {}
     authorized_points: list[ScoredPoint] = []
@@ -714,7 +738,8 @@ async def search_authorized(
         pool = await asyncio.to_thread(_retrieve_pool, root, user_config, opt_config, request_id=request_id)
         if pool:
             pool = await asyncio.to_thread(
-                _rerank_pool, queries.question, pool, user_config, opt_config, request_id=request_id)
+                _rerank_pool, queries.question, pool, user_config, opt_config,
+                colbert_query=colbert_query, request_id=request_id)
 
         n_authorized_before = len(authorized_points)
         n_round_checked = 0

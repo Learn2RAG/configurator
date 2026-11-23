@@ -3,10 +3,19 @@ import unittest
 from typing import Any, Mapping, Sequence, cast
 from unittest.mock import AsyncMock, patch
 
+import numpy as np
 from qdrant_client import models
 from qdrant_client.http.models import ScoredPoint
 
-from ..search import _Queries, _document_exclusion, _exclusion_filter, search_authorized
+from ..search import (
+    _Embedding,
+    _Queries,
+    _QueryEmbeddings,
+    _document_exclusion,
+    _exclusion_filter,
+    _rerank_pool,
+    search_authorized,
+)
 
 LOADER_ID = "loader"
 SEARCH_LOGGER = "learn2rag.pipeline.search"
@@ -60,7 +69,7 @@ class _SearchAuthorizedBase(unittest.IsolatedAsyncioTestCase):
 
         self.build_queries = self._patch(
             "learn2rag.pipeline.search._build_queries", new=AsyncMock(return_value=_Queries("test query", [], [])))
-        self._patch("learn2rag.pipeline.search._embed_queries")
+        self.embed_queries = self._patch("learn2rag.pipeline.search._embed_queries")
         self.build_tree = self._patch("learn2rag.pipeline.search._build_prefetch_tree")
         self.retrieve_pool = self._patch("learn2rag.pipeline.search._retrieve_pool", return_value=[])
         self.rerank_pool = self._patch(
@@ -297,6 +306,47 @@ class SearchRoundsTestCase(_SearchAuthorizedBase):
             _exclusion_filter([1, 2, 3, 4], [cast(models.Filter, _document_exclusion(x)),
                                              cast(models.Filter, _document_exclusion(y))]),
         ])
+
+
+class ColbertRerankingTestCase(_SearchAuthorizedBase):
+    """The ColBERT query vector of the reranker is computed once per request."""
+
+    ROUNDS = (_pool("a", first_id=1), _pool("b", first_id=2), _pool("c", first_id=3))
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.opt_config.update(
+            reranking="True", reranking_mode="reranking_with_colbert", embedding_model="BAAI/bge-m3")
+        # The real `_rerank_pool`, only the ColBERT model and Qdrant are mocked.
+        self.rerank_pool.side_effect = _rerank_pool
+        self.create_embeddings = self._patch("learn2rag.pipeline.search.create_embeddings")
+        self.rerank_colbert = self._patch(
+            "learn2rag.pipeline.search._rerank_points_with_colbert",
+            side_effect=lambda query, points, **kwargs: points)
+
+    def _colbert_queries(self) -> list[Any]:
+        return [call.kwargs["colbert_query"] for call in self.rerank_colbert.call_args_list]
+
+    async def test_vector_is_computed_once_for_all_rounds(self) -> None:
+        self.opt_config["search_mode"] = "dense_sparse"
+        self.embed_queries.return_value = _QueryEmbeddings(_Embedding(), [], [])
+        colbert_query = [np.array([0.1, 0.2])]
+        self.create_embeddings.return_value = {"colbert_vecs": [colbert_query]}
+
+        await self._run(*self.ROUNDS, allowed=set())
+
+        self.create_embeddings.assert_called_once_with(["test query"], "BAAI/bge-m3", embedding_mode="colbert")
+        self.assertEqual(self._colbert_queries(), [colbert_query] * 3)
+
+    async def test_vector_of_the_search_is_reused(self) -> None:
+        self.opt_config["search_mode"] = "dense_sparse_colbert"
+        colbert_query = [np.array([0.3, 0.4])]
+        self.embed_queries.return_value = _QueryEmbeddings(_Embedding(colbert=colbert_query), [], [])
+
+        await self._run(*self.ROUNDS, allowed=set())
+
+        self.create_embeddings.assert_not_called()
+        self.assertEqual(self._colbert_queries(), [colbert_query] * 3)
 
 
 def _point(payload: dict[str, Any] | None, point_id: int = 1) -> ScoredPoint:
