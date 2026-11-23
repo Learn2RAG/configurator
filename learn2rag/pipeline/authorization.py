@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Any, Dict, List, Mapping, Set
+from typing import Any, Dict, List, Mapping, Sequence, Set, Tuple
 import logging
 
 from qdrant_client.http.models import QueryResponse, ScoredPoint
@@ -88,24 +88,33 @@ async def _get_loader_id(point: ScoredPoint) -> str:
     return str(point.payload.get('loader_id', 'unknown'))
 
 
-async def _get_doc_id(point: ScoredPoint) -> str:
-    """This must return the unique document/URL identifier to prevent overwrite bugs."""
-    # If there is no payload at all, fallback to the guaranteed unique Qdrant ID
-    if not point.payload:
-        return str(point.id)
+DOC_ID_FIELDS = ("document_id", "source", "node_id")
 
+
+def get_doc_id_field(point: ScoredPoint) -> Tuple[str, Any]:
+    """Return the payload field the document ID of a point comes from and its stored value.
+
+    The field is the first of `DOC_ID_FIELDS` with a non-empty value, or `"id"` with the
+    Qdrant point ID. `_get_doc_id` and the exclusion filter of the search both rely on it.
+    """
     # Different loaders inject different metadata keys for their primary identifier.
     # We must return a strictly unique ID per document. If multiple documents return an
     # empty string, they overwrite each other in the authorization dictionary, causing a
     # critical security bypass where one public document authorizes restricted documents.
-    unique_id = (
-            point.payload.get("document_id") or
-            point.payload.get("source") or
-            point.payload.get("node_id")
-    )
+    if point.payload:
+        for field in DOC_ID_FIELDS:
+            value = point.payload.get(field)
+            if value:
+                return field, value
 
-    # Ultimate fallback: use the Qdrant vector point ID if no metadata keys match
-    return str(unique_id if unique_id else point.id)
+    # Ultimate fallback: use the guaranteed unique Qdrant point ID if there is no payload
+    # or no metadata key matches
+    return "id", point.id
+
+
+async def _get_doc_id(point: ScoredPoint) -> str:
+    """This must return the unique document/URL identifier to prevent overwrite bugs."""
+    return str(get_doc_id_field(point)[1])
 
 
 async def filter_authorized(user_auths: Mapping[str, Any], search_results: QueryResponse) -> List[ScoredPoint]:
@@ -122,4 +131,46 @@ async def filter_authorized(user_auths: Mapping[str, Any], search_results: Query
     authorized_points = [point for point in search_results.points if
                          authorized_ids[await _get_loader_id(point)].__contains__(await _get_doc_id(point))]
     logger.debug('Authorization filter accepted %s documents out of %s', len(authorized_points), len(search_results.points))
+    return authorized_points
+
+
+async def filter_authorized_cached(
+        user_auths: Mapping[str, Any],
+        points: Sequence[ScoredPoint],
+        checked: Dict[Tuple[str, str], bool],
+) -> List[ScoredPoint]:
+    """Return the authorized points in their given order, checking each document at most once.
+
+    ``checked`` maps ``(loader_id, doc_id)`` to the authorization result and is shared across
+    calls within one request. Only documents not yet in ``checked`` are sent to the filters;
+    the results are written back. Points without payload and documents whose filter fails
+    count as not authorized; configuration errors are raised.
+    """
+    by_loader: Dict[str, Dict[str, Any]] = defaultdict(dict)
+    for point in points:
+        if not point.payload:
+            continue
+        loader_id = await _get_loader_id(point)
+        doc_id = await _get_doc_id(point)
+        if (loader_id, doc_id) not in checked:
+            by_loader[loader_id][doc_id] = point.payload
+
+    for loader_id, documents in by_loader.items():
+        # Configuration errors (unknown loader_id, missing keys) propagate like in filter_authorized
+        auth_filter = _get_authorization_filter(loader_id)
+        try:
+            authorized_ids = await auth_filter.filter_documents(user_auths.get(loader_id), documents)
+        except Exception:
+            logger.exception('Authorization filter failed for loader %s, treating %s documents as not authorized',
+                             loader_id, len(documents))
+            authorized_ids = set()
+        for doc_id in documents:
+            checked[(loader_id, doc_id)] = doc_id in authorized_ids
+
+    authorized_points = [
+        point for point in points
+        if point.payload and checked.get((await _get_loader_id(point), await _get_doc_id(point)), False)
+    ]
+    logger.debug('Authorization filter accepted %s points out of %s (%s documents newly checked)',
+                 len(authorized_points), len(points), sum(len(docs) for docs in by_loader.values()))
     return authorized_points
