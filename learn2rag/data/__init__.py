@@ -1,8 +1,20 @@
+from enum import Enum
 from pathlib import Path
 from typing import Any
 import uuid
 
+from pydantic.networks import AnyHttpUrl
 import yaml
+
+class Dumper(yaml.SafeDumper):
+    pass
+
+Dumper.add_multi_representer(
+    Enum, lambda dumper, member: dumper.represent_data(member.value)
+)
+Dumper.add_multi_representer(
+    AnyHttpUrl, lambda dumper, value: dumper.represent_data(str(value))
+)
 
 
 def create_entry(root: str, category: str, data: Any) -> str:
@@ -10,7 +22,7 @@ def create_entry(root: str, category: str, data: Any) -> str:
     category_root = Path(root) / 'data' / category
     category_root.mkdir(parents=True, exist_ok=True)
     with open(category_root / (name + '.yml'), 'w') as out:
-        yaml.dump(data, out)
+        yaml.dump(data, out, Dumper=Dumper)
     return name
 
 
