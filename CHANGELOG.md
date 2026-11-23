@@ -14,7 +14,7 @@
 - authorized search builds a candidate pool, sorts it (reranker or rank fusion) and checks the authorization lazily in rank order; with too few authorized results it repeats this in up to `max_search_rounds` rounds, excluding the candidates and the rejected documents of the previous rounds
 - **BREAKING:** for users with few permissions a request runs up to `max_search_rounds` Qdrant searches, reranker runs and authorization checks
 - reranking sorts the whole candidate pool instead of cutting it off
-- default search mode is `dense_sparse`
+- **BREAKING:** default search mode is `dense_sparse`; collections created with `dense` have no sparse vectors, so either keep `search_mode: dense` or re-import the data into a new collection
 - default of `prefetch_limit_dense`, `prefetch_limit_sparse` and `prefetch_limit_colbert` is 15 instead of 25
 
 ### Removed
