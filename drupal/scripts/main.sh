@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eux
-composer require --no-audit --no-blocking --no-progress --with-all-dependencies 'drupal/simple_oauth:^6.1' 'drush/drush:*'
+composer require --no-audit --no-blocking --no-progress --with-all-dependencies \
+         'drupal/simple_oauth:6.1.3' \
+         'drush/drush:*'
 php -d memory_limit=256M web/core/scripts/drupal install --password=test --no-interaction demo_umami
 
 # Assign admin role explicitly
@@ -65,6 +67,8 @@ drush cr
 
 drush scr scripts/create_consumer.php
 drush scr scripts/create_normal_user.php
+# Non-admin users need this to approve the OAuth authorization-code consent screen
+drush role:perm:add authenticated 'grant simple_oauth codes'
 
 drush cr
 

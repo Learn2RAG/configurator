@@ -20,6 +20,17 @@
 ### Removed
 - **BREAKING:** `top_k_reranker`, `max_auth_retries`, `auth_oversample_start` and `auth_oversample_step` from `opt_config.json`; they are ignored if still present
 
+## [1.1.0] - 2026-11-09
+### Added
+- embedding models are downloaded on the first start
+- `remove-learn2rag-software` script to remove the Learn2RAG application runtimes
+- `remove-user-data` script to remove user data (asks for confirmation; `-y` skips it)
+- `uninstall` now removes the software and asks whether to also remove user data
+
+### Fixed
+- Drupal document access
+- Drupal example configuration
+
 ## [1.0.0] - 2026-09-16
 ### Added
 - MediaWiki data import
@@ -29,8 +40,6 @@
 - pipeline auto-optimization
 - retrieval optimization
 - displaying status during import
-- `remove-learn2rag-software` script to remove the Learn2RAG application runtimes
-- `remove-user-data` script to remove user data (asks for confirmation; `-y` skips it)
 
 ### Fixed
 - offline installation
@@ -40,7 +49,6 @@
 - open webui chat UI replaced with llama.cpp's UI
 - interface improvements
 - performance improvements
-- `uninstall` now removes the software and asks whether to also remove user data
 
 ### Removed
 - unused API endpoints were removed
