@@ -29,6 +29,7 @@ from learn2rag.evaluation.tools import read_dataset_qa
 import learn2rag.data
 import learn2rag.pipeline.llm
 from ..bootstrap import setup_flask as learn2rag_bootstrap_setup
+from ..data import LanguageModelInput
 from ..importer.utils.import_state import ImportState
 
 
@@ -291,68 +292,45 @@ def create_app(config: dict[str, Any]={}) -> Flask:
             ollama_models=list_ollama_models(),
         )
 
+    model_input_context = {
+        'local_llm_url': 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/',
+    }
+
     @app.post('/models')
     def model_create() -> 'str | werkzeug.wrappers.response.Response':
-        ok = True
-        model = request.form['model']
-        api = request.form['api']
+        form = LanguageModelInput.model_validate(request.form.to_dict(), context=model_input_context)
 
-        if api == learn2rag.pipeline.llm.OllamaClient.ID:
-            url = request.form.get('url') or 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/'
-            # TODO setup tokens for locally running ollama
-            token = request.form.get('token') or ''
-            if request.form.get('ollama') == 'pull':
-                if model.find(':') == -1:
-                    model += ':latest'
-                start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(app.instance_path) / 'ollama_download', {'model': model})
-                return flask_redirect(url_for('model_pulling', model=model))
-        elif api == learn2rag.pipeline.llm.OpenAIClient.ID:
-            url = request.form['url']
-            token = request.form['token']
-        else:
-            ok = False
-            flash(gettext('API is not supported: %(api)s', api=api), 'error')
-        if ok:
-            label = request.form.get('label', model)
-            learn2rag.data.create_entry(app.instance_path, 'models', {
-                'label': label,
-                'url': url,
-                'token': token,
-                'model': model,
-                'api': api,
-            })
-            flash(pgettext('flash', 'Added a new language model configuration: %(label)s', label=label))
+        if request.form.get('ollama') == 'pull':
+            if form.api == learn2rag.pipeline.llm.LLMApi.Ollama:
+                # TODO setup tokens for locally running ollama
+                if form.model.find(':') == -1:
+                    form.model += ':latest'
+                start_project('ollama_download', components_template_path / 'ollama-download.yml', Path(app.instance_path) / 'ollama_download', {'model': form.model})
+                return flask_redirect(url_for('model_pulling', model=form.model, api=form.api.value))
+
+        learn2rag.data.create_entry(app.instance_path, 'models', form.model_dump())
+        flash(pgettext('flash', 'Added a new language model configuration: %(label)s', label=form.label))
         return redirect(url_for('models_list'))
 
     @app.get('/models/download')
     def model_pulling() -> 'str | werkzeug.wrappers.response.Response':
-        model = request.args['model']
+        form = LanguageModelInput.model_validate(request.args.to_dict(), context=model_input_context)
         ollama_downloader = Project.get('ollama_download')
+        if ollama_downloader is not None and ollama_downloader.running:
+            return render_template('model_pulling.html')
         if ollama_downloader is not None and not ollama_downloader.running:
             ollama_downloader.remove()
             ollama_models = list_ollama_models()
-            if any(ollama_model.model == model for ollama_model in ollama_models):
-                learn2rag.data.create_entry(app.instance_path, 'models', {
-                    'label': model,
-                    'url': 'http://127.0.0.1:' + str(app.config['OLLAMA']['port']) + '/',
-                    'token': '',
-                    'model': model,
-                    'api': learn2rag.pipeline.llm.OllamaClient.ID,
-                })
-                flash(pgettext('flash', 'Downloaded a language model: %(model)s', model=model))
+            if any(ollama_model.model == form.model for ollama_model in ollama_models):
+                learn2rag.data.create_entry(app.instance_path, 'models', form.model_dump())
+                flash(pgettext('flash', 'Downloaded a language model: %(model)s', model=form.model))
                 res = make_response(render_template('model_pulling_success.html'))
                 res.headers['HX-Redirect'] = url_for('models_list')
                 return res
-            else:
-                flash(pgettext('flash', 'Failed to download a language model: %(model)s', model=model), 'error')
-                res = make_response(render_template('model_pulling_failure.html'))
-                res.headers['HX-Redirect'] = url_for('models_list')
-                return res
-        elif ollama_downloader is None:
-            raise Exception('Unexpected downloader state')
-        return render_template(
-            'model_pulling.html',
-        )
+        flash(pgettext('flash', 'Failed to download a language model: %(model)s', model=form.model), 'error')
+        res = make_response(render_template('model_pulling_failure.html'))
+        res.headers['HX-Redirect'] = url_for('models_list')
+        return res
 
     @app.post('/models/<name>')
     def model_action(name: str) -> 'str | werkzeug.wrappers.response.Response':

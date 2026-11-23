@@ -1,6 +1,7 @@
 import logging
 import os
 import httpx
+from enum import Enum
 from pydantic import SecretStr
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
@@ -32,6 +33,11 @@ def _ollama_timeout() -> httpx.Timeout:
     return httpx.Timeout(timeout=timeout_s, connect=connect_s, read=timeout_s, write=write_s, pool=pool_s)
 
 
+class LLMApi(Enum):
+    OpenAI = 'ChatOpenAI'
+    Ollama = 'ChatOllama'
+
+
 class LLMClient():
     ID: str
     '''A key stored in user data, must not be changed'''
@@ -57,7 +63,7 @@ def llm_client(cls: type[LLMClient]) -> type[LLMClient]:
 @llm_client
 class OpenAIClient(LLMClient):
     '''A LLM client based on OpenAI API'''
-    ID = 'ChatOpenAI'
+    ID = LLMApi.OpenAI.value
     LABEL = 'OpenAI'
 
     def __init__(self, *, url: str, token: SecretStr, model: str, proxy: str | None) -> None:
@@ -72,7 +78,7 @@ class OpenAIClient(LLMClient):
 @llm_client
 class OllamaClient(LLMClient):
     '''A LLM client based on Ollama API'''
-    ID = 'ChatOllama'
+    ID = LLMApi.Ollama.value
     LABEL = 'Ollama'
 
     def __init__(self, *, url: str, token: str | None, model: str, proxy: str | None) -> None:

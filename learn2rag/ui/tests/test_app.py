@@ -60,7 +60,7 @@ class TestData():
             'label': 'Test label',
             'model': 'test_model',
             'token': 'test_token',
-            'url': 'http://пример.испытание/',
+            'url': 'http://xn--e1afmkfd.xn--80akhbyknj4f/',
         })
 
     def test_create_local(self, app: Flask, client: FlaskClient) -> None:
@@ -91,3 +91,22 @@ class TestData():
             })
         files = list((Path(app.instance_path) / 'data' / 'models').glob('*.yml'))
         assert len(files) == 0
+
+    def test_sanitize(self, app: Flask, client: FlaskClient) -> None:
+        client.post('/models', data={
+            'api': llm.OpenAIClient.ID,
+            'label': ' Test label ',
+            'model': ' test_model ',
+            'token': ' test_token ',
+            'url': ' http://пример.испытание/ ',
+        })
+        files = list((Path(app.instance_path) / 'data' / 'models').glob('*.yml'))
+        assert len(files) == 1
+        file = files[0]
+        TestCase().assertDictEqual(yaml.safe_load(file.open()), {
+            'api': llm.OpenAIClient.ID,
+            'label': 'Test label',
+            'model': 'test_model',
+            'token': 'test_token',
+            'url': 'http://xn--e1afmkfd.xn--80akhbyknj4f/',
+        })

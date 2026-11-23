@@ -1,10 +1,42 @@
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal, Self
 import uuid
 
+from pydantic import (
+    BaseModel,
+    StringConstraints,
+    ValidationInfo,
+    model_validator,
+)
 from pydantic.networks import AnyHttpUrl
 import yaml
+
+from ..pipeline import llm
+
+
+class LanguageModelInput(BaseModel):
+    api: llm.LLMApi
+    label: Annotated[str, StringConstraints(strip_whitespace=True)] = ''
+    model: Annotated[str, StringConstraints(strip_whitespace=True)]
+    token: Annotated[str, StringConstraints(strip_whitespace=True)] | Literal[''] = ''
+    url: AnyHttpUrl | Literal[''] = ''
+
+    @model_validator(mode='after')
+    def set_label(self) -> Self:
+        if self.label == '':
+            self.label = self.model
+        return self
+
+    @model_validator(mode='after')
+    def set_local_llm_url(self, info: ValidationInfo) -> Self:
+        if self.url == '':
+            if self.api == llm.LLMApi.Ollama:
+                self.url = (info.context or {})['local_llm_url']
+            else:
+                raise ValueError('URL is missing')
+        return self
+
 
 class Dumper(yaml.SafeDumper):
     pass
