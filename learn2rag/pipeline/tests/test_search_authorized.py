@@ -67,6 +67,7 @@ class _SearchAuthorizedBase(unittest.IsolatedAsyncioTestCase):
         self.user_config = {"collection_name": "test_collection"}
         self.opt_config: dict[str, Any] = {"top_k": 3}
 
+        self.collection_exists = self._patch("learn2rag.pipeline.search._collection_exists", return_value=True)
         self.build_queries = self._patch(
             "learn2rag.pipeline.search._build_queries", new=AsyncMock(return_value=_Queries("test query", [], [])))
         self.embed_queries = self._patch("learn2rag.pipeline.search._embed_queries")
@@ -198,6 +199,18 @@ class SearchAuthorizedTestCase(_SearchAuthorizedBase):
         await self._run(_pool(*"abcdef"), allowed={"f"})
 
         self.assertEqual(self.opt_config, original)
+
+    async def test_missing_collection_returns_nothing_without_rewrite_or_search(self) -> None:
+        self.collection_exists.return_value = False
+        with self.assertLogs(SEARCH_LOGGER, "WARNING") as logs:
+            results, auth_filter = await self._run(_pool("a"), allowed={"a"})
+
+        self.assertEqual(results, [])
+        self.assertIn("test_collection", logs.output[0])
+        self.build_queries.assert_not_awaited()
+        self.embed_queries.assert_not_called()
+        self.retrieve_pool.assert_not_called()
+        self.assertEqual(auth_filter.calls, [])
 
 
 class SearchRoundsTestCase(_SearchAuthorizedBase):

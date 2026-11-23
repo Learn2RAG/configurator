@@ -613,6 +613,12 @@ def _exclusion_filter(
     return models.Filter(must_not=must_not) if must_not else None
 
 
+def _collection_exists(user_config: dict[str, Any], opt_config: dict[str, Any]) -> bool:
+    collection_name = user_config["collection_name"]
+    qdrant = Qdrant(collection_name=collection_name, opt_config=opt_config)
+    return qdrant.get_client().collection_exists(collection_name)
+
+
 def _retrieve_pool(
     root: models.Prefetch,
     user_config: dict[str, Any],
@@ -715,8 +721,13 @@ async def search_authorized(
     points are authorized, the next round excludes all points delivered so far and all
     rejected documents. The rounds end at `top_k` authorized points, after
     `max_search_rounds` rounds or with an empty pool. Each document is sent to the
-    authorization filter at most once per request.
+    authorization filter at most once per request. Without a collection, i.e. before the
+    first import, the result is empty without rewrite, embeddings or search.
     """
+    if not await asyncio.to_thread(_collection_exists, user_config, opt_config):
+        logger.warning("Collection %s does not exist, returning no documents", user_config["collection_name"])
+        return []
+
     top_k = opt_config.get("top_k", 10)
     max_search_rounds = _read_max_search_rounds(opt_config)
     fusion_params = _read_fusion_params(opt_config)

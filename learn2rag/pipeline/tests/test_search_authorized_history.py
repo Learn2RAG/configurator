@@ -100,6 +100,7 @@ class SearchAuthorizedHistoryTestCase(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
         self.user_config = {"collection_name": "test_collection"}
+        self._patch("learn2rag.pipeline.search._collection_exists", return_value=True)
         self.embed_queries = self._patch("learn2rag.pipeline.search._embed_queries")
         self._patch("learn2rag.pipeline.search._build_prefetch_tree")
         self.rerank_pool = self._patch(
