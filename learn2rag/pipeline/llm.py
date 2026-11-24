@@ -133,12 +133,16 @@ class FakeClient(LLMClient):
 
 
 def _parse_reasoning(value: str | None) -> bool | str | None:
-    '''"true"/"false" -> bool, "low"/"medium"/"high" -> str, empty -> None (model default)'''
-    if not value:
+    '''"true"/"false" -> bool, "low"/"medium"/"high" -> str, empty/"none"/invalid -> None (model default)'''
+    if not value or value.lower() == 'none':
         return None
-    if value.lower() in ('true', 'false'):
-        return value.lower() == 'true'
-    return value
+    v = value.lower()
+    if v in ('true', 'false'):
+        return v == 'true'
+    if v in ('low', 'medium', 'high'):
+        return v
+    logger.warning('Invalid LLM_API_REASONING=%r. Using the model default.', value)
+    return None
 
 
 def _parse_int(name: str) -> int | None:
