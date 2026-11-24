@@ -17,11 +17,6 @@ msgstr ""
 "Generated-By: Babel 2.18.0\n"
 
 #, python-format
-msgctxt "firststep"
-msgid "Yes, add my <code>%(docs_dir)s</code> folder"
-msgstr "Ja, meinen Ordner <code>%(docs_dir)s</code> hinzufügen"
-
-#, python-format
 msgid "%(num)d data source configuration"
 msgid_plural "%(num)d data source configurations"
 msgstr[0] "%(num)d Datenquellenkonfiguration"
@@ -56,6 +51,10 @@ msgstr "Ein individueller Anzeigename für dieses Sprachmodell"
 msgctxt "tooltip"
 msgid "A custom display name for this pipeline"
 msgstr "Ein individueller Anzeigename für diese Pipeline"
+
+msgctxt "firststep"
+msgid "A pipeline would use one of your models and all the sources you have configured."
+msgstr "Eine Pipeline würde eines Ihrer Sprachmodelle und alle konfigurierten Datenquellen verwenden."
 
 msgctxt "column_heading"
 msgid "API URL"
@@ -170,6 +169,10 @@ msgctxt "label"
 msgid "Choose a new training data file:"
 msgstr "Wählen Sie eine neue Trainingsdatei aus"
 
+msgctxt "tooltip"
+msgid "Configure a pipeline yourself"
+msgstr "Eine Pipeline selbst konfigurieren"
+
 msgctxt "heading"
 msgid "Connect an external language model"
 msgstr "Ein externes Sprachmodell anbinden"
@@ -203,6 +206,10 @@ msgctxt "form_label"
 msgid "Crawl depth"
 msgstr "Crawl-Tiefe"
 
+msgctxt "tooltip"
+msgid "Create and start a pipeline with your first language model and all data sources"
+msgstr "Eine Pipeline mit Ihrem ersten Sprachmodell und allen Datenquellen erstellen und starten"
+
 msgctxt "column_heading"
 msgid "Data source type"
 msgstr "Datenquellentyp"
@@ -227,6 +234,14 @@ msgstr "Datenquellen"
 msgid "Debug logging is enabled in config file <code>%(file)s</code>. It might capture sensitive information."
 msgstr "Debug-Protokollierung ist in der Konfigurationsdatei <code>%(file)s</code> aktiviert. Es könnten sensible Informationen erfasst werden."
 
+msgctxt "tooltip"
+msgid "Delete the imported data and the pipeline configuration"
+msgstr "Die importierten Daten und die Pipeline-Konfiguration löschen"
+
+msgctxt "tooltip"
+msgid "Delete the imported data of this pipeline but keep its configuration"
+msgstr "Die importierten Daten dieser Pipeline löschen, die Konfiguration aber behalten"
+
 msgctxt "column_heading"
 msgid "Details"
 msgstr "Weitere"
@@ -243,6 +258,10 @@ msgstr "Verzeichnis entfernt: %(path)s"
 msgctxt "firststep"
 msgid "Do you want to add a folder now?"
 msgstr "Möchten Sie jetzt einen Ordner hinzufügen?"
+
+msgctxt "firststep"
+msgid "Do you want to automatically configure a pipeline?"
+msgstr "Möchten Sie automatisch eine Pipeline konfigurieren?"
 
 msgctxt "heading"
 msgid "Download a language model"
@@ -262,10 +281,86 @@ msgstr "Das Herunterladen gelang nicht"
 msgid "Download is done"
 msgstr "Das Herunterladen ist fertig"
 
+msgctxt "tooltip"
+msgid "Download this model from the Ollama library"
+msgstr "Dieses Modell aus der Ollama-Bibliothek herunterladen"
+
 #, python-format
 msgctxt "flash"
 msgid "Downloaded a language model: %(model)s"
 msgstr "Sprachmodell %(model)s heruntergeladen"
+
+msgctxt "tooltip"
+msgid "Enter the access token for the API, if required"
+msgstr "Zugriffstoken für die API eingeben, falls erforderlich"
+
+msgctxt "tooltip"
+msgid "Enter the directory path for data storage"
+msgstr "Verzeichnispfad für die Datenspeicherung eingeben"
+
+msgctxt "tooltip"
+msgid "Enter the network port for the internal vector store"
+msgstr "Netzwerkport für den internen Vektorspeicher eingeben"
+
+msgctxt "tooltip"
+msgid "Enter the network port for the user interface and the RAG service"
+msgstr "Netzwerkport für die Benutzeroberfläche und den RAG-Dienst eingeben"
+
+msgctxt "tooltip"
+msgid "Enter the public URL of the chat if it is served through a proxy"
+msgstr "Öffentliche URL des Chats eingeben, falls er über einen Proxy bereitgestellt wird"
+
+msgctxt "tooltip"
+msgid "Expand to add Jira projects"
+msgstr "Aufklappen, um Jira-Projekte hinzuzufügen"
+
+msgctxt "tooltip"
+msgid "Expand to add a Drupal site"
+msgstr "Aufklappen, um eine Drupal-Website hinzuzufügen"
+
+msgctxt "tooltip"
+msgid "Expand to add a MediaWiki site"
+msgstr "Aufklappen, um eine MediaWiki-Website hinzuzufügen"
+
+msgctxt "tooltip"
+msgid "Expand to add a SharePoint document library"
+msgstr "Aufklappen, um eine SharePoint-Dokumentbibliothek hinzuzufügen"
+
+msgctxt "tooltip"
+msgid "Expand to add a local file or directory"
+msgstr "Aufklappen, um eine lokale Datei oder ein Verzeichnis hinzuzufügen"
+
+msgctxt "tooltip"
+msgid "Expand to add a web page"
+msgstr "Aufklappen, um eine Webseite hinzuzufügen"
+
+msgctxt "tooltip"
+msgid "Expand to add and configure a new data source"
+msgstr "Aufklappen, um eine neue Datenquelle hinzuzufügen und zu konfigurieren"
+
+msgctxt "tooltip"
+msgid "Expand to add and configure a new language model"
+msgstr "Aufklappen, um ein neues Sprachmodell hinzuzufügen und zu konfigurieren"
+
+msgctxt "tooltip"
+msgid "Expand to add and configure a new pipeline"
+msgstr "Aufklappen, um eine neue Pipeline hinzuzufügen und zu konfigurieren"
+
+msgctxt "tooltip"
+msgid "Expand to browse and download a local language model"
+msgstr "Aufklappen, um ein lokales Sprachmodell auszuwählen und herunterzuladen"
+
+msgctxt "tooltip"
+msgid "Expand to connect an external language model via API"
+msgstr "Aufklappen, um ein externes Sprachmodell über eine API anzubinden"
+
+msgctxt "tooltip"
+msgid "Expand to select a previously downloaded model"
+msgstr "Aufklappen, um ein bereits heruntergeladenes Modell auszuwählen"
+
+msgctxt "tooltip"
+msgid "Expand to view advanced configuration options"
+msgstr "Aufklappen, um erweiterte Optionen anzuzeigen"
 
 msgid "Failed to connect to your Learn2RAG server"
 msgstr "Die Verbindung zu Ihrem Learn2RAG-Server ist nicht möglich"
@@ -327,6 +422,11 @@ msgctxt "form_label"
 msgid "Immediately start the data import and the chat interface"
 msgstr "Den Datenimport und Chat direkt starten"
 
+#, python-format
+msgctxt "tooltip"
+msgid "Import all documents from the %(docs_dir)s folder"
+msgstr "Alle Dokumente aus dem Ordner %(docs_dir)s importieren"
+
 msgctxt "button"
 msgid "Import and start chat"
 msgstr "Importieren und Chat starten"
@@ -353,7 +453,7 @@ msgstr "Kommentare einbeziehen"
 
 msgctxt "form_label"
 msgid "Internal vector store"
-msgstr ""
+msgstr "Interner Vektorspeicher"
 
 msgctxt "form_label:jira"
 msgid "Issue types"
@@ -472,7 +572,7 @@ msgstr "KI-Chat öffnen"
 
 msgctxt "header"
 msgid "Optimization"
-msgstr ""
+msgstr "Optimierung"
 
 msgid "Optional"
 msgstr "Optional"
@@ -569,11 +669,43 @@ msgstr "Speichern"
 
 msgctxt "label"
 msgid "Save"
-msgstr ""
+msgstr "Speichern"
+
+msgctxt "tooltip"
+msgid "Save this language model"
+msgstr "Dieses Sprachmodell speichern"
+
+msgctxt "tooltip"
+msgid "Save this pipeline"
+msgstr "Diese Pipeline speichern"
 
 msgctxt "button"
 msgid "Select all"
 msgstr "Alles auswählen"
+
+msgctxt "tooltip"
+msgid "Select all data sources"
+msgstr "Alle Datenquellen auswählen"
+
+msgctxt "tooltip"
+msgid "Select one of the downloaded Ollama language models"
+msgstr "Eines der heruntergeladenen Ollama-Sprachmodelle auswählen"
+
+msgctxt "tooltip"
+msgid "Select the API type of the language model provider"
+msgstr "API-Typ des Sprachmodell-Anbieters auswählen"
+
+msgctxt "tooltip"
+msgid "Select the language model to use for this pipeline"
+msgstr "Sprachmodell für diese Pipeline auswählen"
+
+msgctxt "tooltip"
+msgid "Set the interval in hours between scheduled data imports, 0 disables it"
+msgstr "Intervall in Stunden zwischen geplanten Datenimporten festlegen, 0 deaktiviert den automatischen Import"
+
+msgctxt "tooltip"
+msgid "Show all types of data sources you can add"
+msgstr "Alle Arten von Datenquellen anzeigen, die Sie hinzufügen können"
 
 msgctxt "button"
 msgid "Show debug log"
@@ -601,7 +733,7 @@ msgstr "Datenquellen"
 
 msgctxt "button"
 msgid "Start optimization"
-msgstr ""
+msgstr "Optimierung starten"
 
 msgctxt "tooltip"
 msgid "Start the AI chat. Requires import to be already completed."
@@ -656,7 +788,7 @@ msgstr "Zeilen insgesamt: %(amount)s"
 
 msgctxt "header"
 msgid "Training data"
-msgstr ""
+msgstr "Trainingsdaten"
 
 msgctxt "flash"
 msgid "Training data file saved"
@@ -669,6 +801,10 @@ msgstr "Unbekannt"
 msgctxt "button"
 msgid "Unselect all"
 msgstr "Alle Abwahl"
+
+msgctxt "tooltip"
+msgid "Unselect all data sources"
+msgstr "Auswahl aller Datenquellen aufheben"
 
 msgctxt "heading"
 msgid "Use previously downloaded model"
@@ -713,6 +849,15 @@ msgctxt "title"
 msgid "Welcome"
 msgstr "Wilkommen"
 
+#, python-format
+msgctxt "firststep"
+msgid "Yes, add my <code>%(docs_dir)s</code> folder"
+msgstr "Ja, meinen Ordner <code>%(docs_dir)s</code> hinzufügen"
+
+msgctxt "firststep"
+msgid "Yes, automatically configure a pipeline"
+msgstr "Ja, automatisch eine Pipeline konfigurieren"
+
 msgid "You and users will see this label."
 msgstr "Sie und die Benutzer sehen diesen Namen."
 
@@ -720,89 +865,90 @@ msgctxt "firststep"
 msgid "You do not have any data sources selected"
 msgstr "Sie haben keine Datenquellen ausgewählt."
 
-#~ msgid "Download failed"
-#~ msgstr ""
+msgctxt "firststep"
+msgid "You do not have any pipelines configured"
+msgstr "Sie haben noch keine Pipelines konfiguriert"
 
-#~ msgid "Download done"
-#~ msgstr ""
+#~ msgctxt "firststep"
+#~ msgid " Yes, add my <code>~/Documents</code> folder"
+#~ msgstr "Ja, füge meinen Ordner <code>~/Documents</code> hinzu."
 
-#~ msgctxt "form_placeholder"
-#~ msgid "My model"
-#~ msgstr "Mein Modell"
+#~ msgctxt "form_label"
+#~ msgid "Additional internal port"
+#~ msgstr ""
 
 #~ msgctxt "heading"
 #~ msgid "Connect or download a suggested language model"
 #~ msgstr "Sprachmodell anbinden oder herunterladen"
 
-#~ msgctxt "button"
-#~ msgid "Start"
-#~ msgstr ""
-
 #~ msgctxt "flash"
-#~ msgid "Started the pipeline"
-#~ msgstr "Pipeline gestartet"
+#~ msgid "Could not save the file"
+#~ msgstr "Die Datei konnte nicht gespeichert werden"
 
-#~ msgctxt "form_label"
-#~ msgid "RAG service"
-#~ msgstr ""
-
-#~ msgctxt "form_label"
-#~ msgid "Vector store"
-#~ msgstr ""
-
-#~ msgid "You can always do the data import later."
-#~ msgstr "Sie können den Datenimport auch später starten."
-
-#~ msgctxt "column_heading"
-#~ msgid "Path"
-#~ msgstr "Pfad"
-
-#~ msgctxt "column_heading"
-#~ msgid "Storage directory path"
-#~ msgstr "Speicherpfad"
+#~ msgctxt "status"
+#~ msgid "Currently running: %(pipeline)s"
+#~ msgstr "Derzeit läuft: %(pipeline)s"
 
 #~ msgctxt "column_heading"
 #~ msgid "Data sources"
 #~ msgstr "Datenquellen"
 
-#~ msgctxt "column_heading"
-#~ msgid "Ports"
-#~ msgstr "Ports"
-
-#~ msgctxt "column_heading"
-#~ msgid "Status"
-#~ msgstr "Status"
-
 #~ msgctxt "tooltip"
-#~ msgid "succeeded"
-#~ msgstr "erfolgreich"
+#~ msgid "Do the import once and stop"
+#~ msgstr ""
 
-#~ msgctxt "tooltip"
-#~ msgid "failed"
-#~ msgstr "fehlgeschlagen"
+#~ msgid "Download done"
+#~ msgstr ""
 
-#~ msgctxt "button"
-#~ msgid "Open"
-#~ msgstr "Öffnen"
-
-#~ msgctxt "button"
-#~ msgid "More"
-#~ msgstr "Mehr"
-
-#~ msgctxt "heading"
-#~ msgid "Sharepoint"
+#~ msgid "Download failed"
 #~ msgstr ""
 
 #~ msgctxt "heading"
 #~ msgid "Drupal"
 #~ msgstr ""
 
-#~ msgctxt "tooltip"
-#~ msgid "Do the import once and stop"
+#~ msgctxt "form_label"
+#~ msgid "Internal RAG service"
 #~ msgstr ""
 
 #~ msgctxt "button"
+#~ msgid "More"
+#~ msgstr "Mehr"
+
+#~ msgctxt "form_placeholder"
+#~ msgid "My model"
+#~ msgstr "Mein Modell"
+
+#~ msgctxt "button"
 #~ msgid "One time import"
+#~ msgstr ""
+
+#~ msgctxt "button"
+#~ msgid "Open"
+#~ msgstr "Öffnen"
+
+#~ msgctxt "button"
+#~ msgid "Optimization"
+#~ msgstr ""
+
+#~ msgctxt "column_heading"
+#~ msgid "Path"
+#~ msgstr "Pfad"
+
+#~ msgctxt "column_heading"
+#~ msgid "Ports"
+#~ msgstr "Ports"
+
+#~ msgctxt "form_label"
+#~ msgid "RAG service"
+#~ msgstr ""
+
+#~ msgctxt "heading"
+#~ msgid "Sharepoint"
+#~ msgstr ""
+
+#~ msgctxt "button"
+#~ msgid "Start"
 #~ msgstr ""
 
 #~ msgctxt "button"
@@ -817,34 +963,37 @@ msgstr "Sie haben keine Datenquellen ausgewählt."
 #~ msgid "Start the AI chat. Requires import to be already completed"
 #~ msgstr ""
 
-#~ msgctxt "form_label"
-#~ msgid "Additional internal port"
-#~ msgstr ""
-
-#~ msgctxt "form_label"
-#~ msgid "Internal RAG service"
-#~ msgstr ""
-
 #~ msgctxt "flash"
-#~ msgid "Could not save the file"
-#~ msgstr "Die Datei konnte nicht gespeichert werden"
+#~ msgid "Started the pipeline"
+#~ msgstr "Pipeline gestartet"
 
-#~ msgctxt "status"
-#~ msgid "Currently running: %(pipeline)s"
-#~ msgstr "Derzeit läuft: %(pipeline)s"
+#~ msgctxt "column_heading"
+#~ msgid "Status"
+#~ msgstr "Status"
 
-#~ msgid "running"
-#~ msgstr "läuft"
+#~ msgctxt "column_heading"
+#~ msgid "Storage directory path"
+#~ msgstr "Speicherpfad"
 
 #~ msgctxt "form_label"
 #~ msgid "User interface"
 #~ msgstr ""
 
-#~ msgctxt "button"
-#~ msgid "Optimization"
+#~ msgctxt "form_label"
+#~ msgid "Vector store"
 #~ msgstr ""
 
-#~ msgctxt "firststep"
-#~ msgid " Yes, add my <code>~/Documents</code> folder"
-#~ msgstr "Ja, füge meinen Ordner <code>~/Documents</code> hinzu."
+#~ msgid "You can always do the data import later."
+#~ msgstr "Sie können den Datenimport auch später starten."
+
+#~ msgctxt "tooltip"
+#~ msgid "failed"
+#~ msgstr "fehlgeschlagen"
+
+#~ msgid "running"
+#~ msgstr "läuft"
+
+#~ msgctxt "tooltip"
+#~ msgid "succeeded"
+#~ msgstr "erfolgreich"
 

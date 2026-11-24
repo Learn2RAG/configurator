@@ -6,9 +6,9 @@
     - ansible.builtin.git:
         repo: 'https://github.com/learn2rag/configurator'
         dest: '{{ learn2rag_dir }}'
-        version: 'release/v1.0'
+        version: 'master'
       register: repo
-    - ansible.builtin.command: ./install
+    - ansible.builtin.command: 'UV_NO_CONFIG=1 ./install'
       args:
         chdir: '{{ learn2rag_dir }}'
       when: repo is changed or repo is skipped

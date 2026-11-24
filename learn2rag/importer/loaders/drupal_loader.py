@@ -85,7 +85,7 @@ def _fetch_oauth_token(base_url: str, entry_config: Dict[str, Any]) -> str:
         payload["scope"] = str(scope)
 
     try:
-        response = requests.post(token_url, data=payload, auth=(client_id, client_secret), timeout=15)
+        response = requests.post(token_url, data=payload, auth=(client_id, client_secret), timeout=180)
         response.raise_for_status()
         access_token = response.json().get("access_token")
     except (requests.exceptions.RequestException, ValueError) as e:

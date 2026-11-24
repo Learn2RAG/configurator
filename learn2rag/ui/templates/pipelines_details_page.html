@@ -1,3 +1,5 @@
+{% from 'macros.html' import pipeline_current_status with context %}
+
 {% macro pipeline_start(name, project, label, description) %}
 <form class="mb-2" method="POST" action="{{ url_for('pipeline_action', name=name) }}">
   <button class="btn btn-primary" type="submit" name="action" value="start:{{ project.name }}" title="{{description}}">{{label}}</button>
@@ -217,7 +219,7 @@
   <p>
     <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove all data stored for this pipeline: %(label)s?', label=pipeline.label)}}">
       <input type="hidden" name="action" value="clean"/>
-      <button type="submit" class="btn btn-danger">
+      <button type="submit" class="btn btn-danger" title="{{pgettext('tooltip', 'Delete the imported data of this pipeline but keep its configuration')}}">
         {{pgettext('button', 'Remove the stored data')}}
       </button>
     </form>
@@ -225,7 +227,7 @@
   <p>
     <form method="POST" action="{{ url_for('pipeline_action', name=name) }}" hx-boost="true" hx-confirm="{{gettext('Are you sure you want to remove this pipeline configuration and all its stored data: %(label)s?', label=pipeline.label)}}">
       <input type="hidden" name="action" value="delete"/>
-      <button type="submit" class="btn btn-danger">
+      <button type="submit" class="btn btn-danger" title="{{pgettext('tooltip', 'Delete the imported data and the pipeline configuration')}}">
         {{pgettext('button', 'Remove the stored data and the pipeline')}}
       </button>
     </form>
