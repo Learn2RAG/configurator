@@ -1,21 +1,28 @@
 #!/bin/sh
 set -eux
 PYBABEL="uv run pybabel"
-POT="learn2rag/ui/messages.pot"
-PO_DIR="learn2rag/ui/translations"
-$PYBABEL extract --mapping-file=learn2rag/ui/babel.cfg \
-         --add-comments="TRANSLATORS:" \
-         --no-location \
-         --no-wrap \
-         --sort-output \
-         --output-file="$POT" learn2rag/ui
 
-$PYBABEL update --input-file="$POT" \
-         --ignore-pot-creation-date \
-         --no-fuzzy-matching \
-         --no-wrap \
-         --output-dir="$PO_DIR"
+update_catalog() {
+    MODULE_DIR="$1"
+    POT="$MODULE_DIR/messages.pot"
+    PO_DIR="$MODULE_DIR/translations"
+    $PYBABEL extract --mapping-file="$MODULE_DIR/babel.cfg" \
+             --add-comments="TRANSLATORS:" \
+             --no-location \
+             --no-wrap \
+             --sort-output \
+             --output-file="$POT" "$MODULE_DIR"
 
-sed -i -E '/^"(POT-Creation-Date|PO-Revision-Date): /d' "$POT" "$PO_DIR"/*/LC_MESSAGES/messages.po
+    $PYBABEL update --input-file="$POT" \
+             --ignore-pot-creation-date \
+             --no-fuzzy-matching \
+             --no-wrap \
+             --output-dir="$PO_DIR"
 
-$PYBABEL compile --directory=learn2rag/ui/translations
+    sed -i -E '/^"(POT-Creation-Date|PO-Revision-Date): /d' "$POT" "$PO_DIR"/*/LC_MESSAGES/messages.po
+
+    $PYBABEL compile --directory="$PO_DIR"
+}
+
+update_catalog learn2rag/ui
+update_catalog learn2rag/userui

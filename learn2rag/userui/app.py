@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import auth, chat
+from .ai_notice import ai_notice, select_language
 from .constants import SESSION_USER_AUTHS
 from ..bootstrap import setup_fastapi as learn2rag_bootstrap_setup
 from ..pipeline import api
@@ -84,7 +85,10 @@ def build_app(
 
     @app.get('/')
     async def index(request: Request) -> HTMLResponse:
+        language = select_language(request.headers.get('accept-language'))
         return templates.TemplateResponse(request, 'index.html', context={
+            'html_lang': language,
+            'ai_notice': ai_notice(language),
             'auth_prefix': auth_prefix,
             'auth_routers': auth_router.auth_routers,
             'user_auths': request.session.get(SESSION_USER_AUTHS, {}),
