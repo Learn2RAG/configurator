@@ -164,7 +164,6 @@ def ragas_llm_from_env() -> Any:     #ragas.metrics.collections doesn't support 
 
     if llm_id == FakeClient.ID:
         return None
-    
     url = os.environ.get('LLM_API_URL')
     token = os.environ.get('LLM_API_TOKEN') or None
     model = os.environ.get('LLM_API_MODEL')
@@ -172,7 +171,7 @@ def ragas_llm_from_env() -> Any:     #ragas.metrics.collections doesn't support 
     if url is None or model is None:
         raise ValueError("LLM_API_URL and LLM_API_MODEL must be configured.")
 
-    if llm_id == OllamaClient.ID:        
+    if llm_id == OllamaClient.ID:
         url = f"{url.rstrip('/')}/v1"
         token = token or 'ollama'
 

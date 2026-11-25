@@ -572,7 +572,7 @@ def create_app(config: dict[str, Any]={}) -> Flask:
         projects = Project.get_all()  # FIXME: only get one
         import_state = ImportState(str(storage_path / 'import_state.json'))
         import_succeeded_once = any(import_state.get_last_import_time(source) for source in pipeline['sources'])
-        allow_open_chat = projects[name].health and import_succeeded_once
+        allow_open_chat = name in projects and projects[name].health and import_succeeded_once
         try:
             training_dataset = read_dataset_qa(storage_path / 'training.csv', 'train')
             training_examples = training_dataset.select(range(min(3, len(training_dataset))))

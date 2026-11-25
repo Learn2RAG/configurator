@@ -18,7 +18,7 @@ from smac import HyperparameterOptimizationFacade, Scenario
 
 from learn2rag.evaluation.tools import read_dataset_qa
 from learn2rag.pipeline.config import opt_config
-from learn2rag.pipeline.llm import llm as learn2rag_llm
+from learn2rag.pipeline.llm import get_llm
 from langchain_core.messages import HumanMessage
 import learn2rag.pipeline.search
 import learn2rag.pipeline.generate
@@ -81,7 +81,7 @@ encoder = SentenceTransformer("all-MiniLM-L6-v2")
 
 
 def call_llm(prompt, max_tokens=512):
-    response = learn2rag_llm.invoke([HumanMessage(content=prompt)], max_tokens=max_tokens)
+    response = get_llm().invoke([HumanMessage(content=prompt)], max_tokens=max_tokens)
     return response.content.strip()
 
 

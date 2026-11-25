@@ -8,11 +8,11 @@
   </div>
   <div class="mb-3">
     <label for="url" class="form-label">{{pgettext('form_label', 'Storage directory path')}}</label>
-    <input type="text" pattern="\S(?:.*\S)?" required="required" class="form-control" name="storage_path" value="{{default_storage_prefix}}{{current_timestamp}}" data-default-prefix="{{default_storage_prefix}}"/>
+    <input type="text" pattern="\S(?:.*\S)?" required="required" class="form-control" name="storage_path" value="{{default_storage_prefix}}{{current_timestamp}}" data-default-prefix="{{default_storage_prefix}}" title="{{pgettext('tooltip', 'Enter the directory path for data storage')}}"/>
   </div>
   <div class="mb-3">
     <label for="language_model" class="form-label">{{pgettext('form_label', 'Language model')}}</label>
-    <select class="form-select" name="language_model">
+    <select class="form-select" name="language_model" title="{{pgettext('tooltip', 'Select the language model to use for this pipeline')}}">
       {% for name, language_model in models.items() %}
       <option value="{{ name }}">{{ language_model.label }} ({{ language_model.model }})</option>
       {% endfor %}
@@ -20,10 +20,10 @@
   </div>
   <div class="mb-3">
     {{pgettext('form_label', 'Data sources')}}
-    <button type="button" class="btn btn-secondary select-sources" data-value="1">
+    <button type="button" class="btn btn-secondary select-sources" data-value="1" title="{{pgettext('tooltip', 'Select all data sources')}}">
       {{pgettext('button', 'Select all')}}
     </button>
-    <button type="button" class="btn btn-secondary select-sources" data-value="0">
+    <button type="button" class="btn btn-secondary select-sources" data-value="0" title="{{pgettext('tooltip', 'Unselect all data sources')}}">
       {{pgettext('button', 'Unselect all')}}
     </button>
     {% for name, source in sources.items() %}
@@ -34,7 +34,7 @@
     {% endfor %}
   </div>
   <div class="mb-3">
-    <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target=".advanced-configuration">
+    <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target=".advanced-configuration" title="{{pgettext('tooltip', 'Expand to view advanced configuration options')}}">
       {{gettext('Advanced configuration')}}
     </button>
   </div>
@@ -44,11 +44,12 @@
       <input class="form-control" name="import_schedule_interval_hours"
              type="number" min="0" step="any"
              value="12"
+             title="{{pgettext('tooltip', 'Set the interval in hours between scheduled data imports, 0 disables it')}}"
              />
     </div>
     <div class="mb-3">
       <label for="ports" class="form-label">{{pgettext('form_label', 'Chat proxy URL')}}</label>
-      <input class="form-control" name="chat_proxy_url" type="url">
+      <input class="form-control" name="chat_proxy_url" type="url" title="{{pgettext('tooltip', 'Enter the public URL of the chat if it is served through a proxy')}}">
     </div>
     <label for="ports" class="form-label">{{pgettext('form_label', 'Ports')}}</label>
     <small class="text-body-secondary">{{gettext('Optional')}}</small>
@@ -56,11 +57,11 @@
     </div>
     {# TODO: labels in the interface currently assume a specific port order in all corresponding .yml files #}
     <div class="form-floating mb-3">
-      <input class="form-control" name="ports" type="number" min="1" max="65535">
+      <input class="form-control" name="ports" type="number" min="1" max="65535" title="{{pgettext('tooltip', 'Enter the network port for the user interface and the RAG service')}}">
       <label for="ports" class="form-label">{{pgettext('form_label', 'User interface and RAG service')}}</label>
     </div>
     <div class="form-floating mb-3">
-      <input class="form-control" name="ports" type="number" min="1" max="65535">
+      <input class="form-control" name="ports" type="number" min="1" max="65535" title="{{pgettext('tooltip', 'Enter the network port for the internal vector store')}}">
       <label for="ports">{{pgettext('form_label', 'Internal vector store')}}</label>
     </div>
   </div>
@@ -72,7 +73,7 @@
       </label>
     </div>
   </div>
-  <button type="submit" class="btn btn-primary">{{pgettext('button', 'Save')}}</button>
+  <button type="submit" class="btn btn-primary" title="{{pgettext('tooltip', 'Save this pipeline')}}">{{pgettext('button', 'Save')}}</button>
 </form>
 
 <script>
