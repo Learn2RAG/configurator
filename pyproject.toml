@@ -238,6 +238,16 @@ log_cli = true
 log_cli_level = "DEBUG"
 strict = true
 testpaths = "learn2rag"
+[tool.ruff.lint]
+ignore = [
+    "BLE001",  # Do not catch blind exception
+    "C901",  # is too complex
+    "E501",  # Line too long
+    "I001",  # Import block is un-sorted or un-formatted
+    "LOG015",  # call on root logger
+    "RUF022",  # `__all__` is not sorted
+    "TRY002",  # Create your own exception
+]
 [tool.setuptools]
 include-package-data = true
 [tool.setuptools.package-data]
