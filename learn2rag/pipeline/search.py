@@ -25,6 +25,8 @@ from .config import opt_config, user_config
 from .embeddings import create_embeddings
 from .qdrant import Qdrant
 from . import rewrite
+from .judges import judge_context_relevance
+
 
 logger = logging.getLogger(__name__)
 profilingLogger = logging.getLogger('profiling')
@@ -731,73 +733,90 @@ async def search_authorized(
     top_k = opt_config.get("top_k", 10)
     max_search_rounds = _read_max_search_rounds(opt_config)
     fusion_params = _read_fusion_params(opt_config)
-    queries = await _build_queries(question, history, opt_config, request_id=request_id)
-    embeddings = await asyncio.to_thread(_embed_queries, queries, opt_config)
-    colbert_query = await asyncio.to_thread(_colbert_rerank_vector, queries, embeddings, opt_config)
+    for judge_attempt in range(2 if opt_config.get("context_relevance_judge", False) else 1):  # Context Relevance Judge
+        search_config = opt_config.copy()
+        if judge_attempt:
+            logging.info("Retrying context relevance")
+            search_config["rewrite"] = "True"
+        queries = await _build_queries(question, history, search_config, request_id=request_id)
+        embeddings = await asyncio.to_thread(_embed_queries, queries, opt_config)
+        colbert_query = await asyncio.to_thread(_colbert_rerank_vector, queries, embeddings, opt_config)
 
-    checked: dict[tuple[str, str], bool] = {}
-    authorized_points: list[ScoredPoint] = []
-    delivered_ids: list[models.ExtendedPointId] = []
-    rejected: dict[tuple[str, str], models.Filter | None] = {}
-    n_pool = n_checked = rounds = 0
-    stop_reason = "max_rounds"
-    while rounds < max_search_rounds:
-        rounds += 1
-        excluded_documents = [condition for condition in rejected.values() if condition is not None]
-        exclusion = _exclusion_filter(delivered_ids, excluded_documents)
-        root = _build_prefetch_tree(embeddings, opt_config, fusion_params, exclusion)
-        pool = await asyncio.to_thread(_retrieve_pool, root, user_config, opt_config, request_id=request_id)
-        if pool:
-            pool = await asyncio.to_thread(
-                _rerank_pool, queries.question, pool, user_config, opt_config,
-                colbert_query=colbert_query, request_id=request_id)
+        checked: dict[tuple[str, str], bool] = {}
+        authorized_points: list[ScoredPoint] = []
+        delivered_ids: list[models.ExtendedPointId] = []
+        rejected: dict[tuple[str, str], models.Filter | None] = {}
+        n_pool = n_checked = rounds = 0
+        stop_reason = "max_rounds"
+        while rounds < max_search_rounds:
+            rounds += 1
+            excluded_documents = [condition for condition in rejected.values() if condition is not None]
+            exclusion = _exclusion_filter(delivered_ids, excluded_documents)
+            root = _build_prefetch_tree(embeddings, opt_config, fusion_params, exclusion)
+            pool = await asyncio.to_thread(_retrieve_pool, root, user_config, opt_config, request_id=request_id)
+            if pool:
+                pool = await asyncio.to_thread(
+                    _rerank_pool, queries.question, pool, user_config, opt_config,
+                    colbert_query=colbert_query, request_id=request_id)
 
-        n_authorized_before = len(authorized_points)
-        n_round_checked = 0
-        for start in range(0, len(pool), top_k):
-            block = pool[start:start + top_k]
-            authorized_points += await filter_authorized_cached(user_auths, block, checked)
-            n_round_checked += len(block)
-            if len(authorized_points) >= top_k:
+            n_authorized_before = len(authorized_points)
+            n_round_checked = 0
+            for start in range(0, len(pool), top_k):
+                block = pool[start:start + top_k]
+                authorized_points += await filter_authorized_cached(user_auths, block, checked)
+                n_round_checked += len(block)
+                if len(authorized_points) >= top_k:
+                    break
+            n_pool += len(pool)
+            n_checked += n_round_checked
+
+            profilingLogger.info(
+                "search_round round=%d pool=%d checked=%d authorized=%d excluded_points=%d excluded_documents=%d",
+                rounds,
+                len(pool),
+                n_round_checked,
+                len(authorized_points) - n_authorized_before,
+                len(delivered_ids),
+                len(excluded_documents),
+                extra={'activity': 'search_authorized', 'request_id': request_id},
+            )
+            if not pool:
+                stop_reason = "exhausted"
                 break
-        n_pool += len(pool)
-        n_checked += n_round_checked
+            if len(authorized_points) >= top_k:
+                stop_reason = "top_k"
+                break
+
+            # Not enough authorized points: the whole pool is checked.
+            delivered_ids += [point.id for point in pool]
+            for point in pool:
+                if not point.payload:
+                    continue
+                key = (await _get_loader_id(point), await _get_doc_id(point))
+                if checked.get(key) is False and key not in rejected:
+                    rejected[key] = _document_exclusion(point)
 
         profilingLogger.info(
-            "search_round round=%d pool=%d checked=%d authorized=%d excluded_points=%d excluded_documents=%d",
+            "authorization_checked pool=%d checked=%d documents=%d authorized=%d top_k=%d rounds=%d stop_reason=%s",
+            n_pool,
+            n_checked,
+            len(checked),
+            len(authorized_points),
+            top_k,
             rounds,
-            len(pool),
-            n_round_checked,
-            len(authorized_points) - n_authorized_before,
-            len(delivered_ids),
-            len(excluded_documents),
+            stop_reason,
             extra={'activity': 'search_authorized', 'request_id': request_id},
         )
-        if not pool:
-            stop_reason = "exhausted"
-            break
-        if len(authorized_points) >= top_k:
-            stop_reason = "top_k"
-            break
+        documents = authorized_points[:top_k]
+        if not opt_config.get("context_relevance_judge", False):
+            return documents
 
-        # Not enough authorized points: the whole pool is checked.
-        delivered_ids += [point.id for point in pool]
-        for point in pool:
-            if not point.payload:
-                continue
-            key = (await _get_loader_id(point), await _get_doc_id(point))
-            if checked.get(key) is False and key not in rejected:
-                rejected[key] = _document_exclusion(point)
+        context_relevance_score = await judge_context_relevance(
+            question=queries.question,
+            documents=documents,
+        )
+        logging.info("Context relevance score: %s", context_relevance_score)
+        if context_relevance_score >= opt_config["judge_threshold"]:
+            return documents
 
-    profilingLogger.info(
-        "authorization_checked pool=%d checked=%d documents=%d authorized=%d top_k=%d rounds=%d stop_reason=%s",
-        n_pool,
-        n_checked,
-        len(checked),
-        len(authorized_points),
-        top_k,
-        rounds,
-        stop_reason,
-        extra={'activity': 'search_authorized', 'request_id': request_id},
-    )
-    return authorized_points[:top_k]
+    return documents
