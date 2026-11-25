@@ -1,10 +1,13 @@
 from qdrant_client.models import ScoredPoint
-from ragas.embeddings import embedding_factory
+from ragas.embeddings.base import embedding_factory
 from ragas.metrics.collections import AnswerRelevancy, ContextRelevance
 
 from .config import opt_config
-from .llm import ragas_llm
+from .llm import ragas_llm_from_env
+import os
 #import logging
+
+ragas_llm = ragas_llm_from_env() if "LLM_API_TYPE" in os.environ else None
 
 context_relevance_scorer: ContextRelevance | None
 answer_relevance_scorer: AnswerRelevancy | None

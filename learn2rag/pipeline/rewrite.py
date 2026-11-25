@@ -6,7 +6,7 @@ import os
 import time
 from .chat import Message
 from .generate import select_history
-from .llm import llm
+from .llm import get_llm
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ def _env_float(name: str, default: float) -> float:
 
 
 def _invoke_llm(messages: list[SystemMessage | HumanMessage], *, purpose: str) -> str:
+    llm = get_llm()
     if llm is None:
         return ''
 
@@ -79,7 +80,7 @@ except FileNotFoundError:
     synonym_list = ''
 
 def rewrite_query(user_query: str) -> str:
-    if llm is None:
+    if get_llm() is None:
         return ''
     system_message_rewrite_query = """
     You are a query rewriter for a RAG pipeline.
@@ -100,7 +101,7 @@ def rewrite_query(user_query: str) -> str:
 
 
 def generate_subqueries(user_query: str, n: int=3) -> list[str]:
-    if llm is None:
+    if get_llm() is None:
         return []
     system_message_generate_subqueries = f"""
     You are a query rewriter for a RAG pipeline.
@@ -143,7 +144,7 @@ def _format_history_transcript(history: Sequence[Message], opt_config: dict[str,
 
 
 def contextualize_query(question: str, history: Sequence[Message], opt_config: dict[str, Any]) -> str:
-    if llm is None:
+    if get_llm() is None:
         return ''
 
     transcript = _format_history_transcript(history, opt_config)
@@ -171,7 +172,7 @@ def contextualize_query(question: str, history: Sequence[Message], opt_config: d
 
 
 def generate_keywords(user_query: str, n: int=3) -> list[str]:
-    if llm is None:
+    if get_llm() is None:
         return []
     system_message_generate_keywords = f"""
     You are a keyword extractor for a RAG pipeline.

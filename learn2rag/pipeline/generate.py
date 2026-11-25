@@ -5,9 +5,8 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from qdrant_client.http.models import ScoredPoint
 from .chat import ASSISTANT_ROLES, Message
-from .llm import llm
+from .llm import get_llm
 from .judges import judge_answer_relevance
-
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +78,7 @@ def build_context(search_results: Sequence[ScoredPoint]) -> str:
 
 
 async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> Any:
+    llm = get_llm()
     assert llm is not None
     if hasattr(search_results, "points"):
         search_results = search_results.points
@@ -86,12 +86,12 @@ async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config
 
     chain = build_prompt(opt_config) | llm
     answer = (await chain.ainvoke({
-        "context": context,
-        "question": query,
-        "history": select_history(history, opt_config),
-    })).content
-    assert isinstance(answer, str)
+            "context": context,
+            "question": query,
+            "history": select_history(history, opt_config),
+        })).content
     if opt_config.get("answer_relevance_judge", False):  #Answer relevance judge
+        assert isinstance(answer, str)
         answer_relevance_score = await judge_answer_relevance(
             question = query,
             answer = answer,
@@ -108,8 +108,8 @@ async def generate(query: str, search_results: Sequence[ScoredPoint], opt_config
     return answer
 
 
-
 async def generate_stream(query: str, search_results: list[ScoredPoint], opt_config: dict[str, Any], history: Sequence[Message] = ()) -> AsyncGenerator[str, None]:
+    llm = get_llm()
     assert llm is not None
 
     if hasattr(search_results, "points"):

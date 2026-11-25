@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 import httpx
 from pydantic import SecretStr
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -8,7 +9,6 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from typing import Any, ClassVar
-
 from openai import AsyncOpenAI
 from ragas.llms import llm_factory
 
@@ -140,7 +140,26 @@ def chat_model_from_env() -> BaseChatModel:
     logger.debug('Using LLM args: %s', llm_kwargs)
     return llms[llm_id](**llm_kwargs).chat_model
 
-def ragas_llm_from_env() -> Any:     #ragas.metrics.collections doesn't support LangchainLLMWrapper
+
+_llm: BaseChatModel | None = None
+_llm_initialized = False
+_llm_lock = threading.Lock()
+
+
+def get_llm() -> BaseChatModel | None:
+    '''Lazy initialization of the LLM.'''
+    global _llm, _llm_initialized
+    if not _llm_initialized:
+        with _llm_lock:
+            if not _llm_initialized:
+                if 'LLM_API_TYPE' in os.environ:
+                    _llm = chat_model_from_env()
+                else:
+                    logger.warning('LLM is not configured')
+                _llm_initialized = True
+    return _llm
+
+def ragas_llm_from_env() -> Any:     #ragas.metrics.collections doesn't support LangchainLLMWrapper (deprecated)
     llm_id = os.environ.get('LLM_API_TYPE', OpenAIClient.ID)
 
     if llm_id == FakeClient.ID:
@@ -166,8 +185,3 @@ def ragas_llm_from_env() -> Any:     #ragas.metrics.collections doesn't support 
         model,
         client=client,
     )
-
-llm = chat_model_from_env() if 'LLM_API_TYPE' in os.environ else None
-ragas_llm = ragas_llm_from_env() if 'LLM_API_TYPE' in os.environ else None
-if not llm:
-    logger.warning('LLM is not configured')
