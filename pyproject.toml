@@ -249,5 +249,6 @@ where = ["."]
 [dependency-groups]
 dev = [
     "pandas-stubs (>=3.0.0.260204,<4.0.0.0)",
+    "ruff>=0.17.6",
     "yamllint>=1.38.0",
 ]
