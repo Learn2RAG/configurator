@@ -1,5 +1,5 @@
 from qdrant_client.models import ScoredPoint
-from ragas.embeddings.base import embedding_factory
+from ragas.embeddings import HuggingFaceEmbeddings
 from ragas.metrics.collections import AnswerRelevancy, ContextRelevance
 
 from .config import opt_config
@@ -13,7 +13,7 @@ context_relevance_scorer: ContextRelevance | None
 answer_relevance_scorer: AnswerRelevancy | None
 
 if ragas_llm is not None:
-    embeddings = embedding_factory("huggingface", model = opt_config["embedding_model"]) # type: ignore[no-untyped-call]
+    embeddings = HuggingFaceEmbeddings(model = opt_config["embedding_model"])
     context_relevance_scorer = ContextRelevance(llm = ragas_llm)
     answer_relevance_scorer = AnswerRelevancy(llm = ragas_llm, embeddings = embeddings)
 else:
