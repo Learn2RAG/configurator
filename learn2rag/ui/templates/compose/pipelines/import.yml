@@ -141,3 +141,5 @@ services:
       LLM_API_URL: '{{ language_model.url }}'
       LLM_API_TOKEN: '{{language_model.token}}'
       LLM_API_MODEL: '{{language_model.model}}'
+      LLM_API_REASONING: '{{ language_model.reasoning if language_model.reasoning is defined else "" }}'
+      LLM_API_NUM_CTX: '{{ language_model.num_ctx if language_model.num_ctx is defined else "" }}'

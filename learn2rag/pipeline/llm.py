@@ -61,7 +61,7 @@ class OpenAIClient(LLMClient):
     ID = 'ChatOpenAI'
     LABEL = 'OpenAI'
 
-    def __init__(self, *, url: str, token: SecretStr, model: str, proxy: str | None) -> None:
+    def __init__(self, *, url: str, token: SecretStr, model: str, proxy: str | None, **_: Any) -> None:
         self.chat_model = ChatOpenAI(
             model=model,
             temperature=0,
@@ -76,11 +76,19 @@ class OllamaClient(LLMClient):
     ID = 'ChatOllama'
     LABEL = 'Ollama'
 
-    def __init__(self, *, url: str, token: str | None, model: str, proxy: str | None) -> None:
+    def __init__(self, *, url: str, token: str | None, model: str, proxy: str | None,
+                 reasoning: bool | str | None = None, num_ctx: int | None = None) -> None:
+        # None means: use the model/Ollama default
+        extra: dict[str, Any] = {}
+        if reasoning is not None:
+            extra['reasoning'] = reasoning
+        if num_ctx is not None:
+            extra['num_ctx'] = num_ctx
         self.chat_model = ChatOllama(
             model=model,
             temperature=0,
             base_url=url,
+            **extra,
             client_kwargs={
                 'headers': {'Authorization': f'Bearer {token}'} if token else {},
                 'proxy': proxy,
@@ -121,8 +129,32 @@ class FakeClient(LLMClient):
     ID = 'ChatFake'
     LABEL = None
 
-    def __init__(self, *, url: str, token: str | None, model: str, proxy: str | None) -> None:
+    def __init__(self, *, url: str, token: str | None, model: str, proxy: str | None, **_: Any) -> None:
         self.chat_model = TestFakeChatModel()
+
+
+def _parse_reasoning(value: str | None) -> bool | str | None:
+    '''"true"/"false" -> bool, "low"/"medium"/"high" -> str, empty/"none"/invalid -> None (model default)'''
+    if not value or value.lower() == 'none':
+        return None
+    v = value.lower()
+    if v in ('true', 'false'):
+        return v == 'true'
+    if v in ('low', 'medium', 'high'):
+        return v
+    logger.warning('Invalid LLM_API_REASONING=%r. Using the model default.', value)
+    return None
+
+
+def _parse_int(name: str) -> int | None:
+    value = os.environ.get(name)
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning('Invalid integer for %s=%r. Ignoring.', name, value)
+        return None
 
 
 def chat_model_from_env() -> BaseChatModel:
@@ -135,6 +167,8 @@ def chat_model_from_env() -> BaseChatModel:
         'token': os.environ.get('LLM_API_TOKEN') or None,
         'model': os.environ.get('LLM_API_MODEL'),
         'proxy': os.environ.get('LLM_API_PROXY') or None,
+        'reasoning': _parse_reasoning(os.environ.get('LLM_API_REASONING')),
+        'num_ctx': _parse_int('LLM_API_NUM_CTX'),
     }
     logger.debug('Using LLM args: %s', llm_kwargs)
     return llms[llm_id](**llm_kwargs).chat_model
